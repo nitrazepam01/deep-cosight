@@ -95,6 +95,23 @@ body {
     text-overflow: ellipsis;
 }
 
+/* 展开时添加淡入效果，收起时淡出 */
+.sidebar-left .logo-text,
+.sidebar-left .section-title,
+.sidebar-left .folder-item-name,
+.sidebar-left .thread-item-title {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.sidebar-left:not(.collapsed) .logo-text,
+.sidebar-left:not(.collapsed) .section-title,
+.sidebar-left:not(.collapsed) .folder-item-name,
+.sidebar-left:not(.collapsed) .thread-item-title {
+    opacity: 1;
+    transition-delay: 0.15s; /* 等侧边栏展开后再显示文字 */
+}
+
 .sidebar-header {
     display: flex;
     align-items: center;
