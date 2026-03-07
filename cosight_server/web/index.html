@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Co-Sight 超级智能体</title>
+    <link rel="icon" href="favicon.ico">
+
+    <script src="libs/d3.v7.min.js"></script>
+    <script src="libs/marked.min.js"></script>
+    <link href="libs/fontawesome-6.7.2/css/all.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="styles/styles.css">
+    <link rel="stylesheet" href="styles/md.css">
+    
+    <!-- 页面刷新时清空localStorage -->
+    <script>
+        // 页面刷新时清空localStorage中的所有内容
+        localStorage.clear();
+        console.log('页面刷新，已清空localStorage');
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-robot"></i> Co-Sight 超级智能体</h1>
+            <button class="btn-settings" onclick="SettingsService.open()" title="设置">
+                <i class="fas fa-cog"></i>
+            </button>
+            <button class="btn-replay-history" onclick="goToReplayHistory()" title="查看历史回放">
+                <i class="fas fa-history"></i>
+            </button>
+            <!-- <p>DAG流程展示与进度跟踪</p> -->
+        </div>
+
+        <div class="initial-input-container">
+            <!-- 欢迎标语 -->
+            <div class="welcome-message">
+                <p class="welcome-title">你好，</p>
+                <p class="welcome-subtitle">今天有什么可以帮到你？</p>
+            </div>
+
+            <div class="initial-input-field-container">
+                <!-- <textarea class="initial-textarea" placeholder="请输入你的任务..." id="initial-message-input" rows="3">请分析2025年江苏足球联赛中各个足球队的表现分析这些球队的强项弱项等，然后预测一下最终的比赛成绩，生成一个对应的报告</textarea> -->
+                <textarea class="initial-textarea" placeholder="请输入你的任务..." id="initial-message-input" rows="3"></textarea>
+                <button class="initial-send-button" id="initial-send-button">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="middle-container">
+
+            <div class="left-container">
+                <div class="progress-overview">
+                    <div class="left-header" id="title-container" style="opacity: 0;">
+                        <h3 id="dynamic-title">江苏足球联赛球队表现分析与预测报告</h3>
+                    </div>
+                    <div class="progress-stats">
+                        <div class="stat-item" style="color: #4CAF50;">
+                            <div class="stat-number" id="completed-count">0</div>
+                            <div class="stat-label" data-i18n="completed">已完成</div>
+                            <div class="step-list" id="completed-steps"></div>
+                        </div>
+                        <div class="stat-item" style="color: #FF9800;">
+                            <div class="stat-number" id="in-progress-count">0</div>
+                            <div class="stat-label" data-i18n="in_progress">进行中</div>
+                            <div class="step-list" id="in-progress-steps"></div>
+                        </div>
+                        <div class="stat-item" style="color: #f44336;">
+                            <div class="stat-number" id="blocked-count">0</div>
+                            <div class="stat-label" data-i18n="blocked">阻塞</div>
+                            <div class="step-list" id="blocked-steps"></div>
+                        </div>
+                        <div class="stat-item" style="color: #9E9E9E;">
+                            <div class="stat-number" id="not-started-count">6</div>
+                            <div class="stat-label" data-i18n="not_started">未开始</div>
+                            <div class="step-list" id="not-started-steps"></div>
+                        </div>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div class="progress-percentage">
+                            总体进度: <span id="progress-percentage">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dag-container">
+                    <div class="controls" style="display: none;">
+                        <button class="btn" onclick="startSimulateWorkflow()">
+                            <i class="fas fa-play-circle"></i> <span class="btn-text">开始运行</span>
+                        </button>
+                        <!-- <button class="btn" onclick="resetProgress()">
+                            <i class="fas fa-undo"></i> <span class="btn-text">重置进度</span>
+                        </button>
+                        <button class="btn" onclick="simulateProgress()">
+                            <i class="fas fa-spinner"></i> <span class="btn-text">模拟进度</span>
+                        </button>
+                        <button class="btn" onclick="simulateStep0Workflow()">
+                            <i class="fa-solid fa-0"></i> <span class="btn-text">模拟STEP0</span>
+                        </button> -->
+                        <button class="btn" onclick="simulateStep5Workflow()">
+                            <i class="fa-solid fa-5"></i> <span class="btn-text">模拟STEP5</span>
+                        </button>
+                        <!-- <button class="btn" onclick="toggleRightContainer()">
+                            <i class="fas fa-columns"></i> <span class="btn-text">切换显示右侧内容</span>
+                        </button> -->
+                        <button class="btn" onclick="testCreateDag()">
+                            <i class="fas fa-flask"></i> <span class="btn-text">测试DAG创建</span>
+                        </button>
+                        <button class="btn" onclick="resetZoom()">
+                            <i class="fas fa-search-minus"></i> <span class="btn-text">重置缩放</span>
+                        </button>
+                        <button class="btn" onclick="fitToScreen()">
+                            <i class="fas fa-expand-arrows-alt"></i> <span class="btn-text">适应屏幕</span>
+                        </button>
+                        <button class="btn" onclick="testLayoutOptimization()">
+                            <i class="fas fa-sitemap"></i> <span class="btn-text">测试布局优化</span>
+                        </button>
+                    </div>
+
+                    <svg class="dag-svg" id="dag-svg">
+                        <defs>
+                            <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="25" refY="0" orient="auto"
+                                viewBox="0 -5 10 10">
+                                <path d="M0,-5L10,0L0,5" fill="#FF9800" />
+                            </marker>
+                        </defs>
+                    </svg>
+
+                    <!-- DAG操作提示 -->
+                    <div class="dag-operation-tip" id="dag-operation-tip">
+                        <div class="tip-content">
+                            <i class="fas fa-mouse-pointer"></i>
+                            <span>滚轮缩放</span>
+                        </div>
+                        <div class="tip-content">
+                            <i class="fas fa-mouse"></i>
+                            <span>按住鼠标拖动</span>
+                        </div>
+                    </div>
+
+                    <div class="input">
+                        <div class="input-container">
+                            <input type="text" class="input-field" placeholder="请输入你的任务..." id="message-input">
+                            <button class="send-button" id="send-button">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                            <!-- 回放按钮已隐藏 -->
+                            <!-- <button class="send-button" id="replay-button" title="回放上次会话">
+                                <i class="fas fa-rotate-left"></i>
+                            </button> -->
+                        </div>
+                    </div>
+
+                    <div class="step-details" id="step-details" style="display: none;">
+                        <h3 id="step-title">选择节点查看详情</h3>
+                        <p id="step-description">点击上方的节点来查看该步骤的详细信息。</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-container" id="right-container">
+                <div class="right-header">
+                    <h3><i class="fas fa-info-circle"></i> Co-Sight 的电脑</h3>
+                    <span id="right-container-status">正在查看文件内容...</span>
+                    <div class="right-header-icons">
+                        <button class="btn-icon" id="toggle-maximize-btn" onclick="toggleMaximizePanel()">
+                            <i class="fas fa-expand-alt"></i>
+                        </button>
+                        <button class="btn-icon" id="close-right-panel-btn" onclick="toggleRightContainer()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="right-content">
+                    <!-- <iframe id="content-iframe" src="https://www.logonews.cn/2025-jiangsu-football-city-league-logo.html" width="100%"
+                        height="100%" frameborder="0"></iframe> -->
+                    <iframe id="content-iframe" width="100%" height="100%" frameborder="0" style="display: none;"></iframe>
+                    <div id="markdown-content"></div>
+                    <!-- 加载中提示 -->
+                    <div id="loading-indicator" class="loading-indicator" style="display: none;">
+                        <div class="loading-spinner"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 工具调用面板容器 -->
+        <div id="tool-call-panels-container">
+            <!-- 工具调用面板将动态创建并添加到这里 -->
+        </div>
+    </div>
+
+    <!-- 设置弹窗容器 -->
+    <div id="settings-modal"></div>
+
+    <div class="tooltip" id="tooltip"></div>
+    <div class="steps-tooltip" id="steps-tooltip"></div>
+    <div class="verification-tooltip" id="verification-tooltip"></div>
+
+    <!-- 国际化服务脚本 --><script src="js/i18n.js"></script><script src="data/data.js"></script>
+    <script src="js/websocket.js"></script>
+    <script src="js/message.js"></script>
+    <script src="js/steps.js"></script>
+    <script src="js/dag.js"></script>
+    <script src="js/credibility.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="js/main.js"></script>
+    <script src="temp/test.js"></script>
+    <script src="temp/data.js"></script>
+
+    <script src="js/init.js"></script>
+    <script src="js/replay-init.js"></script>
+    <script>
+        // 跳转到回放历史页面
+        function goToReplayHistory() {
+            const targetPage = window.location.pathname.includes('/cosight/') 
+                ? 'replay.html' 
+                : '/cosight/replay.html';
+            window.location.href = targetPage;
+        }
+    </script>
+    <script>
+        (function restoreFromStorage() {
+            try {
+                const raw = localStorage.getItem('cosight:lastManusStep');
+                const pendingRaw = localStorage.getItem('cosight:pendingRequests');
+                const pendings = pendingRaw ? JSON.parse(pendingRaw) : {};
+                const pendingTopics = Object.keys(pendings);
+
+                if (!raw && pendingTopics.length === 0) return;
+                const stored = raw ? JSON.parse(raw) : null;
+                const messageData = stored && stored.message;
+
+                // 先切换到主布局（隐藏初始输入区，显示中间容器），不发送新消息
+                if (typeof hideInitialInputAndShowMain === 'function') {
+                    hideInitialInputAndShowMain('');
+                }
+
+                // 等待布局切换动画完成后再恢复 DAG
+                setTimeout(() => {
+                    if (messageData && messageData.data) {
+                        const ok = createDag(messageData);
+                        if (ok && messageData.data.initData && messageData.data.initData.title) {
+                            updateDynamicTitle(messageData.data.initData.title);
+                        }
+                        if (typeof handleResize === 'function') {
+                            setTimeout(() => handleResize(), 50);
+                        }
+                    }
+                }, 400);
+
+                // 等待 WebSocket 连接成功后，恢复订阅；仅在 stillPending===true 时重发
+                const onWsConnected = () => {
+                    try {
+                        pendingTopics.forEach(topic => {
+                            const item = pendings[topic];
+                            if (!item) return;
+
+                            // 包装一次性监听器：首次收到消息后，清除 pending 状态
+                            const originalHandler = window.messageService && window.messageService.receiveMessage
+                                ? window.messageService.receiveMessage
+                                : () => {};
+                            let firstMessageHandled = false;
+                            const wrappedHandler = (evt) => {
+                                if (!firstMessageHandled) {
+                                    firstMessageHandled = true;
+                                    try {
+                                        const latestPendingsRaw = localStorage.getItem('cosight:pendingRequests');
+                                        const latestPendings = latestPendingsRaw ? JSON.parse(latestPendingsRaw) : {};
+                                        if (latestPendings[topic]) {
+                                            latestPendings[topic].stillPending = false;
+                                            localStorage.setItem('cosight:pendingRequests', JSON.stringify(latestPendings));
+                                        }
+                                    } catch (e) {
+                                        console.warn('清除pending失败:', e);
+                                    }
+                                }
+                                try { originalHandler(evt); } catch (e) { /* no-op */ }
+                            };
+
+                            // 只订阅一次（由 WebSocketService 内部去重订阅更佳）
+                            WebSocketService.subscribe(topic, wrappedHandler);
+
+                            // 仅当明确标记 stillPending===true 时才重发，避免刷新导致重复执行
+                            if (item && item.stillPending === true) {
+                                try {
+                                    WebSocketService.sendMessage(topic, JSON.stringify(item.message));
+                                } catch (e) {
+                                    console.warn('重发pending消息失败:', e);
+                                }
+                            }
+                        });
+                    } catch (e) {
+                        console.warn('恢复pending失败:', e);
+                    }
+                };
+                // 如果已经连接，直接执行；否则等待连接事件
+                if (WebSocketService && WebSocketService.isOpen) {
+                    onWsConnected();
+                } else if (WebSocketService && WebSocketService.websocketConnected) {
+                    WebSocketService.websocketConnected.addEventListener('connected', onWsConnected, { once: true });
+                }
+            } catch (e) {
+                console.warn('恢复本地状态失败:', e);
+            }
+        })();
+    </script>
+</body>
+
+</html>

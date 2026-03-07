@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务回放历史 - Co-Sight</title>
+    <link rel="icon" href="favicon.ico">
+    <link href="libs/fontawesome-6.7.2/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles/styles.css">
+    <link rel="stylesheet" href="styles/replay.css">
+</head>
+<body>
+    <div class="replay-container">
+        <div class="replay-header">
+            <h1><i class="fas fa-history"></i> 任务回放历史</h1>
+            <button class="btn-back" onclick="goBack()">
+                <i class="fas fa-arrow-left"></i> 返回主页
+            </button>
+        </div>
+
+        <div class="replay-filter">
+            <input type="text" id="search-input" placeholder="搜索任务标题..." 
+                   class="search-input">
+            <select id="time-filter" class="time-filter">
+                <option value="all">全部时间</option>
+                <option value="today">今天</option>
+                <option value="week">最近一周</option>
+                <option value="month">最近一月</option>
+            </select>
+        </div>
+
+        <div class="replay-list" id="replay-list">
+            <!-- 动态生成回放项目 -->
+        </div>
+
+        <div class="loading" id="loading" style="display: none;">
+            <i class="fas fa-spinner fa-spin"></i> 加载中...
+        </div>
+    </div>
+
+    <script src="js/replay-list.js"></script>
+    <script>
+        // 返回主页的函数
+        function goBack() {
+            const targetPage = window.location.pathname.includes('/cosight/') 
+                ? 'index.html' 
+                : '/cosight/index.html';
+            window.location.href = targetPage;
+        }
+    </script>
+</body>
+</html>
+
