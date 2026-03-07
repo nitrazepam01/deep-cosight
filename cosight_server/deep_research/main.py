@@ -135,6 +135,7 @@ from cosight_server.deep_research.routers.websocket_manager import wsRouter
 from cosight_server.deep_research.routers.common import commonRouter
 from cosight_server.deep_research.routers.chat_manager import chatRouter
 from cosight_server.deep_research.routers.feedback import feedbackRouter
+from cosight_server.deep_research.routers.settings import settingsRouter
 
 app = FastAPI()
 
@@ -208,6 +209,7 @@ app.include_router(wsRouter, prefix=str(custom_config.get("base_chatbot_api_url"
 app.include_router(commonRouter, prefix=str(custom_config.get("base_api_url")))
 app.include_router(chatRouter, prefix=str(custom_config.get("base_chatbot_api_url")))
 app.include_router(feedbackRouter, prefix=str(custom_config.get("base_chatbot_api_url")))
+app.include_router(settingsRouter, prefix=str(custom_config.get("base_api_url")))
 
 
 @app.middleware("http")
