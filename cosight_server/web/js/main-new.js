@@ -46,7 +46,7 @@ const AppState = {
     dagData: null,
     
     // API 基础 URL
-    apiBaseUrl: 'http://localhost:8000',
+    apiBaseUrl: 'http://localhost:7788/api/nae-deep-research/v1',
     
     // 拖放状态
     draggedThreadId: null,
@@ -773,10 +773,43 @@ function initInputArea() {
     if (!chatInput || !sendBtn) return;
     
     // 自动调整输入框高度
-    chatInput.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = Math.min(this.scrollHeight, 200) + 'px';
-    });
+    function adjustTextareaHeight() {
+        const chatInput = document.getElementById('chat-input');
+        if (!chatInput) return;
+        
+        // 先重置高度以获取正确的 scrollHeight
+        chatInput.style.height = 'auto';
+        
+        // 计算 scrollHeight（实际内容高度）
+        const scrollHeight = chatInput.scrollHeight;
+        
+        // 计算单行高度（font-size * line-height = 15px * 1.5 = 22.5px）
+        const lineHeight = 22.5;
+        
+        // 计算需要的行数
+        const rowsNeeded = Math.ceil(scrollHeight / lineHeight);
+        
+        // 限制在 3-6 行之间
+        const finalRows = Math.max(3, Math.min(6, rowsNeeded));
+        
+        // 计算最终高度
+        const newHeight = finalRows * lineHeight;
+        
+        chatInput.style.height = newHeight + 'px';
+        
+        // 如果内容超过 6 行，显示滚动条
+        if (rowsNeeded > 6) {
+            chatInput.style.overflowY = 'auto';
+        } else {
+            chatInput.style.overflowY = 'hidden';
+        }
+    }
+    
+    // 监听输入事件
+    chatInput.addEventListener('input', adjustTextareaHeight);
+    
+    // 初始化时调整一次
+    adjustTextareaHeight();
     
     // 发送按钮点击
     sendBtn.addEventListener('click', () => {
@@ -1565,10 +1598,14 @@ function getFolderById(folderId) {
  * - 如果文件夹处于展开状态，保持展开状态
  */
 function createNewThreadInFolder(folderId) {
-    const folder = getFolderById(folderId);
-    if (!folder) return;
-    
-    const wasExpanded = folder.expanded;
+    // 获取文件夹的展开状态
+    let wasExpanded;
+    if (folderId === 'default') {
+        wasExpanded = AppState.defaultFolderExpanded || false;
+    } else {
+        const folderInArray = AppState.folders.find(f => f.id === folderId);
+        wasExpanded = folderInArray ? (folderInArray.expanded ?? false) : false;
+    }
     
     const thread = {
         id: 'thread-' + Date.now(),
@@ -1579,11 +1616,21 @@ function createNewThreadInFolder(folderId) {
         messages: []
     };
     
-    folder.threads.push(thread);
+    // 添加线程到对应的数组
+    if (folderId === 'default') {
+        AppState.ungroupedThreads.push(thread);
+    } else {
+        const folderInArray = AppState.folders.find(f => f.id === folderId);
+        if (folderInArray) {
+            if (!folderInArray.threads) folderInArray.threads = [];
+            folderInArray.threads.push(thread);
+        }
+    }
     
     renderFolderList();
     saveState();
     
+    // 如果之前是收起状态，触发展开动画并更新状态
     if (!wasExpanded) {
         setTimeout(() => {
             const folderItem = document.querySelector(`.folder-item[data-folder-id="${folderId}"]`);
@@ -1592,20 +1639,25 @@ function createNewThreadInFolder(folderId) {
                 const toggle = folderItem.querySelector('.folder-toggle');
                 const folderIcon = folderItem.querySelector('.folder-icon');
                 
+                // 先移除展开状态，触发重排，再添加展开状态以播放动画
                 content.classList.remove('expanded');
                 toggle.classList.remove('expanded');
                 folderIcon.classList.remove('expanded');
                 
-                void content.offsetWidth;
+                void content.offsetWidth; // 触发重排
                 
                 content.classList.add('expanded');
                 toggle.classList.add('expanded');
                 folderIcon.classList.add('expanded');
                 
+                // 更新状态：确保文件夹在数据模型中也标记为展开
                 if (folderId === 'default') {
                     AppState.defaultFolderExpanded = true;
                 } else {
-                    folder.expanded = true;
+                    const folderInArray = AppState.folders.find(f => f.id === folderId);
+                    if (folderInArray) {
+                        folderInArray.expanded = true;
+                    }
                 }
                 saveState();
             }
@@ -1624,13 +1676,36 @@ function createNewThreadInDefaultGroup() {
     return createNewThreadInFolder('default');
 }
 
+// ==================== 设置管理 ====================
+// 使用 settings.js 中的 SettingsService
+
+function initSettingsModal() {
+    const settingsBtn = document.getElementById('settings-btn');
+    
+    if (!settingsBtn) return;
+    
+    // 点击设置按钮，调用 SettingsService 打开设置弹窗
+    settingsBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        
+        if (window.SettingsService) {
+            try {
+                await SettingsService.open();
+            } catch (err) {
+                alert('打开设置失败：' + err.message);
+            }
+        } else {
+            alert('SettingsService 未加载，请刷新页面重试');
+        }
+    });
+}
+
 // ==================== 初始化 ====================
 
 /**
  * 初始化所有功能
  */
 function initThreeColumnLayout() {
-    // 加载保存的状态
     loadState();
     
     initLeftSidebar();
@@ -1641,16 +1716,14 @@ function initThreeColumnLayout() {
     initRenameModal();
     initDeleteConfirmModal();
     initDeleteFolderConfirmModal();
+    initSettingsModal();
     
-    // 渲染文件夹列表
     renderFolderList();
     
-    // 如果没有线程，创建示例数据
     if (AppState.folders.length === 0 && AppState.ungroupedThreads.length === 0) {
         loadExampleData();
     }
     
-    // 加载当前线程
     if (AppState.currentThreadId) {
         loadThread(AppState.currentThreadId);
     }

@@ -46,6 +46,13 @@
                     <!-- 动态生成文件夹和线程列表 -->
                 </div>
             </div>
+            
+            <div class="sidebar-footer">
+                <button class="btn-settings" id="settings-btn" title="设置">
+                    <i class="fas fa-cog"></i>
+                    <span>设置</span>
+                </button>
+            </div>
         </aside>
 
         <!-- ==================== 中间栏：主窗口对话 ==================== -->
@@ -107,18 +114,15 @@
                             placeholder="请输入你的任务..."
                             rows="1"
                         ></textarea>
-                        <div class="input-actions">
+                        <div class="input-buttons">
                             <button class="btn-input-action" id="upload-file-btn" title="上传文件">
                                 <i class="fas fa-paperclip"></i>
                             </button>
+                            <button class="btn-send" id="send-btn">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
                         </div>
                     </div>
-                    <button class="btn-send" id="send-btn">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                </div>
-                <div class="input-hint">
-                    <span>按 Enter 发送，Shift+Enter 换行</span>
                 </div>
             </div>
         </main>
@@ -269,12 +273,17 @@
         </div>
     </div>
 
+    <!-- 设置弹窗容器 -->
+    <div id="settings-modal"></div>
+
     <!-- 工具提示 -->
     <div class="tooltip" id="tooltip"></div>
     <div class="steps-tooltip" id="steps-tooltip"></div>
     <div class="verification-tooltip" id="verification-tooltip"></div>
 
-    <!-- 脚本加载 -->
+    <!-- 脚本加载：先加载 settings.js，确保 SettingsService 在全局可用 -->
+    <script src="js/i18n.js"></script>
+    <script src="js/settings.js"></script>
     <script src="js/main-new.js"></script>
 </body>
 
