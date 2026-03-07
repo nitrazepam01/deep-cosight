@@ -1581,14 +1581,10 @@ function createNewThreadInFolder(folderId) {
     
     folder.threads.push(thread);
     
-    // 如果之前是展开状态，保持展开；如果是收起状态，保持收起（等下再动态展开）
-    // 不修改 folder.expanded，让 renderFolderList 使用当前状态渲染
     renderFolderList();
     saveState();
     
-    // 如果之前是收起状态，播放展开动画
     if (!wasExpanded) {
-        // 使用 setTimeout 确保 DOM 已经渲染完成
         setTimeout(() => {
             const folderItem = document.querySelector(`.folder-item[data-folder-id="${folderId}"]`);
             if (folderItem) {
@@ -1596,25 +1592,16 @@ function createNewThreadInFolder(folderId) {
                 const toggle = folderItem.querySelector('.folder-toggle');
                 const folderIcon = folderItem.querySelector('.folder-icon');
                 
-                console.log('播放展开动画前:', content.classList.contains('expanded'));
-                
-                // 确保没有 expanded 类（初始状态）
                 content.classList.remove('expanded');
                 toggle.classList.remove('expanded');
                 folderIcon.classList.remove('expanded');
                 
-                // 强制重绘，确保动画生效
-                console.log('offsetHeight:', content.offsetHeight);
-                console.log('offsetWidth:', content.offsetWidth);
+                void content.offsetWidth;
                 
-                // 然后添加 expanded 类，触发展开动画（max-height 过渡）
                 content.classList.add('expanded');
                 toggle.classList.add('expanded');
                 folderIcon.classList.add('expanded');
                 
-                console.log('播放展开动画后:', content.classList.contains('expanded'));
-                
-                // 更新数据状态
                 if (folderId === 'default') {
                     AppState.defaultFolderExpanded = true;
                 } else {
@@ -1625,7 +1612,6 @@ function createNewThreadInFolder(folderId) {
         }, 50);
     }
     
-    // 切换到新线程（变蓝效果）
     switchThread(thread.id);
     
     return thread;
@@ -1644,8 +1630,6 @@ function createNewThreadInDefaultGroup() {
  * 初始化所有功能
  */
 function initThreeColumnLayout() {
-    console.log('初始化三栏布局...');
-    
     // 加载保存的状态
     loadState();
     
@@ -1670,8 +1654,6 @@ function initThreeColumnLayout() {
     if (AppState.currentThreadId) {
         loadThread(AppState.currentThreadId);
     }
-    
-    console.log('三栏布局初始化完成');
 }
 
 /**

@@ -299,7 +299,7 @@ body {
 }
 
 .folder-content.expanded {
-    max-height: 500px;
+    max-height: 500px
 }
 
 .folder-threads {
