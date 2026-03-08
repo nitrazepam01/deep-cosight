@@ -1,22 +1,15 @@
 /**
  * Co-Sight 三栏布局主逻辑
- * 包含侧边栏控制、文件夹管理、线程管理、对话管理、工具链展示等功能
  */
 
 // ==================== 工具函数 ====================
 
-/**
- * HTML 转义
- */
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-/**
- * 渲染 Markdown
- */
 function renderMarkdown(text) {
     if (window.marked) {
         return marked.parse(text);
@@ -26,45 +19,22 @@ function renderMarkdown(text) {
 
 // ==================== 全局状态管理 ====================
 const AppState = {
-    // 侧边栏状态
     leftSidebarCollapsed: false,
     rightSidebarCollapsed: false,
-    
-    // 当前选中的线程
     currentThreadId: null,
-    
-    // 文件夹列表
     folders: [],
-    
-    // 未分组的线程
     ungroupedThreads: [],
-    
-    // 工具调用列表
     toolCalls: [],
-    
-    // DAG 数据
     dagData: null,
-    
-    // API 基础 URL
     apiBaseUrl: 'http://localhost:7788/api/nae-deep-research/v1',
-    
-    // 拖放状态
     draggedThreadId: null,
-    
-    // 重命名状态
     renamingThreadId: null,
-    
-    // 删除确认状态
     deletingThreadId: null,
     deletingFolderId: null,
-    
 };
 
 // ==================== 侧边栏控制 ====================
 
-/**
- * 初始化左侧边栏
- */
 function initLeftSidebar() {
     const leftSidebar = document.getElementById('sidebar-left');
     const collapseBtn = document.getElementById('collapse-left-btn');
@@ -73,7 +43,6 @@ function initLeftSidebar() {
     
     if (!leftSidebar || !collapseBtn) return;
     
-    // 从 localStorage 恢复状态
     const savedState = localStorage.getItem('cosight:leftSidebarCollapsed');
     if (savedState === 'true') {
         leftSidebar.classList.add('collapsed');
@@ -81,12 +50,10 @@ function initLeftSidebar() {
         icon.classList.replace('fa-chevron-left', 'fa-chevron-right');
     }
     
-    // 点击收起/展开按钮
     collapseBtn.addEventListener('click', () => {
         toggleLeftSidebar();
     });
     
-    // 点击展开按钮
     if (expandBtn) {
         expandBtn.addEventListener('click', () => {
             toggleLeftSidebar();
@@ -94,9 +61,6 @@ function initLeftSidebar() {
     }
 }
 
-/**
- * 切换左侧边栏显示状态
- */
 function toggleLeftSidebar() {
     const leftSidebar = document.getElementById('sidebar-left');
     const collapseBtn = document.getElementById('collapse-left-btn');
@@ -113,9 +77,6 @@ function toggleLeftSidebar() {
     }
 }
 
-/**
- * 初始化右侧边栏
- */
 function initRightSidebar() {
     const rightSidebar = document.getElementById('sidebar-right');
     const expandBtn = document.getElementById('expand-right-btn');
@@ -124,19 +85,16 @@ function initRightSidebar() {
     
     if (!rightSidebar || !expandBtn || !closeBtn) return;
     
-    // 从 localStorage 恢复状态
     const savedState = localStorage.getItem('cosight:rightSidebarCollapsed');
     if (savedState === 'true') {
         rightSidebar.classList.add('collapsed');
         AppState.rightSidebarCollapsed = true;
     }
     
-    // 点击展开/收起按钮
     expandBtn.addEventListener('click', () => {
         toggleRightSidebar();
     });
     
-    // 点击关闭按钮
     closeBtn.addEventListener('click', () => {
         rightSidebar.classList.add('collapsed');
         AppState.rightSidebarCollapsed = true;
@@ -144,9 +102,6 @@ function initRightSidebar() {
     });
 }
 
-/**
- * 切换右侧边栏显示状态
- */
 function toggleRightSidebar() {
     const rightSidebar = document.getElementById('sidebar-right');
     const expandBtn = document.getElementById('expand-right-btn');
@@ -165,47 +120,35 @@ function toggleRightSidebar() {
 
 // ==================== 文件夹管理 ====================
 
-/**
- * 播放展开动画
- */
 function playExpandAnimation(content, toggle, folderIcon) {
     content.classList.add('expanded');
     toggle.classList.add('expanded');
     folderIcon.classList.add('expanded');
 }
 
-/**
- * 播放收起动画
- */
 function playCollapseAnimation(content, toggle, folderIcon) {
     content.classList.remove('expanded');
     toggle.classList.remove('expanded');
     folderIcon.classList.remove('expanded');
 }
 
-/**
- * 渲染文件夹列表 - 统一使用同一套逻辑
- */
 function renderFolderList() {
     const folderList = document.getElementById('folder-list');
     if (!folderList) return;
     
     folderList.innerHTML = '';
     
-    // 渲染默认分组（未分组的线程）- 使用统一的 createFolderItem 逻辑
     const defaultFolder = {
         id: 'default',
         name: '默认分组',
         threads: AppState.ungroupedThreads,
         isDefault: true,
-        expanded: AppState.defaultFolderExpanded || false // 默认分组也有展开/收起状态
+        expanded: AppState.defaultFolderExpanded || false
     };
     const defaultGroupContainer = createFolderItem(defaultFolder);
     folderList.appendChild(defaultGroupContainer);
     
-    // 渲染自定义文件夹 - 使用同一套逻辑
     AppState.folders.forEach(folder => {
-        // 确保文件夹有 expanded 属性
         if (folder.expanded === undefined || folder.expanded === null) {
             folder.expanded = false;
         }
@@ -214,21 +157,16 @@ function renderFolderList() {
     });
 }
 
-/**
- * 创建文件夹项 - 统一逻辑，适用于默认分组和自定义文件夹
- */
 function createFolderItem(folder) {
     const div = document.createElement('div');
     div.className = 'folder-item';
     div.dataset.folderId = folder.id;
     
-    // 确保文件夹有 expanded 属性
     if (folder.expanded === undefined || folder.expanded === null) {
         folder.expanded = false;
     }
     const isExpanded = folder.expanded;
     
-    // 根据是否是默认分组，渲染不同的按钮
     const actionsHtml = folder.isDefault ? `
         <div class="folder-actions">
             <button class="folder-action-btn btn-add-thread-to-default" title="添加线程">
@@ -263,19 +201,16 @@ function createFolderItem(folder) {
     const toggle = div.querySelector('.folder-toggle');
     const folderIcon = div.querySelector('.folder-icon');
     
-    // 点击文件夹头展开/收起
     header.addEventListener('click', (e) => {
         if (e.target.closest('.folder-action-btn')) return;
         
         const newExpandedState = !folder.expanded;
         folder.expanded = newExpandedState;
         
-        // 对于默认分组，需要更新 AppState.defaultFolderExpanded
         if (folder.id === 'default') {
             AppState.defaultFolderExpanded = newExpandedState;
         }
         
-        // 播放展开/收起动画
         if (newExpandedState) {
             playExpandAnimation(content, toggle, folderIcon);
         } else {
@@ -284,7 +219,6 @@ function createFolderItem(folder) {
         saveState();
     });
     
-    // 添加线程按钮
     if (folder.isDefault) {
         const addThreadBtn = div.querySelector('.btn-add-thread-to-default');
         if (addThreadBtn) {
@@ -302,7 +236,6 @@ function createFolderItem(folder) {
             });
         }
         
-        // 删除文件夹按钮
         const deleteFolderBtn = div.querySelector('.btn-delete-folder');
         if (deleteFolderBtn) {
             deleteFolderBtn.addEventListener('click', (e) => {
@@ -312,15 +245,11 @@ function createFolderItem(folder) {
         }
     }
     
-    // 渲染文件夹内的线程
     renderFolderThreads(folder, div);
     
     return div;
 }
 
-/**
- * 渲染文件夹内的线程
- */
 function renderFolderThreads(folder, folderItem) {
     const threadsContainer = folderItem.querySelector('.folder-threads');
     if (!threadsContainer) return;
@@ -334,9 +263,6 @@ function renderFolderThreads(folder, folderItem) {
     });
 }
 
-/**
- * 创建线程项
- */
 function createThreadItem(thread, folderId) {
     const div = document.createElement('div');
     div.className = 'thread-item';
@@ -374,49 +300,41 @@ function createThreadItem(thread, folderId) {
         </div>
     `;
     
-    // 点击切换线程
     div.addEventListener('click', (e) => {
         if (e.target.closest('.thread-item-star') || e.target.closest('.thread-action-btn')) return;
         switchThread(thread.id);
     });
     
-    // 标星功能
     const starBtn = div.querySelector('.thread-item-star');
     starBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         toggleThreadStar(thread.id);
     });
     
-    // 重命名按钮
     const renameBtn = div.querySelector('.btn-rename-thread');
     renameBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         openRenameModal(thread.id);
     });
     
-    // 删除按钮
     const deleteBtn = div.querySelector('.btn-delete-thread');
     deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         openDeleteConfirmModal(thread.id);
     });
     
-    // 拖放功能
     setupThreadDragDrop(div, thread.id, folderId);
     
     return div;
 }
 
-/**
- * 设置线程拖放功能
- */
 function setupThreadDragDrop(element, threadId, folderId) {
     element.addEventListener('dragstart', (e) => {
         AppState.draggedThreadId = threadId;
+        AppState.draggedThreadSourceFolderId = folderId;
         element.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', threadId);
-        // 设置拖放图像
         const dragImage = document.createElement('div');
         dragImage.style.cssText = 'position: fixed; top: -1000px;';
         dragImage.textContent = '移动线程';
@@ -428,53 +346,78 @@ function setupThreadDragDrop(element, threadId, folderId) {
     element.addEventListener('dragend', () => {
         element.classList.remove('dragging');
         AppState.draggedThreadId = null;
-        // 清除所有 drag-over 样式
-        document.querySelectorAll('.drag-over').forEach(el => {
+        AppState.draggedThreadSourceFolderId = null;
+        document.querySelectorAll('.folder-item.drag-over').forEach(el => {
             el.classList.remove('drag-over');
         });
     });
-    
-    // 让整个文件夹项都可以作为放置目标
-    const folderItem = element.closest('.folder-item');
-    if (folderItem) {
-        folderItem.addEventListener('dragover', (e) => {
+}
+
+function initFolderDragDrop() {
+    document.addEventListener('dragover', (e) => {
+        const folderItem = e.target.closest('.folder-item');
+        
+        if (folderItem) {
+            const targetFolderId = folderItem.dataset.folderId;
+            
+            if (targetFolderId === AppState.draggedThreadSourceFolderId) {
+                folderItem.classList.remove('drag-over');
+                return;
+            }
+            
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
+            
             if (!folderItem.classList.contains('drag-over')) {
+                document.querySelectorAll('.folder-item.drag-over').forEach(el => {
+                    el.classList.remove('drag-over');
+                });
                 folderItem.classList.add('drag-over');
             }
-        });
+        }
+    });
+    
+    document.addEventListener('dragleave', (e) => {
+        const folderItem = e.target.closest('.folder-item');
         
-        folderItem.addEventListener('dragleave', (e) => {
-            // 只有当鼠标真正离开文件夹区域时才移除样式
+        if (folderItem) {
             const rect = folderItem.getBoundingClientRect();
             if (e.clientX < rect.left || e.clientX > rect.right || 
                 e.clientY < rect.top || e.clientY > rect.bottom) {
                 folderItem.classList.remove('drag-over');
             }
-        });
+        }
+    });
+    
+    document.addEventListener('drop', (e) => {
+        const folderItem = e.target.closest('.folder-item');
         
-        folderItem.addEventListener('drop', (e) => {
+        if (folderItem) {
             e.preventDefault();
             e.stopPropagation();
-            folderItem.classList.remove('drag-over');
+            
             const targetFolderId = folderItem.dataset.folderId;
-            if (AppState.draggedThreadId && targetFolderId) {
+            
+            if (targetFolderId === AppState.draggedThreadSourceFolderId) {
+                folderItem.classList.remove('drag-over');
+                return;
+            }
+            
+            folderItem.classList.remove('drag-over');
+            
+            if (AppState.draggedThreadId) {
                 moveThreadToFolder(AppState.draggedThreadId, targetFolderId === 'default' ? null : targetFolderId);
             }
-        });
-    }
+        }
+    });
 }
 
-/**
- * 新建文件夹
- */
 function createNewFolder(name) {
     const folder = {
         id: 'folder-' + Date.now(),
         name: name,
         threads: [],
-        expanded: false // 新建文件夹默认收起
+        expanded: false
     };
     
     AppState.folders.push(folder);
@@ -484,13 +427,9 @@ function createNewFolder(name) {
     return folder;
 }
 
-/**
- * 删除文件夹 - 同时删除文件夹下面的所有线程
- */
 function deleteFolder(folderId) {
     const index = AppState.folders.findIndex(f => f.id === folderId);
     if (index !== -1) {
-        // 如果当前线程在被删除的文件夹中，清空当前线程
         const folder = AppState.folders[index];
         const threadIdsInFolder = (folder.threads || []).map(t => t.id);
         if (threadIdsInFolder.includes(AppState.currentThreadId)) {
@@ -505,42 +444,49 @@ function deleteFolder(folderId) {
     }
 }
 
-/**
- * 移动线程到文件夹
- */
 function moveThreadToFolder(threadId, targetFolderId) {
-    // 从默认分组移除
+    let sourceThread = null;
+    let sourceArray = null;
+    let sourceIndex = -1;
+    
     const defaultIndex = AppState.ungroupedThreads.findIndex(t => t.id === threadId);
     if (defaultIndex !== -1) {
-        AppState.ungroupedThreads.splice(defaultIndex, 1);
+        sourceThread = AppState.ungroupedThreads[defaultIndex];
+        sourceArray = AppState.ungroupedThreads;
+        sourceIndex = defaultIndex;
     }
     
-    // 从其他文件夹移除
-    AppState.folders.forEach(folder => {
-        const threadIndex = (folder.threads || []).findIndex(t => t.id === threadId);
-        if (threadIndex !== -1) {
-            folder.threads.splice(threadIndex, 1);
-        }
-    });
-    
-    // 添加到目标位置
-    if (targetFolderId) {
-        const folder = AppState.folders.find(f => f.id === targetFolderId);
-        if (folder) {
-            if (!folder.threads) folder.threads = [];
-            const thread = getThreadById(threadId);
-            if (thread) {
-                thread.folderId = targetFolderId;
-                folder.threads.push(thread);
+    if (!sourceThread) {
+        for (const folder of AppState.folders) {
+            const threadIndex = (folder.threads || []).findIndex(t => t.id === threadId);
+            if (threadIndex !== -1) {
+                sourceThread = folder.threads[threadIndex];
+                sourceArray = folder.threads;
+                sourceIndex = threadIndex;
+                break;
             }
         }
-    } else {
-        // 移到默认分组
-        const thread = getThreadById(threadId);
-        if (thread) {
-            thread.folderId = null;
-            AppState.ungroupedThreads.push(thread);
+    }
+    
+    if (!sourceThread || sourceIndex === -1) {
+        console.error('未找到源线程:', threadId);
+        return;
+    }
+    
+    const threadCopy = JSON.parse(JSON.stringify(sourceThread));
+    
+    sourceArray.splice(sourceIndex, 1);
+    
+    if (targetFolderId) {
+        const targetFolder = AppState.folders.find(f => f.id === targetFolderId);
+        if (targetFolder) {
+            if (!targetFolder.threads) targetFolder.threads = [];
+            threadCopy.folderId = targetFolderId;
+            targetFolder.threads.push(threadCopy);
         }
+    } else {
+        threadCopy.folderId = null;
+        AppState.ungroupedThreads.push(threadCopy);
     }
     
     renderFolderList();
@@ -549,9 +495,6 @@ function moveThreadToFolder(threadId, targetFolderId) {
 
 // ==================== 线程管理 ====================
 
-/**
- * 根据 ID 获取线程
- */
 function getThreadById(threadId) {
     let thread = AppState.ungroupedThreads.find(t => t.id === threadId);
     if (!thread) {
@@ -563,9 +506,6 @@ function getThreadById(threadId) {
     return thread;
 }
 
-/**
- * 创建新线程
- */
 function createNewThread(title, folderId = null) {
     const thread = {
         id: 'thread-' + Date.now(),
@@ -581,7 +521,6 @@ function createNewThread(title, folderId = null) {
         if (folder) {
             if (!folder.threads) folder.threads = [];
             folder.threads.push(thread);
-            // 确保文件夹处于展开状态
             folder.expanded = true;
         }
     } else {
@@ -595,59 +534,39 @@ function createNewThread(title, folderId = null) {
     return thread;
 }
 
-/**
- * 切换线程 - 只更新选中状态，不重新渲染整个列表
- */
 function switchThread(threadId) {
     if (threadId === AppState.currentThreadId) return;
     
     AppState.currentThreadId = threadId;
     
-    // 只更新线程项的选中状态，不重新渲染整个列表
     updateThreadActiveState();
-    
-    // 加载线程内容
     loadThread(threadId);
 }
 
-/**
- * 更新线程项的选中状态（变蓝效果）
- */
 function updateThreadActiveState() {
-    // 移除所有线程的 active 类
     document.querySelectorAll('.thread-item').forEach(item => {
         item.classList.remove('active');
     });
     
-    // 添加当前线程的 active 类
     const activeThread = document.querySelector(`.thread-item[data-thread-id="${AppState.currentThreadId}"]`);
     if (activeThread) {
         activeThread.classList.add('active');
     }
 }
 
-/**
- * 加载线程内容
- */
 function loadThread(threadId) {
-    // 查找线程
     const thread = getThreadById(threadId);
     
     if (!thread) return;
     
-    // 更新标题
     const titleEl = document.getElementById('conversation-title');
     if (titleEl) {
         titleEl.textContent = thread.title || '新对话';
     }
     
-    // 加载消息列表
     loadMessages(thread.messages || []);
 }
 
-/**
- * 加载消息列表
- */
 function loadMessages(messages) {
     const messageList = document.getElementById('message-list');
     const welcomeScreen = document.getElementById('welcome-screen');
@@ -670,13 +589,9 @@ function loadMessages(messages) {
         messageList.appendChild(messageItem);
     });
     
-    // 滚动到底部
     scrollToBottom();
 }
 
-/**
- * 创建消息元素
- */
 function createMessageElement(message) {
     const div = document.createElement('div');
     div.className = `message-item ${message.role}`;
@@ -705,16 +620,12 @@ function createMessageElement(message) {
     return div;
 }
 
-/**
- * 添加新消息
- */
 function addMessage(message) {
     const messageList = document.getElementById('message-list');
     const welcomeScreen = document.getElementById('welcome-screen');
     
     if (!messageList) return;
     
-    // 隐藏欢迎界面
     welcomeScreen.style.display = 'none';
     messageList.style.display = 'flex';
     
@@ -722,14 +633,9 @@ function addMessage(message) {
     messageList.appendChild(messageItem);
     
     scrollToBottom();
-    
-    // 更新当前线程
     updateCurrentThread();
 }
 
-/**
- * 更新当前线程
- */
 function updateCurrentThread() {
     const thread = getCurrentThread();
     if (thread) {
@@ -739,18 +645,12 @@ function updateCurrentThread() {
     }
 }
 
-/**
- * 获取当前线程
- */
 function getCurrentThread() {
     if (!AppState.currentThreadId) return null;
     
     return getThreadById(AppState.currentThreadId);
 }
 
-/**
- * 滚动到底部
- */
 function scrollToBottom() {
     const chatContainer = document.getElementById('chat-container');
     if (chatContainer) {
@@ -758,11 +658,213 @@ function scrollToBottom() {
     }
 }
 
+// ==================== 文件上传管理 ====================
+
+const FileUploadConfig = {
+    allowedExtensions: [
+        '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg',
+        '.pdf', '.doc', '.docx', '.txt', '.rtf', '.odt',
+        '.xls', '.xlsx', '.csv',
+        '.ppt', '.pptx', '.key',
+        '.mp3', '.wav', '.ogg', '.m4a',
+        '.mp4', '.avi', '.mov', '.wmv', '.flv', '.mkv',
+        '.js', '.ts', '.py', '.java', '.cpp', '.c', '.h', '.html', '.css', '.json', '.xml', '.md',
+        '.zip', '.rar', '.7z', '.tar', '.gz'
+    ],
+    maxFileSize: 100 * 1024 * 1024,
+    maxFiles: 10
+};
+
+let uploadedFiles = [];
+
+function getFileType(file) {
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    const mimeType = file.type;
+    
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (ext === '.pdf' || mimeType === 'application/pdf') return 'pdf';
+    if (['.doc', '.docx', '.txt', '.rtf', '.odt'].includes(ext)) return 'document';
+    if (['.xls', '.xlsx', '.csv'].includes(ext)) return 'spreadsheet';
+    if (['.ppt', '.pptx', '.key'].includes(ext)) return 'presentation';
+    if (['.js', '.ts', '.py', '.java', '.cpp', '.c', '.h', '.html', '.css', '.json', '.xml', '.md'].includes(ext)) return 'code';
+    if (['.zip', '.rar', '.7z', '.tar', '.gz'].includes(ext)) return 'archive';
+    
+    return 'other';
+}
+
+function getFileTypeIcon(fileType) {
+    const icons = {
+        image: 'fa-image',
+        audio: 'fa-file-audio',
+        video: 'fa-file-video',
+        document: 'fa-file-word',
+        spreadsheet: 'fa-file-excel',
+        presentation: 'fa-file-powerpoint',
+        pdf: 'fa-file-pdf',
+        code: 'fa-file-code',
+        archive: 'fa-file-archive',
+        other: 'fa-file'
+    };
+    return icons[fileType] || 'fa-file';
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+
+function validateFile(file) {
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    
+    if (!FileUploadConfig.allowedExtensions.includes(ext)) {
+        return { valid: false, message: `不支持的文件类型：${ext}` };
+    }
+    
+    if (file.size > FileUploadConfig.maxFileSize) {
+        return { valid: false, message: `文件大小超过限制 (${FileUploadConfig.maxFileSize / 1024 / 1024}MB)` };
+    }
+    
+    return { valid: true };
+}
+
+function addUploadedFile(file) {
+    const validation = validateFile(file);
+    if (!validation.valid) {
+        alert(validation.message);
+        return false;
+    }
+    
+    if (uploadedFiles.length >= FileUploadConfig.maxFiles) {
+        alert(`最多只能上传 ${FileUploadConfig.maxFiles} 个文件`);
+        return false;
+    }
+    
+    if (uploadedFiles.some(f => f.name === file.name && f.size === file.size)) {
+        alert('该文件已添加到上传列表');
+        return false;
+    }
+    
+    const fileData = {
+        id: 'file-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+        file: file,
+        name: file.name,
+        size: file.size,
+        type: getFileType(file),
+        uploadedAt: Date.now()
+    };
+    
+    uploadedFiles.push(fileData);
+    renderFilePreview();
+    return true;
+}
+
+function removeUploadedFile(fileId) {
+    uploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
+    renderFilePreview();
+}
+
+function renderFilePreview() {
+    const container = document.getElementById('file-preview-container');
+    const list = document.getElementById('file-preview-list');
+    
+    if (!container || !list) return;
+    
+    if (uploadedFiles.length === 0) {
+        container.style.display = 'none';
+        list.innerHTML = '';
+        return;
+    }
+    
+    container.style.display = 'block';
+    list.innerHTML = '';
+    
+    uploadedFiles.forEach(fileData => {
+        const item = createFilePreviewItem(fileData);
+        list.appendChild(item);
+    });
+}
+
+function createFilePreviewItem(fileData) {
+    const div = document.createElement('div');
+    div.className = 'file-preview-item';
+    
+    const fileType = fileData.type;
+    const fileSize = formatFileSize(fileData.size);
+    
+    if (fileType === 'image') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = div.querySelector('.file-preview-image');
+            if (img) {
+                img.src = e.target.result;
+            }
+        };
+        reader.readAsDataURL(fileData.file);
+        
+        div.innerHTML = `
+            <img class="file-preview-image" src="" alt="${escapeHtml(fileData.name)}">
+            <div class="file-preview-info">
+                <div class="file-preview-name">${escapeHtml(fileData.name)}</div>
+                <div class="file-preview-size">${fileSize}</div>
+            </div>
+            <button class="file-preview-remove" title="移除">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+    } else {
+        const iconClass = getFileTypeIcon(fileType);
+        div.innerHTML = `
+            <div class="file-preview-icon ${fileType}">
+                <i class="fas ${iconClass}"></i>
+            </div>
+            <div class="file-preview-info">
+                <div class="file-preview-name">${escapeHtml(fileData.name)}</div>
+                <div class="file-preview-size">${fileSize}</div>
+            </div>
+            <button class="file-preview-remove" title="移除">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+    }
+    
+    const removeBtn = div.querySelector('.file-preview-remove');
+    removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeUploadedFile(fileData.id);
+    });
+    
+    return div;
+}
+
+function getAllowedFileTypesAttr() {
+    const imageTypes = ['image/*'];
+    const audioTypes = ['audio/*'];
+    const videoTypes = ['video/*'];
+    const docTypes = ['.doc', '.docx', '.pdf', '.txt', '.rtf', '.odt'];
+    const sheetTypes = ['.xls', '.xlsx', '.csv'];
+    const presentationTypes = ['.ppt', '.pptx', '.key'];
+    const codeTypes = ['.js', '.ts', '.py', '.java', '.cpp', '.c', '.h', '.html', '.css', '.json', '.xml', '.md'];
+    const archiveTypes = ['.zip', '.rar', '.7z', '.tar', '.gz'];
+    
+    return [
+        ...imageTypes,
+        ...audioTypes,
+        ...videoTypes,
+        ...docTypes,
+        ...sheetTypes,
+        ...presentationTypes,
+        ...codeTypes,
+        ...archiveTypes
+    ].join(',');
+}
+
 // ==================== 输入处理 ====================
 
-/**
- * 初始化输入区域
- */
 function initInputArea() {
     const chatInput = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
@@ -772,51 +874,49 @@ function initInputArea() {
     
     if (!chatInput || !sendBtn) return;
     
-    // 自动调整输入框高度
     function adjustTextareaHeight() {
         const chatInput = document.getElementById('chat-input');
         if (!chatInput) return;
         
-        // 先重置高度以获取正确的 scrollHeight
-        chatInput.style.height = 'auto';
-        
-        // 计算 scrollHeight（实际内容高度）
-        const scrollHeight = chatInput.scrollHeight;
-        
-        // 计算单行高度（font-size * line-height = 15px * 1.5 = 22.5px）
+        const minHeight = 68;
+        const maxHeight = 136;
         const lineHeight = 22.5;
         
-        // 计算需要的行数
-        const rowsNeeded = Math.ceil(scrollHeight / lineHeight);
+        chatInput.style.height = 'auto';
+        chatInput.style.overflowY = 'hidden';
         
-        // 限制在 3-6 行之间
-        const finalRows = Math.max(3, Math.min(6, rowsNeeded));
+        const scrollHeight = chatInput.scrollHeight;
         
-        // 计算最终高度
-        const newHeight = finalRows * lineHeight;
+        if (!chatInput.value.trim()) {
+            chatInput.style.height = minHeight + 'px';
+            return;
+        }
+        
+        let newHeight = scrollHeight;
+        newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
+        
+        const extraHeight = newHeight - minHeight;
+        const extraRows = Math.ceil(extraHeight / lineHeight);
+        newHeight = minHeight + (extraRows * lineHeight);
+        
+        newHeight = Math.min(newHeight, maxHeight);
         
         chatInput.style.height = newHeight + 'px';
         
-        // 如果内容超过 6 行，显示滚动条
-        if (rowsNeeded > 6) {
+        if (scrollHeight > maxHeight) {
             chatInput.style.overflowY = 'auto';
         } else {
             chatInput.style.overflowY = 'hidden';
         }
     }
     
-    // 监听输入事件
     chatInput.addEventListener('input', adjustTextareaHeight);
-    
-    // 初始化时调整一次
     adjustTextareaHeight();
     
-    // 发送按钮点击
     sendBtn.addEventListener('click', () => {
         sendMessage();
     });
     
-    // 回车发送
     chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -824,7 +924,6 @@ function initInputArea() {
         }
     });
     
-    // 文件上传
     if (uploadFileBtn) {
         uploadFileBtn.addEventListener('click', () => {
             const input = document.createElement('input');
@@ -837,7 +936,6 @@ function initInputArea() {
         });
     }
     
-    // 清空对话
     if (clearChatBtn) {
         clearChatBtn.addEventListener('click', () => {
             if (confirm('确定要清空当前对话吗？')) {
@@ -846,7 +944,6 @@ function initInputArea() {
         });
     }
     
-    // 导出对话
     if (exportChatBtn) {
         exportChatBtn.addEventListener('click', () => {
             exportCurrentChat();
@@ -854,16 +951,12 @@ function initInputArea() {
     }
 }
 
-/**
- * 发送消息
- */
 function sendMessage() {
     const chatInput = document.getElementById('chat-input');
     const message = chatInput.value.trim();
     
     if (!message) return;
     
-    // 添加用户消息
     const userMessage = {
         role: 'user',
         content: message,
@@ -871,20 +964,13 @@ function sendMessage() {
     };
     addMessage(userMessage);
     
-    // 清空输入框
     chatInput.value = '';
     chatInput.style.height = 'auto';
     
-    // 显示思考状态
     showThinkingState();
-    
-    // 发送到后端 API
     sendToBackend(message);
 }
 
-/**
- * 发送到后端 API
- */
 async function sendToBackend(message) {
     try {
         const response = await fetch(`${AppState.apiBaseUrl}/api/chat`, {
@@ -905,14 +991,12 @@ async function sendToBackend(message) {
         const data = await response.json();
         hideThinkingState();
         
-        // 添加助手响应
         addMessage({
             role: 'assistant',
             content: data.response || '收到消息',
             timestamp: Date.now()
         });
         
-        // 更新线程标题（如果是第一条消息）
         const thread = getCurrentThread();
         if (thread && thread.messageCount === 1) {
             thread.title = message.substring(0, 30) + (message.length > 30 ? '...' : '');
@@ -924,7 +1008,6 @@ async function sendToBackend(message) {
         console.error('发送消息失败:', error);
         hideThinkingState();
         
-        // 显示错误消息
         addMessage({
             role: 'assistant',
             content: '抱歉，连接服务器失败。请确保后端服务正在运行。',
@@ -933,9 +1016,6 @@ async function sendToBackend(message) {
     }
 }
 
-/**
- * 显示思考状态
- */
 function showThinkingState() {
     const messageList = document.getElementById('message-list');
     if (!messageList) return;
@@ -961,9 +1041,6 @@ function showThinkingState() {
     scrollToBottom();
 }
 
-/**
- * 隐藏思考状态
- */
 function hideThinkingState() {
     const thinkingMessage = document.getElementById('thinking-message');
     if (thinkingMessage) {
@@ -971,24 +1048,14 @@ function hideThinkingState() {
     }
 }
 
-/**
- * 处理文件上传
- */
 function handleFileUpload(files) {
     if (!files || files.length === 0) return;
     
     Array.from(files).forEach(file => {
-        addMessage({
-            role: 'user',
-            content: `📎 上传了文件：${file.name}`,
-            timestamp: Date.now()
-        });
+        addUploadedFile(file);
     });
 }
 
-/**
- * 清空当前对话
- */
 function clearCurrentChat() {
     const thread = getCurrentThread();
     if (thread) {
@@ -1000,9 +1067,6 @@ function clearCurrentChat() {
     }
 }
 
-/**
- * 导出当前对话
- */
 function exportCurrentChat() {
     const thread = getCurrentThread();
     if (!thread) return;
@@ -1023,9 +1087,6 @@ function exportCurrentChat() {
 
 // ==================== 工具链展示 ====================
 
-/**
- * 添加工具调用到工具链
- */
 function addToolCallToChain(toolCall) {
     const toolChainList = document.getElementById('tool-chain-list');
     const toolCountEl = document.getElementById('tool-count');
@@ -1037,15 +1098,11 @@ function addToolCallToChain(toolCall) {
     const toolItem = createToolChainItem(toolCall);
     toolChainList.insertBefore(toolItem, toolChainList.firstChild);
     
-    // 更新工具计数
     if (toolCountEl) {
         toolCountEl.textContent = AppState.toolCalls.length;
     }
 }
 
-/**
- * 创建工具链项
- */
 function createToolChainItem(toolCall) {
     const div = document.createElement('div');
     div.className = `tool-chain-item ${toolCall.status}`;
@@ -1068,9 +1125,6 @@ function createToolChainItem(toolCall) {
     return div;
 }
 
-/**
- * 获取工具图标
- */
 function getToolIcon(toolName) {
     const icons = {
         search_baidu: 'fab fa-baidu',
@@ -1085,9 +1139,6 @@ function getToolIcon(toolName) {
     return icons[toolName] || 'fas fa-tools';
 }
 
-/**
- * 获取工具显示名称
- */
 function getToolDisplayName(toolName) {
     const names = {
         search_baidu: '百度搜索',
@@ -1102,9 +1153,6 @@ function getToolDisplayName(toolName) {
     return names[toolName] || toolName;
 }
 
-/**
- * 获取工具状态文本
- */
 function getToolStatusText(status) {
     const texts = {
         running: '执行中...',
@@ -1116,9 +1164,6 @@ function getToolStatusText(status) {
 
 // ==================== 进度更新 ====================
 
-/**
- * 更新进度统计
- */
 function updateProgressStats(stats) {
     const completedCount = document.getElementById('completed-count');
     const inProgressCount = document.getElementById('in-progress-count');
@@ -1141,9 +1186,6 @@ function updateProgressStats(stats) {
 
 // ==================== 状态持久化 ====================
 
-/**
- * 保存状态到 localStorage
- */
 function saveState() {
     const state = {
         folders: AppState.folders,
@@ -1153,9 +1195,6 @@ function saveState() {
     localStorage.setItem('cosight:state', JSON.stringify(state));
 }
 
-/**
- * 从 localStorage 加载状态
- */
 function loadState() {
     const saved = localStorage.getItem('cosight:state');
     if (saved) {
@@ -1165,14 +1204,12 @@ function loadState() {
             AppState.ungroupedThreads = state.ungroupedThreads || [];
             AppState.currentThreadId = state.currentThreadId;
             
-            // 确保所有文件夹都有 expanded 属性，默认展开
             AppState.folders.forEach(folder => {
                 if (folder.expanded === undefined || folder.expanded === null) {
-                    folder.expanded = true; // 所有文件夹默认展开
+                    folder.expanded = true;
                 }
             });
             
-            // 默认分组也有 expanded 属性，默认展开
             if (AppState.defaultFolderExpanded === undefined || AppState.defaultFolderExpanded === null) {
                 AppState.defaultFolderExpanded = true;
             }
@@ -1180,14 +1217,10 @@ function loadState() {
             console.error('加载状态失败:', e);
         }
     } else {
-        // 首次加载时，默认分组和所有自定义文件夹都默认展开
         AppState.defaultFolderExpanded = true;
     }
 }
 
-/**
- * 格式化时间
- */
 function formatTime(timestamp) {
     const date = new Date(timestamp);
     const now = new Date();
@@ -1201,16 +1234,10 @@ function formatTime(timestamp) {
     return date.toLocaleDateString('zh-CN');
 }
 
-/**
- * 获取相对时间
- */
 function getTimeAgo(timestamp) {
     return formatTime(timestamp);
 }
 
-/**
- * 切换线程标星状态
- */
 function toggleThreadStar(threadId) {
     const thread = getThreadById(threadId);
     if (thread) {
@@ -1220,17 +1247,12 @@ function toggleThreadStar(threadId) {
     }
 }
 
-/**
- * 删除线程
- */
 function deleteThread(threadId) {
-    // 从默认分组删除
     const defaultIndex = AppState.ungroupedThreads.findIndex(t => t.id === threadId);
     if (defaultIndex !== -1) {
         AppState.ungroupedThreads.splice(defaultIndex, 1);
     }
     
-    // 从文件夹删除
     AppState.folders.forEach(folder => {
         const threadIndex = (folder.threads || []).findIndex(t => t.id === threadId);
         if (threadIndex !== -1) {
@@ -1238,7 +1260,6 @@ function deleteThread(threadId) {
         }
     });
     
-    // 如果删除的是当前线程，清空对话
     if (threadId === AppState.currentThreadId) {
         AppState.currentThreadId = null;
         loadMessages([]);
@@ -1251,9 +1272,6 @@ function deleteThread(threadId) {
 
 // ==================== 重命名弹窗 ====================
 
-/**
- * 打开重命名弹窗
- */
 function openRenameModal(threadId) {
     const thread = getThreadById(threadId);
     if (!thread) return;
@@ -1271,9 +1289,6 @@ function openRenameModal(threadId) {
     }
 }
 
-/**
- * 关闭重命名弹窗
- */
 function closeRenameModal() {
     const modal = document.getElementById('rename-modal-overlay');
     if (modal) {
@@ -1282,9 +1297,6 @@ function closeRenameModal() {
     AppState.renamingThreadId = null;
 }
 
-/**
- * 确认重命名
- */
 function confirmRename() {
     const input = document.getElementById('rename-input');
     const newName = input.value.trim();
@@ -1296,7 +1308,6 @@ function confirmRename() {
             renderFolderList();
             saveState();
             
-            // 如果是当前线程，更新标题
             if (AppState.renamingThreadId === AppState.currentThreadId) {
                 document.getElementById('conversation-title').textContent = newName;
             }
@@ -1306,9 +1317,6 @@ function confirmRename() {
     closeRenameModal();
 }
 
-/**
- * 初始化重命名弹窗
- */
 function initRenameModal() {
     const closeBtn = document.getElementById('close-rename-modal');
     const cancelBtn = document.getElementById('cancel-rename-btn');
@@ -1323,14 +1331,12 @@ function initRenameModal() {
     
     confirmBtn.addEventListener('click', confirmRename);
     
-    // 点击标题旁的重命名按钮打开弹窗
     if (renameTitleBtn) {
         renameTitleBtn.addEventListener('click', () => {
             openTitleRenameModal();
         });
     }
     
-    // 点击遮罩关闭
     const modal = document.getElementById('rename-modal-overlay');
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
@@ -1338,7 +1344,6 @@ function initRenameModal() {
         }
     });
     
-    // 回车确认
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             confirmRename();
@@ -1346,9 +1351,6 @@ function initRenameModal() {
     });
 }
 
-/**
- * 打开标题重命名弹窗
- */
 function openTitleRenameModal() {
     const currentTitle = document.getElementById('conversation-title').textContent;
     
@@ -1367,9 +1369,6 @@ function openTitleRenameModal() {
 
 // ==================== 删除确认弹窗 ====================
 
-/**
- * 打开删除确认弹窗（线程）
- */
 function openDeleteConfirmModal(threadId) {
     const thread = getThreadById(threadId);
     if (!thread) return;
@@ -1385,9 +1384,6 @@ function openDeleteConfirmModal(threadId) {
     }
 }
 
-/**
- * 打开删除文件夹确认弹窗
- */
 function openDeleteFolderConfirmModal(folderId, folderName) {
     AppState.deletingFolderId = folderId;
     
@@ -1400,9 +1396,6 @@ function openDeleteFolderConfirmModal(folderId, folderName) {
     }
 }
 
-/**
- * 关闭删除确认弹窗
- */
 function closeDeleteConfirmModal() {
     const modal = document.getElementById('delete-confirm-modal-overlay');
     if (modal) {
@@ -1411,9 +1404,6 @@ function closeDeleteConfirmModal() {
     AppState.deletingThreadId = null;
 }
 
-/**
- * 确认删除线程
- */
 function confirmDelete() {
     if (AppState.deletingThreadId) {
         deleteThread(AppState.deletingThreadId);
@@ -1421,9 +1411,6 @@ function confirmDelete() {
     closeDeleteConfirmModal();
 }
 
-/**
- * 确认删除文件夹
- */
 function confirmDeleteFolder() {
     if (AppState.deletingFolderId) {
         deleteFolder(AppState.deletingFolderId);
@@ -1431,9 +1418,6 @@ function confirmDeleteFolder() {
     closeDeleteFolderConfirmModal();
 }
 
-/**
- * 关闭删除文件夹确认弹窗
- */
 function closeDeleteFolderConfirmModal() {
     const modal = document.getElementById('delete-folder-confirm-modal-overlay');
     if (modal) {
@@ -1442,9 +1426,6 @@ function closeDeleteFolderConfirmModal() {
     AppState.deletingFolderId = null;
 }
 
-/**
- * 初始化删除确认弹窗（线程）
- */
 function initDeleteConfirmModal() {
     const closeBtn = document.getElementById('close-delete-confirm-modal');
     const cancelBtn = document.getElementById('cancel-delete-confirm-btn');
@@ -1457,7 +1438,6 @@ function initDeleteConfirmModal() {
     
     confirmBtn.addEventListener('click', confirmDelete);
     
-    // 点击遮罩关闭
     const modal = document.getElementById('delete-confirm-modal-overlay');
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
@@ -1466,9 +1446,6 @@ function initDeleteConfirmModal() {
     });
 }
 
-/**
- * 初始化删除文件夹确认弹窗
- */
 function initDeleteFolderConfirmModal() {
     const closeBtn = document.getElementById('close-delete-folder-confirm-modal');
     const cancelBtn = document.getElementById('cancel-delete-folder-confirm-btn');
@@ -1481,7 +1458,6 @@ function initDeleteFolderConfirmModal() {
     
     confirmBtn.addEventListener('click', confirmDeleteFolder);
     
-    // 点击遮罩关闭
     const modal = document.getElementById('delete-folder-confirm-modal-overlay');
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
@@ -1492,9 +1468,6 @@ function initDeleteFolderConfirmModal() {
 
 // ==================== 弹窗控制 ====================
 
-/**
- * 初始化文件夹弹窗
- */
 function initFolderModal() {
     const newFolderBtn = document.getElementById('new-folder-btn');
     const modalOverlay = document.getElementById('folder-modal-overlay');
@@ -1505,14 +1478,12 @@ function initFolderModal() {
     
     if (!newFolderBtn || !modalOverlay) return;
     
-    // 打开弹窗
     newFolderBtn.addEventListener('click', () => {
         modalOverlay.style.display = 'flex';
         nameInput.value = '';
         nameInput.focus();
     });
     
-    // 关闭弹窗
     const closeModal = () => {
         modalOverlay.style.display = 'none';
     };
@@ -1525,7 +1496,6 @@ function initFolderModal() {
         }
     });
     
-    // 确认创建
     confirmBtn.addEventListener('click', () => {
         const name = nameInput.value.trim();
         if (name) {
@@ -1534,7 +1504,6 @@ function initFolderModal() {
         }
     });
     
-    // 回车确认
     nameInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             const name = nameInput.value.trim();
@@ -1546,31 +1515,23 @@ function initFolderModal() {
     });
 }
 
-/**
- * 初始化新建线程按钮
- */
 function initNewThreadBtn() {
     const newThreadBtn = document.getElementById('new-thread-btn');
     const newChatBubbleBtn = document.getElementById('new-chat-bubble-btn');
     
     if (newThreadBtn) {
         newThreadBtn.addEventListener('click', () => {
-            // 在默认分组创建新线程
             createNewThreadInDefaultGroup();
         });
     }
     
     if (newChatBubbleBtn) {
         newChatBubbleBtn.addEventListener('click', () => {
-            // 在默认分组创建新线程
             createNewThreadInDefaultGroup();
         });
     }
 }
 
-/**
- * 统一的创建新线程函数 - 适用于所有文件夹（包括默认分组）
- */
 function getFolderById(folderId) {
     if (folderId === 'default') {
         return {
@@ -1592,19 +1553,15 @@ function getFolderById(folderId) {
     return null;
 }
 
-/**
- * 在文件夹中创建新线程（使用默认名称）
- * - 如果文件夹处于收起状态，先创建线程，然后自动触发展开动画
- * - 如果文件夹处于展开状态，保持展开状态
- */
 function createNewThreadInFolder(folderId) {
-    // 获取文件夹的展开状态
     let wasExpanded;
+    let targetFolder = null;
+    
     if (folderId === 'default') {
         wasExpanded = AppState.defaultFolderExpanded || false;
     } else {
-        const folderInArray = AppState.folders.find(f => f.id === folderId);
-        wasExpanded = folderInArray ? (folderInArray.expanded ?? false) : false;
+        targetFolder = AppState.folders.find(f => f.id === folderId);
+        wasExpanded = targetFolder ? (targetFolder.expanded ?? false) : false;
     }
     
     const thread = {
@@ -1616,22 +1573,19 @@ function createNewThreadInFolder(folderId) {
         messages: []
     };
     
-    // 添加线程到对应的数组
     if (folderId === 'default') {
         AppState.ungroupedThreads.push(thread);
     } else {
-        const folderInArray = AppState.folders.find(f => f.id === folderId);
-        if (folderInArray) {
-            if (!folderInArray.threads) folderInArray.threads = [];
-            folderInArray.threads.push(thread);
+        if (targetFolder) {
+            if (!targetFolder.threads) targetFolder.threads = [];
+            targetFolder.threads.push(thread);
         }
     }
     
-    renderFolderList();
-    saveState();
-    
-    // 如果之前是收起状态，触发展开动画并更新状态
     if (!wasExpanded) {
+        saveState();
+        renderFolderList();
+        
         setTimeout(() => {
             const folderItem = document.querySelector(`.folder-item[data-folder-id="${folderId}"]`);
             if (folderItem) {
@@ -1639,29 +1593,22 @@ function createNewThreadInFolder(folderId) {
                 const toggle = folderItem.querySelector('.folder-toggle');
                 const folderIcon = folderItem.querySelector('.folder-icon');
                 
-                // 先移除展开状态，触发重排，再添加展开状态以播放动画
-                content.classList.remove('expanded');
-                toggle.classList.remove('expanded');
-                folderIcon.classList.remove('expanded');
-                
-                void content.offsetWidth; // 触发重排
-                
-                content.classList.add('expanded');
-                toggle.classList.add('expanded');
-                folderIcon.classList.add('expanded');
-                
-                // 更新状态：确保文件夹在数据模型中也标记为展开
-                if (folderId === 'default') {
-                    AppState.defaultFolderExpanded = true;
-                } else {
-                    const folderInArray = AppState.folders.find(f => f.id === folderId);
-                    if (folderInArray) {
-                        folderInArray.expanded = true;
-                    }
+                if (content && toggle && folderIcon) {
+                    playExpandAnimation(content, toggle, folderIcon);
                 }
-                saveState();
             }
-        }, 50);
+        }, 0);
+
+        if (folderId === 'default') {
+            AppState.defaultFolderExpanded = true;
+        } else {
+            if (targetFolder) {
+                targetFolder.expanded = true;
+            }
+        }
+    } else {
+        renderFolderList();
+        saveState();
     }
     
     switchThread(thread.id);
@@ -1669,22 +1616,17 @@ function createNewThreadInFolder(folderId) {
     return thread;
 }
 
-/**
- * 在默认分组创建新线程 - 直接调用统一的 createNewThreadInFolder 函数
- */
 function createNewThreadInDefaultGroup() {
     return createNewThreadInFolder('default');
 }
 
 // ==================== 设置管理 ====================
-// 使用 settings.js 中的 SettingsService
 
 function initSettingsModal() {
     const settingsBtn = document.getElementById('settings-btn');
     
     if (!settingsBtn) return;
     
-    // 点击设置按钮，调用 SettingsService 打开设置弹窗
     settingsBtn.addEventListener('click', async (e) => {
         e.preventDefault();
         
@@ -1702,9 +1644,6 @@ function initSettingsModal() {
 
 // ==================== 初始化 ====================
 
-/**
- * 初始化所有功能
- */
 function initThreeColumnLayout() {
     loadState();
     
@@ -1717,6 +1656,7 @@ function initThreeColumnLayout() {
     initDeleteConfirmModal();
     initDeleteFolderConfirmModal();
     initSettingsModal();
+    initFolderDragDrop();
     
     renderFolderList();
     
@@ -1729,28 +1669,20 @@ function initThreeColumnLayout() {
     }
 }
 
-/**
- * 加载示例数据
- */
 function loadExampleData() {
-    // 创建一个示例文件夹
     const folder = createNewFolder('工作项目');
     
-    // 创建示例线程
     createNewThread('江苏足球联赛球队表现分析', folder.id);
     createNewThread('GDP 数据分析报告');
     createNewThread('代码审查与优化');
     
-    // 设置当前线程
     if (AppState.ungroupedThreads.length > 0) {
         switchThread(AppState.ungroupedThreads[0].id);
     }
 }
 
-// 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', initThreeColumnLayout);
 
-// 导出到全局
 window.AppState = AppState;
 window.updateProgressStats = updateProgressStats;
 window.addToolCallToChain = addToolCallToChain;

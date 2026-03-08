@@ -17,7 +17,6 @@
 
 <body>
     <div class="app-container">
-        <!-- ==================== 左侧栏：历史线程管理 ==================== -->
         <aside class="sidebar-left" id="sidebar-left">
             <div class="sidebar-header">
                 <div class="logo">
@@ -42,9 +41,7 @@
                     </div>
                 </div>
                 
-                <div class="folder-list" id="folder-list">
-                    <!-- 动态生成文件夹和线程列表 -->
-                </div>
+                <div class="folder-list" id="folder-list"></div>
             </div>
             
             <div class="sidebar-footer">
@@ -55,10 +52,8 @@
             </div>
         </aside>
 
-        <!-- ==================== 中间栏：主窗口对话 ==================== -->
         <main class="main-content">
             <div class="main-header">
-                <!-- 左侧按钮组：展开侧边栏 + 新建聊天 -->
                 <div class="sidebar-expand-btn-wrapper">
                     <button class="sidebar-expand-btn" id="sidebar-expand-btn" title="展开侧边栏">
                         <i class="fas fa-indent"></i>
@@ -68,7 +63,6 @@
                     </button>
                 </div>
                 
-                <!-- 中间标题 -->
                 <div class="main-title">
                     <h2 id="conversation-title">新对话</h2>
                     <button class="rename-title-btn" id="rename-title-btn" title="重命名标题">
@@ -76,7 +70,6 @@
                     </button>
                 </div>
                 
-                <!-- 右侧按钮组：清除 + 导出 -->
                 <div class="main-actions">
                     <button class="btn-icon" id="clear-chat-btn" title="清空对话">
                         <i class="fas fa-trash"></i>
@@ -88,7 +81,6 @@
             </div>
             
             <div class="chat-container" id="chat-container">
-                <!-- 欢迎界面 -->
                 <div class="welcome-screen" id="welcome-screen">
                     <div class="welcome-content">
                         <div class="welcome-icon">
@@ -99,15 +91,16 @@
                     </div>
                 </div>
                 
-                <!-- 对话消息列表 -->
-                <div class="message-list" id="message-list" style="display: none;">
-                    <!-- 动态生成消息 -->
-                </div>
+                <div class="message-list" id="message-list" style="display: none;"></div>
             </div>
             
             <div class="input-area">
                 <div class="input-container">
                     <div class="input-wrapper">
+                        <div class="file-preview-container" id="file-preview-container" style="display: none;">
+                            <div class="file-preview-list" id="file-preview-list"></div>
+                        </div>
+                        
                         <textarea 
                             class="chat-input" 
                             id="chat-input" 
@@ -127,7 +120,6 @@
             </div>
         </main>
 
-        <!-- ==================== 右侧栏：任务链和工具链展示 ==================== -->
         <aside class="sidebar-right" id="sidebar-right">
             <div class="sidebar-right-header">
                 <div class="sidebar-right-title">
@@ -145,7 +137,6 @@
             </div>
             
             <div class="sidebar-right-content">
-                <!-- 进度概览 -->
                 <div class="progress-overview">
                     <div class="progress-stats">
                         <div class="stat-item completed">
@@ -173,7 +164,6 @@
                     </div>
                 </div>
                 
-                <!-- 任务链 (DAG 图) -->
                 <div class="task-chain-section">
                     <div class="section-title-bar">
                         <span><i class="fas fa-sitemap"></i> 任务链</span>
@@ -183,21 +173,17 @@
                     </div>
                 </div>
                 
-                <!-- 工具链 -->
                 <div class="tool-chain-section">
                     <div class="section-title-bar">
                         <span><i class="fas fa-tools"></i> 工具链</span>
                         <span class="tool-count" id="tool-count">0</span>
                     </div>
-                    <div class="tool-chain-list" id="tool-chain-list">
-                        <!-- 动态生成工具调用列表 -->
-                    </div>
+                    <div class="tool-chain-list" id="tool-chain-list"></div>
                 </div>
             </div>
         </aside>
     </div>
 
-    <!-- 新建文件夹弹窗 -->
     <div class="modal-overlay" id="folder-modal-overlay" style="display: none;">
         <div class="modal">
             <div class="modal-header">
@@ -216,7 +202,6 @@
         </div>
     </div>
 
-    <!-- 重命名线程弹窗 -->
     <div class="modal-overlay" id="rename-modal-overlay" style="display: none;">
         <div class="modal">
             <div class="modal-header">
@@ -235,7 +220,6 @@
         </div>
     </div>
 
-    <!-- 删除线程确认弹窗 -->
     <div class="modal-overlay" id="delete-confirm-modal-overlay" style="display: none;">
         <div class="modal">
             <div class="modal-header">
@@ -254,7 +238,6 @@
         </div>
     </div>
 
-    <!-- 删除文件夹确认弹窗 -->
     <div class="modal-overlay" id="delete-folder-confirm-modal-overlay" style="display: none;">
         <div class="modal">
             <div class="modal-header">
@@ -273,15 +256,12 @@
         </div>
     </div>
 
-    <!-- 设置弹窗容器 -->
     <div id="settings-modal"></div>
 
-    <!-- 工具提示 -->
     <div class="tooltip" id="tooltip"></div>
     <div class="steps-tooltip" id="steps-tooltip"></div>
     <div class="verification-tooltip" id="verification-tooltip"></div>
 
-    <!-- 脚本加载：先加载 settings.js，确保 SettingsService 在全局可用 -->
     <script src="js/i18n.js"></script>
     <script src="js/settings.js"></script>
     <script src="js/main-new.js"></script>
