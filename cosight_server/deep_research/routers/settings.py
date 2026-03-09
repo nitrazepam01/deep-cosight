@@ -15,7 +15,10 @@
 
 import os
 import re
-from typing import Dict, List, Optional
+import json
+import time
+import uuid
+from typing import Dict, List, Optional, Any
 from fastapi import APIRouter
 from fastapi.params import Body
 from pydantic import BaseModel
@@ -312,3 +315,221 @@ async def save_settings(body: SettingsUpdateRequest):
     except Exception as e:
         logger.error(f"保存设置失败: {str(e)}", exc_info=True)
         return json_result(-1, f"保存设置失败: {str(e)}", None)
+
+
+# ==================== 供应商管理 ====================
+
+def _find_providers_path() -> str:
+    """定位 providers.json 文件路径（与 .env 同目录）"""
+    env_path = _find_env_path()
+    return os.path.join(os.path.dirname(env_path), "providers.json")
+
+
+def _read_providers() -> List[dict]:
+    """读取 providers.json"""
+    path = _find_providers_path()
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception as e:
+        logger.warning(f"读取 providers.json 失败: {e}")
+        return []
+
+
+def _write_providers(providers: List[dict]):
+    """写入 providers.json"""
+    path = _find_providers_path()
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(providers, f, ensure_ascii=False, indent=2)
+
+
+@settingsRouter.get("/deep-research/providers")
+async def get_providers():
+    """获取已配置的模型供应商列表"""
+    try:
+        providers = _read_providers()
+        # 对 API Key 脱敏
+        safe_providers = []
+        for p in providers:
+            sp = dict(p)
+            if sp.get("api_key"):
+                sp["api_key"] = _mask_value("API_KEY", sp["api_key"])
+            safe_providers.append(sp)
+        return json_result(0, "success", {"providers": safe_providers})
+    except Exception as e:
+        logger.error(f"获取供应商列表失败: {e}", exc_info=True)
+        return json_result(-1, f"获取供应商列表失败: {str(e)}", None)
+
+
+class ProvidersUpdateRequest(BaseModel):
+    providers: List[Dict[str, Any]]
+
+
+@settingsRouter.post("/deep-research/providers")
+async def save_providers(body: ProvidersUpdateRequest):
+    """保存供应商列表（全量覆盖）"""
+    try:
+        existing = _read_providers()
+        existing_map = {p.get("id"): p for p in existing if p.get("id")}
+
+        new_providers = []
+        for p in body.providers:
+            # 如果没有 id，自动生成
+            if not p.get("id"):
+                p["id"] = str(uuid.uuid4())[:8]
+            # 如果 api_key 是脱敏值，用旧值还原
+            if p.get("api_key") and _is_masked(p["api_key"]):
+                old = existing_map.get(p["id"])
+                if old:
+                    p["api_key"] = old.get("api_key", "")
+            new_providers.append(p)
+
+        _write_providers(new_providers)
+        logger.info(f"供应商列表已保存，共 {len(new_providers)} 个")
+        return json_result(0, "保存成功", {"count": len(new_providers)})
+    except Exception as e:
+        logger.error(f"保存供应商列表失败: {e}", exc_info=True)
+        return json_result(-1, f"保存失败: {str(e)}", None)
+
+
+class ProviderTestRequest(BaseModel):
+    provider_id: str
+    model: str = "gpt-4o-mini"
+
+
+@settingsRouter.post("/deep-research/providers/test")
+async def test_provider(body: ProviderTestRequest):
+    """测试供应商 API 连通性 — 从 providers.json 读取真实 API Key"""
+    try:
+        import httpx
+        from openai import OpenAI
+
+        # 从 providers.json 读取真实（未脱敏）的供应商信息
+        providers = _read_providers()
+        provider = None
+        for p in providers:
+            if p.get("id") == body.provider_id:
+                provider = p
+                break
+
+        if not provider:
+            return json_result(-1, f"未找到供应商 (id={body.provider_id})", None)
+
+        api_key = provider["api_key"]
+        base_url = provider["base_url"]
+        test_model = body.model
+
+        logger.info(f"测试供应商连接: base_url={base_url}, model={test_model}, api_key长度={len(api_key)}")
+
+        # 与 llm.py set_model() 完全一致的 httpx 客户端配置
+        http_client = httpx.Client(
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': api_key
+            },
+            verify=False,
+            trust_env=False,
+            timeout=httpx.Timeout(
+                connect=15.0,
+                read=30.0,
+                write=15.0,
+                pool=10.0
+            )
+        )
+
+        client = OpenAI(
+            base_url=base_url,
+            api_key=api_key,
+            http_client=http_client,
+        )
+
+        start = time.monotonic()
+
+        import asyncio
+        def _do_test():
+            return client.chat.completions.create(
+                model=test_model,
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=1,
+            )
+
+        response = await asyncio.to_thread(_do_test)
+        latency_ms = int((time.monotonic() - start) * 1000)
+
+        actual_model = response.model or test_model
+        logger.info(f"测试供应商成功: model={actual_model}, latency={latency_ms}ms")
+
+        http_client.close()
+
+        return json_result(0, "连接成功", {
+            "model": actual_model,
+            "latency_ms": latency_ms,
+        })
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"测试供应商连接失败: {error_msg}")
+
+        if "timeout" in error_msg.lower():
+            return json_result(-1, "连接超时（30秒）", None)
+        elif "401" in error_msg or "Unauthorized" in error_msg:
+            return json_result(-1, "认证失败：API Key 无效或已过期", {"error": error_msg})
+        elif "404" in error_msg:
+            return json_result(-1, "接口地址错误：未找到 chat/completions 端点", {"error": error_msg})
+        else:
+            return json_result(-1, f"连接失败: {error_msg[:200]}", {"error": error_msg[:500]})
+
+
+class ProviderApplyRequest(BaseModel):
+    provider_id: str
+    model_name: str
+    target_group: str  # e.g. "default", "plan", "act", "tool", "vision"
+
+
+# 模型分组 -> .env key 前缀映射
+_GROUP_PREFIX_MAP = {
+    "default": "",
+    "plan": "PLAN_",
+    "act": "ACT_",
+    "tool": "TOOL_",
+    "vision": "VISION_",
+    "credibility": "CREDIBILITY_",
+    "browser": "BROWSER_",
+}
+
+
+@settingsRouter.post("/deep-research/providers/apply")
+async def apply_provider(body: ProviderApplyRequest):
+    """将供应商的配置应用到指定模型分组（写入 .env）"""
+    try:
+        providers = _read_providers()
+        provider = next((p for p in providers if p.get("id") == body.provider_id), None)
+        if not provider:
+            return json_result(-1, "供应商不存在", None)
+
+        prefix = _GROUP_PREFIX_MAP.get(body.target_group)
+        if prefix is None:
+            return json_result(-1, f"未知的模型分组: {body.target_group}", None)
+
+        env_path = _find_env_path()
+        updates = {
+            f"{prefix}API_KEY": provider.get("api_key", ""),
+            f"{prefix}API_BASE_URL": provider.get("base_url", ""),
+            f"{prefix}MODEL_NAME": body.model_name,
+        }
+
+        current_values = _parse_env_file(env_path)
+        merged = {**current_values, **updates}
+        _write_env_file(env_path, merged)
+
+        # 同步更新环境变量
+        for k, v in updates.items():
+            os.environ[k] = v
+
+        logger.info(f"已将供应商 {provider.get('name')} 应用到 {body.target_group} 分组")
+        return json_result(0, "应用成功", {"updated_keys": list(updates.keys())})
+    except Exception as e:
+        logger.error(f"应用供应商配置失败: {e}", exc_info=True)
+        return json_result(-1, f"应用失败: {str(e)}", None)
