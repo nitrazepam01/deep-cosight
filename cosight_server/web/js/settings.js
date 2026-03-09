@@ -27,7 +27,7 @@ const SettingsService = (function () {
     }
 
     /* ---------- 渲染 ---------- */
-    function renderModal(groups) {
+    function renderModal(groups, isInitialRender = true) {
         _currentData = groups;
         const modal = document.getElementById('settings-modal');
         if (!modal) return;
@@ -37,51 +37,81 @@ const SettingsService = (function () {
             _activeGroup = groups[0].group;
         }
 
-        const sidebarItems = groups.map(g => `
-            <div class="settings-sidebar-item ${g.group === _activeGroup ? 'active' : ''}" 
-                 data-group="${g.group}" onclick="SettingsService.switchGroup('${g.group}')">
-                <i class="fas ${g.icon}"></i>
-                <span>${g.label_zh}</span>
-            </div>
-        `).join('');
-
-        const activeGroupData = groups.find(g => g.group === _activeGroup) || groups[0];
-        const formFields = renderGroupFields(activeGroupData);
-
-        modal.innerHTML = `
-            <div class="settings-overlay" onclick="SettingsService.close()"></div>
-            <div class="settings-panel">
-                <div class="settings-header">
-                    <h2><i class="fas fa-cog"></i> 设置</h2>
-                    <button class="settings-close-btn" onclick="SettingsService.close()">
-                        <i class="fas fa-times"></i>
-                    </button>
+        if (isInitialRender) {
+            // 首次渲染，生成完整 HTML
+            const sidebarItems = groups.map(g => `
+                <div class="settings-sidebar-item ${g.group === _activeGroup ? 'active' : ''}" 
+                     data-group="${g.group}" onclick="SettingsService.switchGroup('${g.group}')">
+                    <i class="fas ${g.icon}"></i>
+                    <span>${g.label_zh}</span>
                 </div>
-                <div class="settings-body">
-                    <div class="settings-sidebar">${sidebarItems}</div>
-                    <div class="settings-content">
-                        <div class="settings-group-title">
-                            <i class="fas ${activeGroupData.icon}"></i>
-                            ${activeGroupData.label_zh}
-                            <span class="settings-group-subtitle">${activeGroupData.label_en}</span>
-                        </div>
-                        <div class="settings-fields">${formFields}</div>
-                    </div>
-                </div>
-                <div class="settings-footer">
-                    <div class="settings-footer-hint">
-                        <i class="fas fa-info-circle"></i>
-                        修改配置后需要重启服务才能完全生效
-                    </div>
-                    <div class="settings-footer-actions">
-                        <button class="settings-btn settings-btn-cancel" onclick="SettingsService.close()">取消</button>
-                        <button class="settings-btn settings-btn-save" onclick="SettingsService.save()">
-                            <i class="fas fa-save"></i> 保存
+            `).join('');
+
+            const activeGroupData = groups.find(g => g.group === _activeGroup) || groups[0];
+            const formFields = renderGroupFields(activeGroupData);
+
+            modal.innerHTML = `
+                <div class="settings-overlay" onclick="SettingsService.close()"></div>
+                <div class="settings-panel">
+                    <div class="settings-header">
+                        <h2><i class="fas fa-cog"></i> 设置</h2>
+                        <button class="settings-close-btn" onclick="SettingsService.close()">
+                            <i class="fas fa-times"></i>
                         </button>
                     </div>
+                    <div class="settings-body">
+                        <div class="settings-sidebar">${sidebarItems}</div>
+                        <div class="settings-content">
+                            <div class="settings-group-title">
+                                <i class="fas ${activeGroupData.icon}"></i>
+                                ${activeGroupData.label_zh}
+                                <span class="settings-group-subtitle">${activeGroupData.label_en}</span>
+                            </div>
+                            <div class="settings-fields">${formFields}</div>
+                        </div>
+                    </div>
+                    <div class="settings-footer">
+                        <div class="settings-footer-hint">
+                            <i class="fas fa-info-circle"></i>
+                            修改配置后需要重启服务才能完全生效
+                        </div>
+                        <div class="settings-footer-actions">
+                            <button class="settings-btn settings-btn-cancel" onclick="SettingsService.close()">取消</button>
+                            <button class="settings-btn settings-btn-save" onclick="SettingsService.save()">
+                                <i class="fas fa-save"></i> 保存
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        } else {
+            // 切换分组时，只更新右侧内容和左侧选中状态
+            const activeGroupData = groups.find(g => g.group === _activeGroup) || groups[0];
+            const formFields = renderGroupFields(activeGroupData);
+            
+            // 更新左侧选中状态
+            const sidebarItems = modal.querySelectorAll('.settings-sidebar-item');
+            sidebarItems.forEach(item => {
+                if (item.dataset.group === _activeGroup) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+            
+            // 更新右侧标题和内容
+            const contentDiv = modal.querySelector('.settings-content');
+            if (contentDiv) {
+                contentDiv.innerHTML = `
+                    <div class="settings-group-title">
+                        <i class="fas ${activeGroupData.icon}"></i>
+                        ${activeGroupData.label_zh}
+                        <span class="settings-group-subtitle">${activeGroupData.label_en}</span>
+                    </div>
+                    <div class="settings-fields">${formFields}</div>
+                `;
+            }
+        }
 
         modal.classList.add('show');
         document.body.style.overflow = 'hidden';
@@ -126,7 +156,7 @@ const SettingsService = (function () {
     /* ---------- 交互 ---------- */
     function switchGroup(groupName) {
         _activeGroup = groupName;
-        if (_currentData) renderModal(_currentData);
+        if (_currentData) renderModal(_currentData, false); // 切换分组时不重新渲染整个弹窗
     }
 
     function togglePassword(btn) {
@@ -154,7 +184,10 @@ const SettingsService = (function () {
         const modal = document.getElementById('settings-modal');
         if (modal) {
             modal.classList.remove('show');
-            setTimeout(() => { modal.innerHTML = ''; }, 300);
+            // 等待动画结束后再清空内容
+            setTimeout(() => {
+                if (modal) modal.innerHTML = '';
+            }, 300);
         }
         document.body.style.overflow = '';
         _activeGroup = null;
@@ -244,3 +277,6 @@ const SettingsService = (function () {
     /* ---------- 公开接口 ---------- */
     return { open, close, save, switchGroup, togglePassword };
 })();
+
+// 导出到全局
+window.SettingsService = SettingsService;
