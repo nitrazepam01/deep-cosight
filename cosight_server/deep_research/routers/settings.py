@@ -533,3 +533,101 @@ async def apply_provider(body: ProviderApplyRequest):
     except Exception as e:
         logger.error(f"应用供应商配置失败: {e}", exc_info=True)
         return json_result(-1, f"应用失败: {str(e)}", None)
+
+
+# ==================== 智能体管理 ====================
+
+def _find_agents_path() -> str:
+    """定位 agents.json 文件路径（与 .env 同目录）"""
+    env_path = _find_env_path()
+    return os.path.join(os.path.dirname(env_path), "agents.json")
+
+
+def _read_agents() -> List[dict]:
+    """读取 agents.json"""
+    path = _find_agents_path()
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception as e:
+        logger.warning(f"读取 agents.json 失败: {e}")
+        return []
+
+
+def _write_agents(agents: List[dict]):
+    """写入 agents.json"""
+    path = _find_agents_path()
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(agents, f, ensure_ascii=False, indent=2)
+
+
+@settingsRouter.get("/deep-research/agents")
+async def get_agents():
+    """获取所有智能体配置"""
+    try:
+        agents = _read_agents()
+        return json_result(0, "success", {"agents": agents})
+    except Exception as e:
+        logger.error(f"读取智能体失败: {e}", exc_info=True)
+        return json_result(-1, f"读取失败: {str(e)}", None)
+
+
+class AgentSaveRequest(BaseModel):
+    id: str = ""
+    name: str
+    description: str = ""
+    system_prompt: str = ""
+    provider_id: str = ""
+    model_name: str = ""
+    enabled: bool = True
+    is_default: bool = False
+
+
+@settingsRouter.post("/deep-research/agents")
+async def save_agent(body: AgentSaveRequest):
+    """创建或更新智能体"""
+    try:
+        agents = _read_agents()
+        agent_data = body.model_dump()
+
+        if not agent_data["id"]:
+            import uuid
+            agent_data["id"] = uuid.uuid4().hex[:8]
+
+        # 如果设置为默认，取消其他默认
+        if agent_data.get("is_default"):
+            for a in agents:
+                a["is_default"] = False
+
+        existing = next((i for i, a in enumerate(agents) if a["id"] == agent_data["id"]), None)
+        if existing is not None:
+            agents[existing] = agent_data
+        else:
+            agents.append(agent_data)
+
+        _write_agents(agents)
+        logger.info(f"保存智能体: {agent_data['name']} (id={agent_data['id']})")
+        return json_result(0, "保存成功", {"agent": agent_data})
+    except Exception as e:
+        logger.error(f"保存智能体失败: {e}", exc_info=True)
+        return json_result(-1, f"保存失败: {str(e)}", None)
+
+
+@settingsRouter.delete("/deep-research/agents/{agent_id}")
+async def delete_agent(agent_id: str):
+    """删除智能体"""
+    try:
+        agents = _read_agents()
+        new_agents = [a for a in agents if a.get("id") != agent_id]
+        if len(new_agents) == len(agents):
+            return json_result(-1, "智能体不存在", None)
+        _write_agents(new_agents)
+        logger.info(f"删除智能体: id={agent_id}")
+        return json_result(0, "删除成功", None)
+    except Exception as e:
+        logger.error(f"删除智能体失败: {e}", exc_info=True)
+        return json_result(-1, f"删除失败: {str(e)}", None)
+

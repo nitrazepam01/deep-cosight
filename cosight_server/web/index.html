@@ -27,6 +27,9 @@
         <div class="header">
             <h1><i class="fas fa-robot"></i> Co-Sight 超级智能体</h1>
             <div class="header-buttons">
+                <button class="btn-agents" onclick="AgentService.open()" title="智能体管理">
+                    <i class="fas fa-robot"></i>
+                </button>
                 <button class="btn-settings" onclick="SettingsService.open()" title="设置">
                     <i class="fas fa-cog"></i>
                 </button>
@@ -204,6 +207,8 @@
 
     <!-- 设置弹窗容器 -->
     <div id="settings-modal"></div>
+    <!-- 智能体管理弹窗容器 -->
+    <div id="agent-modal"></div>
 
     <div class="tooltip" id="tooltip"></div>
     <div class="steps-tooltip" id="steps-tooltip"></div>
@@ -218,6 +223,7 @@
     <script src="js/dag.js"></script>
     <script src="js/credibility.js"></script>
     <script src="js/settings.js"></script>
+    <script src="js/agents.js"></script>
     <script src="js/main.js"></script>
     <script src="temp/test.js"></script>
     <script src="temp/data.js"></script>
