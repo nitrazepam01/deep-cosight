@@ -2610,53 +2610,178 @@ body {
 }
 
 .agent-run-config {
-    margin-bottom: 12px;
+    margin-bottom: 20px;
+    width: 100%;
+}
+
+.initial-agent-wrapper {
+    max-width: 680px;
+}
+
+.main-agent-wrapper {
+    padding-left: 16px;
+    padding-right: 16px;
 }
 
 .agent-run-card {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 12px 14px;
-    border-radius: 14px;
-    border: 1px solid #e5e9f2;
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 10px 24px rgba(31, 41, 55, 0.08);
+    gap: 12px;
+    padding: 18px 22px;
+    border-radius: 16px;
+    border: 1px solid #e0e0e0;
+    background: #fafbfc;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); /* Softer shadow */
+    transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+    z-index: 1;
+}
+
+/* 渐变边框动画交互 */
+.agent-run-card::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 18px; /* Slightly larger than card */
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 50%, #667eea 100%);
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    /* 蒙版让它只在边缘显示，内部透明 */
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    padding: 2px;
+    /* Animated */
+    background-size: 200% 200%;
+    animation: gradientShift 3s ease infinite;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.agent-run-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    background: #ffffff;
+}
+
+.agent-run-card:hover::before {
+    opacity: 1;
 }
 
 .agent-run-header {
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 700;
-    color: #344054;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.agent-run-header::before {
+    content: '\f544'; /* FontAwesome robot icon */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    color: #667eea;
 }
 
 .agent-run-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
+    gap: 16px;
 }
 
 .agent-run-field {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    font-size: 12px;
-    color: #475467;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    position: relative;
 }
 
-.agent-run-field select {
+.custom-select-container {
+    position: relative;
+    user-select: none;
+}
+
+.custom-select-trigger {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     width: 100%;
-    border: 1px solid #d0d5dd;
-    border-radius: 10px;
-    padding: 8px 10px;
-    background: #fff;
-    color: #101828;
-    font-size: 12px;
-    outline: none;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    background: #fafbfc;
+    color: #333;
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
-.agent-run-field select[multiple] {
-    min-height: 88px;
+.custom-select-trigger:hover {
+    border-color: #667eea;
+}
+
+.custom-select-value {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 90%;
+}
+
+.custom-select-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 6px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    z-index: 100;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.custom-select-option {
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 14px;
+    color: #333;
+    display: flex;
+    align-items: center;
+}
+
+.custom-select-option:not(:last-child) {
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.custom-select-option:hover {
+    background: #f0f4ff;
+}
+
+.custom-select-option.multi {
+    gap: 8px;
+    cursor: pointer;
+}
+
+.custom-select-option.multi input {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
 }
 
 @media (max-width: 900px) {

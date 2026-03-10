@@ -1999,108 +1999,145 @@ const RuntimeAgentSelector = (function () {
 
   function ensureContainers() {
     const initialField = document.querySelector(".initial-input-field-container");
-    if (initialField && !document.getElementById("initial-agent-selector")) {
+    if (initialField && initialField.parentNode && !document.getElementById("initial-agent-selector")) {
       const container = document.createElement("div");
       container.id = "initial-agent-selector";
-      container.className = "agent-run-config";
-      initialField.insertBefore(container, initialField.firstChild);
+      container.className = "agent-run-config initial-agent-wrapper";
+      initialField.parentNode.insertBefore(container, initialField);
     }
 
     const mainInput = document.querySelector(".input");
-    if (mainInput && !document.getElementById("main-agent-selector")) {
+    if (mainInput && mainInput.parentNode && !document.getElementById("main-agent-selector")) {
       const container = document.createElement("div");
       container.id = "main-agent-selector";
-      container.className = "agent-run-config";
-      mainInput.insertBefore(container, mainInput.firstChild);
+      container.className = "agent-run-config main-agent-wrapper";
+      mainInput.parentNode.insertBefore(container, mainInput);
     }
   }
 
-  function buildActorOptions(selectedIds) {
-    return (runtimeDefaults.actors || [])
-      .map((actor) => {
-        const selected = selectedIds.includes(actor.id) ? "selected" : "";
-        return `<option value="${actor.id}" ${selected}>${actor.name}</option>`;
-      })
-      .join("");
+  function getPlannerName(id) {
+    const p = (runtimeDefaults.planners || []).find(x => x.id === id);
+    return p ? p.name : id;
   }
-
-  function buildDefaultActorOptions(selectedIds, defaultActorId) {
-    return (runtimeDefaults.actors || [])
-      .filter((actor) => selectedIds.includes(actor.id))
-      .map((actor) => {
-        const selected = actor.id === defaultActorId ? "selected" : "";
-        return `<option value="${actor.id}" ${selected}>${actor.name}</option>`;
-      })
-      .join("");
+  function getActorName(id) {
+    const a = (runtimeDefaults.actors || []).find(x => x.id === id);
+    return a ? a.name : id;
+  }
+  function getActorNames(ids) {
+    return ids.map(id => getActorName(id)).join(', ');
   }
 
   function renderSelector(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const plannerOptions = (runtimeDefaults.planners || [])
-      .map((planner) => {
-        const selected = planner.id === state.planner_id ? "selected" : "";
-        return `<option value="${planner.id}" ${selected}>${planner.name}</option>`;
-      })
-      .join("");
-
     container.innerHTML = `
       <div class="agent-run-card">
         <div class="agent-run-header">运行时智能体</div>
         <div class="agent-run-grid">
-          <label class="agent-run-field">
-            <span>Planner</span>
-            <select data-role="planner">${plannerOptions}</select>
-          </label>
-          <label class="agent-run-field">
-            <span>Actors</span>
-            <select data-role="actors" multiple size="3">${buildActorOptions(
-              state.allowed_actor_ids
-            )}</select>
-          </label>
-          <label class="agent-run-field">
-            <span>默认 Actor</span>
-            <select data-role="default-actor">${buildDefaultActorOptions(
-              state.allowed_actor_ids,
-              state.default_actor_id
-            )}</select>
-          </label>
-          <label class="agent-run-field">
-            <span>分配模式</span>
-            <select data-role="dispatch-mode">
-              <option value="single_actor" ${
-                state.dispatch_mode === "single_actor" ? "selected" : ""
-              }>Single Actor</option>
-              <option value="planner_assign" ${
-                state.dispatch_mode === "planner_assign" ? "selected" : ""
-              }>Planner Assign</option>
-            </select>
-          </label>
+           <!-- Custom Select: Planner -->
+           <div class="agent-run-field custom-select-container">
+             <span>Planner</span>
+             <div class="custom-select-trigger" data-dropdown="planner-${containerId}">
+                <span class="custom-select-value">${getPlannerName(state.planner_id)}</span>
+                <i class="fas fa-chevron-down"></i>
+             </div>
+             <div class="custom-select-dropdown" id="planner-${containerId}" style="display:none;">
+               ${(runtimeDefaults.planners || []).map(p => `
+                 <div class="custom-select-option" data-value="${p.id}" data-role-target="planner">${p.name}</div>
+               `).join("")}
+             </div>
+           </div>
+           
+           <!-- Custom Select: Actors -->
+           <div class="agent-run-field custom-select-container">
+             <span>Actors</span>
+             <div class="custom-select-trigger" data-dropdown="actors-${containerId}">
+                <span class="custom-select-value">${state.allowed_actor_ids.length > 0 ? getActorNames(state.allowed_actor_ids) : '无'}</span>
+                <i class="fas fa-chevron-down"></i>
+             </div>
+             <div class="custom-select-dropdown" id="actors-${containerId}" style="display:none;">
+               ${(runtimeDefaults.actors || []).map(a => `
+                 <label class="custom-select-option multi" onclick="event.stopPropagation()">
+                   <input type="checkbox" value="${a.id}" ${state.allowed_actor_ids.includes(a.id)?'checked':''} data-role-target="actors" />
+                   <span>${a.name}</span>
+                 </label>
+               `).join("")}
+             </div>
+           </div>
+
+           <!-- Custom Select: Default Actor -->
+           <div class="agent-run-field custom-select-container">
+             <span>默认 Actor</span>
+             <div class="custom-select-trigger" data-dropdown="default-actor-${containerId}">
+                <span class="custom-select-value">${getActorName(state.default_actor_id)}</span>
+                <i class="fas fa-chevron-down"></i>
+             </div>
+             <div class="custom-select-dropdown" id="default-actor-${containerId}" style="display:none;">
+               ${(runtimeDefaults.actors || []).filter(a => state.allowed_actor_ids.includes(a.id)).map(a => `
+                 <div class="custom-select-option" data-value="${a.id}" data-role-target="default-actor">${a.name}</div>
+               `).join("")}
+             </div>
+           </div>
+
+           <!-- Custom Select: Dispatch Mode -->
+           <div class="agent-run-field custom-select-container">
+             <span>分配模式</span>
+             <div class="custom-select-trigger" data-dropdown="dispatch-mode-${containerId}">
+                <span class="custom-select-value">${state.dispatch_mode === 'planner_assign' ? 'Planner Assign' : 'Single Actor'}</span>
+                <i class="fas fa-chevron-down"></i>
+             </div>
+             <div class="custom-select-dropdown" id="dispatch-mode-${containerId}" style="display:none;">
+                <div class="custom-select-option" data-value="single_actor" data-role-target="dispatch-mode">Single Actor</div>
+                <div class="custom-select-option" data-value="planner_assign" data-role-target="dispatch-mode">Planner Assign</div>
+             </div>
+           </div>
         </div>
       </div>
     `;
 
-    container.querySelector('[data-role="planner"]')?.addEventListener("change", (event) => {
-      updateState({ planner_id: event.target.value });
+    // Handle toggling dropdowns
+    container.querySelectorAll('.custom-select-trigger').forEach(trigger => {
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const dropdownId = trigger.getAttribute('data-dropdown');
+        const dropdown = document.getElementById(dropdownId);
+        const isVisible = dropdown.style.display === 'block';
+
+        // Hide all other dropdowns
+        document.querySelectorAll('.custom-select-dropdown').forEach(d => d.style.display = 'none');
+        
+        if (!isVisible) {
+          dropdown.style.display = 'block';
+        }
+      });
     });
 
-    container.querySelector('[data-role="actors"]')?.addEventListener("change", (event) => {
-      const nextActors = Array.from(event.target.selectedOptions).map((option) => option.value);
-      updateState({ allowed_actor_ids: nextActors });
+    // Handle single selections
+    container.querySelectorAll('.custom-select-option:not(.multi)').forEach(opt => {
+      opt.addEventListener('click', (e) => {
+        const val = opt.getAttribute('data-value');
+        const role = opt.getAttribute('data-role-target');
+        if (role === 'planner') updateState({ planner_id: val });
+        if (role === 'default-actor') updateState({ default_actor_id: val });
+        if (role === 'dispatch-mode') updateState({ dispatch_mode: val });
+      });
     });
 
-    container
-      .querySelector('[data-role="default-actor"]')
-      ?.addEventListener("change", (event) => {
-        updateState({ default_actor_id: event.target.value });
+    // Handle multi selections
+    container.querySelectorAll('input[data-role-target="actors"]').forEach(chk => {
+      chk.addEventListener('change', (e) => {
+        const dropdown = chk.closest('.custom-select-dropdown');
+        const nextActors = Array.from(dropdown.querySelectorAll('input:checked')).map(i => i.value);
+        
+        const openId = dropdown.id;
+        updateState({ allowed_actor_ids: nextActors });
+        
+        // Re-open since renderAll destroys the DOM
+        const newDropdown = document.getElementById(openId);
+        if (newDropdown) newDropdown.style.display = 'block';
       });
-
-    container
-      .querySelector('[data-role="dispatch-mode"]')
-      ?.addEventListener("change", (event) => {
-        updateState({ dispatch_mode: event.target.value });
-      });
+    });
   }
 
   function renderAll() {
@@ -2115,6 +2152,13 @@ const RuntimeAgentSelector = (function () {
   }
 
   async function init() {
+    if (!window.__globalClickAdded) {
+      document.addEventListener('click', () => {
+        document.querySelectorAll('.custom-select-dropdown').forEach(d => d.style.display = 'none');
+      });
+      window.__globalClickAdded = true;
+    }
+    
     if (!initPromise) {
       initPromise = (async () => {
         ensureContainers();
