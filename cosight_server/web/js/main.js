@@ -897,7 +897,38 @@ function normalizeFilePathForFrontend(originalPath) {
 
 // 从原始绝对路径构造 API 工作区路径：/api/nae-deep-research/v1/work_space/...
 function buildApiWorkspacePath(originalPath) {
-  return originalPath;
+  if (!originalPath || typeof originalPath !== "string") {
+    return originalPath;
+  }
+
+  try {
+    const normalized = originalPath.replace(/\\/g, "/").trim();
+    if (!normalized) {
+      return originalPath;
+    }
+
+    if (normalized.startsWith("/api/")) {
+      return normalized;
+    }
+
+    const markerIndex = normalized.indexOf("work_space");
+    if (markerIndex === -1) {
+      return originalPath;
+    }
+
+    let relativePath = normalized.substring(markerIndex);
+    if (!relativePath.startsWith("work_space/")) {
+      if (relativePath.startsWith("work_space_")) {
+        relativePath = `work_space/${relativePath}`;
+      } else if (relativePath.startsWith("work_space")) {
+        relativePath = relativePath.replace(/^work_space\/?/, "work_space/");
+      }
+    }
+
+    return `/api/nae-deep-research/v1/${relativePath}`;
+  } catch (e) {
+    return originalPath;
+  }
 }
 
 // 提取文件名（兼容 \ 与 /）
@@ -2778,24 +2809,7 @@ function showRightPanelForTool(toolCall) {
     const fileName = path.split("/").pop() || path.split("\\").pop() || "";
     const ext = (fileName.split(".").pop() || "").toLowerCase();
 
-    // 将绝对路径转换为相对路径（与 loadMarkdownFile 保持一致）
-    let relativePath = path;
-    // 如果路径已经是完整的API路径（以/api/开头），直接使用
-    if (relativePath.startsWith("/api/")) {
-      relativePath = path;
-    } else if (relativePath.includes("work_space")) {
-      // 提取work_space之后的路径部分
-      const workspaceIndex = relativePath.indexOf("work_space");
-      if (workspaceIndex !== -1) {
-        relativePath = relativePath.substring(workspaceIndex);
-      }
-    } else if (relativePath.includes("workspace")) {
-      // 兼容旧的workspace命名
-      const workspaceIndex = relativePath.indexOf("workspace");
-      if (workspaceIndex !== -1) {
-        relativePath = relativePath.substring(workspaceIndex);
-      }
-    }
+    const relativePath = buildApiWorkspacePath(path);
 
     if (ext === "html" || ext === "htm") {
       // 使用 iframe 显示 HTML 文件
@@ -3233,24 +3247,7 @@ function loadMarkdownFile(filePath, tool, toolCall) {
     statusElement.className = "loading";
   }
 
-  // 将绝对路径转换为相对路径
-  let relativePath = filePath;
-  // 如果路径已经是完整的API路径（以/api/开头），直接使用
-  if (filePath.startsWith("/api/")) {
-    relativePath = filePath;
-  } else if (filePath.includes("work_space")) {
-    // 提取work_space之后的路径部分
-    const workspaceIndex = filePath.indexOf("work_space");
-    if (workspaceIndex !== -1) {
-      relativePath = filePath.substring(workspaceIndex);
-    }
-  } else if (filePath.includes("workspace")) {
-    // 兼容旧的workspace命名
-    const workspaceIndex = filePath.indexOf("workspace");
-    if (workspaceIndex !== -1) {
-      relativePath = filePath.substring(workspaceIndex);
-    }
-  }
+  const relativePath = buildApiWorkspacePath(filePath);
 
   console.log("尝试加载文件:", relativePath);
 
