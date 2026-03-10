@@ -1438,6 +1438,14 @@ function createToolCallItem(toolCall) {
   nameText.textContent = toolCall.toolName;
   name.appendChild(nameText);
 
+  if (toolCall.agentName) {
+    const agentBadge = document.createElement("span");
+    agentBadge.textContent = toolCall.agentName;
+    agentBadge.style.cssText =
+      "display:inline-flex;align-items:center;margin-left:8px;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3949ab;font-size:11px;font-weight:600;";
+    name.appendChild(agentBadge);
+  }
+
   // 添加验证步骤图标
   const verificationIcons = createVerificationIcons(toolCall);
   if (verificationIcons) {
@@ -1890,7 +1898,290 @@ function initFileUpload() {
 }
 
 // 输入框处理函数
+const RuntimeAgentSelector = (function () {
+  const API_BASE = "/api/nae-deep-research/v1";
+  const STORAGE_KEY = "cosight:agentRunConfig";
+  let runtimeDefaults = {
+    planners: [],
+    actors: [],
+    default_planner: null,
+    default_actor: null,
+  };
+  let state = {
+    planner_id: "",
+    allowed_actor_ids: [],
+    default_actor_id: "",
+    dispatch_mode: "single_actor",
+  };
+  let initPromise = null;
+
+  function getAgentMap() {
+    const items = [...(runtimeDefaults.planners || []), ...(runtimeDefaults.actors || [])];
+    return new Map(items.map((item) => [item.id, item]));
+  }
+
+  function getAgentName(agentId) {
+    if (!agentId) return "";
+    const agent = getAgentMap().get(agentId);
+    return agent && agent.name ? agent.name : agentId;
+  }
+
+  function loadStoredState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (error) {
+      console.warn("Failed to parse stored agentRunConfig:", error);
+      return {};
+    }
+  }
+
+  function persistState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      console.warn("Failed to persist agentRunConfig:", error);
+    }
+  }
+
+  function normalizeState(candidate = {}) {
+    const plannerMap = new Map((runtimeDefaults.planners || []).map((item) => [item.id, item]));
+    const actorMap = new Map((runtimeDefaults.actors || []).map((item) => [item.id, item]));
+    const defaultPlannerId =
+      runtimeDefaults.default_planner?.id ||
+      runtimeDefaults.planners?.[0]?.id ||
+      "builtin-planner";
+    const defaultActorId =
+      runtimeDefaults.default_actor?.id ||
+      runtimeDefaults.actors?.[0]?.id ||
+      "builtin-actor";
+
+    const planner_id = plannerMap.has(candidate.planner_id)
+      ? candidate.planner_id
+      : defaultPlannerId;
+
+    const requestedActors = Array.isArray(candidate.allowed_actor_ids)
+      ? candidate.allowed_actor_ids.filter((actorId) => actorMap.has(actorId))
+      : [];
+    const allowed_actor_ids = Array.from(new Set(requestedActors));
+    const normalizedAllowedActors =
+      allowed_actor_ids.length > 0
+        ? allowed_actor_ids
+        : actorMap.has(defaultActorId)
+        ? [defaultActorId]
+        : runtimeDefaults.actors?.[0]
+        ? [runtimeDefaults.actors[0].id]
+        : [];
+
+    const default_actor_id = normalizedAllowedActors.includes(candidate.default_actor_id)
+      ? candidate.default_actor_id
+      : normalizedAllowedActors[0] || defaultActorId;
+
+    const dispatch_mode =
+      candidate.dispatch_mode === "planner_assign" ? "planner_assign" : "single_actor";
+
+    return {
+      planner_id,
+      allowed_actor_ids: normalizedAllowedActors,
+      default_actor_id,
+      dispatch_mode,
+    };
+  }
+
+  async function fetchRuntimeDefaults() {
+    const response = await fetch(`${API_BASE}/deep-research/runtime-agent-defaults`);
+    const json = await response.json();
+    if (json.code !== 200 && json.code !== 0) {
+      throw new Error(json.msg || "Failed to fetch runtime agent defaults");
+    }
+    return json.data || {};
+  }
+
+  function ensureContainers() {
+    const initialField = document.querySelector(".initial-input-field-container");
+    if (initialField && !document.getElementById("initial-agent-selector")) {
+      const container = document.createElement("div");
+      container.id = "initial-agent-selector";
+      container.className = "agent-run-config";
+      initialField.insertBefore(container, initialField.firstChild);
+    }
+
+    const mainInput = document.querySelector(".input");
+    if (mainInput && !document.getElementById("main-agent-selector")) {
+      const container = document.createElement("div");
+      container.id = "main-agent-selector";
+      container.className = "agent-run-config";
+      mainInput.insertBefore(container, mainInput.firstChild);
+    }
+  }
+
+  function buildActorOptions(selectedIds) {
+    return (runtimeDefaults.actors || [])
+      .map((actor) => {
+        const selected = selectedIds.includes(actor.id) ? "selected" : "";
+        return `<option value="${actor.id}" ${selected}>${actor.name}</option>`;
+      })
+      .join("");
+  }
+
+  function buildDefaultActorOptions(selectedIds, defaultActorId) {
+    return (runtimeDefaults.actors || [])
+      .filter((actor) => selectedIds.includes(actor.id))
+      .map((actor) => {
+        const selected = actor.id === defaultActorId ? "selected" : "";
+        return `<option value="${actor.id}" ${selected}>${actor.name}</option>`;
+      })
+      .join("");
+  }
+
+  function renderSelector(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const plannerOptions = (runtimeDefaults.planners || [])
+      .map((planner) => {
+        const selected = planner.id === state.planner_id ? "selected" : "";
+        return `<option value="${planner.id}" ${selected}>${planner.name}</option>`;
+      })
+      .join("");
+
+    container.innerHTML = `
+      <div class="agent-run-card">
+        <div class="agent-run-header">运行时智能体</div>
+        <div class="agent-run-grid">
+          <label class="agent-run-field">
+            <span>Planner</span>
+            <select data-role="planner">${plannerOptions}</select>
+          </label>
+          <label class="agent-run-field">
+            <span>Actors</span>
+            <select data-role="actors" multiple size="3">${buildActorOptions(
+              state.allowed_actor_ids
+            )}</select>
+          </label>
+          <label class="agent-run-field">
+            <span>默认 Actor</span>
+            <select data-role="default-actor">${buildDefaultActorOptions(
+              state.allowed_actor_ids,
+              state.default_actor_id
+            )}</select>
+          </label>
+          <label class="agent-run-field">
+            <span>分配模式</span>
+            <select data-role="dispatch-mode">
+              <option value="single_actor" ${
+                state.dispatch_mode === "single_actor" ? "selected" : ""
+              }>Single Actor</option>
+              <option value="planner_assign" ${
+                state.dispatch_mode === "planner_assign" ? "selected" : ""
+              }>Planner Assign</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    `;
+
+    container.querySelector('[data-role="planner"]')?.addEventListener("change", (event) => {
+      updateState({ planner_id: event.target.value });
+    });
+
+    container.querySelector('[data-role="actors"]')?.addEventListener("change", (event) => {
+      const nextActors = Array.from(event.target.selectedOptions).map((option) => option.value);
+      updateState({ allowed_actor_ids: nextActors });
+    });
+
+    container
+      .querySelector('[data-role="default-actor"]')
+      ?.addEventListener("change", (event) => {
+        updateState({ default_actor_id: event.target.value });
+      });
+
+    container
+      .querySelector('[data-role="dispatch-mode"]')
+      ?.addEventListener("change", (event) => {
+        updateState({ dispatch_mode: event.target.value });
+      });
+  }
+
+  function renderAll() {
+    renderSelector("initial-agent-selector");
+    renderSelector("main-agent-selector");
+  }
+
+  function updateState(patch) {
+    state = normalizeState({ ...state, ...patch });
+    persistState();
+    renderAll();
+  }
+
+  async function init() {
+    if (!initPromise) {
+      initPromise = (async () => {
+        ensureContainers();
+        runtimeDefaults = await fetchRuntimeDefaults();
+        state = normalizeState(loadStoredState());
+        persistState();
+        renderAll();
+      })().catch((error) => {
+        console.warn("RuntimeAgentSelector init failed:", error);
+        initPromise = null;
+      });
+    }
+    return initPromise;
+  }
+
+  async function refresh() {
+    runtimeDefaults = await fetchRuntimeDefaults();
+    state = normalizeState(state);
+    persistState();
+    ensureContainers();
+    renderAll();
+  }
+
+  function getSelectedConfig() {
+    return { ...state, allowed_actor_ids: [...state.allowed_actor_ids] };
+  }
+
+  return {
+    init,
+    refresh,
+    getSelectedConfig,
+    getAgentName,
+  };
+})();
+
+window.RuntimeAgentSelector = RuntimeAgentSelector;
+
+function getRuntimeAgentDisplayName(agentId) {
+  if (!agentId) return "未分配";
+  if (
+    window.RuntimeAgentSelector &&
+    typeof window.RuntimeAgentSelector.getAgentName === "function"
+  ) {
+    return window.RuntimeAgentSelector.getAgentName(agentId) || agentId;
+  }
+  return agentId;
+}
+
+function formatStepAgentSummary(step) {
+  const planned = step.plannedAgentId
+    ? `计划执行: ${getRuntimeAgentDisplayName(step.plannedAgentId)}`
+    : "计划执行: 未分配";
+  const actual = step.executionAgentId
+    ? `实际执行: ${getRuntimeAgentDisplayName(step.executionAgentId)}`
+    : "实际执行: 未开始";
+  const fallback = step.isFallback ? "已回退到默认 Actor" : "";
+  return [planned, actual, fallback].filter(Boolean).join(" | ");
+}
+
 function initInputHandler() {
+  if (
+    window.RuntimeAgentSelector &&
+    typeof window.RuntimeAgentSelector.init === "function"
+  ) {
+    window.RuntimeAgentSelector.init();
+  }
+
   const messageInput = document.getElementById("message-input");
   const sendButton = document.getElementById("send-button");
   const replayButton = document.getElementById("replay-button");
@@ -1937,7 +2228,12 @@ function initInputHandler() {
         ) {
           window.messageService.sendReplay();
         } else {
-          messageService.sendMessage(message);
+          const agentRunConfig =
+            window.RuntimeAgentSelector &&
+            typeof window.RuntimeAgentSelector.getSelectedConfig === "function"
+              ? window.RuntimeAgentSelector.getSelectedConfig()
+              : null;
+          messageService.sendMessage(message, { agentRunConfig });
         }
         // 清空输入框
         messageInput.value = "";
@@ -2045,7 +2341,12 @@ function initInputHandler() {
         typeof window.messageService.sendMessage === "function" &&
         message
       ) {
-        window.messageService.sendMessage(message);
+        const agentRunConfig =
+          window.RuntimeAgentSelector &&
+          typeof window.RuntimeAgentSelector.getSelectedConfig === "function"
+            ? window.RuntimeAgentSelector.getSelectedConfig()
+            : null;
+        window.messageService.sendMessage(message, { agentRunConfig });
       }
     }
 
@@ -3144,13 +3445,17 @@ function generateStepsListHtml() {
   steps.forEach((step) => {
     const statusClass = step.status || "not_started";
     const statusText = getStatusText(step.status);
+    const agentSummary = formatStepAgentSummary(step);
 
     html += `
             <div class="step-item">
                 <div class="step-status ${statusClass}"></div>
-                <div class="step-text">${step.name} - ${
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                  <div class="step-text">${step.name} - ${
       step.fullName || step.title || ""
     }</div>
+                  <div style="font-size:11px;color:#667085;">${statusText} | ${agentSummary}</div>
+                </div>
             </div>
         `;
   });

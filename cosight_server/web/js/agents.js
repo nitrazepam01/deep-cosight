@@ -6,6 +6,7 @@ const AgentService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
     let _agents = [];
     let _providers = [];
+    let _availableSkills = []; // 新增：存储可用的技能列表
     let _editingAgent = null;
     let _isAddingAgent = false;
 
@@ -36,6 +37,18 @@ const AgentService = (function () {
         return (json.data && json.data.providers) || [];
     }
 
+    async function fetchAvailableSkills() {
+        try {
+            const resp = await fetch(`${API_BASE}/deep-research/available-skills`);
+            const json = await resp.json();
+            if (json.code !== 200 && json.code !== 0) throw new Error(json.msg || 'Failed to fetch skills');
+            return (json.data && json.data.skills) || [];
+        } catch (e) {
+            console.warn('fetchAvailableSkills failed:', e);
+            return [];
+        }
+    }
+
     async function saveAgentAPI(agentData) {
         const resp = await fetch(`${API_BASE}/deep-research/agents`, {
             method: 'POST',
@@ -58,6 +71,9 @@ const AgentService = (function () {
     async function open() {
         try {
             _agents = await fetchAgents();
+            if (window.RuntimeAgentSelector && typeof window.RuntimeAgentSelector.refresh === 'function') {
+                await window.RuntimeAgentSelector.refresh();
+            }
         } catch (e) {
             console.warn('fetchAgents failed:', e);
             _agents = [];
@@ -68,6 +84,7 @@ const AgentService = (function () {
             console.warn('fetchProviders failed:', e);
             _providers = [];
         }
+        _availableSkills = await fetchAvailableSkills();
         _editingAgent = null;
         _isAddingAgent = false;
         renderPanel();
@@ -248,6 +265,27 @@ const AgentService = (function () {
                 <input type="text" id="af-desc" style="${S.formInput}" value="${escapeHtml(a.description)}" placeholder="该智能体的职责简介" ${isBuiltin ? 'readonly' : ''} />
             </div>
 
+            <div style="display:flex;gap:16px;">
+                <div style="${S.formGroup}flex:1;">
+                    <label style="${S.formLabel}">智能体类型</label>
+                    <select id="af-type" style="${S.formSelect}" ${isBuiltin ? 'disabled' : ''} onchange="document.getElementById('skills-container').style.display = this.value === 'actor' ? 'block' : 'none'">
+                        <option value="actor" ${a.agent_type === 'actor' || !a.agent_type ? 'selected' : ''}>执行者 (Actor)</option>
+                        <option value="planner" ${a.agent_type === 'planner' ? 'selected' : ''}>规划者 (Planner)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="skills-container" style="${S.formGroup}; display: ${a.agent_type === 'planner' ? 'none' : 'block'}">
+                <label style="${S.formLabel}">执行技能配置 <span style="${S.formHint}">（按住 Ctrl/Cmd 多选）</span></label>
+                <select id="af-skills" style="${S.formSelect}" multiple size="6" ${isBuiltin ? 'disabled' : ''}>
+                    ${_availableSkills.map(skill => {
+            const selected = (a.skills || []).includes(skill.name) ? 'selected' : '';
+            return `<option value="${escapeHtml(skill.name)}" ${selected}>${escapeHtml(skill.display_name_zh)} - ${escapeHtml(skill.description_zh)}</option>`;
+        }).join('')}
+                </select>
+                <div style="${S.formHint}">仅 Actor 类型的智能体可配置执行技能。</div>
+            </div>
+
             <div style="${S.formGroup}">
                 <label style="${S.formLabel}">系统提示词 (System Prompt)</label>
                 <textarea id="af-prompt" style="${S.formTextarea}" rows="12" placeholder="在这里定义智能体的身份、目标、规则和输出格式...">${escapeHtml(a.system_prompt)}</textarea>
@@ -316,6 +354,15 @@ const AgentService = (function () {
             modelName = parts[1] || '';
         }
 
+        const agentType = document.getElementById('af-type')?.value || 'actor';
+        let skills = [];
+        if (agentType === 'actor') {
+            const skillsEl = document.getElementById('af-skills');
+            if (skillsEl) {
+                skills = Array.from(skillsEl.selectedOptions).map(opt => opt.value);
+            }
+        }
+
         const data = {
             id: _editingAgent ? _editingAgent.id : '',
             name, description,
@@ -323,12 +370,17 @@ const AgentService = (function () {
             provider_id: providerId,
             model_name: modelName,
             enabled, is_default: isDefault,
+            agent_type: agentType,
+            skills: skills
         };
 
         try {
             await saveAgentAPI(data);
             showToast('保存成功', 'success');
             _agents = await fetchAgents();
+            if (window.RuntimeAgentSelector && typeof window.RuntimeAgentSelector.refresh === 'function') {
+                await window.RuntimeAgentSelector.refresh();
+            }
             _editingAgent = _agents.find(a => a.name === name) || null;
             _isAddingAgent = false;
             refreshPanel();
@@ -344,6 +396,9 @@ const AgentService = (function () {
             await deleteAgentAPI(_editingAgent.id);
             showToast('删除成功', 'success');
             _agents = await fetchAgents();
+            if (window.RuntimeAgentSelector && typeof window.RuntimeAgentSelector.refresh === 'function') {
+                await window.RuntimeAgentSelector.refresh();
+            }
             _editingAgent = null;
             _isAddingAgent = false;
             refreshPanel();

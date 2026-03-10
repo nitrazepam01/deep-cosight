@@ -568,7 +568,9 @@ def _write_agents(agents: List[dict]):
 async def get_agents():
     """获取所有智能体配置"""
     try:
-        agents = _read_agents()
+        from app.cosight.agent.runtime.agent_registry import load_agents
+
+        agents = load_agents()
         return json_result(0, "success", {"agents": agents})
     except Exception as e:
         logger.error(f"读取智能体失败: {e}", exc_info=True)
@@ -579,7 +581,9 @@ class AgentSaveRequest(BaseModel):
     id: str = ""
     name: str
     description: str = ""
+    agent_type: str = "actor"  # "planner" or "actor"
     system_prompt: str = ""
+    skills: list = []  # actor 可用 skill 名称列表
     provider_id: str = ""
     model_name: str = ""
     enabled: bool = True
@@ -590,26 +594,50 @@ class AgentSaveRequest(BaseModel):
 async def save_agent(body: AgentSaveRequest):
     """创建或更新智能体"""
     try:
+        from app.cosight.agent.runtime.skill_catalog import validate_skill_names
+
         agents = _read_agents()
         agent_data = body.model_dump()
+        agent_data["name"] = agent_data.get("name", "").strip()
+        agent_data["description"] = agent_data.get("description", "").strip()
+        agent_data["system_prompt"] = agent_data.get("system_prompt", "").strip()
+        agent_data["skills"] = list(dict.fromkeys(agent_data.get("skills") or []))
+        if not agent_data["name"]:
+            return json_result(-1, "name 涓嶈兘涓虹┖", None)
+
+        # 校验 agent_type
+        if agent_data.get("agent_type") not in ("planner", "actor"):
+            return json_result(-1, "agent_type 必须是 'planner' 或 'actor'", None)
+
+        # planner 不允许自定义 skills
+        if agent_data.get("agent_type") == "planner":
+            agent_data["skills"] = []
+        else:
+            if not agent_data["skills"]:
+                return json_result(-1, "actor 绫诲瀷蹇呴』鑷冲皯鏈?1 涓?skill", None)
+            invalid_skills = validate_skill_names(agent_data["skills"])
+            if invalid_skills:
+                return json_result(-1, f"鍖呭惈鏃犳晥 skill: {invalid_skills}", None)
 
         if not agent_data["id"]:
             import uuid
             agent_data["id"] = uuid.uuid4().hex[:8]
+        existing = next((i for i, a in enumerate(agents) if a["id"] == agent_data["id"]), None)
+        existing_agent = agents[existing] if existing is not None else None
+        agent_data["builtin"] = bool(existing_agent.get("builtin")) if existing_agent else False
 
-        # 如果设置为默认，取消其他默认
+        # 如果设置为默认，只取消同类型的其他默认
         if agent_data.get("is_default"):
             for a in agents:
-                a["is_default"] = False
-
-        existing = next((i for i, a in enumerate(agents) if a["id"] == agent_data["id"]), None)
+                if a.get("agent_type") == agent_data.get("agent_type") and a.get("id") != agent_data["id"]:
+                    a["is_default"] = False
         if existing is not None:
             agents[existing] = agent_data
         else:
             agents.append(agent_data)
 
         _write_agents(agents)
-        logger.info(f"保存智能体: {agent_data['name']} (id={agent_data['id']})")
+        logger.info(f"保存智能体: {agent_data['name']} (id={agent_data['id']}, type={agent_data.get('agent_type')})")
         return json_result(0, "保存成功", {"agent": agent_data})
     except Exception as e:
         logger.error(f"保存智能体失败: {e}", exc_info=True)
@@ -621,6 +649,9 @@ async def delete_agent(agent_id: str):
     """删除智能体"""
     try:
         agents = _read_agents()
+        target_agent = next((a for a in agents if a.get("id") == agent_id), None)
+        if target_agent and target_agent.get("builtin"):
+            return json_result(-1, "鍐呯疆鏅鸿兘浣撲笉鍏佽鍒犻櫎", None)
         new_agents = [a for a in agents if a.get("id") != agent_id]
         if len(new_agents) == len(agents):
             return json_result(-1, "智能体不存在", None)
@@ -631,3 +662,30 @@ async def delete_agent(agent_id: str):
         logger.error(f"删除智能体失败: {e}", exc_info=True)
         return json_result(-1, f"删除失败: {str(e)}", None)
 
+
+@settingsRouter.get("/deep-research/available-skills")
+async def get_available_skills():
+    """返回所有 actor 可选的 skill 列表"""
+    try:
+        from app.cosight.agent.runtime.skill_catalog import get_available_actor_skills
+        skills = get_available_actor_skills()
+        return json_result(0, "success", {"skills": skills})
+    except Exception as e:
+        logger.error(f"获取可用技能失败: {e}", exc_info=True)
+        return json_result(-1, f"获取失败: {str(e)}", None)
+
+
+@settingsRouter.get("/deep-research/runtime-agent-defaults")
+async def get_runtime_agent_defaults():
+    """返回默认的 planner 和 actor 配置，供前端初始化运行时选择器"""
+    try:
+        from app.cosight.agent.runtime.agent_registry import get_default_planner, get_default_actor, get_planner_agents, get_actor_agents
+        return json_result(0, "success", {
+            "default_planner": get_default_planner(),
+            "default_actor": get_default_actor(),
+            "planners": get_planner_agents(),
+            "actors": get_actor_agents(),
+        })
+    except Exception as e:
+        logger.error(f"获取运行时默认配置失败: {e}", exc_info=True)
+        return json_result(-1, f"获取失败: {str(e)}", None)

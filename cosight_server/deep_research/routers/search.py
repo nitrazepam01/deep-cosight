@@ -224,6 +224,37 @@ async def _check_and_continue_next_step(plan_queue, plan_data: Plan):
     except Exception as e:
         logger.error(f"检查下一步骤失败: {e}", exc_info=True)
 
+def _serialize_plan_data(plan_obj: Plan) -> dict:
+    return {
+        "title": plan_obj.title if hasattr(plan_obj, "title") else "",
+        "steps": plan_obj.steps if hasattr(plan_obj, "steps") else [],
+        "step_files": plan_obj.step_files if hasattr(plan_obj, "step_files") else {},
+        "step_statuses": plan_obj.step_statuses if hasattr(plan_obj, "step_statuses") else {},
+        "step_notes": plan_obj.step_notes if hasattr(plan_obj, "step_notes") else {},
+        "step_details": plan_obj.step_details if hasattr(plan_obj, "step_details") else {},
+        "step_tool_calls": plan_obj.step_tool_calls if hasattr(plan_obj, "step_tool_calls") else {},
+        "dependencies": {str(k): v for k, v in plan_obj.dependencies.items()}
+        if hasattr(plan_obj, "dependencies")
+        else {},
+        "progress": plan_obj.get_progress()
+        if hasattr(plan_obj, "get_progress") and callable(plan_obj.get_progress)
+        else {},
+        "result": plan_obj.get_plan_result()
+        if hasattr(plan_obj, "get_plan_result") and callable(plan_obj.get_plan_result)
+        else "",
+        "selected_planner_id": getattr(plan_obj, "selected_planner_id", ""),
+        "allowed_actor_ids": getattr(plan_obj, "allowed_actor_ids", []),
+        "default_actor_id": getattr(plan_obj, "default_actor_id", ""),
+        "dispatch_mode": getattr(plan_obj, "dispatch_mode", "single_actor"),
+        "step_agents": plan_obj.get_step_agents_payload()
+        if hasattr(plan_obj, "get_step_agents_payload")
+        else {},
+        "step_execution_agents": plan_obj.get_step_execution_agents_payload()
+        if hasattr(plan_obj, "get_step_execution_agents_payload")
+        else {},
+    }
+
+
 async def append_create_plan(data: Any):
     """
     将数据追加写入LOGS_PATH下的plan.log文件，并将数据放入队列以发送给客户端
@@ -237,21 +268,7 @@ async def append_create_plan(data: Any):
 
         # 处理Plan对象转换为可序列化的dict
         if isinstance(data, Plan):
-            plan_dict = {
-                "title": data.title if hasattr(data, 'title') else "",
-                "steps": data.steps if hasattr(data, 'steps') else [],
-                "step_files": data.step_files if hasattr(data, 'step_files') else {},
-                "step_statuses": data.step_statuses if hasattr(data, 'step_statuses') else {},
-                "step_notes": data.step_notes if hasattr(data, 'step_notes') else {},
-                "step_details": data.step_details if hasattr(data, 'step_details') else {},
-                "step_tool_calls": data.step_tool_calls if hasattr(data, 'step_tool_calls') else {},
-                "dependencies": {str(k): v for k, v in data.dependencies.items()} if hasattr(data,
-                                                                                             'dependencies') else {},
-                "progress": data.get_progress() if hasattr(data, 'get_progress') and callable(
-                    data.get_progress) else {},
-                "result": data.get_plan_result() if hasattr(data, 'get_plan_result') and callable(
-                    data.get_plan_result) else ""
-            }
+            plan_dict = _serialize_plan_data(data)
             logger.info(f"step_files:{data.step_files}")
 
             # logger.info(f"Plan对象已转换为字典: {plan_dict}")
@@ -471,21 +488,7 @@ async def search(request: Request, params: Any = Body(None)):
                 # 处理Plan对象转换为可序列化的dict
                 if isinstance(data, Plan):
                     plan_obj = data
-                    plan_dict = {
-                        "title": plan_obj.title if hasattr(plan_obj, 'title') else "",
-                        "steps": plan_obj.steps if hasattr(plan_obj, 'steps') else [],
-                        "step_files": plan_obj.step_files if hasattr(plan_obj, 'step_files') else {},
-                        "step_statuses": plan_obj.step_statuses if hasattr(plan_obj, 'step_statuses') else {},
-                        "step_notes": plan_obj.step_notes if hasattr(plan_obj, 'step_notes') else {},
-                        "step_details": plan_obj.step_details if hasattr(plan_obj, 'step_details') else {},
-                        "step_tool_calls": plan_obj.step_tool_calls if hasattr(plan_obj, 'step_tool_calls') else {},
-                        "dependencies": {str(k): v for k, v in plan_obj.dependencies.items()} if hasattr(plan_obj,
-                                                                                                     'dependencies') else {},
-                        "progress": plan_obj.get_progress() if hasattr(plan_obj, 'get_progress') and callable(
-                            data.get_progress) else {},
-                        "result": plan_obj.get_plan_result() if hasattr(plan_obj, 'get_plan_result') and callable(
-                            data.get_plan_result) else ""
-                    }
+                    plan_dict = _serialize_plan_data(plan_obj)
                     logger.info(f"step_files:{plan_obj.step_files}")
 
                     # logger.info(f"Plan对象已转换为字典: {plan_dict}")
@@ -614,15 +617,20 @@ async def search(request: Request, params: Any = Body(None)):
                 plan_report_event_manager.subscribe("tool_event", plan_id, append_create_plan_local)
                 logger.info(f"Event subscription completed for plan_id: {plan_id}")
 
-                # 初始化CoSight并传入plan_id
+                # 初始化CoSight并传入plan_id和运行时agent配置
                 logger.info(f"llm is {llm_for_plan.model}, {llm_for_plan.base_url}, {llm_for_plan.api_key}")
+                # 从请求参数中提取 agent_run_config（前端发送）
+                agent_run_config = params.get("agentRunConfig", None)
+                if agent_run_config:
+                    logger.info(f"Using agent_run_config: {agent_run_config}")
                 cosight = CoSight(
                     llm_for_plan,
                     llm_for_act,
                     llm_for_tool,
                     llm_for_vision,
                     work_space_path=work_space_path_time,
-                    message_uuid = plan_id
+                    message_uuid = plan_id,
+                    agent_run_config=agent_run_config
                 )
                 result = cosight.execute(query_content)
                 logger.info(f"final result is {result}")
