@@ -16,9 +16,30 @@
 
     <!-- 页面刷新时清空localStorage -->
     <script>
-        // 页面刷新时清空localStorage中的所有内容
-        // Keep persisted runtime selector and pending session state.
-        console.log('页面刷新，已清空localStorage');
+        (function prepareEntryReset() {
+            const params = new URLSearchParams(window.location.search);
+            const shouldResetHome = params.get('reset_home') === '1';
+            window.__cosightResetHome = shouldResetHome;
+
+            if (!shouldResetHome) {
+                return;
+            }
+
+            try {
+                localStorage.removeItem('cosight:lastManusStep');
+                localStorage.removeItem('cosight:stepToolEvents');
+                localStorage.removeItem('cosight:planIdByTopic');
+                localStorage.removeItem('cosight:pendingRequests');
+            } catch (error) {
+                console.warn('[home-reset] failed to clear cached session state:', error);
+            }
+
+            try {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } catch (error) {
+                console.warn('[home-reset] failed to clean URL:', error);
+            }
+        })();
     </script>
 </head>
 
@@ -242,6 +263,7 @@
     <script>
         (function restoreFromStorage() {
             try {
+                if (window.__cosightResetHome) return;
                 const raw = localStorage.getItem('cosight:lastManusStep');
                 const pendingRaw = localStorage.getItem('cosight:pendingRequests');
                 const pendings = pendingRaw ? JSON.parse(pendingRaw) : {};

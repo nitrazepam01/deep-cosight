@@ -2437,6 +2437,32 @@ function hideInitialInputAndShowMain(message) {
   }
 }
 
+function showInitialHomeView() {
+  const initialInputContainer = document.querySelector(
+    ".initial-input-container"
+  );
+  const middleContainer = document.querySelector(".middle-container");
+  const rightContainer = document.getElementById("right-container");
+  const titleContainer = document.getElementById("title-container");
+
+  if (initialInputContainer) {
+    initialInputContainer.classList.remove("hidden");
+  }
+
+  if (middleContainer) {
+    middleContainer.classList.remove("show");
+  }
+
+  if (rightContainer) {
+    rightContainer.classList.remove("show");
+    rightContainer.classList.remove("maximized");
+  }
+
+  if (titleContainer) {
+    titleContainer.style.opacity = "0";
+  }
+}
+
 function updateDynamicTitle(title) {
   const titleContainer = document.getElementById("title-container");
   const dynamicTitle = document.getElementById("dynamic-title");
@@ -2606,6 +2632,12 @@ function cleanupAllResources() {
 // 检查并恢复DAG数据
 function checkAndRestoreDAGData() {
   try {
+    if (window.__cosightResetHome) {
+      resetUICaches();
+      showInitialHomeView();
+      return;
+    }
+
     // F5刷新场景：只清理UI状态，保留localStorage数据
     resetUICaches();
 
@@ -3636,6 +3668,7 @@ function resetUICaches() {
 if (typeof window !== "undefined") {
   window.resetSessionCaches = resetSessionCaches;
   window.resetUICaches = resetUICaches;
+  window.showInitialHomeView = showInitialHomeView;
 }
 
 if (typeof module !== "undefined" && module.exports) {

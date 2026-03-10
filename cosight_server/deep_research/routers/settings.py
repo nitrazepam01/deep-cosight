@@ -586,6 +586,7 @@ class AgentSaveRequest(BaseModel):
     skills: list = []  # actor 可用 skill 名称列表
     provider_id: str = ""
     model_name: str = ""
+    thinking_mode: bool | None = None
     enabled: bool = True
     is_default: bool = False
 
@@ -602,6 +603,8 @@ async def save_agent(body: AgentSaveRequest):
         agent_data["description"] = agent_data.get("description", "").strip()
         agent_data["system_prompt"] = agent_data.get("system_prompt", "").strip()
         agent_data["skills"] = list(dict.fromkeys(agent_data.get("skills") or []))
+        if agent_data.get("thinking_mode") is not None:
+            agent_data["thinking_mode"] = bool(agent_data["thinking_mode"])
         if not agent_data["name"]:
             return json_result(-1, "name 涓嶈兘涓虹┖", None)
 

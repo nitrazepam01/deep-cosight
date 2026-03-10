@@ -9,8 +9,26 @@ from app.common.logger_util import logger
 def _create_llm_for_agent(agent_config: dict, fallback_llm=None):
     provider_id = agent_config.get("provider_id", "")
     model_name = agent_config.get("model_name", "")
+    thinking_mode = agent_config.get("thinking_mode")
 
     if not provider_id or not model_name:
+        if fallback_llm is not None and isinstance(thinking_mode, bool):
+            try:
+                from app.cosight.llm.chat_llm import ChatLLM
+
+                return ChatLLM(
+                    base_url=fallback_llm.base_url,
+                    api_key=fallback_llm.api_key,
+                    model=fallback_llm.model,
+                    client=fallback_llm.client,
+                    max_tokens=fallback_llm.max_tokens,
+                    temperature=fallback_llm.temperature,
+                    stream=fallback_llm.stream,
+                    tools=list(getattr(fallback_llm, "tools", []) or []),
+                    thinking_mode=thinking_mode,
+                )
+            except Exception as exc:
+                logger.warning("Failed to clone fallback LLM for thinking_mode override: %s", exc)
         return fallback_llm
 
     try:
@@ -30,13 +48,14 @@ def _create_llm_for_agent(agent_config: dict, fallback_llm=None):
             "proxy": provider.get("proxy", ""),
             "max_tokens": None,
             "temperature": None,
-            "thinking_mode": None,
+            "thinking_mode": thinking_mode if isinstance(thinking_mode, bool) else None,
         }
         custom_llm = set_model(model_config)
         logger.info(
-            "Created custom LLM for agent: provider=%s, model=%s",
+            "Created custom LLM for agent: provider=%s, model=%s, thinking_mode=%s",
             provider_id,
             model_name,
+            model_config["thinking_mode"],
         )
         return custom_llm
     except Exception as exc:

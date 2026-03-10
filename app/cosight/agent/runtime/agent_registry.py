@@ -44,9 +44,12 @@ def load_agents() -> List[dict]:
             if "skills" not in a:
                 a["skills"] = []
                 migrated = True
+            if "thinking_mode" not in a:
+                a["thinking_mode"] = None
+                migrated = True
         if migrated:
             _write_agents(agents, path)
-            logger.info("agents.json 已自动迁移：补充了 agent_type 和 skills 字段")
+            logger.info("agents.json 已自动迁移：补充了 agent_type、skills 和 thinking_mode 字段")
         return agents
     except Exception as e:
         logger.warning(f"读取 agents.json 失败: {e}")

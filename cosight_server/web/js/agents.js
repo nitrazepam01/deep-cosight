@@ -306,6 +306,7 @@ const AgentService = (function () {
             skills: [],
             provider_id: '',
             model_name: '',
+            thinking_mode: null,
             enabled: true,
             is_default: false
         };
@@ -386,6 +387,16 @@ const AgentService = (function () {
                 <textarea id="af-prompt" style="${S.formTextarea}" rows="12" placeholder="在这里定义智能体的身份、目标、规则和输出格式...">${escapeHtml(a.system_prompt)}</textarea>
             </div>
 
+            <div style="${S.formGroup}">
+                <label style="${S.formLabel}">Thinking Mode</label>
+                <select id="af-thinking-mode" style="${S.formSelect}">
+                    <option value="" ${a.thinking_mode === null || typeof a.thinking_mode === 'undefined' ? 'selected' : ''}>继承系统默认</option>
+                    <option value="true" ${a.thinking_mode === true ? 'selected' : ''}>开启 thinking mode</option>
+                    <option value="false" ${a.thinking_mode === false ? 'selected' : ''}>关闭 thinking mode</option>
+                </select>
+                <div style="${S.formHint}">不设置时使用系统默认；开启或关闭则仅对当前智能体生效。</div>
+            </div>
+
             <div style="display:flex;gap:16px;">
                 <div style="${S.formGroup}flex:1;">
                     <label style="${S.formLabel}">绑定大模型</label>
@@ -436,6 +447,7 @@ const AgentService = (function () {
         const description = document.getElementById('af-desc').value.trim();
         const systemPrompt = document.getElementById('af-prompt').value.trim();
         const modelVal = document.getElementById('af-model').value;
+        const thinkingModeVal = document.getElementById('af-thinking-mode')?.value ?? '';
         const enabledEl = document.getElementById('af-enabled');
         const enabled = enabledEl ? enabledEl.value === 'true' : true;
         const isDefault = document.getElementById('af-default').checked;
@@ -458,12 +470,20 @@ const AgentService = (function () {
             }
         }
 
+        let thinkingMode = null;
+        if (thinkingModeVal === 'true') {
+            thinkingMode = true;
+        } else if (thinkingModeVal === 'false') {
+            thinkingMode = false;
+        }
+
         const data = {
             id: _editingAgent ? _editingAgent.id : '',
             name, description,
             system_prompt: systemPrompt,
             provider_id: providerId,
             model_name: modelName,
+            thinking_mode: thinkingMode,
             enabled, is_default: isDefault,
             agent_type: agentType,
             skills: skills
