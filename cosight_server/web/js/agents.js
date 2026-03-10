@@ -102,7 +102,7 @@ const AgentService = (function () {
     /* ============ 样式常量（内联样式，不依赖外部CSS） ============ */
     const S = {
         overlay: 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);z-index:10001;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;',
-        panel: 'position:relative;width:880px;max-width:92vw;max-height:85vh;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);display:flex;flex-direction:column;overflow:hidden;',
+        panel: 'position:relative;width:880px;max-width:92vw;max-height:85vh;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);display:flex;flex-direction:column;overflow:hidden;pointer-events:auto;',
         header: 'display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #eee;background:linear-gradient(135deg,#f8f9fa 0%,#fff 100%);',
         headerTitle: 'margin:0;font-size:20px;font-weight:600;color:#333;display:flex;align-items:center;gap:10px;',
         closeBtn: 'width:36px;height:36px;border:none;background:#f0f0f0;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#666;font-size:16px;transition:all 0.2s;',
@@ -136,11 +136,11 @@ const AgentService = (function () {
         if (!modal) return;
 
         modal.innerHTML = `
-            <div style="${S.overlay}" onclick="AgentService.close()">
-                <div style="${S.panel}" onclick="event.stopPropagation()">
+            <div id="agent-modal-overlay" style="${S.overlay}">
+                <div id="agent-modal-panel" style="${S.panel}">
                     <div style="${S.header}">
                         <h2 style="${S.headerTitle}"><i class="fas fa-robot" style="color:#667eea;"></i> 智能体管理</h2>
-                        <button style="${S.closeBtn}" onclick="AgentService.close()" onmouseover="this.style.background='#e0e0e0'" onmouseout="this.style.background='#f0f0f0'">
+                        <button id="agent-modal-close" style="${S.closeBtn}" onmouseover="this.style.background='#e0e0e0'" onmouseout="this.style.background='#f0f0f0'">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
@@ -151,8 +151,91 @@ const AgentService = (function () {
             </div>
         `;
 
+        bindModalEvents();
+        bindContentEvents();
+        const overlay = document.getElementById('agent-modal-overlay');
+        if (overlay) {
+            overlay.addEventListener('click', function (event) {
+                if (event.target === overlay) {
+                    AgentService.close();
+                }
+            });
+        }
+
         modal.classList.add('show');
         document.body.style.overflow = 'hidden';
+    }
+
+    function bindModalEvents() {
+        const panel = document.getElementById('agent-modal-panel');
+        if (panel) {
+            panel.addEventListener('click', function (event) {
+                event.stopPropagation();
+            });
+        }
+
+        const closeBtn = document.getElementById('agent-modal-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function () {
+                close();
+            });
+        }
+    }
+
+    function bindContentEvents() {
+        const addBtn = document.getElementById('agent-add-btn');
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                startAddAgent();
+            });
+        }
+
+        document.querySelectorAll('[data-agent-action="edit"]').forEach(button => {
+            button.addEventListener('click', function () {
+                selectAgent(this.dataset.agentId || '');
+            });
+        });
+
+        const backBtn = document.getElementById('agent-back-btn');
+        if (backBtn) {
+            backBtn.addEventListener('click', function () {
+                cancelEdit();
+            });
+        }
+
+        const cancelBtn = document.getElementById('agent-cancel-btn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function () {
+                cancelEdit();
+            });
+        }
+
+        const saveBtn = document.getElementById('agent-save-btn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', function () {
+                saveCurrentAgent();
+            });
+        }
+
+        const deleteBtn = document.getElementById('agent-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function () {
+                deleteCurrentAgent();
+            });
+        }
+
+        const typeSelect = document.getElementById('af-type');
+        if (typeSelect) {
+            typeSelect.addEventListener('change', syncSkillsVisibility);
+            syncSkillsVisibility();
+        }
+    }
+
+    function syncSkillsVisibility() {
+        const typeSelect = document.getElementById('af-type');
+        const skillsContainer = document.getElementById('skills-container');
+        if (!typeSelect || !skillsContainer) return;
+        skillsContainer.style.display = typeSelect.value === 'actor' ? 'block' : 'none';
     }
 
     function renderAgentContent() {
@@ -186,7 +269,7 @@ const AgentService = (function () {
                                 <div style="${S.cardDesc}">${escapeHtml(agent.description || '暂无描述')}</div>
                             </div>
                             <div style="display:flex;gap:8px;margin-left:12px;flex-shrink:0;">
-                                <button style="${S.btnSecondary}" onclick="AgentService.selectAgent('${agent.id}')">
+                                <button type="button" style="${S.btnSecondary}" data-agent-action="edit" data-agent-id="${escapeHtml(agent.id)}">
                                     <i class="fas fa-pen"></i> 编辑
                                 </button>
                             </div>
@@ -201,7 +284,7 @@ const AgentService = (function () {
                 智能体管理 <span style="font-size:14px;color:#888;font-weight:normal;margin-left:8px;">AI Agents</span>
             </div>
             ${agentCards}
-            <button style="${S.btnAdd}" onclick="AgentService.startAddAgent()" onmouseover="this.style.borderColor='#667eea';this.style.color='#667eea'" onmouseout="this.style.borderColor='#ddd';this.style.color='#888'">
+            <button id="agent-add-btn" type="button" style="${S.btnAdd}" onmouseover="this.style.borderColor='#667eea';this.style.color='#667eea'" onmouseout="this.style.borderColor='#ddd';this.style.color='#888'">
                 <i class="fas fa-plus"></i> 添加自定义智能体
             </button>
         `;
@@ -214,7 +297,18 @@ const AgentService = (function () {
     }
 
     function startAddAgent() {
-        _editingAgent = { id: '', name: '', description: '', system_prompt: '', provider_id: '', model_name: '', enabled: true, is_default: false };
+        _editingAgent = {
+            id: '',
+            name: '',
+            description: '',
+            agent_type: 'actor',
+            system_prompt: '',
+            skills: [],
+            provider_id: '',
+            model_name: '',
+            enabled: true,
+            is_default: false
+        };
         _isAddingAgent = true;
         refreshPanel();
     }
@@ -223,6 +317,7 @@ const AgentService = (function () {
         const contentArea = document.getElementById('agent-content-area');
         if (contentArea) {
             contentArea.innerHTML = renderAgentContent();
+            bindContentEvents();
         }
     }
 
@@ -246,7 +341,7 @@ const AgentService = (function () {
 
         return `
             <div style="${S.sectionTitle}">
-                <button style="${S.btnSecondary}" onclick="AgentService.cancelEdit()">
+                <button id="agent-back-btn" type="button" style="${S.btnSecondary}">
                     <i class="fas fa-arrow-left"></i> 返回
                 </button>
                 <span style="margin-left:8px;">${_isAddingAgent ? '✨ 创建智能体' : '✏️ 编辑智能体'}</span>
@@ -268,7 +363,7 @@ const AgentService = (function () {
             <div style="display:flex;gap:16px;">
                 <div style="${S.formGroup}flex:1;">
                     <label style="${S.formLabel}">智能体类型</label>
-                    <select id="af-type" style="${S.formSelect}" ${isBuiltin ? 'disabled' : ''} onchange="document.getElementById('skills-container').style.display = this.value === 'actor' ? 'block' : 'none'">
+                    <select id="af-type" style="${S.formSelect}" ${isBuiltin ? 'disabled' : ''}>
                         <option value="actor" ${a.agent_type === 'actor' || !a.agent_type ? 'selected' : ''}>执行者 (Actor)</option>
                         <option value="planner" ${a.agent_type === 'planner' ? 'selected' : ''}>规划者 (Planner)</option>
                     </select>
@@ -317,13 +412,13 @@ const AgentService = (function () {
 
             <div style="${S.formActions}">
                 ${!_isAddingAgent && !isBuiltin ? `
-                    <button style="${S.btnDanger}" onclick="AgentService.deleteCurrentAgent()">
+                    <button id="agent-delete-btn" type="button" style="${S.btnDanger}">
                         <i class="fas fa-trash"></i> 删除
                     </button>
                 ` : ''}
                 <div style="flex:1;"></div>
-                <button style="${S.btnSecondary}" onclick="AgentService.cancelEdit()">取消</button>
-                <button style="${S.btnPrimary}" onclick="AgentService.saveCurrentAgent()">
+                <button id="agent-cancel-btn" type="button" style="${S.btnSecondary}">取消</button>
+                <button id="agent-save-btn" type="button" style="${S.btnPrimary}">
                     <i class="fas fa-save"></i> 保存配置
                 </button>
             </div>
@@ -412,3 +507,5 @@ const AgentService = (function () {
         saveCurrentAgent, deleteCurrentAgent,
     };
 })();
+
+window.AgentService = AgentService;

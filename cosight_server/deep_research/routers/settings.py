@@ -651,7 +651,7 @@ async def delete_agent(agent_id: str):
         agents = _read_agents()
         target_agent = next((a for a in agents if a.get("id") == agent_id), None)
         if target_agent and target_agent.get("builtin"):
-            return json_result(-1, "鍐呯疆鏅鸿兘浣撲笉鍏佽鍒犻櫎", None)
+            return json_result(-1, "内置智能体不允许删除", None)
         new_agents = [a for a in agents if a.get("id") != agent_id]
         if len(new_agents) == len(agents):
             return json_result(-1, "智能体不存在", None)
