@@ -1907,7 +1907,15 @@ function initInputHandler() {
       const message = raw.trim();
       if (message) {
         console.log("发送消息:", message);
-        // 清理之前的tool events和UI状态
+        
+        // 检查是否为测试命令
+        if (message === "测试") {
+          handleTestCommand();
+          messageInput.value = "";
+          return;
+        }
+        
+        // 清理之前的 tool events 和 UI 状态
         if (
           window.messageService &&
           typeof window.messageService.clearStepToolEvents === "function"
@@ -3718,3 +3726,91 @@ async function copyUrlToClipboard(url) {
 // 将函数暴露到全局作用域
 window.openInNewWindow = openInNewWindow;
 window.copyUrlToClipboard = copyUrlToClipboard;
+
+// ==================== 测试命令处理 ====================
+// 缓存测试文档内容
+let testMarkdownContent = null;
+
+/**
+ * 处理测试命令
+ * 当用户输入"测试"时，显示 Markdown 测试文档
+ */
+async function handleTestCommand() {
+  console.log("处理测试命令...");
+
+  const rightContainer = document.getElementById("right-container");
+  const markdownContent = document.getElementById("markdown-content");
+  const statusElement = document.getElementById("right-container-status");
+
+  // 显示右侧面板
+  showRightPanel();
+
+  // 如果已缓存，直接使用
+  if (testMarkdownContent) {
+    console.log("使用缓存的测试内容");
+    displayTestContent(testMarkdownContent);
+    return;
+  }
+
+  // 显示加载状态
+  if (statusElement) {
+    statusElement.textContent = "正在加载测试内容...";
+    statusElement.className = "loading";
+  }
+  markdownContent.innerHTML = `<div style="text-align: center; padding: 50px;"><i class="fas fa-spinner fa-spin"></i> 正在加载测试内容...</div>`;
+
+  try {
+    // 加载测试文档
+    const response = await fetch('markdown-test-response.txt');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    testMarkdownContent = await response.text();
+    console.log("测试文档加载成功，长度:", testMarkdownContent.length);
+    displayTestContent(testMarkdownContent);
+  } catch (error) {
+    console.error("加载测试文档失败:", error);
+    if (statusElement) {
+      statusElement.textContent = "加载测试内容失败";
+      statusElement.className = "error";
+    }
+    markdownContent.innerHTML = `
+      <div style="text-align: center; padding: 50px; color: #f44336;">
+        <i class="fas fa-exclamation-triangle"></i>
+        <h3>加载测试内容失败</h3>
+        <p>错误信息：${error.message}</p>
+        <p>请确保 markdown-test-response.txt 文件存在于 web 目录下</p>
+      </div>
+    `;
+  }
+}
+
+/**
+ * 显示测试内容
+ */
+function displayTestContent(content) {
+  const markdownContent = document.getElementById("markdown-content");
+  const statusElement = document.getElementById("right-container-status");
+
+  // 使用 marked 渲染 Markdown
+  const htmlContent = marked.parse(content);
+  markdownContent.innerHTML = htmlContent;
+
+  // 更新状态
+  if (statusElement) {
+    statusElement.textContent = "测试内容已加载";
+    statusElement.className = "success";
+  }
+
+  // 渲染 Mermaid 图表
+  if (typeof window.renderMermaidDiagrams === 'function') {
+    setTimeout(() => {
+      window.renderMermaidDiagrams(markdownContent);
+    }, 100);
+  }
+
+  console.log("测试内容显示完成");
+}
+
+// 暴露测试命令处理函数到全局
+window.handleTestCommand = handleTestCommand;

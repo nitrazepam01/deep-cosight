@@ -1,8 +1,594 @@
 /**
  * Co-Sight 三栏布局主逻辑
+ * 
+ * 注意：本文件需要与 message.js、dag.js、credibility.js 等配合使用
+ * 必须提供这些文件所需的全局变量和函数
  */
 
+// ==================== 全局变量（供 dag.js、message.js、credibility.js 使用）====================
+
+// DAG 图全局数据
+let dagData = { nodes: [], edges: [] };
+
+// 工具调用状态管理
+let toolCallHistory = [];
+let activeToolCalls = new Map();
+let toolCallCounter = 0;
+let nodeToolPanels = new Map();
+let autoOpenedPanels = new Set();
+
 // ==================== 工具函数 ====================
+
+// 生成唯一 ID（使用时间戳 + 随机数，避免 ID 冲突）
+function generateUniqueId(prefix = 'id') {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// ==================== 核心工具函数（与 main.js 保持一致）====================
+
+// 构建 API 工作区路径
+function buildApiWorkspacePath(originalPath) {
+    return originalPath;
+}
+
+// 提取文件名
+function extractFileName(p) {
+    if (!p || typeof p !== "string") return "";
+    const unified = p.replace(/\\/g, "/");
+    const idx = unified.lastIndexOf("/");
+    return idx >= 0 ? unified.substring(idx + 1) : unified;
+}
+
+// 获取工具显示名称
+function getToolDisplayName(toolName) {
+    const toolNames = {
+        search_baidu: "百度搜索",
+        search_google: "谷歌搜索",
+        image_search: "图片搜索",
+        file_saver: "文件保存",
+        file_read: "文件读取",
+        execute_code: "代码执行器",
+        data_analyzer: "数据分析",
+        predictor: "预测模型",
+        report_generator: "报告生成",
+        create_plan: "创建计划",
+        fetch_website_content: "获取网页内容",
+        fetch_website_content_with_images: "网页内容爬取（含图片）",
+        fetch_website_images_only: "网页图片提取",
+        tavily_search: "Tavily 搜索",
+        search_wiki: "维基百科搜索",
+    };
+    return toolNames[toolName] || toolName;
+}
+
+// 获取工具特定图标
+function getToolSpecificIcon(tool) {
+    const toolIcons = {
+        file_read: "fas fa-book-open",
+        file_saver: "fas fa-save",
+        search_baidu: "fab fa-baidu",
+        search_google: "fab fa-google",
+        tavily_search: "fas fa-search",
+        image_search: "fas fa-search",
+        search_wiki: "fab fa-wikipedia-w",
+        execute_code: "fas fa-file-code",
+        create_html_report: "fas fa-chart-line",
+    };
+    return toolIcons[tool] || "fas fa-check";
+}
+
+// ==================== 节点工具面板管理 ====================
+
+// 创建节点工具面板
+function createNodeToolPanel(nodeId, nodeName, sticky = false) {
+    const container = document.getElementById("tool-call-panels-container");
+    const panelId = `tool-panel-${nodeId}`;
+
+    // 如果面板已存在，直接显示
+    let panel = document.getElementById(panelId);
+    if (panel) {
+        panel.classList.add("show");
+        updatePanelPosition(panel, nodeId);
+        return panel;
+    }
+
+    // 计算安全标题
+    let safeTitle = nodeName;
+    if (!safeTitle || /undefined/i.test(String(safeTitle))) {
+        safeTitle = `Step ${nodeId}`;
+    }
+    // 尝试从 dagData 中获取更完整的标题
+    try {
+        if (typeof dagData !== "undefined" && dagData.nodes) {
+            const node = dagData.nodes.find((n) => n.id === nodeId);
+            if (node) {
+                const namePart = node.name || `Step ${nodeId}`;
+                const detailPart = node.fullName || node.title || "";
+                safeTitle = detailPart ? `${namePart} - ${detailPart}` : namePart;
+            }
+        }
+    } catch (e) {}
+
+    // 创建新面板
+    panel = document.createElement("div");
+    panel.id = panelId;
+    panel.className = "tool-call-panel";
+    panel.setAttribute("data-node-id", nodeId);
+    panel.setAttribute("data-sticky", sticky);
+
+    panel.innerHTML = `
+        <div class="panel-header" data-panel-id="${panelId}" data-sticky="${sticky}">
+            <h3><i class="fas fa-tools"></i> <span class="panel-title" title="${safeTitle}">${safeTitle}</span></h3>
+            <button class="btn-close" onclick="closeNodeToolPanel(${nodeId})">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="tool-call-list" id="tool-call-list-${nodeId}">
+            <!-- 工具调用项目将动态添加到这里 -->
+        </div>
+    `;
+
+    panel.style.position = "absolute";
+    panel.style.top = "50px";
+    panel.style.left = "16px";
+
+    container.appendChild(panel);
+    nodeToolPanels.set(nodeId, panel);
+
+    // 初始化拖拽功能
+    initNodePanelDrag(panel);
+
+    // 显示面板并定位
+    panel.classList.add("show");
+
+    panel.style.top = "50px";
+    panel.style.left = "16px";
+
+    return panel;
+}
+
+// 关闭节点工具面板
+function closeNodeToolPanel(nodeId) {
+    const panel = nodeToolPanels.get(nodeId);
+    if (panel) {
+        panel.classList.remove("show");
+        setTimeout(() => {
+            try {
+                if (panel.parentNode) {
+                    panel.parentNode.removeChild(panel);
+                }
+            } catch (e) {
+                console.warn(`[panel:${nodeId}] remove panel error`, e);
+            }
+            nodeToolPanels.delete(nodeId);
+        }, 300);
+    }
+}
+
+// 切换节点工具面板的显示状态
+function toggleNodeToolPanel(nodeId, nodeName) {
+    const panel = nodeToolPanels.get(nodeId);
+
+    if (panel && panel.classList.contains("show")) {
+        closeNodeToolPanel(nodeId);
+        return false;
+    } else {
+        createNodeToolPanel(nodeId, nodeName, true);
+        return true;
+    }
+}
+
+// 更新节点工具面板
+function updateNodeToolPanel(nodeId, toolCall) {
+    // 过滤内部工具：mark_step 不更新面板
+    if (toolCall && toolCall.tool === "mark_step") {
+        return;
+    }
+    let panel = nodeToolPanels.get(nodeId);
+    if (!panel) {
+        // 面板不存在：在首次事件到来时自动创建并展示
+        try {
+            if (!autoOpenedPanels.has(nodeId)) {
+                let nodeName = `Step ${nodeId}`;
+                try {
+                    if (typeof dagData !== "undefined" && dagData.nodes) {
+                        const node = dagData.nodes.find((n) => n.id === nodeId);
+                        if (node) {
+                            const title = node.fullName || node.title || "";
+                            nodeName = title ? `Step ${nodeId} - ${title}` : `Step ${nodeId}`;
+                        }
+                    }
+                } catch (_) {}
+                panel = createNodeToolPanel(nodeId, nodeName, true);
+                autoOpenedPanels.add(nodeId);
+            }
+        } catch (_) {}
+        panel = nodeToolPanels.get(nodeId);
+        if (!panel) return;
+    }
+
+    const toolCallList = panel.querySelector(".tool-call-list");
+    if (!toolCallList) return;
+
+    // 查找或创建工具调用项
+    let toolCallItem = toolCallList.querySelector(
+        `[data-call-id="${toolCall.id}"]`
+    );
+    const isExistingItem = !!toolCallItem;
+    if (!toolCallItem) {
+        toolCallItem = createToolCallItem(toolCall);
+        toolCallList.insertBefore(toolCallItem, toolCallList.firstChild);
+    } else {
+        const newItem = createToolCallItem(toolCall);
+        toolCallList.replaceChild(newItem, toolCallItem);
+        toolCallItem = newItem;
+    }
+
+    // 首次出现且具备可展示内容时，自动在右侧展示
+    try {
+        if (!isExistingItem && (toolCall.url || toolCall.path)) {
+            showRightPanelForTool(toolCall);
+        }
+    } catch (_) {}
+
+    try {
+        if (
+            isExistingItem &&
+            (toolCall.url || toolCall.path) &&
+            toolCall.status !== "running"
+        ) {
+            showRightPanelForTool(toolCall);
+        }
+    } catch (_) {}
+
+    // 内容更新后，重新计算面板位置
+    setTimeout(() => {
+        const panel = nodeToolPanels.get(nodeId);
+        if (panel && panel.classList.contains("show")) {
+            updatePanelPosition(panel, nodeId);
+        }
+    }, 100);
+}
+
+// 创建工具调用项
+function createToolCallItem(toolCall) {
+    const item = document.createElement("div");
+    item.className = `tool-call-item ${toolCall.status}`;
+    item.dataset.callId = toolCall.id;
+
+    const hasContent = toolCall.url || toolCall.path;
+    if (hasContent) {
+        item.style.cursor = "pointer";
+        item.title = "点击查看详情";
+        item.addEventListener("click", function () {
+            showRightPanelForTool(toolCall);
+        });
+    }
+
+    const icon = document.createElement("div");
+    icon.className = `tool-call-icon ${toolCall.status}`;
+
+    let iconHtml = "";
+    switch (toolCall.status) {
+        case "running":
+            iconHtml = `<i class="fas fa-cog loading-spinner"></i>`;
+            break;
+        case "completed":
+            iconHtml = `<i class="${getToolSpecificIcon(toolCall.tool)}"></i>`;
+            break;
+        case "failed":
+            iconHtml = `<i class="fas fa-times"></i>`;
+            break;
+        default:
+            iconHtml = `<i class="fas fa-check"></i>`;
+    }
+
+    if (toolCall.tool === "search_baidu") {
+        iconHtml = `<img src="/cosight/images/baidu.png" style="width: 24px; height: 24px;">`;
+    }
+
+    icon.innerHTML = iconHtml;
+
+    const content = document.createElement("div");
+    content.className = "tool-call-content";
+
+    const name = document.createElement("div");
+    name.className = "tool-call-name";
+    name.textContent = toolCall.toolName;
+
+    const status = document.createElement("div");
+    status.className = "tool-call-status";
+    status.textContent = toolCall.description;
+
+    content.appendChild(name);
+    content.appendChild(status);
+
+    if (toolCall.result && toolCall.status !== "running") {
+        const result = document.createElement("div");
+        result.className = "tool-call-result";
+        let displayText = "";
+        if (toolCall.tool === "execute_code") {
+            if (toolCall.status === "failed") {
+                displayText = "代码执行失败";
+            } else if (toolCall.status === "running") {
+                displayText = "代码执行中...";
+            } else {
+                displayText = "代码执行成功";
+            }
+        } else {
+            displayText = typeof toolCall.result === "string" ? toolCall.result : JSON.stringify(toolCall.result, null, 2);
+        }
+        result.textContent = displayText;
+        content.appendChild(result);
+    }
+
+    item.appendChild(icon);
+    item.appendChild(content);
+
+    return item;
+}
+
+// 初始化节点面板拖拽功能
+function initNodePanelDrag(panel) {
+    const header = panel.querySelector(".panel-header");
+    let isDragging = false;
+    let currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
+
+    header.addEventListener("mousedown", dragStart);
+    document.addEventListener("mousemove", drag);
+    document.addEventListener("mouseup", dragEnd);
+
+    function dragStart(e) {
+        if (!panel.classList.contains("show")) return;
+        initialX = e.clientX - xOffset;
+        initialY = e.clientY - yOffset;
+        if (e.target === header || header.contains(e.target)) {
+            isDragging = true;
+            panel.classList.add("dragging");
+        }
+    }
+
+    function drag(e) {
+        if (isDragging) {
+            e.preventDefault();
+            currentX = e.clientX - initialX;
+            currentY = e.clientY - initialY;
+            xOffset = currentX;
+            yOffset = currentY;
+            panel.style.transform = `translate(${currentX}px, ${currentY}px)`;
+        }
+    }
+
+    function dragEnd(e) {
+        if (isDragging) {
+            initialX = currentX;
+            initialY = currentY;
+            isDragging = false;
+            panel.classList.remove("dragging");
+        }
+    }
+}
+
+// 更新面板位置
+function updatePanelPosition(panel, nodeId) {
+    const FORCED_TOP_OFFSET = 50;
+    panel.style.top = `${FORCED_TOP_OFFSET}px`;
+    panel.style.left = "16px";
+}
+
+// 更新所有面板位置
+function updateAllPanelPositions() {
+    nodeToolPanels.forEach((panel, nodeId) => {
+        if (panel.classList.contains("show")) {
+            panel.style.top = "50px";
+            panel.style.left = "16px";
+        }
+    });
+}
+
+// ==================== 右侧内容面板控制 ====================
+
+// 显示右侧面板用于工具内容展示
+function showRightPanelForTool(toolCall) {
+    // 首先确保右侧面板可见
+    const rightSidebar = document.getElementById('sidebar-right');
+    if (rightSidebar && rightSidebar.classList.contains('collapsed')) {
+        toggleRightSidebar();
+    }
+
+    // 获取右侧内容区域
+    const rightContent = document.getElementById('right-container-content');
+    const iframe = document.getElementById('content-iframe');
+    const markdownContent = document.getElementById('markdown-content');
+    const rightStatus = document.getElementById('right-container-status');
+
+    if (!rightContent || !iframe || !markdownContent) {
+        console.warn('右侧面板元素不存在');
+        return;
+    }
+
+    // 显示 iframe 或 markdown 内容
+    iframe.style.display = 'block';
+    markdownContent.style.display = 'none';
+
+    // 更新状态文本
+    if (rightStatus) {
+        if (toolCall.url) {
+            rightStatus.textContent = `正在查看：${toolCall.toolName}`;
+        } else if (toolCall.path) {
+            rightStatus.textContent = `正在查看：${toolCall.toolName}`;
+        }
+    }
+
+    // 如果有 URL，在 iframe 中显示
+    if (toolCall.url) {
+        iframe.src = toolCall.url;
+        iframe.style.display = 'block';
+        markdownContent.style.display = 'none';
+    } else if (toolCall.path) {
+        // 如果是文件路径，显示文件内容
+        showFileContentInIframe(toolCall.path);
+    }
+}
+
+// 在 iframe 中显示文件内容
+function showFileContentInIframe(filePath) {
+    const iframe = document.getElementById('content-iframe');
+    if (!iframe) return;
+
+    // 构建 API URL
+    const apiUrl = `/api/workspace/file?path=${encodeURIComponent(filePath)}`;
+    iframe.src = apiUrl;
+    iframe.style.display = 'block';
+}
+
+// 显示右侧面板（通用）
+function showRightPanel() {
+    const rightSidebar = document.getElementById('sidebar-right');
+    if (rightSidebar && rightSidebar.classList.contains('collapsed')) {
+        toggleRightSidebar();
+    }
+    return true;
+}
+
+// 隐藏右侧面板
+function hideRightPanel() {
+    const rightSidebar = document.getElementById('sidebar-right');
+    if (rightSidebar && !rightSidebar.classList.contains('collapsed')) {
+        toggleRightSidebar();
+    }
+}
+
+// 切换右侧内容面板的显示/隐藏（与 index.html 保持一致）
+function toggleRightContainer() {
+    const rightContainer = document.getElementById('right-container');
+    if (rightContainer) {
+        if (rightContainer.style.display === 'none') {
+            rightContainer.style.display = 'block';
+        } else {
+            rightContainer.style.display = 'none';
+        }
+    }
+}
+
+// 最大化/还原右侧面板
+function toggleMaximizePanel() {
+    const rightContainer = document.getElementById('right-container');
+    if (rightContainer) {
+        rightContainer.classList.toggle('maximized');
+    }
+}
+
+// 更新动态标题
+function updateDynamicTitle(title) {
+    const titleEl = document.getElementById('conversation-title');
+    if (titleEl) {
+        titleEl.textContent = title;
+    }
+}
+
+// ==================== 工具链展示 ====================
+
+// 添加工具调用到节点面板
+function addToolCallToNodePanel(nodeId, tool) {
+    if (tool && (tool.tool === "mark_step" || tool.tool_name === "mark_step")) {
+        return;
+    }
+    const callId = `tool_${++toolCallCounter}_${Date.now()}`;
+    const startTime = Date.now() - tool.duration;
+    const endTime = Date.now();
+
+    let finalStatus = tool.status || "completed";
+    if (tool.tool === "execute_code" && tool.status !== "running") {
+        try {
+            let resultTextForCheck = "";
+            if (tool.raw_result) {
+                if (typeof tool.raw_result === "string") {
+                    resultTextForCheck = tool.raw_result;
+                } else if (tool.raw_result.output && typeof tool.raw_result.output === "string") {
+                    resultTextForCheck = tool.raw_result.output;
+                } else if (tool.raw_result.summary && typeof tool.raw_result.summary === "string") {
+                    resultTextForCheck = tool.raw_result.summary;
+                }
+            } else if (tool.result) {
+                resultTextForCheck = typeof tool.result === "string" ? tool.result : JSON.stringify(tool.result);
+            }
+
+            if (resultTextForCheck) {
+                const lowered = resultTextForCheck.toLowerCase();
+                const hasErrorPattern =
+                    /traceback \(most recent call last\)/i.test(resultTextForCheck) ||
+                    /exception[:\s]/i.test(resultTextForCheck) ||
+                    /error[:\s]/i.test(resultTextForCheck) ||
+                    lowered.includes("nameerror") ||
+                    resultTextForCheck.includes("错误");
+
+                if (hasErrorPattern) {
+                    finalStatus = "failed";
+                } else if (tool.status !== "failed") {
+                    finalStatus = "completed";
+                }
+            }
+        } catch (e) {
+            console.warn("智能判断代码执行状态失败 (addToolCallToNodePanel):", e);
+        }
+    }
+
+    const toolCall = {
+        id: callId,
+        nodeId: nodeId,
+        duration: tool.duration,
+        tool: tool.tool,
+        toolName: tool.toolName,
+        description: tool.description,
+        status: finalStatus,
+        startTime: startTime,
+        endTime: endTime,
+        result: tool.result || `工具 ${tool.toolName} 执行完成`,
+        error: finalStatus === "failed" ? "工具执行失败" : null,
+        url: tool.url || null,
+        path: tool.path || null,
+        tool_args: tool.tool_args || null,
+        raw_result: tool.raw_result || null,
+    };
+
+    toolCallHistory.unshift(toolCall);
+    if (toolCallHistory.length > 50) {
+        toolCallHistory = toolCallHistory.slice(0, 50);
+    }
+
+    updateNodeToolPanel(nodeId, toolCall);
+}
+
+// 预设气泡颜色（与 settings.js 保持一致，6 种）
+const BUBBLE_COLORS = [
+    { name: '渐变粉红', from: '#ff9a9e', to: '#fecfef' },
+    { name: '渐变橙红', from: '#ff6a6a', to: '#ff9a6e' },
+    { name: '渐变青绿', from: '#43e97b', to: '#38f9d7' },
+    { name: '渐变蓝绿', from: '#4facfe', to: '#00f2fe' },
+    { name: '渐变紫红', from: '#a18cd1', to: '#fbc2eb' },
+    { name: '渐变金黄', from: '#ffd700', to: '#ffcc00' },
+];
+
+// 初始化气泡颜色主题
+function initBubbleColorTheme() {
+    const savedIndex = localStorage.getItem('cosight:bubbleColorIndex');
+    let index = 0; // 默认为粉红（索引 0）
+    
+    if (savedIndex !== null) {
+        index = parseInt(savedIndex, 10);
+        // 如果保存的索引无效，使用默认值 0
+        if (isNaN(index) || index < 0 || index >= BUBBLE_COLORS.length) {
+            index = 0;
+        }
+    }
+    
+    const color = BUBBLE_COLORS[index];
+    if (color) {
+        document.documentElement.style.setProperty('--bubble-gradient-from', color.from);
+        document.documentElement.style.setProperty('--bubble-gradient-to', color.to);
+    }
+}
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -10,12 +596,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-function renderMarkdown(text) {
-    if (window.marked) {
-        return marked.parse(text);
-    }
-    return text;
-}
+// renderMarkdown 函数已移除，直接使用 markdown-it
 
 // ==================== 全局状态管理 ====================
 const AppState = {
@@ -26,7 +607,6 @@ const AppState = {
     ungroupedThreads: [],
     toolCalls: [],
     dagData: null,
-    apiBaseUrl: 'http://localhost:7788/api/nae-deep-research/v1',
     draggedThreadId: null,
     renamingThreadId: null,
     deletingThreadId: null,
@@ -414,7 +994,7 @@ function initFolderDragDrop() {
 
 function createNewFolder(name) {
     const folder = {
-        id: 'folder-' + Date.now(),
+        id: generateUniqueId('folder'),
         name: name,
         threads: [],
         expanded: false
@@ -508,7 +1088,7 @@ function getThreadById(threadId) {
 
 function createNewThread(title, folderId = null) {
     const thread = {
-        id: 'thread-' + Date.now(),
+        id: generateUniqueId('thread'),
         title: title,
         folderId: folderId,
         updatedAt: Date.now(),
@@ -596,11 +1176,12 @@ function createMessageElement(message) {
     const div = document.createElement('div');
     div.className = `message-item ${message.role}`;
     
-    const avatarIcon = message.role === 'user' ? 'fa-user' : 'fa-robot';
-    const content = message.role === 'assistant' 
-        ? renderMarkdown(message.content) 
-        : escapeHtml(message.content);
+    // 为用户消息应用气泡颜色主题
+    if (message.role === 'user') {
+        div.classList.add('theme-custom');
+    }
     
+    const avatarIcon = message.role === 'user' ? 'fa-user' : 'fa-robot';
     const timeStr = formatTime(message.timestamp);
     
     div.innerHTML = `
@@ -609,13 +1190,25 @@ function createMessageElement(message) {
         </div>
         <div class="message-content">
             <div class="message-bubble">
-                ${content}
             </div>
             <div class="message-meta">
                 <span>${timeStr}</span>
             </div>
         </div>
     `;
+    
+    // 渲染内容
+    const messageBubble = div.querySelector('.message-bubble');
+    if (message.role === 'assistant') {
+        // 使用 MarkdownRenderer 渲染 Markdown
+        if (window.MarkdownRenderer && typeof window.MarkdownRenderer.render === 'function') {
+            window.MarkdownRenderer.render(message.content, messageBubble);
+        } else {
+            messageBubble.textContent = message.content;
+        }
+    } else {
+        messageBubble.textContent = message.content;
+    }
     
     return div;
 }
@@ -938,9 +1531,7 @@ function initInputArea() {
     
     if (clearChatBtn) {
         clearChatBtn.addEventListener('click', () => {
-            if (confirm('确定要清空当前对话吗？')) {
-                clearCurrentChat();
-            }
+            openClearChatConfirmModal();
         });
     }
     
@@ -962,6 +1553,18 @@ function sendMessage() {
         content: message,
         timestamp: Date.now()
     };
+    
+    // 先保存到当前线程的消息数组
+    const thread = getCurrentThread();
+    if (thread) {
+        if (!thread.messages) thread.messages = [];
+        thread.messages.push(userMessage);
+        thread.updatedAt = Date.now();
+        thread.messageCount = thread.messages.length;
+        saveState();
+    }
+    
+    // 然后添加到 UI 显示
     addMessage(userMessage);
     
     chatInput.value = '';
@@ -972,37 +1575,37 @@ function sendMessage() {
 }
 
 async function sendToBackend(message) {
+    console.log('sendToBackend 被调用，message:', message);
     try {
-        const response = await fetch(`${AppState.apiBaseUrl}/api/chat`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: message,
-                threadId: AppState.currentThreadId
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
+        // 使用 WebSocket 发送消息（与 main.js 保持一致）
+        if (!window.messageService || !window.WebSocketService) {
+            console.error('messageService 或 WebSocketService 未初始化');
+            hideThinkingState();
+            addMessage({
+                role: 'assistant',
+                content: '抱歉，WebSocket 服务未初始化。请刷新页面重试。',
+                timestamp: Date.now()
+            });
+            return;
         }
         
-        const data = await response.json();
-        hideThinkingState();
+        console.log('WebSocketService 状态:', WebSocketService.getConnectionInfo());
+        console.log('messageService 存在:', !!window.messageService);
         
-        addMessage({
-            role: 'assistant',
-            content: data.response || '收到消息',
-            timestamp: Date.now()
-        });
-        
-        const thread = getCurrentThread();
-        if (thread && thread.messageCount === 1) {
-            thread.title = message.substring(0, 30) + (message.length > 30 ? '...' : '');
-            renderFolderList();
-            saveState();
+        // 检查是否为测试命令 - 测试命令绕过 WebSocket，直接显示 AI 回复
+        if (message === '测试') {
+            console.log('检测到测试命令，绕过 WebSocket 直接显示 AI 回复');
+            await handleTestCommand();
+            return;
         }
+        
+        // 调用 messageService.sendMessage 通过 WebSocket 发送
+        console.log('准备调用 messageService.sendMessage, message:', message);
+        window.messageService.sendMessage(message);
+        console.log('messageService.sendMessage 调用完成');
+        
+        // WebSocket 消息会通过 receiveMessage 回调接收，不需要在这里处理响应
+        // 消息会显示在 DAG 区域和工具面板中
         
     } catch (error) {
         console.error('发送消息失败:', error);
@@ -1013,6 +1616,95 @@ async function sendToBackend(message) {
             content: '抱歉，连接服务器失败。请确保后端服务正在运行。',
             timestamp: Date.now()
         });
+    }
+}
+
+// ==================== WebSocket 消息接收处理 ====================
+
+// 初始化 WebSocket 消息监听
+function initWebSocketMessageHandler() {
+    if (!window.messageService) {
+        console.warn('messageService 未初始化，无法设置消息监听');
+        return;
+    }
+    
+    // 保存原始的 receiveMessage 方法
+    const originalReceiveMessage = window.messageService.receiveMessage.bind(window.messageService);
+    
+    // 包装 receiveMessage 方法，添加我们的处理逻辑
+    window.messageService.receiveMessage = function(message) {
+        // 先调用原始方法处理 DAG 和工具面板
+        originalReceiveMessage(message);
+        
+        // 添加我们的聊天消息处理
+        handleWebSocketMessage(message);
+    };
+    
+    console.log('WebSocket 消息监听已初始化');
+}
+
+// 处理 WebSocket 消息
+function handleWebSocketMessage(message) {
+    try {
+        const messageData = typeof message === 'string' ? JSON.parse(message) : message;
+        console.log('main-new.js 收到消息:', messageData);
+        
+        // 检查是否是 lui-message-manus-step 类型的消息（DAG 步骤消息）
+        const messageType = messageData.data?.contentType || messageData.data?.type;
+        
+        if (messageType === 'lui-message-manus-step') {
+            // DAG 步骤消息，已经在 message.js 中处理
+            console.log('收到 DAG 步骤消息');
+            return;
+        }
+        
+        if (messageType === 'lui-message-tool-event') {
+            // 工具事件消息，已经在 message.js 中处理
+            console.log('收到工具事件消息');
+            return;
+        }
+        
+        // 处理普通的多模态消息
+        if (messageData.data && messageData.data.initData) {
+            const initData = messageData.data.initData;
+            const from = messageData.data.from;
+            
+            // 只处理 AI 返回的消息
+            if (from === 'ai' && Array.isArray(initData)) {
+                hideThinkingState();
+                
+                // 合并所有文本内容
+                let content = '';
+                initData.forEach(item => {
+                    if (item.type === 'text' && item.value) {
+                        content += item.value;
+                    }
+                });
+                
+                if (content) {
+                    const assistantMessage = {
+                        role: 'assistant',
+                        content: content,
+                        timestamp: Date.now()
+                    };
+                    
+                    // 保存到当前线程的消息数组
+                    const thread = getCurrentThread();
+                    if (thread) {
+                        if (!thread.messages) thread.messages = [];
+                        thread.messages.push(assistantMessage);
+                        thread.updatedAt = Date.now();
+                        thread.messageCount = thread.messages.length;
+                        saveState();
+                    }
+                    
+                    // 添加到 UI 显示
+                    addMessage(assistantMessage);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('处理 WebSocket 消息失败:', error);
     }
 }
 
@@ -1466,6 +2158,47 @@ function initDeleteFolderConfirmModal() {
     });
 }
 
+// ==================== 清除对话确认弹窗 ====================
+
+function openClearChatConfirmModal() {
+    const modal = document.getElementById('clear-chat-confirm-modal-overlay');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeClearChatConfirmModal() {
+    const modal = document.getElementById('clear-chat-confirm-modal-overlay');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function confirmClearChat() {
+    clearCurrentChat();
+    closeClearChatConfirmModal();
+}
+
+function initClearChatConfirmModal() {
+    const closeBtn = document.getElementById('close-clear-chat-confirm-modal');
+    const cancelBtn = document.getElementById('cancel-clear-chat-confirm-btn');
+    const confirmBtn = document.getElementById('confirm-clear-chat-confirm-btn');
+
+    if (!closeBtn) return;
+
+    closeBtn.addEventListener('click', closeClearChatConfirmModal);
+    cancelBtn.addEventListener('click', closeClearChatConfirmModal);
+
+    confirmBtn.addEventListener('click', confirmClearChat);
+
+    const modal = document.getElementById('clear-chat-confirm-modal-overlay');
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeClearChatConfirmModal();
+        }
+    });
+}
+
 // ==================== 弹窗控制 ====================
 
 function initFolderModal() {
@@ -1565,7 +2298,7 @@ function createNewThreadInFolder(folderId) {
     }
     
     const thread = {
-        id: 'thread-' + Date.now(),
+        id: generateUniqueId('thread'),
         title: '新对话',
         folderId: folderId === 'default' ? null : folderId,
         updatedAt: Date.now(),
@@ -1647,6 +2380,20 @@ function initSettingsModal() {
 function initThreeColumnLayout() {
     loadState();
     
+    // 初始化气泡颜色主题
+    initBubbleColorTheme();
+    
+    // 初始化 WebSocket 连接（必须在其他初始化之前）
+    if (window.WebSocketService) {
+        WebSocketService.initWebSocket();
+        
+        // 等待 WebSocket 连接建立后设置消息处理
+        WebSocketService.websocketConnected.addEventListener('connected', function() {
+            console.log('WebSocket 连接已建立，设置消息处理...');
+            setupPendingRequests();
+        });
+    }
+    
     initLeftSidebar();
     initRightSidebar();
     initInputArea();
@@ -1655,8 +2402,12 @@ function initThreeColumnLayout() {
     initRenameModal();
     initDeleteConfirmModal();
     initDeleteFolderConfirmModal();
+    initClearChatConfirmModal();
     initSettingsModal();
     initFolderDragDrop();
+    
+    // 初始化 WebSocket 消息监听（必须在 renderFolderList 之前）
+    initWebSocketMessageHandler();
     
     renderFolderList();
     
@@ -1669,20 +2420,124 @@ function initThreeColumnLayout() {
     }
 }
 
+// 检查是否有 pending 的请求需要重发
+function setupPendingRequests() {
+    try {
+        const pendingRaw = localStorage.getItem('cosight:pendingRequests');
+        if (pendingRaw) {
+            const pendings = JSON.parse(pendingRaw);
+            Object.entries(pendings).forEach(([topic, data]) => {
+                if (data && data.message) {
+                    console.log('恢复 pending 订阅:', topic);
+                    // 重新订阅
+                    if (window.messageService) {
+                        WebSocketService.subscribe(topic, messageService.receiveMessage.bind(messageService));
+                    }
+                    // 仅当明确 stillPending===true 时才重发，避免刷新重复执行
+                    if (data.stillPending === true) {
+                        console.log('重发 pending 请求:', topic);
+                        WebSocketService.sendMessage(topic, JSON.stringify(data.message));
+                    }
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('处理 pending 请求失败:', e);
+    }
+}
+
 function loadExampleData() {
+    // 创建文件夹
     const folder = createNewFolder('工作项目');
     
-    createNewThread('江苏足球联赛球队表现分析', folder.id);
-    createNewThread('GDP 数据分析报告');
-    createNewThread('代码审查与优化');
+    // 在文件夹中创建线程（使用 createNewThreadInFolder 确保线程添加到文件夹中）
+    createNewThreadInFolder(folder.id);
+    createNewThreadInFolder(folder.id);
+    createNewThreadInFolder(folder.id);
     
-    if (AppState.ungroupedThreads.length > 0) {
-        switchThread(AppState.ungroupedThreads[0].id);
+    // 获取文件夹中的线程并设置标题
+    const folderThreads = folder.threads || [];
+    if (folderThreads.length > 0) {
+        folderThreads[0].title = '江苏足球联赛球队表现分析';
+        folderThreads[1].title = 'GDP 数据分析报告';
+        folderThreads[2].title = '代码审查与优化';
+        
+        // 切换到第一个线程
+        switchThread(folderThreads[0].id);
+        renderFolderList();
+        saveState();
     }
 }
 
 document.addEventListener('DOMContentLoaded', initThreeColumnLayout);
 
+// ==================== 测试命令处理 ====================
+// 缓存测试文档内容
+let testMarkdownContent = null;
+
+/**
+ * 处理测试命令
+ * 当用户输入"测试"时，直接作为 AI 回复显示 Markdown 测试文档内容
+ */
+async function handleTestCommand() {
+    console.log("处理测试命令，直接显示 AI 回复...");
+
+    // 隐藏思考状态
+    hideThinkingState();
+
+    // 如果已缓存，直接使用
+    if (testMarkdownContent) {
+        console.log("使用缓存的测试内容");
+        showTestContentAsAIReply(testMarkdownContent);
+        return;
+    }
+
+    try {
+        // 加载测试文档
+        const response = await fetch('markdown/markdown-response.txt');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        testMarkdownContent = await response.text();
+        console.log("测试文档加载成功，长度:", testMarkdownContent.length);
+        showTestContentAsAIReply(testMarkdownContent);
+    } catch (error) {
+        console.error("加载测试文档失败:", error);
+        addMessage({
+            role: 'assistant',
+            content: `加载测试内容失败：${error.message}`,
+            timestamp: Date.now()
+        });
+    }
+}
+
+/**
+ * 将测试内容作为 AI 回复显示
+ */
+function showTestContentAsAIReply(content) {
+    const assistantMessage = {
+        role: 'assistant',
+        content: content,
+        timestamp: Date.now()
+    };
+    
+    // 保存到当前线程的消息数组
+    const thread = getCurrentThread();
+    if (thread) {
+        if (!thread.messages) thread.messages = [];
+        thread.messages.push(assistantMessage);
+        thread.updatedAt = Date.now();
+        thread.messageCount = thread.messages.length;
+        saveState();
+    }
+    
+    // 添加到 UI 显示
+    addMessage(assistantMessage);
+    
+    console.log("测试内容已作为 AI 回复显示");
+}
+
+// 暴露到全局
 window.AppState = AppState;
 window.updateProgressStats = updateProgressStats;
 window.addToolCallToChain = addToolCallToChain;
@@ -1690,3 +2545,4 @@ window.addMessage = addMessage;
 window.toggleRightSidebar = toggleRightSidebar;
 window.createThread = createNewThread;
 window.getThreadById = getThreadById;
+window.handleTestCommand = handleTestCommand;

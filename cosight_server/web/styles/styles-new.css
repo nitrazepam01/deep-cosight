@@ -701,7 +701,25 @@ body {
 .settings-field {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 8px;
+}
+
+/* 下拉框字段特殊布局 - 左右排列 */
+.settings-field:has(select.settings-input) {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+}
+
+.settings-field:has(select.settings-input) .settings-label {
+    min-width: 140px;
+    margin: 0;
+    justify-content: flex-start;
+}
+
+.settings-field:has(select.settings-input) .settings-input-wrap {
+    flex: 1;
+    max-width: 280px;
 }
 
 .settings-label {
@@ -733,7 +751,7 @@ body {
     color: #333;
     background: #fafafa;
     transition: all 0.5s;
-    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-family: inherit;
 }
 
 .settings-input:focus {
@@ -747,6 +765,45 @@ body {
     color: #bbb;
     font-family: inherit;
     font-style: italic;
+}
+
+/* 下拉框特殊样式 */
+select.settings-input {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 40px;
+    cursor: pointer;
+    background-color: #fff;
+    border-color: #ddd;
+}
+
+select.settings-input:focus {
+    background-color: #fff;
+    border-color: #43e97b;
+}
+
+/* 下拉选项列表样式 */
+select.settings-input option {
+    padding: 10px 16px;
+    background: #fff;
+    color: #333;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+select.settings-input option:hover {
+    background: #f5f5f5;
+}
+
+select.settings-input option:checked {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    color: #fff;
+    font-weight: 500;
 }
 
 .settings-eye-btn {
@@ -832,9 +889,9 @@ body {
 
 .settings-toast {
     position: fixed;
-    bottom: 30px;
+    top: 30px;
     left: 50%;
-    transform: translateX(-50%) translateY(20px);
+    transform: translateX(-50%) translateY(-20px);
     padding: 12px 24px;
     border-radius: 10px;
     font-size: 14px;
@@ -869,7 +926,7 @@ body {
 .main-content {
     flex: 1;
     display: grid;
-    grid-template-rows: 68px 1fr auto;
+    grid-template-rows: 56px 1fr auto;
     background: #fff;
     overflow: hidden;
     min-width: 0;
@@ -878,13 +935,13 @@ body {
 
 .main-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    padding: 16px 24px;
+    padding: 8px 24px 0;
     border-bottom: 1px solid #e8e8e8;
     background: #fff;
     position: relative;
-    height: 68px;
+    height: 56px;
 }
 
 .sidebar-expand-btn-wrapper {
@@ -892,6 +949,7 @@ body {
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+    margin-top: -4px;
 }
 
 .main-title {
@@ -900,8 +958,15 @@ body {
     gap: 0px;
     position: absolute;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%);
     flex-shrink: 0;
+}
+
+.main-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+    margin-top: -4px;
 }
 
 .main-title h2 {
@@ -922,6 +987,10 @@ body {
 
 .sidebar-left.collapsed ~ .main-content .main-title .rename-title-btn {
     display: flex;
+}
+
+.sidebar-left.collapsed ~ .main-content .main-title {
+    transform: translateX(-50%) translateY(-4px);
 }
 
 .sidebar-left:not(.collapsed) ~ .main-content .sidebar-expand-btn-wrapper {
@@ -1092,6 +1161,7 @@ body {
     max-width: 900px;
     margin: 0 auto;
     width: 100%;
+    align-items: flex-start;
 }
 
 .message-item.user {
@@ -1106,39 +1176,169 @@ body {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .message-item.assistant .message-avatar {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: #fff;
 }
 
 .message-item.user .message-avatar {
-    background: #e0e0e0;
-    color: #666;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
 }
 
 .message-content {
-    flex: 1;
-    max-width: calc(100% - 60px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    max-width: 75%;
+}
+
+.message-item.user .message-content {
+    align-items: flex-end;
+}
+
+.message-item.assistant .message-content {
+    align-items: flex-start;
 }
 
 .message-bubble {
-    padding: 16px 20px;
-    border-radius: 16px;
+    padding: 14px 18px;
+    border-radius: 18px;
     line-height: 1.6;
+    font-size: 15px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
 }
 
 .message-item.assistant .message-bubble {
-    background: #f8f9fa;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
     color: #333;
-    border-bottom-left-radius: 4px;
+    border: 1px solid #e8e8e8;
+    border-top-left-radius: 4px;
 }
 
 .message-item.user .message-bubble {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, #f06292 0%, #f8bbd9 100%);
     color: #fff;
-    border-bottom-right-radius: 4px;
+    border-top-right-radius: 4px;
+    text-shadow: 0 1px 2px rgba(233, 30, 99, 0.15);
+}
+
+.message-item.user.theme-blue .message-bubble {
+    background: linear-gradient(135deg, #64b5f6 0%, #bbdefb 100%);
+    text-shadow: 0 1px 2px rgba(33, 150, 243, 0.15);
+}
+
+.message-item.user.theme-green .message-bubble {
+    background: linear-gradient(135deg, #66bb6a 0%, #a5d6a7 100%);
+    text-shadow: 0 1px 2px rgba(76, 175, 80, 0.15);
+}
+
+.message-item.user.theme-yellow .message-bubble {
+    background: linear-gradient(135deg, #ffd54f 0%, #fff9c4 100%);
+    color: #5d4037;
+    text-shadow: 0 1px 2px rgba(255, 193, 7, 0.15);
+}
+
+.message-item.user.theme-purple .message-bubble {
+    background: linear-gradient(135deg, #ba68c8 0%, #e1bee7 100%);
+    text-shadow: 0 1px 2px rgba(156, 39, 176, 0.15);
+}
+
+.message-item.user.theme-orange .message-bubble {
+    background: linear-gradient(135deg, #ffa726 0%, #ffcc80 100%);
+    color: #5d4037;
+    text-shadow: 0 1px 2px rgba(255, 152, 0, 0.15);
+}
+
+.message-item.user.theme-pink .message-bubble {
+    background: linear-gradient(135deg, #f06292 0%, #f8bbd9 100%);
+    text-shadow: 0 1px 2px rgba(233, 30, 99, 0.15);
+}
+
+/* 用户自定义气泡颜色主题 */
+.message-item.user.theme-custom .message-bubble {
+    background: linear-gradient(135deg, var(--bubble-gradient-from, #667eea), var(--bubble-gradient-to, #764ba2));
+    text-shadow: 0 1px 2px rgba(102, 126, 234, 0.15);
+}
+
+.message-bubble p {
+    margin: 0;
+}
+
+.message-bubble p + p {
+    margin-top: 12px;
+}
+
+.message-bubble pre {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 16px;
+    border-radius: 10px;
+    overflow-x: auto;
+    margin: 12px 0;
+    font-size: 13px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.message-bubble code {
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+}
+
+.message-bubble p code {
+    background: rgba(0, 0, 0, 0.08);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.message-item.user .message-bubble p code {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.message-bubble ul,
+.message-bubble ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.message-bubble li {
+    margin: 4px 0;
+}
+
+.message-bubble h1,
+.message-bubble h2,
+.message-bubble h3,
+.message-bubble h4 {
+    margin: 16px 0 8px;
+    font-weight: 600;
+}
+
+.message-bubble h1:first-child,
+.message-bubble h2:first-child,
+.message-bubble h3:first-child,
+.message-bubble h4:first-child {
+    margin-top: 0;
+}
+
+.message-bubble blockquote {
+    border-left: 3px solid #667eea;
+    padding-left: 12px;
+    margin: 12px 0;
+    color: #666;
+    font-style: italic;
+}
+
+.message-item.user .message-bubble blockquote {
+    border-left-color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .message-meta {
@@ -1179,7 +1379,7 @@ body {
 }
 
 .input-area {
-    padding: 16px 24px 24px;
+    padding: 24px 24px 0;
     background: #fff;
     border-top: 1px solid #e8e8e8;
     flex-shrink: 0;
@@ -1212,8 +1412,6 @@ body {
 
 .input-wrapper:focus-within {
     border-color: #667eea;
-    background: #fff;
-    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
 }
 
 .chat-input {
@@ -1987,6 +2185,540 @@ body {
 }
 
 /* 响应式设计 */
+/* ==================== Provider Management Styles ==================== */
+
+.cs-header-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eaeaea;
+}
+
+.cs-header-sub {
+    font-size: 13px;
+    color: #999;
+    font-weight: 400;
+    margin-left: 8px;
+}
+
+.cs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.cs-empty {
+    font-size: 14px;
+    color: #999;
+    padding: 20px 0;
+}
+
+/* 供应商卡片 */
+.cs-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: opacity 0.2s;
+}
+
+.cs-item.disabled {
+    opacity: 0.5;
+}
+
+.cs-icon {
+    font-size: 20px;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.cs-item-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 2px;
+}
+
+.cs-name {
+    font-size: 15px;
+    color: #333;
+}
+
+.cs-badge {
+    font-size: 14px;
+    color: #666;
+}
+
+.cs-item-actions {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 2px;
+}
+
+/* 供应商操作按钮 */
+.cs-btn {
+    border: none;
+    background: #f3f4f6;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #4b5563;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.cs-btn:hover {
+    background: #e5e7eb;
+}
+
+.cs-btn-test {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.cs-btn-test i {
+    color: inherit;
+}
+
+.cs-btn-test:hover {
+    background: #bae6fd;
+}
+
+.cs-btn-edit:hover {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.cs-btn-delete:hover {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.cs-item-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 14px;
+    color: #374151;
+    line-height: 1.4;
+}
+
+.cs-item-info i {
+    margin-top: 3px;
+    font-size: 12px;
+    color: #374151;
+}
+
+/* 供应商表单 */
+.cs-form {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.cs-form-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.cs-input-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cs-input-group.full {
+    flex: 100%;
+}
+
+.cs-input-group label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #4b5563;
+}
+
+.cs-input {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #1f2937;
+    background: #fff;
+    transition: border-color 0.2s;
+    font-family: inherit;
+}
+
+.cs-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.cs-input-with-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.cs-input-with-icon .cs-input {
+    width: 100%;
+    padding-right: 32px;
+}
+
+.cs-eye-btn {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 4px;
+}
+
+.cs-eye-btn:hover {
+    color: #4b5563;
+}
+
+.cs-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+/* 快速选择组件 */
+.provider-quick-select {
+    background: linear-gradient(135deg, #f0fdf4, #ffffff);
+    border: 1px solid #bbf7d0;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(74, 222, 128, 0.05);
+}
+
+.quick-select-header {
+    font-size: 14px;
+    font-weight: 600;
+    color: #166534;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.quick-select-header i {
+    color: #22c55e;
+}
+
+.quick-select-empty {
+    font-size: 13px;
+    color: #64748b;
+    font-style: italic;
+    background: #f8fafc;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px dashed #cbd5e1;
+}
+
+.quick-select-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.quick-select-dropdown {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #334155;
+    background: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.quick-select-dropdown:focus {
+    outline: none;
+    border-color: #43e97b;
+    box-shadow: 0 0 0 4px rgba(67, 233, 123, 0.15);
+}
+
+.quick-select-apply-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(67, 233, 123, 0.2);
+}
+
+.quick-select-apply-btn:hover {
+    box-shadow: 0 6px 16px rgba(67, 233, 123, 0.3);
+    transform: translateY(-2px);
+}
+
+/* 模型标签样式 */
+.cs-model-tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 36px;
+    padding: 8px;
+    background: #f8f9fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.cs-model-tags-container:empty::before {
+    content: '暂无模型，请在下方添加';
+    color: #aaa;
+    font-size: 13px;
+}
+
+.cs-model-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, #e8f5e9 0%, #e0f7fa 100%);
+    color: #2e7d32;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    animation: tagFadeIn 0.2s ease;
+}
+
+@keyframes tagFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.cs-model-tag-remove {
+    cursor: pointer;
+    font-size: 11px;
+    color: #999;
+    transition: color 0.15s;
+    padding: 2px;
+}
+
+.cs-model-tag-remove:hover {
+    color: #e53935;
+}
+
+.cs-model-add-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.cs-model-add-row .cs-input {
+    flex: 1;
+}
+
+/* 测试结果显示样式 */
+.test-loading {
+    color: #f59e0b;
+    font-size: 13px;
+}
+
+.test-success {
+    color: #10b981;
+    font-size: 13px;
+}
+
+.test-fail {
+    color: #ef4444;
+    font-size: 13px;
+}
+
+#test-result-0,
+#test-result-1,
+#test-result-2,
+#test-result-3,
+#test-result-4,
+#test-result-5,
+#test-result-6,
+#test-result-7,
+#test-result-8,
+#test-result-9 {
+    margin-top: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    background: #f8f9fa;
+    font-size: 13px;
+}
+
+/* ==================== 个性化页面样式 ==================== */
+.personalization-section {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 16px;
+}
+
+.personalization-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.personalization-section-title {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.personalization-section-title i {
+    color: #a18cd1 !important;
+    font-size: 32px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.personalization-section-title-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.personalization-section-title-content span:first-child {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.personalization-section-desc-inline {
+    font-size: 13px;
+    color: #888;
+}
+
+.bubble-color-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 20px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.bubble-color-toggle-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.bubble-color-toggle-btn i {
+    font-size: 12px;
+}
+
+.personalization-section-desc {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 16px;
+    padding-left: 28px;
+}
+
+.bubble-color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    padding-left: 0;
+}
+
+.bubble-color-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #fff;
+    border-radius: 12px;
+    border: 2px solid #e8e8e8;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.bubble-color-item:hover {
+    border-color: #a18cd1;
+    box-shadow: 0 4px 12px rgba(161, 140, 209, 0.15);
+    transform: translateY(-2px);
+}
+
+.bubble-color-item.selected {
+    border-color: #a18cd1;
+    background: linear-gradient(135deg, rgba(161, 140, 209, 0.1) 0%, rgba(251, 194, 235, 0.1) 100%);
+    box-shadow: 0 4px 16px rgba(161, 140, 209, 0.25);
+}
+
+.bubble-color-preview {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.bubble-color-name {
+    flex: 1;
+    font-size: 14px;
+    color: #333;
+    font-weight: 500;
+}
+
+.bubble-color-check {
+    color: #a18cd1;
+    font-size: 18px;
+}
+
+/* CSS 变量用于气泡颜色 */
+:root {
+    --bubble-gradient-from: #667eea;
+    --bubble-gradient-to: #764ba2;
+}
+
 @media (max-width: 1200px) {
     .sidebar-right {
         width: 350px;

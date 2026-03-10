@@ -1,0 +1,16 @@
+[
+  {
+    "id": "b2a248b0",
+    "name": "阿里云百炼",
+    "provider": "anthropic",
+    "api_key": "sk-sp-75c1757bbe3048799c0028481bfda015",
+    "base_url": "https://coding.dashscope.aliyuncs.com/v1",
+    "models": [
+      "qwen3.5-plus",
+      "kimi-k2.5",
+      "glm-5",
+      "MiniMax-M2.5"
+    ],
+    "enabled": true
+  }
+]

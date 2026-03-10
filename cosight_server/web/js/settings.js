@@ -6,6 +6,40 @@ const SettingsService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
     let _currentData = null;   // 缓存当前配置数据
     let _activeGroup = null;   // 当前选中的分组
+<<<<<<< Updated upstream
+=======
+    let _providers = [];        // 供应商列表（含原始 api_key 脱敏值）
+    let _editingProvider = null; // 当前正在编辑的供应商
+    let _isAddingProvider = false;
+
+    // 模型分组 key 前缀映射（与后端一致）
+    const MODEL_GROUPS = ['default_model', 'plan_model', 'act_model', 'tool_model', 'vision_model', 'credibility_model', 'browser_model'];
+    const GROUP_TARGET_MAP = {
+        'default_model': 'default',
+        'plan_model': 'plan',
+        'act_model': 'act',
+        'tool_model': 'tool',
+        'vision_model': 'vision',
+        'credibility_model': 'credibility',
+        'browser_model': 'browser',
+    };
+    
+    // 预设气泡颜色（6 种）
+    const BUBBLE_COLORS = [
+        { name: '渐变粉红', from: '#ff9a9e', to: '#fecfef' },
+        { name: '渐变橙红', from: '#ff6a6a', to: '#ff9a6e' },
+        { name: '渐变青绿', from: '#43e97b', to: '#38f9d7' },
+        { name: '渐变蓝绿', from: '#4facfe', to: '#00f2fe' },
+        { name: '渐变紫红', from: '#a18cd1', to: '#fbc2eb' },
+        { name: '渐变金黄', from: '#ffd700', to: '#ffcc00' },
+    ];
+    
+    // 当前选中的气泡颜色索引（默认为粉红，索引 0）
+    let _selectedBubbleColorIndex = 0;
+    
+    // 是否展开显示所有颜色
+    let _isBubbleColorExpanded = false;
+>>>>>>> Stashed changes
 
     /* ---------- API ---------- */
     async function fetchSettings() {
@@ -38,8 +72,24 @@ const SettingsService = (function () {
         }
 
         if (isInitialRender) {
+<<<<<<< Updated upstream
             // 首次渲染，生成完整 HTML
             const sidebarItems = groups.map(g => `
+=======
+            // 构建侧边栏：先加"大模型"，再加"个性化"，再加原有分组
+            const sidebarItems = `
+                <div class="settings-sidebar-item ${'providers' === _activeGroup ? 'active' : ''}" 
+                     data-group="providers" onclick="SettingsService.switchGroup('providers')">
+                    <i class="fas fa-cube"></i>
+                    <span>大模型</span>
+                </div>
+                <div class="settings-sidebar-item ${'personalization' === _activeGroup ? 'active' : ''}" 
+                     data-group="personalization" onclick="SettingsService.switchGroup('personalization')">
+                    <i class="fas fa-palette"></i>
+                    <span>个性化</span>
+                </div>
+            ` + groups.map(g => `
+>>>>>>> Stashed changes
                 <div class="settings-sidebar-item ${g.group === _activeGroup ? 'active' : ''}" 
                      data-group="${g.group}" onclick="SettingsService.switchGroup('${g.group}')">
                     <i class="fas ${g.icon}"></i>
@@ -47,8 +97,16 @@ const SettingsService = (function () {
                 </div>
             `).join('');
 
+<<<<<<< Updated upstream
             const activeGroupData = groups.find(g => g.group === _activeGroup) || groups[0];
             const formFields = renderGroupFields(activeGroupData);
+=======
+            const contentHtml = _activeGroup === 'providers'
+                ? renderProvidersPage()
+                : _activeGroup === 'personalization'
+                ? renderPersonalizationPage()
+                : renderSettingsContent(groups);
+>>>>>>> Stashed changes
 
             modal.innerHTML = `
                 <div class="settings-overlay" onclick="SettingsService.close()"></div>
@@ -117,6 +175,182 @@ const SettingsService = (function () {
         document.body.style.overflow = 'hidden';
     }
 
+<<<<<<< Updated upstream
+=======
+    function updateSidebarAndContent(groups) {
+        const modal = document.getElementById('settings-modal');
+        if (!modal) return;
+
+        // 更新左侧选中状态
+        const sidebarItems = modal.querySelectorAll('.settings-sidebar-item');
+        sidebarItems.forEach(item => {
+            item.classList.toggle('active', item.dataset.group === _activeGroup);
+        });
+
+        // 更新右侧内容
+        const contentDiv = document.getElementById('settings-content-area');
+        if (!contentDiv) return;
+
+        if (_activeGroup === 'providers') {
+            contentDiv.innerHTML = renderProvidersPage();
+        } else if (_activeGroup === 'personalization') {
+            contentDiv.innerHTML = renderPersonalizationPage();
+        } else {
+            contentDiv.innerHTML = renderSettingsContent(groups);
+        }
+    }
+
+    /* ---------- 个性化页面 ---------- */
+    function renderPersonalizationPage() {
+        // 从 localStorage 读取当前选中的气泡颜色索引
+        const savedIndex = localStorage.getItem('cosight:bubbleColorIndex');
+        if (savedIndex !== null) {
+            _selectedBubbleColorIndex = parseInt(savedIndex, 10);
+        }
+
+        // 获取当前选中的颜色
+        const currentColor = BUBBLE_COLORS[_selectedBubbleColorIndex] || BUBBLE_COLORS[2];
+        
+        // 收起时不显示颜色，展开时显示所有颜色
+        const displayCount = _isBubbleColorExpanded ? BUBBLE_COLORS.length : 0;
+        
+        const colorItems = [];
+        for (let i = 0; i < displayCount; i++) {
+            const color = BUBBLE_COLORS[i];
+            const isSelected = i === _selectedBubbleColorIndex;
+            colorItems.push(`
+                <div class="bubble-color-item ${isSelected ? 'selected' : ''}" 
+                     data-color-index="${i}" 
+                     onclick="SettingsService.selectBubbleColor(${i})">
+                    <div class="bubble-color-preview" style="background: linear-gradient(135deg, ${color.from}, ${color.to});"></div>
+                    <span class="bubble-color-name">${color.name}</span>
+                    ${isSelected ? '<i class="fas fa-check bubble-color-check"></i>' : ''}
+                </div>
+            `);
+        }
+
+        // 展开收起按钮的图标和文字
+        const toggleIcon = _isBubbleColorExpanded ? 'fa-chevron-up' : 'fa-chevron-down';
+        const toggleText = _isBubbleColorExpanded ? '收起' : '展开';
+
+        return `
+            <div class="cs-header-title">
+                <i class="fas fa-palette" style="color:#a18cd1; margin-right:8px;"></i>
+                个性化设置 <span class="cs-header-sub">Personalization</span>
+            </div>
+            
+            <div class="personalization-section">
+                <div class="personalization-section-header">
+                    <div class="personalization-section-title">
+                        <i class="fas fa-comment-dots" style="color: #a18cd1; font-size: 24px;"></i>
+                        <div class="personalization-section-title-content">
+                            <span>气泡颜色主题</span>
+                            <span class="personalization-section-desc-inline">选择你喜欢的对话气泡颜色主题</span>
+                        </div>
+                    </div>
+                    <button class="bubble-color-toggle-btn" 
+                            onclick="SettingsService.toggleBubbleColorExpand()"
+                            style="background: linear-gradient(135deg, ${currentColor.from}, ${currentColor.to});">
+                        <i class="fas ${toggleIcon}"></i>
+                        <span>${toggleText}</span>
+                    </button>
+                </div>
+                <div class="bubble-color-grid">
+                    ${colorItems.join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function toggleBubbleColorExpand() {
+        _isBubbleColorExpanded = !_isBubbleColorExpanded;
+        const contentDiv = document.getElementById('settings-content-area');
+        if (contentDiv) {
+            contentDiv.innerHTML = renderPersonalizationPage();
+        }
+    }
+
+    function selectBubbleColor(index) {
+        _selectedBubbleColorIndex = index;
+        localStorage.setItem('cosight:bubbleColorIndex', index.toString());
+        
+        // 更新 CSS 变量
+        const color = BUBBLE_COLORS[index];
+        if (color) {
+            document.documentElement.style.setProperty('--bubble-gradient-from', color.from);
+            document.documentElement.style.setProperty('--bubble-gradient-to', color.to);
+        }
+        
+        // 重新渲染页面以更新选中状态
+        const contentDiv = document.getElementById('settings-content-area');
+        if (contentDiv) {
+            contentDiv.innerHTML = renderPersonalizationPage();
+        }
+        
+        showToast('气泡颜色已更新', 'success');
+    }
+
+    function renderSettingsContent(groups) {
+        const activeGroupData = groups.find(g => g.group === _activeGroup) || groups[0];
+        if (!activeGroupData) return '<p>暂无配置项</p>';
+
+        const isModelGroup = MODEL_GROUPS.includes(activeGroupData.group);
+        const quickSelectHtml = isModelGroup ? renderQuickSelect(activeGroupData.group) : '';
+        const formFields = renderGroupFields(activeGroupData);
+
+        return `
+            <div class="settings-group-title">
+                <i class="fas ${activeGroupData.icon}"></i>
+                ${activeGroupData.label_zh}
+                <span class="settings-group-subtitle">${activeGroupData.label_en}</span>
+            </div>
+            ${quickSelectHtml}
+            <div class="settings-fields">${formFields}</div>
+        `;
+    }
+
+    function renderQuickSelect(groupName) {
+        if (_providers.length === 0) {
+            return `
+                <div class="provider-quick-select">
+                    <div class="quick-select-header">
+                        <i class="fas fa-magic"></i> 快速选择供应商
+                    </div>
+                    <div class="quick-select-empty">
+                        暂无供应商，请先在「大模型」页面添加
+                    </div>
+                </div>
+            `;
+        }
+
+        const targetGroup = GROUP_TARGET_MAP[groupName] || 'default';
+        const options = _providers.map(p => {
+            const models = (p.models || []).map(m =>
+                `<option value="${p.id}|${m}">${p.name} / ${m}</option>`
+            ).join('');
+            return models;
+        }).join('');
+
+        return `
+            <div class="provider-quick-select">
+                <div class="quick-select-header">
+                    <i class="fas fa-magic"></i> 快速选择供应商
+                </div>
+                <div class="quick-select-row">
+                    <select class="quick-select-dropdown" id="quick-select-${groupName}" 
+                            onchange="SettingsService.onQuickSelect('${targetGroup}', this.value)">
+                        <option value="">-- 选择已配置的供应商和模型 --</option>
+                        ${options}
+                    </select>
+                    <button class="quick-select-apply-btn" onclick="SettingsService.applyQuickSelect('${targetGroup}')">
+                        <i class="fas fa-check"></i> 应用
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+>>>>>>> Stashed changes
     function renderGroupFields(group) {
         if (!group || !group.items) return '<p>暂无配置项</p>';
         return group.items.map(item => {
@@ -275,7 +509,16 @@ const SettingsService = (function () {
     }
 
     /* ---------- 公开接口 ---------- */
+<<<<<<< Updated upstream
     return { open, close, save, switchGroup, togglePassword };
+=======
+    return {
+        open, close, save, switchGroup, togglePassword,
+        startAddProvider, startEditProvider, cancelProviderForm, saveProviderForm,
+        deleteProvider, testProvider, addModelTag, removeModelTag,
+        onQuickSelect, applyQuickSelect, selectBubbleColor, toggleBubbleColorExpand,
+    };
+>>>>>>> Stashed changes
 })();
 
 // 导出到全局

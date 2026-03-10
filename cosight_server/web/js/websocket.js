@@ -5,9 +5,9 @@
 class WebsocketService {
     constructor() {
         this._webSocket = null;
-        // 动态获取WebSocket地址，支持外部访问
+        // 动态获取 WebSocket 地址，支持外部访问
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.host; // 自动获取当前访问的host（包含端口）
+        const host = window.location.host; // 自动获取当前访问的 host（包含端口）
         this._webSocketUrl = `${protocol}//${host}`;
         this._webSocketPath = '/api/openans-support-chatbot/v1/robot/wss/messages';
         this._topics = [];
