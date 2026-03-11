@@ -6,8 +6,6 @@ const SettingsService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
     let _currentData = null;   // 缓存当前配置数据
     let _activeGroup = null;   // 当前选中的分组
-<<<<<<< Updated upstream
-=======
     let _providers = [];        // 供应商列表（含原始 api_key 脱敏值）
     let _editingProvider = null; // 当前正在编辑的供应商
     let _isAddingProvider = false;
@@ -39,7 +37,6 @@ const SettingsService = (function () {
     
     // 是否展开显示所有颜色
     let _isBubbleColorExpanded = false;
->>>>>>> Stashed changes
 
     /* ---------- API ---------- */
     async function fetchSettings() {
@@ -72,10 +69,6 @@ const SettingsService = (function () {
         }
 
         if (isInitialRender) {
-<<<<<<< Updated upstream
-            // 首次渲染，生成完整 HTML
-            const sidebarItems = groups.map(g => `
-=======
             // 构建侧边栏：先加"大模型"，再加"个性化"，再加原有分组
             const sidebarItems = `
                 <div class="settings-sidebar-item ${'providers' === _activeGroup ? 'active' : ''}" 
@@ -89,7 +82,6 @@ const SettingsService = (function () {
                     <span>个性化</span>
                 </div>
             ` + groups.map(g => `
->>>>>>> Stashed changes
                 <div class="settings-sidebar-item ${g.group === _activeGroup ? 'active' : ''}" 
                      data-group="${g.group}" onclick="SettingsService.switchGroup('${g.group}')">
                     <i class="fas ${g.icon}"></i>
@@ -97,16 +89,11 @@ const SettingsService = (function () {
                 </div>
             `).join('');
 
-<<<<<<< Updated upstream
-            const activeGroupData = groups.find(g => g.group === _activeGroup) || groups[0];
-            const formFields = renderGroupFields(activeGroupData);
-=======
             const contentHtml = _activeGroup === 'providers'
                 ? renderProvidersPage()
                 : _activeGroup === 'personalization'
                 ? renderPersonalizationPage()
                 : renderSettingsContent(groups);
->>>>>>> Stashed changes
 
             modal.innerHTML = `
                 <div class="settings-overlay" onclick="SettingsService.close()"></div>
@@ -175,8 +162,6 @@ const SettingsService = (function () {
         document.body.style.overflow = 'hidden';
     }
 
-<<<<<<< Updated upstream
-=======
     function updateSidebarAndContent(groups) {
         const modal = document.getElementById('settings-modal');
         if (!modal) return;
@@ -350,7 +335,6 @@ const SettingsService = (function () {
         `;
     }
 
->>>>>>> Stashed changes
     function renderGroupFields(group) {
         if (!group || !group.items) return '<p>暂无配置项</p>';
         return group.items.map(item => {
@@ -509,16 +493,12 @@ const SettingsService = (function () {
     }
 
     /* ---------- 公开接口 ---------- */
-<<<<<<< Updated upstream
-    return { open, close, save, switchGroup, togglePassword };
-=======
     return {
         open, close, save, switchGroup, togglePassword,
         startAddProvider, startEditProvider, cancelProviderForm, saveProviderForm,
         deleteProvider, testProvider, addModelTag, removeModelTag,
         onQuickSelect, applyQuickSelect, selectBubbleColor, toggleBubbleColorExpand,
     };
->>>>>>> Stashed changes
 })();
 
 // 导出到全局
