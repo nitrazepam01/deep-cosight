@@ -922,6 +922,119 @@ select.settings-input option:checked {
     border: 1px solid #ef9a9a;
 }
 
+/* ========== 设置窗口内的删除确认弹窗 ========== */
+.settings-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.settings-modal {
+    background: #fff;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: settingsModalSlideIn 0.3s ease;
+}
+
+@keyframes settingsModalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.settings-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e8e8e8;
+}
+
+.settings-modal-header h3 {
+    font-size: 18px;
+    color: #333;
+    font-weight: 600;
+}
+
+.settings-modal-close-btn {
+    background: transparent;
+    border: none;
+    color: #999;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.settings-modal-close-btn:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.settings-modal-body {
+    padding: 24px;
+}
+
+.settings-modal-message {
+    color: #333;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.settings-modal-footer {
+    display: flex;
+    gap: 12px;
+    padding: 16px 24px;
+    justify-content: flex-end;
+}
+
+.settings-modal-btn {
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.settings-modal-btn-cancel {
+    background: #f0f0f0;
+    color: #666;
+}
+
+.settings-modal-btn-cancel:hover {
+    background: #e0e0e0;
+}
+
+.settings-modal-btn-delete {
+    background: linear-gradient(135deg, #f44336, #d32f2f);
+    color: #fff;
+}
+
+.settings-modal-btn-delete:hover {
+    background: linear-gradient(135deg, #d32f2f, #b71c1c);
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+}
+
 /* ==================== 中间主内容区 ==================== */
 .main-content {
     flex: 1;
@@ -2218,63 +2331,97 @@ select.settings-input option:checked {
     padding: 20px 0;
 }
 
-/* 供应商卡片 */
 .cs-item {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #f0f0f0;
-    transition: opacity 0.2s;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 16px;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.cs-item:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .cs-item.disabled {
     opacity: 0.5;
 }
 
+.cs-icon-wrapper {
+    display: flex;
+    align-items: center;
+    padding-top: 12px;
+    flex-shrink: 0;
+}
+
 .cs-icon {
-    font-size: 20px;
-    display: block;
-    margin-bottom: 2px;
+    font-size: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+}
+
+.cs-item-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
 }
 
 .cs-item-title-row {
     display: flex;
-    align-items: baseline;
-    gap: 8px;
-    margin-bottom: 2px;
+    align-items: center;
+    gap: 12px;
 }
 
 .cs-name {
-    font-size: 15px;
+    font-size: 18px;
+    font-weight: 600;
     color: #333;
 }
 
 .cs-badge {
     font-size: 14px;
     color: #666;
+    background: #e5e7eb;
+    padding: 4px 10px;
+    border-radius: 16px;
 }
 
 .cs-item-actions {
     display: flex;
+    flex-direction: column;
     gap: 6px;
-    margin-bottom: 2px;
+    justify-content: center;
+    padding-top: 8px;
 }
 
-/* 供应商操作按钮 */
 .cs-btn {
     border: none;
     background: #f3f4f6;
-    padding: 6px 14px;
+    padding: 8px 16px;
     border-radius: 8px;
     font-size: 13px;
     color: #4b5563;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     transition: all 0.2s;
     font-weight: 500;
+    white-space: nowrap;
 }
 
 .cs-btn:hover {
@@ -2306,20 +2453,20 @@ select.settings-input option:checked {
 
 .cs-item-info {
     display: flex;
-    align-items: flex-start;
-    gap: 6px;
+    align-items: center;
+    gap: 8px;
     font-size: 14px;
     color: #374151;
     line-height: 1.4;
 }
 
 .cs-item-info i {
-    margin-top: 3px;
-    font-size: 12px;
+    font-size: 14px;
     color: #374151;
+    width: 16px;
+    text-align: center;
 }
 
-/* 供应商表单 */
 .cs-form {
     background: white;
     border: 1px solid #e5e7eb;
@@ -2394,14 +2541,92 @@ select.settings-input option:checked {
     color: #4b5563;
 }
 
+/* 表单动作区域样式 */
 .cs-form-actions {
     display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    margin-top: 20px;
+    align-items: center;
+    margin-top: 16px;
+    gap: 16px;
 }
 
-/* 快速选择组件 */
+.cs-form-result {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    display: block;
+    background: #f8f9fa;
+    border: 1px solid #e5e7eb;
+    min-width: 0;
+    text-align: left;
+    color: #999;
+}
+
+.cs-form-result-default {
+    color: #999;
+    font-style: italic;
+}
+
+.cs-form-actions-buttons {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.cs-form-result:has(.test-success) {
+    display: block;
+    background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+    border-color: #a5d6a7;
+}
+
+.cs-form-result:has(.test-fail) {
+    display: block;
+    background: linear-gradient(135deg, #ffebee 0%, #fff5f5 100%);
+    border-color: #ef9a9a;
+}
+
+.cs-form-result:has(.test-loading) {
+    display: block;
+    background: linear-gradient(135deg, #fff3e0 0%, #fff8e1 100%);
+    border-color: #ffcc80;
+}
+
+/* Ping 按钮样式 - 蓝色 */
+.settings-btn-ping {
+    background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(33, 150, 247, 0.3);
+}
+
+.settings-btn-ping:hover {
+    box-shadow: 0 4px 16px rgba(33, 150, 247, 0.5);
+    transform: translateY(-1px);
+}
+
+.settings-btn-ping:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* 添加按钮样式 - 黄色 */
+.cs-model-add-row .settings-btn-save {
+    background: linear-gradient(135deg, #ffd700 0%, #ffcc00 100%);
+    color: #5d4037;
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+    font-weight: 600;
+}
+
+.cs-model-add-row .settings-btn-save i {
+    color: #5d4037;
+}
+
+.cs-model-add-row .settings-btn-save:hover {
+    box-shadow: 0 4px 16px rgba(255, 215, 0, 0.5);
+    transform: translateY(-1px);
+}
+
 .provider-quick-select {
     background: linear-gradient(135deg, #f0fdf4, #ffffff);
     border: 1px solid #bbf7d0;

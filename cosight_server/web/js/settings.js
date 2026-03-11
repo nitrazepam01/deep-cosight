@@ -1,16 +1,11 @@
-/**
- * Co-Sight Settings Panel
- * 设置弹窗模块 — 查看和修改 .env 配置
- */
 const SettingsService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
-    let _currentData = null;   // 缓存当前配置数据
-    let _activeGroup = null;   // 当前选中的分组
-    let _providers = [];        // 供应商列表（含原始 api_key 脱敏值）
-    let _editingProvider = null; // 当前正在编辑的供应商
+    let _currentData = null;
+    let _activeGroup = null;
+    let _providers = [];
+    let _editingProvider = null;
     let _isAddingProvider = false;
 
-    // 模型分组 key 前缀映射（与后端一致）
     const MODEL_GROUPS = ['default_model', 'plan_model', 'act_model', 'tool_model', 'vision_model', 'credibility_model', 'browser_model'];
     const GROUP_TARGET_MAP = {
         'default_model': 'default',
@@ -22,7 +17,6 @@ const SettingsService = (function () {
         'browser_model': 'browser',
     };
     
-    // 预设气泡颜色（6 种）
     const BUBBLE_COLORS = [
         { name: '渐变粉红', from: '#ff9a9e', to: '#fecfef' },
         { name: '渐变橙红', from: '#ff6a6a', to: '#ff9a6e' },
@@ -32,13 +26,10 @@ const SettingsService = (function () {
         { name: '渐变金黄', from: '#ffd700', to: '#ffcc00' },
     ];
     
-    // 当前选中的气泡颜色索引（默认为粉红，索引 0）
     let _selectedBubbleColorIndex = 0;
     
-    // 是否展开显示所有颜色
     let _isBubbleColorExpanded = false;
 
-    /* ---------- API ---------- */
     async function fetchSettings() {
         const resp = await fetch(`${API_BASE}/deep-research/settings`);
         const json = await resp.json();
@@ -57,15 +48,64 @@ const SettingsService = (function () {
         return json.data;
     }
 
-    /* ---------- 渲染 ---------- */
+    async function fetchProviders() {
+        try {
+            const resp = await fetch(`${API_BASE}/deep-research/providers`);
+            if (!resp.ok) {
+                console.log('供应商 API 不可用，将使用.env 文件直接配置');
+                return [];
+            }
+            const json = await resp.json();
+            if (json.code !== 0) throw new Error(json.msg || json.message);
+            return json.data.providers || [];
+        } catch (e) {
+            console.log('获取供应商列表失败:', e.message, '将使用.env 文件直接配置');
+            return [];
+        }
+    }
+
+    async function postProviders(providers) {
+        try {
+            const resp = await fetch(`${API_BASE}/deep-research/providers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ providers }),
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const json = await resp.json();
+            if (json.code !== 0) throw new Error(json.msg || json.message);
+            return json.data;
+        } catch (e) {
+            console.error('保存供应商失败:', e.message);
+            throw e;
+        }
+    }
+
+    async function testProviderAPI(providerId, model) {
+        const resp = await fetch(`${API_BASE}/deep-research/providers/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider_id: providerId, model }),
+        });
+        return await resp.json();
+    }
+
+    async function applyProviderToGroup(providerId, modelName, targetGroup) {
+        const resp = await fetch(`${API_BASE}/deep-research/providers/apply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider_id: providerId, model_name: modelName, target_group: targetGroup }),
+        });
+        return await resp.json();
+    }
+
     function renderModal(groups, isInitialRender = true) {
         _currentData = groups;
         const modal = document.getElementById('settings-modal');
         if (!modal) return;
 
-        // 默认选中第一个分组
-        if (!_activeGroup && groups.length > 0) {
-            _activeGroup = groups[0].group;
+        if (!_activeGroup) {
+            _activeGroup = 'providers';
         }
 
         if (isInitialRender) {
@@ -93,7 +133,7 @@ const SettingsService = (function () {
                 ? renderProvidersPage()
                 : _activeGroup === 'personalization'
                 ? renderPersonalizationPage()
-                : renderSettingsContent(groups);
+                : renderSettingsContent(_currentData);
 
             modal.innerHTML = `
                 <div class="settings-overlay" onclick="SettingsService.close()"></div>
@@ -106,14 +146,7 @@ const SettingsService = (function () {
                     </div>
                     <div class="settings-body">
                         <div class="settings-sidebar">${sidebarItems}</div>
-                        <div class="settings-content">
-                            <div class="settings-group-title">
-                                <i class="fas ${activeGroupData.icon}"></i>
-                                ${activeGroupData.label_zh}
-                                <span class="settings-group-subtitle">${activeGroupData.label_en}</span>
-                            </div>
-                            <div class="settings-fields">${formFields}</div>
-                        </div>
+                        <div class="settings-content" id="settings-content-area">${contentHtml}</div>
                     </div>
                     <div class="settings-footer">
                         <div class="settings-footer-hint">
@@ -128,34 +161,27 @@ const SettingsService = (function () {
                         </div>
                     </div>
                 </div>
+                <!-- 删除确认弹窗 - 内嵌在设置窗口中 -->
+                <div class="settings-modal-overlay" id="delete-provider-modal-overlay" style="display: none;">
+                    <div class="settings-modal">
+                        <div class="settings-modal-header">
+                            <h3>删除确认</h3>
+                            <button class="settings-modal-close-btn" id="close-delete-provider-modal">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="settings-modal-body">
+                            <p class="settings-modal-message" id="delete-provider-message"></p>
+                        </div>
+                        <div class="settings-modal-footer">
+                            <button class="settings-modal-btn settings-modal-btn-cancel" id="cancel-delete-provider-btn">取消</button>
+                            <button class="settings-modal-btn settings-modal-btn-delete" id="confirm-delete-provider-btn">删除</button>
+                        </div>
+                    </div>
+                </div>
             `;
         } else {
-            // 切换分组时，只更新右侧内容和左侧选中状态
-            const activeGroupData = groups.find(g => g.group === _activeGroup) || groups[0];
-            const formFields = renderGroupFields(activeGroupData);
-            
-            // 更新左侧选中状态
-            const sidebarItems = modal.querySelectorAll('.settings-sidebar-item');
-            sidebarItems.forEach(item => {
-                if (item.dataset.group === _activeGroup) {
-                    item.classList.add('active');
-                } else {
-                    item.classList.remove('active');
-                }
-            });
-            
-            // 更新右侧标题和内容
-            const contentDiv = modal.querySelector('.settings-content');
-            if (contentDiv) {
-                contentDiv.innerHTML = `
-                    <div class="settings-group-title">
-                        <i class="fas ${activeGroupData.icon}"></i>
-                        ${activeGroupData.label_zh}
-                        <span class="settings-group-subtitle">${activeGroupData.label_en}</span>
-                    </div>
-                    <div class="settings-fields">${formFields}</div>
-                `;
-            }
+            updateSidebarAndContent(groups);
         }
 
         modal.classList.add('show');
@@ -166,13 +192,11 @@ const SettingsService = (function () {
         const modal = document.getElementById('settings-modal');
         if (!modal) return;
 
-        // 更新左侧选中状态
         const sidebarItems = modal.querySelectorAll('.settings-sidebar-item');
         sidebarItems.forEach(item => {
             item.classList.toggle('active', item.dataset.group === _activeGroup);
         });
 
-        // 更新右侧内容
         const contentDiv = document.getElementById('settings-content-area');
         if (!contentDiv) return;
 
@@ -187,16 +211,13 @@ const SettingsService = (function () {
 
     /* ---------- 个性化页面 ---------- */
     function renderPersonalizationPage() {
-        // 从 localStorage 读取当前选中的气泡颜色索引
         const savedIndex = localStorage.getItem('cosight:bubbleColorIndex');
         if (savedIndex !== null) {
             _selectedBubbleColorIndex = parseInt(savedIndex, 10);
         }
 
-        // 获取当前选中的颜色
         const currentColor = BUBBLE_COLORS[_selectedBubbleColorIndex] || BUBBLE_COLORS[2];
         
-        // 收起时不显示颜色，展开时显示所有颜色
         const displayCount = _isBubbleColorExpanded ? BUBBLE_COLORS.length : 0;
         
         const colorItems = [];
@@ -214,7 +235,6 @@ const SettingsService = (function () {
             `);
         }
 
-        // 展开收起按钮的图标和文字
         const toggleIcon = _isBubbleColorExpanded ? 'fa-chevron-up' : 'fa-chevron-down';
         const toggleText = _isBubbleColorExpanded ? '收起' : '展开';
 
@@ -365,16 +385,404 @@ const SettingsService = (function () {
         }).join('');
     }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;')
-                  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    /* ---------- 供应商管理页面 ---------- */
+    function renderProvidersPage() {
+        const providerCards = _providers.length === 0
+            ? ''
+            : _providers.map((p, idx) => {
+                if (_editingProvider && _editingProvider._idx === idx) {
+                    return renderProviderForm(_editingProvider);
+                }
+                return renderProviderCard(p, idx);
+            }).join('');
+
+        const addFormHtml = _isAddingProvider ? renderProviderForm(null) : '';
+
+        return `
+            <div class="cs-header-title">
+                <i class="fas fa-cube" style="color:#43e97b; margin-right:8px;"></i>
+                大模型供应商管理 <span class="cs-header-sub">Model Providers</span>
+            </div>
+            <div class="cs-list">
+                ${providerCards}
+                ${addFormHtml}
+            </div>
+            ${!_isAddingProvider ? `
+                <button class="settings-btn settings-btn-cancel" style="width: 100%; justify-content: center; padding: 10px; margin-top: 8px;" onclick="SettingsService.startAddProvider()">
+                    <i class="fas fa-plus"></i> 添加供应商
+                </button>
+            ` : ''}
+        `;
     }
 
-    /* ---------- 交互 ---------- */
+    function renderProviderCard(provider, idx) {
+        const models = (provider.models || []).join(', ') || '未配置模型';
+        const enabledClass = provider.enabled !== false ? 'enabled' : 'disabled';
+
+        return `
+            <div class="cs-item ${enabledClass}" data-provider-id="${provider.id}">
+                <div class="cs-icon-wrapper">
+                    <div class="cs-icon">${getProviderIcon(provider.provider)}</div>
+                </div>
+                <div class="cs-item-content">
+                    <div class="cs-item-title-row">
+                        <span class="cs-name">${escapeHtml(provider.name || '未命名')}</span>
+                        <span class="cs-badge">${escapeHtml(provider.provider || '')}</span>
+                    </div>
+                    <div class="cs-item-info">
+                        <i class="fas fa-link"></i>
+                        <span>${escapeHtml(provider.base_url || '未设置')}</span>
+                    </div>
+                    <div class="cs-item-info">
+                        <i class="fas fa-layer-group"></i>
+                        <span>${escapeHtml(models)}</span>
+                    </div>
+                </div>
+                <div class="cs-item-actions">
+                    <button class="cs-btn cs-btn-test" onclick="SettingsService.testProvider(${idx})" title="测试连接">
+                        <i class="fas fa-bolt"></i> 测试
+                    </button>
+                    <button class="cs-btn cs-btn-edit" onclick="SettingsService.startEditProvider(${idx})" title="编辑">
+                        <i class="fas fa-pen"></i> 编辑
+                    </button>
+                    <button class="cs-btn cs-btn-delete" onclick="SettingsService.deleteProvider(${idx})" title="删除">
+                        <i class="fas fa-trash-alt"></i> 删除
+                    </button>
+                </div>
+                <div class="provider-test-result" id="test-result-${idx}"></div>
+            </div>
+        `;
+    }
+
+    function getProviderIcon(provider) {
+        const icons = {
+            'openai': '🤖', 'deepseek': '🔮', 'anthropic': '🧠',
+            'google': '🌐', 'qwen': '☁️', 'zhipu': '🔬',
+            'moonshot': '🌙', 'baichuan': '🏔️', 'minimax': '⚡',
+            'yi': '🎯', 'doubao': '🔥',
+        };
+        return icons[(provider || '').toLowerCase()] || '🧩';
+    }
+
+    function renderProviderForm(provider) {
+        const p = provider || { name: '', provider: 'openai', api_key: '', base_url: '', models: [], enabled: true };
+        const modelTags = (p.models || []).map(m =>
+            `<span class="cs-model-tag" data-model="${escapeHtml(m)}">${escapeHtml(m)} <i class="fas fa-times cs-model-tag-remove" onclick="SettingsService.removeModelTag(this)"></i></span>`
+        ).join('');
+        
+        const isEditing = !!_editingProvider;
+        const formId = isEditing ? `edit-form-${_editingProvider._idx}` : 'add-form';
+
+        return `
+            <div class="cs-form" id="${formId}">
+                <div class="cs-form-row">
+                    <div class="cs-input-group">
+                        <label>名称</label>
+                        <input type="text" id="pf-name" class="cs-input" value="${escapeHtml(p.name)}" placeholder="例如：阿里云百炼"/>
+                    </div>
+                    <div class="cs-input-group">
+                        <label>类型</label>
+                        <select id="pf-provider" class="cs-input">
+                            ${['openai', 'deepseek', 'anthropic', 'google', 'qwen', 'zhipu', 'moonshot', 'baichuan', 'minimax', 'yi', 'doubao', 'other']
+                .map(v => `<option value="${v}" ${v === p.provider ? 'selected' : ''}>${v}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div class="cs-form-row">
+                    <div class="cs-input-group full">
+                        <label>接口地址 (Base URL)</label>
+                        <input type="text" id="pf-base-url" class="cs-input" value="${escapeHtml(p.base_url)}" placeholder="https://api.openai.com/v1"/>
+                    </div>
+                </div>
+                <div class="cs-form-row">
+                    <div class="cs-input-group full">
+                        <label>API Key</label>
+                        <div class="cs-input-with-icon">
+                            <input type="password" id="pf-api-key" class="cs-input" value="${escapeHtml(p.api_key)}" placeholder="sk-xxxxxxxx"/>
+                            <button class="cs-eye-btn" type="button" onclick="SettingsService.togglePassword(this)" title="显示/隐藏"><i class="fas fa-eye"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="cs-form-row">
+                    <div class="cs-input-group full">
+                        <label>模型列表</label>
+                        <div class="cs-model-tags-container" id="pf-model-tags">
+                            ${modelTags}
+                        </div>
+                        <div class="cs-model-add-row">
+                            <input type="text" id="pf-model-input" class="cs-input" placeholder="输入模型名称 如 qwen3.5-plus" onkeydown="if(event.key==='Enter'){event.preventDefault();SettingsService.addModelTag()}"/>
+                            <button class="settings-btn settings-btn-save" style="padding: 6px 12px; border-radius: 8px; white-space: nowrap;" onclick="SettingsService.addModelTag()">
+                                <i class="fas fa-plus"></i> 添加
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="cs-form-actions">
+                    <div class="cs-form-result" id="cs-form-result">
+                        <span class="cs-form-result-default"><i class="fas fa-info-circle"></i> 请先填写配置信息，点击 Ping 检测连接成功后即可保存</span>
+                    </div>
+                    <div class="cs-form-actions-buttons">
+                        <button class="settings-btn settings-btn-cancel" style="border-radius: 8px;" onclick="SettingsService.cancelProviderForm()">取消</button>
+                        <button class="settings-btn settings-btn-ping" style="border-radius: 8px;" onclick="SettingsService.pingProviderForm()">
+                            <i class="fas fa-bolt"></i> Ping
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function startAddProvider() {
+        _isAddingProvider = true;
+        _editingProvider = null;
+        refreshProvidersPage();
+    }
+
+    function startEditProvider(idx) {
+        _isAddingProvider = false;
+        _editingProvider = { ..._providers[idx], _idx: idx };
+        refreshProvidersPage();
+    }
+
+    function cancelProviderForm() {
+        _isAddingProvider = false;
+        _editingProvider = null;
+        refreshProvidersPage();
+    }
+
+    function addModelTag() {
+        const input = document.getElementById('pf-model-input');
+        if (!input) return;
+        const modelName = input.value.trim();
+        if (!modelName) return;
+
+        const container = document.getElementById('pf-model-tags');
+        if (!container) return;
+
+        const existing = container.querySelectorAll('.cs-model-tag');
+        for (const tag of existing) {
+            if (tag.dataset.model === modelName) {
+                showToast('模型已存在', 'error');
+                return;
+            }
+        }
+
+        const tag = document.createElement('span');
+        tag.className = 'cs-model-tag';
+        tag.dataset.model = modelName;
+        tag.innerHTML = `${escapeHtml(modelName)} <i class="fas fa-times cs-model-tag-remove" onclick="SettingsService.removeModelTag(this)"></i>`;
+        container.appendChild(tag);
+        input.value = '';
+        input.focus();
+    }
+
+    function removeModelTag(iconEl) {
+        const tag = iconEl.closest('.cs-model-tag');
+        if (tag) tag.remove();
+    }
+
+    async function pingProviderForm() {
+        const name = document.getElementById('pf-name').value.trim();
+        const providerType = document.getElementById('pf-provider').value;
+        const baseUrl = document.getElementById('pf-base-url').value.trim();
+        const apiKey = document.getElementById('pf-api-key').value.trim();
+        const modelTags = document.querySelectorAll('#pf-model-tags .cs-model-tag');
+        const models = Array.from(modelTags).map(t => t.dataset.model).filter(Boolean);
+
+        if (!name) { showToast('请输入供应商名称', 'error'); return; }
+        if (!baseUrl) { showToast('请输入 API Base URL', 'error'); return; }
+        if (!apiKey) { showToast('请输入 API Key', 'error'); return; }
+
+        const resultEl = document.getElementById('cs-form-result');
+        if (!resultEl) return;
+
+        resultEl.innerHTML = '<span class="test-loading"><i class="fas fa-spinner fa-spin"></i> 正在 Ping 测试...</span>';
+        resultEl.style.display = 'block';
+
+        const tempProvider = {
+            id: _editingProvider?.id || 'temp_' + Date.now(),
+            name, provider: providerType, api_key: apiKey, base_url: baseUrl, models, enabled: true,
+        };
+
+        const testModel = models.length > 0 ? models[0] : 'gpt-4o-mini';
+
+        try {
+            const result = await testProviderAPI(tempProvider.id, testModel);
+            if (result.code === 0) {
+                resultEl.innerHTML = `<span class="test-success"><i class="fas fa-check-circle"></i> 连接成功 · 模型：${result.data.model} · 延迟：${result.data.latency_ms}ms</span>`;
+                await saveProviderToBackend();
+            } else {
+                let errMsg = '';
+                if (result.data) {
+                    if (result.data.error) {
+                        errMsg = typeof result.data.error === 'object' 
+                            ? JSON.stringify(result.data.error) 
+                            : result.data.error;
+                    } else if (result.data.message) {
+                        errMsg = result.data.message;
+                    } else {
+                        errMsg = JSON.stringify(result.data);
+                    }
+                } else if (result.message) {
+                    errMsg = result.message;
+                } else {
+                    errMsg = '未知错误';
+                }
+                resultEl.innerHTML = `<span class="test-fail"><i class="fas fa-times-circle"></i> ${escapeHtml(errMsg)}</span>`;
+            }
+        } catch (e) {
+            resultEl.innerHTML = `<span class="test-fail"><i class="fas fa-times-circle"></i> 请求失败：${escapeHtml(e.message || '未知错误')}</span>`;
+        }
+    }
+
+    async function saveProviderToBackend() {
+        const name = document.getElementById('pf-name').value.trim();
+        const provider = document.getElementById('pf-provider').value;
+        const baseUrl = document.getElementById('pf-base-url').value.trim();
+        const apiKey = document.getElementById('pf-api-key').value.trim();
+        const modelTags = document.querySelectorAll('#pf-model-tags .cs-model-tag');
+        const models = Array.from(modelTags).map(t => t.dataset.model).filter(Boolean);
+
+        if (!name || !baseUrl || !apiKey) return;
+
+        const providerObj = {
+            id: _editingProvider?.id || '',
+            name, provider, api_key: apiKey, base_url: baseUrl, models, enabled: true,
+        };
+
+        if (_editingProvider && typeof _editingProvider._idx === 'number') {
+            _providers[_editingProvider._idx] = providerObj;
+        } else {
+            _providers.push(providerObj);
+        }
+
+        try {
+            await postProviders(_providers);
+            _providers = await fetchProviders();
+            showToast('供应商已保存', 'success');
+            _isAddingProvider = false;
+            _editingProvider = null;
+            refreshProvidersPage();
+        } catch (e) {
+            showToast('保存失败：' + e.message, 'error');
+        }
+    }
+
+    async function deleteProvider(idx) {
+        const provider = _providers[idx];
+        if (!provider) return;
+        
+        const modalOverlay = document.getElementById('delete-provider-modal-overlay');
+        const messageEl = document.getElementById('delete-provider-message');
+        if (modalOverlay && messageEl) {
+            messageEl.textContent = `确定要删除供应商「${provider.name || '未命名'}」吗？此操作不可恢复。`;
+            modalOverlay.style.display = 'flex';
+            
+            const confirmBtn = document.getElementById('confirm-delete-provider-btn');
+            const cancelBtn = document.getElementById('cancel-delete-provider-btn');
+            const closeBtn = document.getElementById('close-delete-provider-modal');
+            
+            const cleanup = () => {
+                modalOverlay.style.display = 'none';
+                if (confirmBtn) confirmBtn.onclick = null;
+                if (cancelBtn) cancelBtn.onclick = null;
+                if (closeBtn) closeBtn.onclick = null;
+            };
+            
+            if (confirmBtn) {
+                confirmBtn.onclick = async () => {
+                    cleanup();
+                    _providers.splice(idx, 1);
+                    try {
+                        await postProviders(_providers);
+                        _providers = await fetchProviders();
+                        showToast('已删除', 'success');
+                        refreshProvidersPage();
+                    } catch (e) {
+                        showToast('删除失败：' + e.message, 'error');
+                    }
+                };
+            }
+            
+            if (cancelBtn) {
+                cancelBtn.onclick = cleanup;
+            }
+            
+            if (closeBtn) {
+                closeBtn.onclick = cleanup;
+            }
+        }
+    }
+
+    async function testProvider(idx) {
+        const p = _providers[idx];
+        if (!p) return;
+        const resultEl = document.getElementById(`test-result-${idx}`);
+        if (!resultEl) return;
+
+        const testModel = (p.models && p.models.length > 0) ? p.models[0] : 'gpt-4o-mini';
+        resultEl.innerHTML = '<span class="test-loading"><i class="fas fa-spinner fa-spin"></i> 测试中...</span>';
+        resultEl.style.display = 'block';
+
+        try {
+            const result = await testProviderAPI(p.id, testModel);
+            if (result.code === 0) {
+                resultEl.innerHTML = `<span class="test-success"><i class="fas fa-check-circle"></i> 连接成功 · 模型：${result.data.model} · 延迟：${result.data.latency_ms}ms</span>`;
+            } else {
+                const errMsg = (result.data && result.data.error) ? result.data.error : result.message;
+                resultEl.innerHTML = `<span class="test-fail"><i class="fas fa-times-circle"></i> ${escapeHtml(errMsg)}</span>`;
+            }
+        } catch (e) {
+            resultEl.innerHTML = `<span class="test-fail"><i class="fas fa-times-circle"></i> 请求失败：${escapeHtml(e.message)}</span>`;
+        }
+    }
+
+    function refreshProvidersPage() {
+        const contentDiv = document.getElementById('settings-content-area');
+        if (contentDiv && _activeGroup === 'providers') {
+            contentDiv.innerHTML = renderProvidersPage();
+        }
+    }
+
+    function onQuickSelect(targetGroup, value) {
+        if (!value) return;
+    }
+
+    async function applyQuickSelect(targetGroup) {
+        const groupName = Object.keys(GROUP_TARGET_MAP).find(k => GROUP_TARGET_MAP[k] === targetGroup);
+        const select = document.getElementById(`quick-select-${groupName}`);
+        if (!select || !select.value) {
+            showToast('请先选择供应商和模型', 'error');
+            return;
+        }
+
+        const [providerId, modelName] = select.value.split('|');
+        if (!providerId || !modelName) return;
+
+        try {
+            const result = await applyProviderToGroup(providerId, modelName, targetGroup);
+            if (result.code === 0) {
+                showToast(`已应用到 ${targetGroup} 分组`, 'success');
+                const groups = await fetchSettings();
+                _currentData = groups;
+                updateSidebarAndContent(groups);
+            } else {
+                showToast(result.message || '应用失败', 'error');
+            }
+        } catch (e) {
+            showToast('应用失败：' + e.message, 'error');
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&').replace(/</g, '<')
+            .replace(/>/g, '>').replace(/"/g, '"');
+    }
+
     function switchGroup(groupName) {
         _activeGroup = groupName;
-        if (_currentData) renderModal(_currentData, false); // 切换分组时不重新渲染整个弹窗
+        if (_currentData) renderModal(_currentData, false);
     }
 
     function togglePassword(btn) {
@@ -390,11 +798,12 @@ const SettingsService = (function () {
 
     async function open() {
         try {
-            const groups = await fetchSettings();
+            const [groups, providers] = await Promise.all([fetchSettings(), fetchProviders()]);
+            _providers = providers;
             renderModal(groups);
         } catch (e) {
             console.error('获取设置失败:', e);
-            alert('获取设置失败: ' + e.message);
+            alert('获取设置失败：' + e.message);
         }
     }
 
@@ -402,23 +811,31 @@ const SettingsService = (function () {
         const modal = document.getElementById('settings-modal');
         if (modal) {
             modal.classList.remove('show');
-            // 等待动画结束后再清空内容
-            setTimeout(() => {
-                if (modal) modal.innerHTML = '';
-            }, 300);
+            setTimeout(() => { if (modal) modal.innerHTML = ''; }, 300);
         }
         document.body.style.overflow = '';
         _activeGroup = null;
+        _isAddingProvider = false;
+        _editingProvider = null;
     }
 
     async function save() {
+        if (_activeGroup === 'providers') {
+            showToast('供应商配置已自动保存', 'success');
+            return;
+        }
+        
+        if (_activeGroup === 'personalization') {
+            showToast('个性化设置已自动保存', 'success');
+            return;
+        }
+
         const inputs = document.querySelectorAll('.settings-input[data-key]');
         const settings = {};
         inputs.forEach(input => {
             settings[input.dataset.key] = input.value;
         });
 
-        // 也收集非当前页面的分组数据（保留已有值）
         if (_currentData) {
             _currentData.forEach(group => {
                 group.items.forEach(item => {
@@ -444,14 +861,12 @@ const SettingsService = (function () {
                 saveBtn.classList.add('saved');
             }
 
-            // 显示保存提示
-            showToast(count > 0 
-                ? `保存成功，更新了 ${count} 个配置项` 
+            showToast(count > 0
+                ? `保存成功，更新了 ${count} 个配置项`
                 : '无需更新，配置未变化',
                 'success'
             );
 
-            // 刷新数据
             setTimeout(async () => {
                 const groups = await fetchSettings();
                 _currentData = groups;
@@ -463,7 +878,7 @@ const SettingsService = (function () {
             }, 1500);
         } catch (e) {
             console.error('保存设置失败:', e);
-            showToast('保存失败: ' + e.message, 'error');
+            showToast('保存失败：' + e.message, 'error');
             if (saveBtn) {
                 saveBtn.disabled = false;
                 saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存';
@@ -472,7 +887,6 @@ const SettingsService = (function () {
     }
 
     function showToast(message, type) {
-        // 移除已有的 toast
         const existing = document.querySelector('.settings-toast');
         if (existing) existing.remove();
 
@@ -484,7 +898,6 @@ const SettingsService = (function () {
         `;
         document.body.appendChild(toast);
 
-        // 动画
         requestAnimationFrame(() => toast.classList.add('show'));
         setTimeout(() => {
             toast.classList.remove('show');
@@ -495,7 +908,7 @@ const SettingsService = (function () {
     /* ---------- 公开接口 ---------- */
     return {
         open, close, save, switchGroup, togglePassword,
-        startAddProvider, startEditProvider, cancelProviderForm, saveProviderForm,
+        startAddProvider, startEditProvider, cancelProviderForm, saveProviderForm, pingProviderForm,
         deleteProvider, testProvider, addModelTag, removeModelTag,
         onQuickSelect, applyQuickSelect, selectBubbleColor, toggleBubbleColorExpand,
     };

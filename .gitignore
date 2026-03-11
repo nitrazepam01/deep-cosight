@@ -8,7 +8,6 @@ venv/
 *.egg-info
 .obsidian
 build/
-dist/
 dist - *
 node_modules
 **/.angular
@@ -23,3 +22,7 @@ work_space/**
 .cursorindexingignore
 .specstory
 scripts/*
+providers.json
+test_api_key.py
+/tmp/test_api_key.py
+*.bak
