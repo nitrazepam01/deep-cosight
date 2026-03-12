@@ -908,8 +908,8 @@ const SettingsService = (function () {
     /* ---------- 公开接口 ---------- */
     return {
         open, close, save, switchGroup, togglePassword,
-        startAddProvider, startEditProvider, cancelProviderForm, pingProviderForm,
-        deleteProvider, testProvider, addModelTag, removeModelTag,
+        startAddProvider, startEditProvider, cancelProviderForm,
+        pingProviderForm, deleteProvider, testProvider, addModelTag, removeModelTag,
         onQuickSelect, applyQuickSelect, selectBubbleColor, toggleBubbleColorExpand,
     };
 })();
