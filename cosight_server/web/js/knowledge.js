@@ -131,8 +131,8 @@ const KnowledgeService = (function () {
             : '<span class="kb-status-badge kb-status-offline"><i class="fas fa-circle"></i> 未连接</span>';
 
         const serviceBtn = _lightragStatus === 'connected'
-            ? '<button class="kb-service-btn kb-service-stop" onclick="event.stopPropagation(); KnowledgeService.doStopService()" title="停止服务"><i class="fas fa-stop-circle"></i> 停止服务</button>'
-            : '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.doStartService()" title="启动服务"><i class="fas fa-play-circle"></i> 启动服务</button>';
+            ? '<button class="kb-service-btn kb-service-stop" onclick="event.stopPropagation(); KnowledgeService.doStopService()" title="停止服务"><i class="fas fa-stop-circle"></i> <span class="kb-service-text">停止服务</span></button>'
+            : '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.doStartService()" title="启动服务"><i class="fas fa-play-circle"></i> <span class="kb-service-text">启动服务</span></button>';
 
         const contentHtml = _currentKbId
             ? renderKBDetail()
@@ -165,6 +165,7 @@ const KnowledgeService = (function () {
 
     function renderKBList() {
         let cardsHtml = '';
+        
         if (_kbList.length === 0) {
             cardsHtml = `
                 <div class="kb-empty-state">
@@ -188,6 +189,9 @@ const KnowledgeService = (function () {
         } else {
             const cards = _kbList.map(kb => `
                 <div class="kb-card" onclick="KnowledgeService.openDetail('${kb.id}')">
+                    <div class="kb-card-checkbox" data-kb-id="${kb.id}" onclick="KnowledgeService.toggleCheckbox('${kb.id}', event)">
+                        <i class="fas fa-check"></i>
+                    </div>
                     <div class="kb-card-icon-wrap">
                         <i class="fas fa-database"></i>
                     </div>
@@ -199,9 +203,6 @@ const KnowledgeService = (function () {
                             <span class="kb-card-stat"><i class="fas fa-clock"></i> ${formatDate(kb.created_at)}</span>
                         </div>
                     </div>
-                    <button class="kb-card-delete" onclick="event.stopPropagation(); KnowledgeService.confirmDelete('${kb.id}', '${escapeHtml(kb.name)}')" title="删除">
-                        <i class="fas fa-trash-alt"></i>
-                    </button>
                 </div>
             `).join('');
 
@@ -236,7 +237,7 @@ const KnowledgeService = (function () {
             <div class="kb-detail">
                 <div class="kb-detail-info">
                     <div class="kb-detail-icon"><i class="fas fa-database"></i></div>
-                    <div>
+                    <div class="kb-detail-info-content">
                         <h3>${escapeHtml(kb.name)}</h3>
                         <p class="kb-detail-desc">${escapeHtml(kb.description || '暂无描述')}</p>
                         <div class="kb-detail-stats">
@@ -244,6 +245,9 @@ const KnowledgeService = (function () {
                             <span><i class="fas fa-calendar"></i> 创建于 ${formatDate(kb.created_at)}</span>
                         </div>
                     </div>
+                    <button class="kb-detail-delete-btn" onclick="KnowledgeService.confirmDelete('${kb.id}', '${escapeHtml(kb.name).replace(/'/g, "\\'")}')">
+                        <i class="fas fa-trash-alt"></i> 删除知识库
+                    </button>
                 </div>
 
                 <!-- 模型状态 -->
@@ -587,6 +591,37 @@ const KnowledgeService = (function () {
         }
     }
 
+    let _selectedKbIds = new Set();  // 当前选中的知识库 ID 集合（用于多选模式）
+
+    function toggleCheckbox(kbId, event) {
+        // 阻止事件冒泡，防止触发卡片的点击事件
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
+        if (_selectedKbIds.has(kbId)) {
+            _selectedKbIds.delete(kbId);
+        } else {
+            _selectedKbIds.add(kbId);
+        }
+        
+        // 只更新勾选框的视觉状态，不重新渲染整个页面
+        updateCheckboxVisuals();
+    }
+    
+    function updateCheckboxVisuals() {
+        // 只更新勾选框的类名，不重新渲染
+        document.querySelectorAll('.kb-card-checkbox').forEach(checkbox => {
+            const kbId = checkbox.dataset.kbId;
+            if (_selectedKbIds.has(kbId)) {
+                checkbox.classList.add('checked');
+            } else {
+                checkbox.classList.remove('checked');
+            }
+        });
+    }
+
     async function confirmDelete(kbId, name) {
         if (!confirm(`确定要删除知识库 "${name}" 吗？此操作不可恢复。`)) return;
         try {
@@ -902,6 +937,10 @@ const KnowledgeService = (function () {
             _kbList = [];
         }
         renderModal();
+        
+        // 添加 active 状态到知识库按钮
+        const kbBtn = document.getElementById('knowledge-base-btn');
+        if (kbBtn) kbBtn.classList.add('active');
     }
 
     function close() {
@@ -915,6 +954,11 @@ const KnowledgeService = (function () {
         _currentKbId = null;
         _detailDocuments = [];
         _detailPipeline = null;
+        _selectedKbIds = new Set();  // 清空选中状态
+        
+        // 移除知识库按钮的 active 状态
+        const kbBtn = document.getElementById('knowledge-base-btn');
+        if (kbBtn) kbBtn.classList.remove('active');
     }
 
     /* ========== 工具函数 ========== */
@@ -964,6 +1008,7 @@ const KnowledgeService = (function () {
         handleFileSelect, handleDrop, doInsertText, doQuery,
         renderSelector, toggleSelector, onSelectorChange, getSelectedKBIds,
         doStartService, doStopService, refreshDocuments,
+        toggleCheckbox,
     };
 })();
 

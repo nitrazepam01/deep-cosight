@@ -240,7 +240,7 @@ const SettingsService = (function () {
 
         return `
             <div class="cs-header-title">
-                <i class="fas fa-palette" style="color:#a18cd1; margin-right:8px;"></i>
+                <i class="fas fa-palette" style="color:#a18cd1;"></i>
                 个性化设置 <span class="cs-header-sub">Personalization</span>
             </div>
             
@@ -400,7 +400,7 @@ const SettingsService = (function () {
 
         return `
             <div class="cs-header-title">
-                <i class="fas fa-cube" style="color:#43e97b; margin-right:8px;"></i>
+                <i class="fas fa-cube" style="color:#a18cd1;"></i>
                 大模型供应商管理 <span class="cs-header-sub">Model Providers</span>
             </div>
             <div class="cs-list">

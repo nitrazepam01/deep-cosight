@@ -108,9 +108,14 @@
                             rows="1"
                         ></textarea>
                         <div class="input-buttons">
-                            <button class="btn-input-action" id="upload-file-btn" title="上传文件">
-                                <i class="fas fa-paperclip"></i>
-                            </button>
+                            <div class="input-buttons-left">
+                                <button class="btn-input-action" id="upload-file-btn" title="上传文件">
+                                    <i class="fas fa-paperclip"></i>
+                                </button>
+                                <button class="btn-input-action" id="knowledge-base-btn" title="知识库管理" onclick="KnowledgeService.open()">
+                                    <i class="fas fa-book"></i>
+                                </button>
+                            </div>
                             <button class="btn-send" id="send-btn">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
@@ -302,6 +307,8 @@
     </div>
 
     <div id="settings-modal"></div>
+    <!-- 知识库管理弹窗容器 -->
+    <div id="knowledge-modal"></div>
 
     <div class="tooltip" id="tooltip"></div>
     <div class="steps-tooltip" id="steps-tooltip"></div>
@@ -315,6 +322,7 @@
     <script src="js/steps.js"></script>
     <script src="js/dag.js"></script>
     <script src="js/settings.js"></script>
+    <script src="js/knowledge.js"></script>
     
     <!-- Markdown 渲染依赖（本地库文件） -->
     <link rel="stylesheet" href="markdown/src/dist/styles/github.min.css" />
