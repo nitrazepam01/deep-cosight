@@ -11,13 +11,13 @@ echo ===== 配置 LightRAG 环境变量 =====
 REM LLM 配置（用于知识图谱构建时的实体抽取）
 set LLM_BINDING=openai
 set LLM_BINDING_HOST=https://coding.dashscope.aliyuncs.com/v1
-set LLM_BINDING_API_KEY=sk-sp-75c1757bbe3048799c0028481bfda015
+set LLM_BINDING_API_KEY=your_api_key_here
 set LLM_MODEL=glm-5
 
 REM Embedding 配置（核心！文档向量化）
 set EMBEDDING_BINDING=openai
 set EMBEDDING_BINDING_HOST=https://api.siliconflow.cn/v1
-set EMBEDDING_BINDING_API_KEY=sk-roqvydfziqubtdqjrgzjgovmpaecrttvtszjvakrefytvewb
+set EMBEDDING_BINDING_API_KEY=your_embedding_api_key_here
 set EMBEDDING_MODEL=Qwen/Qwen3-Embedding-4B
 set EMBEDDING_MAX_TOKEN_SIZE=8192
 
