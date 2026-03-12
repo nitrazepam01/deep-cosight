@@ -26,3 +26,5 @@ providers.json
 test_api_key.py
 /tmp/test_api_key.py
 *.bak
+lightrag_data/
+lightrag_storage/
