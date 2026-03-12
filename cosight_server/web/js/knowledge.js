@@ -2,7 +2,7 @@
  * Co-Sight Knowledge Base Management
  * 知识库管理模块 — 对接 LightRAG 服务
  */
-let KnowledgeService = (function () {
+const KnowledgeService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
     let _kbList = [];
     let _currentKbId = null;
@@ -962,7 +962,7 @@ let KnowledgeService = (function () {
         open, close, backToList, openDetail,
         showCreateForm, hideCreateForm, doCreate, confirmDelete,
         handleFileSelect, handleDrop, doInsertText, doQuery,
-        renderSelector, toggleSelector, onSelectorChange,
+        renderSelector, toggleSelector, onSelectorChange, getSelectedKBIds,
         doStartService, doStopService, refreshDocuments,
     };
 })();
