@@ -2801,15 +2801,16 @@ body {
     background: linear-gradient(135deg, #10b981, #059669);
     color: #fff;
     border: none;
-    border-radius: 8px;
-    width: 36px;
-    height: 36px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 14px;
+    font-size: 16px;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 .btn-knowledge:hover {
     transform: scale(1.08);
