@@ -515,6 +515,22 @@ async def search(request: Request, params: Any = Body(None)):
     query_content = content_array[0]['value'] if content_array and isinstance(
         content_array, list) and len(content_array) > 0 and 'value' in content_array[0] else ""
 
+    # === LightRAG 知识库上下文注入 ===
+    kb_ids = params.get('knowledgeBases', [])
+    if kb_ids and isinstance(kb_ids, list) and len(kb_ids) > 0:
+        try:
+            from cosight_server.deep_research.services.knowledge_base_service import query_knowledge_bases
+            kb_context = await query_knowledge_bases(
+                question=query_content,
+                kb_ids=kb_ids,
+                mode=os.environ.get('LIGHTRAG_DEFAULT_QUERY_MODE', 'hybrid')
+            )
+            if kb_context:
+                query_content = f"{query_content}\n\n[知识库参考信息]\n{kb_context}"
+                logger.info(f"Injected KB context from {len(kb_ids)} knowledge base(s)")
+        except Exception as e:
+            logger.warning(f"Failed to query knowledge bases: {e}")
+
     # 规划每个 plan 的持久化文件
     plan_log_path = os.path.join(LOGS_PATH, f"{plan_id}.log")
     plan_final_path = os.path.join(LOGS_PATH, f"{plan_id}.final.json")

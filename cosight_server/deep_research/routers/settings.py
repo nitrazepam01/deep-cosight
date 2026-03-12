@@ -152,6 +152,30 @@ SETTINGS_GROUPS = [
             "LANGFUSE_PUBLIC_KEY", "LANGFUSE_BASE_URL",
         ],
     },
+    {
+        "group": "knowledge_base",
+        "label_zh": "知识库 (LightRAG)",
+        "label_en": "Knowledge Base (LightRAG)",
+        "icon": "fa-book",
+        "keys": [
+            "LIGHTRAG_BASE_URL", "LIGHTRAG_API_KEY",
+            "LIGHTRAG_STORAGE_DIR", "LIGHTRAG_DEFAULT_QUERY_MODE",
+        ],
+    },
+    {
+        "group": "embedding_rerank",
+        "label_zh": "嵌入与重排序模型",
+        "label_en": "Embedding & Rerank Models",
+        "icon": "fa-layer-group",
+        "keys": [
+            "LIGHTRAG_EMBEDDING_API_KEY", "LIGHTRAG_EMBEDDING_API_BASE",
+            "LIGHTRAG_EMBEDDING_MODEL", "LIGHTRAG_EMBEDDING_DIM",
+            "LIGHTRAG_EMBEDDING_MAX_TOKENS",
+            "LIGHTRAG_RERANK_ENABLED", "LIGHTRAG_RERANK_API_KEY",
+            "LIGHTRAG_RERANK_API_BASE", "LIGHTRAG_RERANK_MODEL",
+            "LIGHTRAG_RERANK_TOP_K",
+        ],
+    },
 ]
 
 # 需要脱敏的字段关键字

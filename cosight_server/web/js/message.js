@@ -660,7 +660,8 @@ class MessageService {
             extra: {
                 fromBackEnd: {
                     actualPrompt: JSON.stringify({deepResearchEnabled: true}),
-                    agentRunConfig: options.agentRunConfig || null
+                    agentRunConfig: options.agentRunConfig || null,
+                    knowledgeBases: (typeof KnowledgeService !== 'undefined') ? KnowledgeService.getSelectedKBIds() : []
                 }
             },
             // 会被服务端解析的会话信息

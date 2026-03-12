@@ -2257,6 +2257,12 @@ function initInputHandler() {
     window.RuntimeAgentSelector.init();
   }
 
+  // 初始化知识库选择器
+  if (typeof KnowledgeService !== 'undefined') {
+    KnowledgeService.renderSelector('kb-selector-container-initial');
+    KnowledgeService.renderSelector('kb-selector-container-main');
+  }
+
   const messageInput = document.getElementById("message-input");
   const sendButton = document.getElementById("send-button");
   const replayButton = document.getElementById("replay-button");
