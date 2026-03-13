@@ -210,7 +210,9 @@ app.include_router(commonRouter, prefix=str(custom_config.get("base_api_url")))
 app.include_router(chatRouter, prefix=str(custom_config.get("base_chatbot_api_url")))
 app.include_router(feedbackRouter, prefix=str(custom_config.get("base_chatbot_api_url")))
 app.include_router(settingsRouter, prefix=str(custom_config.get("base_api_url")))
-
+app.include_router(knowledgeBaseRouter, prefix=str(custom_config.get("base_api_url")))
+from cosight_server.deep_research.routers.full_agent import router as full_agent_router
+app.include_router(full_agent_router, prefix=str(custom_config.get("base_api_url")))
 
 @app.middleware("http")
 async def global_exception_handler(request: Request, call_next):
