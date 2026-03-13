@@ -265,23 +265,39 @@ async def kb_start_service():
         if sys.platform == "win32":
             creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
 
+        # 将 stdout 写入日志文件，避免 PIPE 缓冲区满导致进程阻塞
+        log_file_path = os.path.join(work_dir, "lightrag.log")
+        _lightrag_log_file = open(log_file_path, "a", encoding="utf-8")
+
         _lightrag_process = subprocess.Popen(
             cmd.split(),
             env=startup_env,
             cwd=work_dir,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+            stdout=_lightrag_log_file,
             stderr=subprocess.STDOUT,
             creationflags=creation_flags,
         )
+        # 向 stdin 写入 yes 以自动跳过任何交互式确认
+        try:
+            _lightrag_process.stdin.write(b"yes\nyes\nyes\n")
+            _lightrag_process.stdin.flush()
+            _lightrag_process.stdin.close()
+        except Exception:
+            pass
 
         # 等待服务启动（最多 30 秒）
         for i in range(15):
             await asyncio.sleep(2)
             if _lightrag_process.poll() is not None:
-                # 进程已退出，读取输出
-                out = _lightrag_process.stdout.read().decode("utf-8", errors="replace") if _lightrag_process.stdout else ""
-                _lightrag_log_lines = out.splitlines()[-50:]
+                # 进程已退出，从日志文件读取输出
+                _lightrag_log_file.close()
+                try:
+                    with open(log_file_path, "r", encoding="utf-8", errors="replace") as f:
+                        all_lines = f.readlines()
+                    _lightrag_log_lines = [l.rstrip() for l in all_lines[-50:]]
+                except Exception:
+                    _lightrag_log_lines = []
                 _lightrag_process = None
                 log_summary = "\n".join(_lightrag_log_lines[-10:]) if _lightrag_log_lines else "无输出"
                 return {"code": 1, "msg": f"LightRAG 启动失败，进程已退出。\n最后日志:\n{log_summary}", "data": {"logs": _lightrag_log_lines}}
@@ -337,20 +353,16 @@ async def kb_stop_service():
 @knowledgeBaseRouter.get("/deep-research/kb/service-logs")
 async def kb_service_logs():
     """获取 LightRAG 服务最近的日志"""
-    global _lightrag_process, _lightrag_log_lines
-    if _lightrag_process and _lightrag_process.stdout:
-        import select
-        # Non-blocking read of available output
-        try:
-            while True:
-                line = _lightrag_process.stdout.readline()
-                if not line:
-                    break
-                _lightrag_log_lines.append(line.decode("utf-8", errors="replace").rstrip())
-                if len(_lightrag_log_lines) > 100:
-                    _lightrag_log_lines = _lightrag_log_lines[-100:]
-        except Exception:
-            pass
+    global _lightrag_log_lines
+    # 从日志文件读取最新内容
+    try:
+        log_file_path = os.path.join(_get_lightrag_work_dir(), "lightrag.log")
+        if os.path.exists(log_file_path):
+            with open(log_file_path, "r", encoding="utf-8", errors="replace") as f:
+                all_lines = f.readlines()
+            _lightrag_log_lines = [l.rstrip() for l in all_lines[-100:]]
+    except Exception:
+        pass
     return {"code": 0, "data": {"logs": _lightrag_log_lines[-30:]}}
 
 
