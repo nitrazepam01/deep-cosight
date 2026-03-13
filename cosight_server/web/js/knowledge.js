@@ -1026,13 +1026,13 @@ const KnowledgeService = (function () {
         updateKnowledgeBaseBtnActiveState();
     }
 
-    // 根据知识库选中状态更新按钮 active 状态
+    // 根据 LightRAG 服务状态更新按钮 active 状态
     function updateKnowledgeBaseBtnActiveState() {
         const kbBtn = document.getElementById('knowledge-base-btn');
         if (!kbBtn) return;
         
-        const selectedKBIds = getSelectedKBIds();
-        if (selectedKBIds.length > 0) {
+        // 当 LightRAG 服务已连接时，按钮处于激活状态
+        if (_lightragStatus === 'connected') {
             kbBtn.classList.add('active');
         } else {
             kbBtn.classList.remove('active');
