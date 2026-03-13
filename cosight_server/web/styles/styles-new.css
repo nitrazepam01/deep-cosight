@@ -3055,14 +3055,14 @@ select.settings-input option:checked {
 }
 
 .kb-service-stop {
-    background: #fef2f2;
-    color: #dc2626;
-    border: 1px solid #fecaca;
+    background: linear-gradient(135deg, #f87171, #dc2626);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.35);
 }
 
 .kb-service-stop:hover:not(:disabled) {
-    background: #fee2e2;
-    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45);
 }
 
 .kb-body {
@@ -3339,13 +3339,10 @@ select.settings-input option:checked {
 /* 创建表单 */
 .kb-create-form {
     margin-bottom: 16px;
-    padding: 18px;
+    padding: 12px 16px 14px 16px;
     background: #f8fafb;
     border: 1px solid #e5e7eb;
     border-radius: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
     animation: kbSlideDown 0.25s ease;
 }
 
@@ -3356,16 +3353,22 @@ select.settings-input option:checked {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
 }
 
 .kb-create-form-title i { color: #10b981; }
+
+.kb-create-form .kb-input {
+    height: 38px;
+    margin-bottom: 8px;
+    width: calc(100% - 0px);
+}
 
 .kb-create-actions {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
-    margin-top: 4px;
+    margin-top: 2px;
 }
 
 @keyframes kbSlideDown {

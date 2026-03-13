@@ -266,7 +266,9 @@ async def kb_start_service():
             creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
 
         # 将 stdout 写入日志文件，避免 PIPE 缓冲区满导致进程阻塞
-        log_file_path = os.path.join(work_dir, "lightrag.log")
+        logs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        log_file_path = os.path.join(logs_dir, "lightrag.log")
         _lightrag_log_file = open(log_file_path, "a", encoding="utf-8")
 
         _lightrag_process = subprocess.Popen(
@@ -356,7 +358,8 @@ async def kb_service_logs():
     global _lightrag_log_lines
     # 从日志文件读取最新内容
     try:
-        log_file_path = os.path.join(_get_lightrag_work_dir(), "lightrag.log")
+        logs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "logs")
+        log_file_path = os.path.join(logs_dir, "lightrag.log")
         if os.path.exists(log_file_path):
             with open(log_file_path, "r", encoding="utf-8", errors="replace") as f:
                 all_lines = f.readlines()

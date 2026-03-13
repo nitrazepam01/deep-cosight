@@ -178,8 +178,8 @@ const KnowledgeService = (function () {
                 </div>
                 <div id="kb-create-form" class="kb-create-form" style="display:none;">
                     <div class="kb-create-form-title"><i class="fas fa-pen-fancy"></i> 新建知识库</div>
-                    <input type="text" id="kb-name-input" placeholder="知识库名称（必填）" class="kb-input">
-                    <input type="text" id="kb-desc-input" placeholder="描述（可选），例如：项目技术文档集合" class="kb-input">
+                    <input type="text" id="kb-name-input" placeholder="知识库名称（必填，最多 10 字）" class="kb-input" maxlength="10">
+                    <input type="text" id="kb-desc-input" placeholder="描述（可选，最多 30 字）" class="kb-input" maxlength="30">
                     <div class="kb-create-actions">
                         <button class="kb-btn-cancel" onclick="KnowledgeService.hideCreateForm()">取消</button>
                         <button class="kb-btn-primary" onclick="KnowledgeService.doCreate()"><i class="fas fa-check"></i> 创建</button>
@@ -213,16 +213,16 @@ const KnowledgeService = (function () {
                         <i class="fas fa-plus"></i> 新建知识库
                     </button>
                 </div>
-                <div id="kb-create-form" class="kb-create-form" style="display:none;">
+                <div class="kb-card-grid">${cards}</div>
+                <div id="kb-create-form" class="kb-create-form" style="display:none; margin-top: 16px;">
                     <div class="kb-create-form-title"><i class="fas fa-pen-fancy"></i> 新建知识库</div>
-                    <input type="text" id="kb-name-input" placeholder="知识库名称（必填）" class="kb-input">
-                    <input type="text" id="kb-desc-input" placeholder="描述（可选），例如：项目技术文档集合" class="kb-input">
+                    <input type="text" id="kb-name-input" placeholder="知识库名称（必填，最多 10 字）" class="kb-input" maxlength="10">
+                    <input type="text" id="kb-desc-input" placeholder="描述（可选，最多 30 字）" class="kb-input" maxlength="30">
                     <div class="kb-create-actions">
                         <button class="kb-btn-cancel" onclick="KnowledgeService.hideCreateForm()">取消</button>
                         <button class="kb-btn-primary" onclick="KnowledgeService.doCreate()"><i class="fas fa-check"></i> 创建</button>
                     </div>
                 </div>
-                <div class="kb-card-grid">${cards}</div>
             `;
         }
 
@@ -622,8 +622,44 @@ const KnowledgeService = (function () {
         });
     }
 
-    async function confirmDelete(kbId, name) {
-        if (!confirm(`确定要删除知识库 "${name}" 吗？此操作不可恢复。`)) return;
+    function confirmDelete(kbId, name) {
+        showDeleteKBConfirmModal(kbId, name);
+    }
+
+    function showDeleteKBConfirmModal(kbId, name) {
+        const modal = document.getElementById('knowledge-modal');
+        if (!modal) return;
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'settings-modal-overlay';
+        overlay.id = 'kb-delete-confirm-overlay';
+        overlay.innerHTML = `
+            <div class="settings-modal">
+                <div class="settings-modal-header">
+                    <h3>删除确认</h3>
+                    <button class="settings-modal-close-btn" onclick="KnowledgeService.closeDeleteKBConfirm()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="settings-modal-body">
+                    <p class="settings-modal-message">确定要删除知识库 "${escapeHtml(name)}" 吗？此操作不可恢复。</p>
+                </div>
+                <div class="settings-modal-footer">
+                    <button class="settings-modal-btn settings-modal-btn-cancel" onclick="KnowledgeService.closeDeleteKBConfirm()">取消</button>
+                    <button class="settings-modal-btn settings-modal-btn-delete" onclick="KnowledgeService.doDeleteKB('${kbId}', '${escapeHtml(name).replace(/'/g, "\\'")}')">删除</button>
+                </div>
+            </div>
+        `;
+        modal.appendChild(overlay);
+    }
+
+    function closeDeleteKBConfirm() {
+        const overlay = document.getElementById('kb-delete-confirm-overlay');
+        if (overlay) overlay.remove();
+    }
+
+    async function doDeleteKB(kbId, name) {
+        closeDeleteKBConfirm();
         try {
             await deleteKB(kbId);
             showToast(`知识库 "${name}" 已删除`, 'success');
@@ -853,6 +889,9 @@ const KnowledgeService = (function () {
         document.querySelectorAll('[id^="kb-selector-dropdown-"] input[type="checkbox"]').forEach(cb => {
             cb.checked = unique.includes(cb.value);
         });
+
+        // 更新知识库管理按钮的激活状态
+        updateKnowledgeBaseBtnActiveState();
     }
 
     function getSelectedKBIds() {
@@ -907,23 +946,51 @@ const KnowledgeService = (function () {
     }
 
     async function doStopService() {
-        if (!confirm('确定要停止 LightRAG 服务吗？停止后知识库将无法使用。')) return;
-        const btn = document.querySelector('.kb-service-btn');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 停止中...';
-        }
+        // 显示确认弹窗（不改变按钮状态）
+        showStopServiceConfirmModal();
+    }
+
+    function showStopServiceConfirmModal() {
+        const modal = document.getElementById('knowledge-modal');
+        if (!modal) return;
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'settings-modal-overlay';
+        overlay.id = 'kb-stop-service-confirm-overlay';
+        overlay.innerHTML = `
+            <div class="settings-modal">
+                <div class="settings-modal-header">
+                    <h3>停止服务确认</h3>
+                    <button class="settings-modal-close-btn" onclick="KnowledgeService.closeStopServiceConfirm()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="settings-modal-body">
+                    <p class="settings-modal-message">确定要停止 LightRAG 服务吗？停止后知识库将无法使用。</p>
+                </div>
+                <div class="settings-modal-footer">
+                    <button class="settings-modal-btn settings-modal-btn-cancel" onclick="KnowledgeService.closeStopServiceConfirm()">取消</button>
+                    <button class="settings-modal-btn settings-modal-btn-delete" onclick="KnowledgeService.confirmStopService()">停止</button>
+                </div>
+            </div>
+        `;
+        modal.appendChild(overlay);
+    }
+
+    function closeStopServiceConfirm() {
+        const overlay = document.getElementById('kb-stop-service-confirm-overlay');
+        if (overlay) overlay.remove();
+    }
+
+    async function confirmStopService() {
+        closeStopServiceConfirm();
         try {
             await stopService();
             showToast('LightRAG 服务已停止', 'success');
             _lightragStatus = 'disconnected';
             renderModal();
         } catch (e) {
-            showToast('停止失败: ' + e.message, 'error');
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-stop-circle"></i> 停止服务';
-            }
+            showToast('停止失败：' + e.message, 'error');
         }
     }
 
@@ -938,9 +1005,8 @@ const KnowledgeService = (function () {
         }
         renderModal();
         
-        // 添加 active 状态到知识库按钮
-        const kbBtn = document.getElementById('knowledge-base-btn');
-        if (kbBtn) kbBtn.classList.add('active');
+        // 根据知识库选中状态更新按钮 active 状态
+        updateKnowledgeBaseBtnActiveState();
     }
 
     function close() {
@@ -956,9 +1022,21 @@ const KnowledgeService = (function () {
         _detailPipeline = null;
         _selectedKbIds = new Set();  // 清空选中状态
         
-        // 移除知识库按钮的 active 状态
+        // 根据知识库选中状态更新按钮 active 状态
+        updateKnowledgeBaseBtnActiveState();
+    }
+
+    // 根据知识库选中状态更新按钮 active 状态
+    function updateKnowledgeBaseBtnActiveState() {
         const kbBtn = document.getElementById('knowledge-base-btn');
-        if (kbBtn) kbBtn.classList.remove('active');
+        if (!kbBtn) return;
+        
+        const selectedKBIds = getSelectedKBIds();
+        if (selectedKBIds.length > 0) {
+            kbBtn.classList.add('active');
+        } else {
+            kbBtn.classList.remove('active');
+        }
     }
 
     /* ========== 工具函数 ========== */
@@ -1009,6 +1087,10 @@ const KnowledgeService = (function () {
         renderSelector, toggleSelector, onSelectorChange, getSelectedKBIds,
         doStartService, doStopService, refreshDocuments,
         toggleCheckbox,
+        // 停止服务确认弹窗相关
+        closeStopServiceConfirm, confirmStopService,
+        // 删除知识库确认弹窗相关
+        closeDeleteKBConfirm, doDeleteKB,
     };
 })();
 
