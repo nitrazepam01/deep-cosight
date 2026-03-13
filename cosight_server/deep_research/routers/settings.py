@@ -15,7 +15,10 @@
 
 import os
 import re
-from typing import Dict, List, Optional
+import json
+import time
+import uuid
+from typing import Dict, List, Optional, Any
 from fastapi import APIRouter
 from fastapi.params import Body
 from pydantic import BaseModel
@@ -147,6 +150,30 @@ SETTINGS_GROUPS = [
         "keys": [
             "LANGFUSE_ENABLED", "LANGFUSE_SECRET_KEY",
             "LANGFUSE_PUBLIC_KEY", "LANGFUSE_BASE_URL",
+        ],
+    },
+    {
+        "group": "knowledge_base",
+        "label_zh": "知识库 (LightRAG)",
+        "label_en": "Knowledge Base (LightRAG)",
+        "icon": "fa-book",
+        "keys": [
+            "LIGHTRAG_BASE_URL", "LIGHTRAG_API_KEY",
+            "LIGHTRAG_STORAGE_DIR", "LIGHTRAG_DEFAULT_QUERY_MODE",
+        ],
+    },
+    {
+        "group": "embedding_rerank",
+        "label_zh": "嵌入与重排序模型",
+        "label_en": "Embedding & Rerank Models",
+        "icon": "fa-layer-group",
+        "keys": [
+            "LIGHTRAG_EMBEDDING_API_KEY", "LIGHTRAG_EMBEDDING_API_BASE",
+            "LIGHTRAG_EMBEDDING_MODEL", "LIGHTRAG_EMBEDDING_DIM",
+            "LIGHTRAG_EMBEDDING_MAX_TOKENS",
+            "LIGHTRAG_RERANK_ENABLED", "LIGHTRAG_RERANK_API_KEY",
+            "LIGHTRAG_RERANK_API_BASE", "LIGHTRAG_RERANK_MODEL",
+            "LIGHTRAG_RERANK_TOP_K",
         ],
     },
 ]
@@ -312,3 +339,380 @@ async def save_settings(body: SettingsUpdateRequest):
     except Exception as e:
         logger.error(f"保存设置失败: {str(e)}", exc_info=True)
         return json_result(-1, f"保存设置失败: {str(e)}", None)
+
+
+# ==================== 供应商管理 ====================
+
+def _find_providers_path() -> str:
+    """定位 providers.json 文件路径（与 .env 同目录）"""
+    env_path = _find_env_path()
+    return os.path.join(os.path.dirname(env_path), "providers.json")
+
+
+def _read_providers() -> List[dict]:
+    """读取 providers.json"""
+    path = _find_providers_path()
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception as e:
+        logger.warning(f"读取 providers.json 失败: {e}")
+        return []
+
+
+def _write_providers(providers: List[dict]):
+    """写入 providers.json"""
+    path = _find_providers_path()
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(providers, f, ensure_ascii=False, indent=2)
+
+
+@settingsRouter.get("/deep-research/providers")
+async def get_providers():
+    """获取已配置的模型供应商列表"""
+    try:
+        providers = _read_providers()
+        # 对 API Key 脱敏
+        safe_providers = []
+        for p in providers:
+            sp = dict(p)
+            if sp.get("api_key"):
+                sp["api_key"] = _mask_value("API_KEY", sp["api_key"])
+            safe_providers.append(sp)
+        return json_result(0, "success", {"providers": safe_providers})
+    except Exception as e:
+        logger.error(f"获取供应商列表失败: {e}", exc_info=True)
+        return json_result(-1, f"获取供应商列表失败: {str(e)}", None)
+
+
+class ProvidersUpdateRequest(BaseModel):
+    providers: List[Dict[str, Any]]
+
+
+@settingsRouter.post("/deep-research/providers")
+async def save_providers(body: ProvidersUpdateRequest):
+    """保存供应商列表（全量覆盖）"""
+    try:
+        existing = _read_providers()
+        existing_map = {p.get("id"): p for p in existing if p.get("id")}
+
+        new_providers = []
+        for p in body.providers:
+            # 如果没有 id，自动生成
+            if not p.get("id"):
+                p["id"] = str(uuid.uuid4())[:8]
+            # 如果 api_key 是脱敏值，用旧值还原
+            if p.get("api_key") and _is_masked(p["api_key"]):
+                old = existing_map.get(p["id"])
+                if old:
+                    p["api_key"] = old.get("api_key", "")
+            new_providers.append(p)
+
+        _write_providers(new_providers)
+        logger.info(f"供应商列表已保存，共 {len(new_providers)} 个")
+        return json_result(0, "保存成功", {"count": len(new_providers)})
+    except Exception as e:
+        logger.error(f"保存供应商列表失败: {e}", exc_info=True)
+        return json_result(-1, f"保存失败: {str(e)}", None)
+
+
+class ProviderTestRequest(BaseModel):
+    provider_id: str
+    model: str = "gpt-4o-mini"
+
+
+@settingsRouter.post("/deep-research/providers/test")
+async def test_provider(body: ProviderTestRequest):
+    """测试供应商 API 连通性 — 从 providers.json 读取真实 API Key"""
+    try:
+        import httpx
+        from openai import OpenAI
+
+        # 从 providers.json 读取真实（未脱敏）的供应商信息
+        providers = _read_providers()
+        provider = None
+        for p in providers:
+            if p.get("id") == body.provider_id:
+                provider = p
+                break
+
+        if not provider:
+            return json_result(-1, f"未找到供应商 (id={body.provider_id})", None)
+
+        api_key = provider["api_key"]
+        base_url = provider["base_url"]
+        test_model = body.model
+
+        logger.info(f"测试供应商连接: base_url={base_url}, model={test_model}, api_key长度={len(api_key)}")
+
+        # 与 llm.py set_model() 完全一致的 httpx 客户端配置
+        http_client = httpx.Client(
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': api_key
+            },
+            verify=False,
+            trust_env=False,
+            timeout=httpx.Timeout(
+                connect=15.0,
+                read=30.0,
+                write=15.0,
+                pool=10.0
+            )
+        )
+
+        client = OpenAI(
+            base_url=base_url,
+            api_key=api_key,
+            http_client=http_client,
+        )
+
+        start = time.monotonic()
+
+        import asyncio
+        def _do_test():
+            return client.chat.completions.create(
+                model=test_model,
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=1,
+            )
+
+        response = await asyncio.to_thread(_do_test)
+        latency_ms = int((time.monotonic() - start) * 1000)
+
+        actual_model = response.model or test_model
+        logger.info(f"测试供应商成功: model={actual_model}, latency={latency_ms}ms")
+
+        http_client.close()
+
+        return json_result(0, "连接成功", {
+            "model": actual_model,
+            "latency_ms": latency_ms,
+        })
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"测试供应商连接失败: {error_msg}")
+
+        if "timeout" in error_msg.lower():
+            return json_result(-1, "连接超时（30秒）", None)
+        elif "401" in error_msg or "Unauthorized" in error_msg:
+            return json_result(-1, "认证失败：API Key 无效或已过期", {"error": error_msg})
+        elif "404" in error_msg:
+            return json_result(-1, "接口地址错误：未找到 chat/completions 端点", {"error": error_msg})
+        else:
+            return json_result(-1, f"连接失败: {error_msg[:200]}", {"error": error_msg[:500]})
+
+
+class ProviderApplyRequest(BaseModel):
+    provider_id: str
+    model_name: str
+    target_group: str  # e.g. "default", "plan", "act", "tool", "vision"
+
+
+# 模型分组 -> .env key 前缀映射
+_GROUP_PREFIX_MAP = {
+    "default": "",
+    "plan": "PLAN_",
+    "act": "ACT_",
+    "tool": "TOOL_",
+    "vision": "VISION_",
+    "credibility": "CREDIBILITY_",
+    "browser": "BROWSER_",
+}
+
+
+@settingsRouter.post("/deep-research/providers/apply")
+async def apply_provider(body: ProviderApplyRequest):
+    """将供应商的配置应用到指定模型分组（写入 .env）"""
+    try:
+        providers = _read_providers()
+        provider = next((p for p in providers if p.get("id") == body.provider_id), None)
+        if not provider:
+            return json_result(-1, "供应商不存在", None)
+
+        prefix = _GROUP_PREFIX_MAP.get(body.target_group)
+        if prefix is None:
+            return json_result(-1, f"未知的模型分组: {body.target_group}", None)
+
+        env_path = _find_env_path()
+        updates = {
+            f"{prefix}API_KEY": provider.get("api_key", ""),
+            f"{prefix}API_BASE_URL": provider.get("base_url", ""),
+            f"{prefix}MODEL_NAME": body.model_name,
+        }
+
+        current_values = _parse_env_file(env_path)
+        merged = {**current_values, **updates}
+        _write_env_file(env_path, merged)
+
+        # 同步更新环境变量
+        for k, v in updates.items():
+            os.environ[k] = v
+
+        logger.info(f"已将供应商 {provider.get('name')} 应用到 {body.target_group} 分组")
+        return json_result(0, "应用成功", {"updated_keys": list(updates.keys())})
+    except Exception as e:
+        logger.error(f"应用供应商配置失败: {e}", exc_info=True)
+        return json_result(-1, f"应用失败: {str(e)}", None)
+
+
+# ==================== 智能体管理 ====================
+
+def _find_agents_path() -> str:
+    """定位 agents.json 文件路径（与 .env 同目录）"""
+    env_path = _find_env_path()
+    return os.path.join(os.path.dirname(env_path), "agents.json")
+
+
+def _read_agents() -> List[dict]:
+    """读取 agents.json"""
+    path = _find_agents_path()
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception as e:
+        logger.warning(f"读取 agents.json 失败: {e}")
+        return []
+
+
+def _write_agents(agents: List[dict]):
+    """写入 agents.json"""
+    path = _find_agents_path()
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(agents, f, ensure_ascii=False, indent=2)
+
+
+@settingsRouter.get("/deep-research/agents")
+async def get_agents():
+    """获取所有智能体配置"""
+    try:
+        from app.cosight.agent.runtime.agent_registry import load_agents
+
+        agents = load_agents()
+        return json_result(0, "success", {"agents": agents})
+    except Exception as e:
+        logger.error(f"读取智能体失败: {e}", exc_info=True)
+        return json_result(-1, f"读取失败: {str(e)}", None)
+
+
+class AgentSaveRequest(BaseModel):
+    id: str = ""
+    name: str
+    description: str = ""
+    agent_type: str = "actor"  # "planner" or "actor"
+    system_prompt: str = ""
+    skills: list = []  # actor 可用 skill 名称列表
+    provider_id: str = ""
+    model_name: str = ""
+    thinking_mode: bool | None = None
+    enabled: bool = True
+    is_default: bool = False
+
+
+@settingsRouter.post("/deep-research/agents")
+async def save_agent(body: AgentSaveRequest):
+    """创建或更新智能体"""
+    try:
+        from app.cosight.agent.runtime.skill_catalog import validate_skill_names
+
+        agents = _read_agents()
+        agent_data = body.model_dump()
+        agent_data["name"] = agent_data.get("name", "").strip()
+        agent_data["description"] = agent_data.get("description", "").strip()
+        agent_data["system_prompt"] = agent_data.get("system_prompt", "").strip()
+        agent_data["skills"] = list(dict.fromkeys(agent_data.get("skills") or []))
+        if agent_data.get("thinking_mode") is not None:
+            agent_data["thinking_mode"] = bool(agent_data["thinking_mode"])
+        if not agent_data["name"]:
+            return json_result(-1, "name 涓嶈兘涓虹┖", None)
+
+        # 校验 agent_type
+        if agent_data.get("agent_type") not in ("planner", "actor"):
+            return json_result(-1, "agent_type 必须是 'planner' 或 'actor'", None)
+
+        # planner 不允许自定义 skills
+        if agent_data.get("agent_type") == "planner":
+            agent_data["skills"] = []
+        else:
+            if not agent_data["skills"]:
+                return json_result(-1, "actor 绫诲瀷蹇呴』鑷冲皯鏈?1 涓?skill", None)
+            invalid_skills = validate_skill_names(agent_data["skills"])
+            if invalid_skills:
+                return json_result(-1, f"鍖呭惈鏃犳晥 skill: {invalid_skills}", None)
+
+        if not agent_data["id"]:
+            import uuid
+            agent_data["id"] = uuid.uuid4().hex[:8]
+        existing = next((i for i, a in enumerate(agents) if a["id"] == agent_data["id"]), None)
+        existing_agent = agents[existing] if existing is not None else None
+        agent_data["builtin"] = bool(existing_agent.get("builtin")) if existing_agent else False
+
+        # 如果设置为默认，只取消同类型的其他默认
+        if agent_data.get("is_default"):
+            for a in agents:
+                if a.get("agent_type") == agent_data.get("agent_type") and a.get("id") != agent_data["id"]:
+                    a["is_default"] = False
+        if existing is not None:
+            agents[existing] = agent_data
+        else:
+            agents.append(agent_data)
+
+        _write_agents(agents)
+        logger.info(f"保存智能体: {agent_data['name']} (id={agent_data['id']}, type={agent_data.get('agent_type')})")
+        return json_result(0, "保存成功", {"agent": agent_data})
+    except Exception as e:
+        logger.error(f"保存智能体失败: {e}", exc_info=True)
+        return json_result(-1, f"保存失败: {str(e)}", None)
+
+
+@settingsRouter.delete("/deep-research/agents/{agent_id}")
+async def delete_agent(agent_id: str):
+    """删除智能体"""
+    try:
+        agents = _read_agents()
+        target_agent = next((a for a in agents if a.get("id") == agent_id), None)
+        if target_agent and target_agent.get("builtin"):
+            return json_result(-1, "内置智能体不允许删除", None)
+        new_agents = [a for a in agents if a.get("id") != agent_id]
+        if len(new_agents) == len(agents):
+            return json_result(-1, "智能体不存在", None)
+        _write_agents(new_agents)
+        logger.info(f"删除智能体: id={agent_id}")
+        return json_result(0, "删除成功", None)
+    except Exception as e:
+        logger.error(f"删除智能体失败: {e}", exc_info=True)
+        return json_result(-1, f"删除失败: {str(e)}", None)
+
+
+@settingsRouter.get("/deep-research/available-skills")
+async def get_available_skills():
+    """返回所有 actor 可选的 skill 列表"""
+    try:
+        from app.cosight.agent.runtime.skill_catalog import get_available_actor_skills
+        skills = get_available_actor_skills()
+        return json_result(0, "success", {"skills": skills})
+    except Exception as e:
+        logger.error(f"获取可用技能失败: {e}", exc_info=True)
+        return json_result(-1, f"获取失败: {str(e)}", None)
+
+
+@settingsRouter.get("/deep-research/runtime-agent-defaults")
+async def get_runtime_agent_defaults():
+    """返回默认的 planner 和 actor 配置，供前端初始化运行时选择器"""
+    try:
+        from app.cosight.agent.runtime.agent_registry import get_default_planner, get_default_actor, get_planner_agents, get_actor_agents
+        return json_result(0, "success", {
+            "default_planner": get_default_planner(),
+            "default_actor": get_default_actor(),
+            "planners": get_planner_agents(),
+            "actors": get_actor_agents(),
+        })
+    except Exception as e:
+        logger.error(f"获取运行时默认配置失败: {e}", exc_info=True)
+        return json_result(-1, f"获取失败: {str(e)}", None)
