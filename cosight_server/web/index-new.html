@@ -323,6 +323,14 @@
     <script src="js/dag.js"></script>
     <script src="js/settings.js"></script>
     <script src="js/knowledge.js"></script>
+    <script>
+        // 页面加载时初始化知识库服务状态
+        window.addEventListener('DOMContentLoaded', function() {
+            if (typeof KnowledgeService !== 'undefined' && KnowledgeService.init) {
+                KnowledgeService.init();
+            }
+        });
+    </script>
     
     <!-- Markdown 渲染依赖（本地库文件） -->
     <link rel="stylesheet" href="markdown/src/dist/styles/github.min.css" />

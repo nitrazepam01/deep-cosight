@@ -6,11 +6,11 @@ const KnowledgeService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
     let _kbList = [];
     let _currentKbId = null;
-    let _lightragStatus = 'unknown';
-    let _pipelineTimer = null;          // 管线轮询定时器
-    let _detailDocuments = [];          // 当前KB的文档列表
-    let _detailPipeline = null;         // 当前KB的管线状态
-    let _healthDetail = null;           // LightRAG 服务详情（含模型配置）
+    let _lightragStatus = 'unknown';       // connected, disconnected, starting
+    let _pipelineTimer = null;              // 管线轮询定时器
+    let _detailDocuments = [];              // 当前 KB 的文档列表
+    let _detailPipeline = null;             // 当前 KB 的管线状态
+    let _healthDetail = null;               // LightRAG 服务详情（含模型配置）
 
     /* ========== API ========== */
     async function fetchKBList() {
@@ -82,6 +82,8 @@ const KnowledgeService = (function () {
             _lightragStatus = 'disconnected';
             _healthDetail = null;
         }
+        // 每次健康检查后更新按钮状态
+        updateKnowledgeBaseBtnActiveState();
         return _lightragStatus;
     }
 
@@ -126,13 +128,46 @@ const KnowledgeService = (function () {
         const modal = document.getElementById('knowledge-modal');
         if (!modal) return;
 
+        // 只更新状态徽章和服务按钮，避免整个窗口重绘
+        const statusEl = modal.querySelector('.kb-status-badge');
+        const serviceBtnEl = modal.querySelector('.kb-service-btn');
+
         const statusHtml = _lightragStatus === 'connected'
             ? '<span class="kb-status-badge kb-status-online"><i class="fas fa-circle"></i> 已连接</span>'
-            : '<span class="kb-status-badge kb-status-offline"><i class="fas fa-circle"></i> 未连接</span>';
+            : (_lightragStatus === 'starting'
+                ? '<span class="kb-status-badge kb-status-starting"><i class="fas fa-spinner fa-spin"></i> 启动中...</span>'
+                : '<span class="kb-status-badge kb-status-offline"><i class="fas fa-circle"></i> 未连接</span>');
 
         const serviceBtn = _lightragStatus === 'connected'
             ? '<button class="kb-service-btn kb-service-stop" onclick="event.stopPropagation(); KnowledgeService.doStopService()" title="停止服务"><i class="fas fa-stop-circle"></i> <span class="kb-service-text">停止服务</span></button>'
-            : '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.doStartService()" title="启动服务"><i class="fas fa-play-circle"></i> <span class="kb-service-text">启动服务</span></button>';
+            : (_lightragStatus === 'starting'
+                ? '<button class="kb-service-btn kb-service-starting" disabled onclick="event.stopPropagation();" title="服务正在启动中"><i class="fas fa-spinner fa-spin"></i> <span class="kb-service-text">启动中...</span></button>'
+                : '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.doStartService()" title="启动服务"><i class="fas fa-play-circle"></i> <span class="kb-service-text">启动服务</span></button>');
+
+        // 如果元素存在，只更新这些部分
+        if (statusEl) {
+            statusEl.outerHTML = statusHtml;
+        }
+        if (serviceBtnEl) {
+            serviceBtnEl.outerHTML = serviceBtn;
+        }
+    }
+
+    function renderModalFull() {
+        const modal = document.getElementById('knowledge-modal');
+        if (!modal) return;
+
+        const statusHtml = _lightragStatus === 'connected'
+            ? '<span class="kb-status-badge kb-status-online"><i class="fas fa-circle"></i> 已连接</span>'
+            : (_lightragStatus === 'starting'
+                ? '<span class="kb-status-badge kb-status-starting"><i class="fas fa-spinner fa-spin"></i> 启动中...</span>'
+                : '<span class="kb-status-badge kb-status-offline"><i class="fas fa-circle"></i> 未连接</span>');
+
+        const serviceBtn = _lightragStatus === 'connected'
+            ? '<button class="kb-service-btn kb-service-stop" onclick="event.stopPropagation(); KnowledgeService.doStopService()" title="停止服务"><i class="fas fa-stop-circle"></i> <span class="kb-service-text">停止服务</span></button>'
+            : (_lightragStatus === 'starting'
+                ? '<button class="kb-service-btn kb-service-starting" disabled onclick="event.stopPropagation();" title="服务正在启动中"><i class="fas fa-spinner fa-spin"></i> <span class="kb-service-text">启动中...</span></button>'
+                : '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.doStartService()" title="启动服务"><i class="fas fa-play-circle"></i> <span class="kb-service-text">启动服务</span></button>');
 
         const contentHtml = _currentKbId
             ? renderKBDetail()
@@ -377,7 +412,7 @@ const KnowledgeService = (function () {
                 renderDocumentsSection();
                 if (!_detailPipeline.busy) {
                     stopPipelinePolling();
-                    // 刷新KB列表以更新doc_count
+                    // 刷新 KB 列表以更新 doc_count
                     _kbList = await fetchKBList();
                 }
             } catch (e) { /* ignore */ }
@@ -450,7 +485,7 @@ const KnowledgeService = (function () {
                         <span class="kb-pipeline-progress-text">${p.cur_batch || 0} / ${p.batchs || 0} 批次 (${progress}%)</span>
                     </div>
                     <div class="kb-pipeline-docs-info">
-                        <span><i class="fas fa-file-alt"></i> 文档数: ${p.docs || 0}</span>
+                        <span><i class="fas fa-file-alt"></i> 文档数：${p.docs || 0}</span>
                         ${p.latest_message ? `<span class="kb-pipeline-latest-inline"><i class="fas fa-comment-dots"></i> ${escapeHtml(p.latest_message)}</span>` : ''}
                     </div>
                     <details class="kb-pipeline-log-details" ${historyHtml ? 'open' : ''}>
@@ -557,7 +592,7 @@ const KnowledgeService = (function () {
             renderDocumentsSection();
             if (_detailPipeline.busy && !_pipelineTimer) startPipelinePolling();
         } catch (e) {
-            showToast('刷新失败: ' + e.message, 'error');
+            showToast('刷新失败：' + e.message, 'error');
         } finally {
             if (btn) btn.classList.remove('kb-spin');
         }
@@ -709,12 +744,12 @@ const KnowledgeService = (function () {
         let completed = 0;
         for (const file of files) {
             try {
-                if (progressText) progressText.textContent = `上传中: ${file.name} (${completed + 1}/${files.length})`;
+                if (progressText) progressText.textContent = `上传中：${file.name} (${completed + 1}/${files.length})`;
                 if (progressFill) progressFill.style.width = `${(completed / files.length) * 100}%`;
                 await uploadDocument(_currentKbId, file);
                 completed++;
             } catch (e) {
-                showToast(`上传 ${file.name} 失败: ${e.message}`, 'error');
+                showToast(`上传 ${file.name} 失败：${e.message}`, 'error');
             }
         }
 
@@ -762,7 +797,7 @@ const KnowledgeService = (function () {
                 resultDiv.innerHTML = `<div class="kb-query-result-header"><i class="fas fa-lightbulb"></i> 检索结果 <span class="kb-query-mode-tag">${mode}</span></div><pre class="kb-query-result-text">${escapeHtml(text)}</pre>`;
             }
         } catch (e) {
-            if (resultDiv) resultDiv.innerHTML = `<div class="kb-query-error"><i class="fas fa-exclamation-triangle"></i> 查询失败: ${escapeHtml(e.message)}</div>`;
+            if (resultDiv) resultDiv.innerHTML = `<div class="kb-query-error"><i class="fas fa-exclamation-triangle"></i> 查询失败：${escapeHtml(e.message)}</div>`;
         }
     }
 
@@ -904,27 +939,29 @@ const KnowledgeService = (function () {
 
     /* ========== 生命周期 ========== */
     async function doStartService() {
-        const btn = document.querySelector('.kb-service-btn');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 启动中...';
-        }
+        // 点击按钮后立即显示"启动中"状态
+        _lightragStatus = 'starting';
+        renderModal();
+        updateKnowledgeBaseBtnActiveState();
+        
         try {
             const result = await startService();
             if (result.status === 'already_running') {
                 showToast(result.message, 'success');
             } else if (result.status === 'started') {
                 showToast('✅ LightRAG 服务启动成功', 'success');
-            } else {
-                showToast(result.message || '服务正在启动...', 'success');
+            } else if (result.status === 'starting') {
+                showToast('服务正在启动中，请稍候检查状态', 'success');
             }
-            await checkHealth();
-            renderModal();
         } catch (e) {
             let msg = e.message;
             // 截取前 200 字符避免 toast 太长
             if (msg.length > 200) msg = msg.substring(0, 200) + '...';
-            showToast('启动失败: ' + msg, 'error');
+            showToast('启动失败：' + msg, 'error');
+            // 启动失败时恢复为 disconnected 状态
+            _lightragStatus = 'disconnected';
+            renderModal();
+            updateKnowledgeBaseBtnActiveState();
             // 如果有日志，在弹窗中显示
             if (e.logs && e.logs.length > 0) {
                 const bodyEl = document.querySelector('.kb-body');
@@ -938,16 +975,22 @@ const KnowledgeService = (function () {
                     `;
                 }
             }
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-play-circle"></i> 启动服务';
-            }
+            return;
         }
+        
+        // 启动后触发一次健康检查查询
+        await checkHealth();
+        renderModal();
     }
 
     async function doStopService() {
         // 显示确认弹窗（不改变按钮状态）
         showStopServiceConfirmModal();
+    }
+
+    // 公开：从外部触发按钮状态更新（用于 main.js 等）
+    function triggerBtnStateUpdate() {
+        updateKnowledgeBaseBtnActiveState();
     }
 
     function showStopServiceConfirmModal() {
@@ -989,6 +1032,8 @@ const KnowledgeService = (function () {
             showToast('LightRAG 服务已停止', 'success');
             _lightragStatus = 'disconnected';
             renderModal();
+            // 停止服务后更新按钮状态
+            updateKnowledgeBaseBtnActiveState();
         } catch (e) {
             showToast('停止失败：' + e.message, 'error');
         }
@@ -996,17 +1041,16 @@ const KnowledgeService = (function () {
 
     async function open() {
         _currentKbId = null;
+        _healthDetail = null;
         try {
-            const [list] = await Promise.all([fetchKBList(), checkHealth()]);
-            _kbList = list;
+            _kbList = await fetchKBList();
         } catch (e) {
             console.error('Failed to load KB data:', e);
             _kbList = [];
         }
-        renderModal();
-        
-        // 根据知识库选中状态更新按钮 active 状态
-        updateKnowledgeBaseBtnActiveState();
+        // 打开窗口时检查健康状态
+        await checkHealth();
+        renderModalFull();
     }
 
     function close() {
@@ -1021,9 +1065,6 @@ const KnowledgeService = (function () {
         _detailDocuments = [];
         _detailPipeline = null;
         _selectedKbIds = new Set();  // 清空选中状态
-        
-        // 根据知识库选中状态更新按钮 active 状态
-        updateKnowledgeBaseBtnActiveState();
     }
 
     // 根据 LightRAG 服务状态更新按钮 active 状态
@@ -1037,6 +1078,13 @@ const KnowledgeService = (function () {
         } else {
             kbBtn.classList.remove('active');
         }
+    }
+
+    // 页面加载时检查服务状态
+    async function init() {
+        await checkHealth();
+        // 页面加载时根据服务状态更新按钮激活状态
+        updateKnowledgeBaseBtnActiveState();
     }
 
     /* ========== 工具函数 ========== */
@@ -1091,6 +1139,10 @@ const KnowledgeService = (function () {
         closeStopServiceConfirm, confirmStopService,
         // 删除知识库确认弹窗相关
         closeDeleteKBConfirm, doDeleteKB,
+        // 初始化
+        init,
+        // 公开：从外部触发按钮状态更新
+        triggerBtnStateUpdate,
     };
 })();
 

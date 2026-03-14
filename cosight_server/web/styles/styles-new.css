@@ -3065,6 +3065,13 @@ select.settings-input option:checked {
     box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45);
 }
 
+.kb-service-starting {
+    background: linear-gradient(135deg, #fde68a, #fbbf24);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.35);
+    cursor: not-allowed;
+}
+
 .kb-body {
     flex: 1;
     overflow-y: auto;
@@ -3103,6 +3110,11 @@ select.settings-input option:checked {
 .kb-status-offline {
     background: #fef2f2;
     color: #dc2626;
+}
+
+.kb-status-starting {
+    background: #fffbeb;
+    color: #d97706;
 }
 
 /* 返回按钮 */

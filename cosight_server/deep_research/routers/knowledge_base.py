@@ -29,7 +29,6 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
-from io import TextIOWrapper
 
 import httpx
 from fastapi import APIRouter, UploadFile, File, Body
@@ -37,30 +36,9 @@ from fastapi import APIRouter, UploadFile, File, Body
 from app.common.logger_util import logger
 
 
-def _strip_ansi_codes(text: str) -> str:
-    """移除 ANSI 转义码（颜色码）"""
-    ansi_pattern = re.compile(r'\x1b\[[0-9;]*m')
-    return ansi_pattern.sub('', text)
-
-
-class AnsiStrippingWrapper:
-    """文件包装器，写入时自动移除 ANSI 转义码"""
-    def __init__(self, file: TextIOWrapper):
-        self._file = file
-    
-    def write(self, text: str):
-        clean_text = _strip_ansi_codes(text)
-        self._file.write(clean_text)
-    
-    def flush(self):
-        self._file.flush()
-    
-    def close(self):
-        self._file.close()
-    
-    @property
-    def closed(self):
-        return self._file.closed
+def _strip_ansi(text: str) -> str:
+    """移除 ANSI 转义码"""
+    return re.sub(r'\x1b\[[0-9;]*m', '', text)
 
 knowledgeBaseRouter = APIRouter()
 
@@ -69,7 +47,6 @@ _lightrag_process: Optional[subprocess.Popen] = None
 _lightrag_log_lines: List[str] = []
 _lightrag_pid: Optional[int] = None
 _lightrag_port: int = 9621
-_lightrag_log_file: Optional = None  # 日志文件句柄
 
 
 # ---------- 工具函数 ----------
@@ -268,11 +245,9 @@ def _write_log_message(message: str):
     """写入日志消息到文件（使用 UTF-8 编码）"""
     log_file_path = _get_log_file_path()
     try:
-        # 先移除 ANSI 转义码
-        clean_message = _strip_ansi_codes(message)
-        with open(log_file_path, "a", encoding="utf-8") as f:
-            f.write(f"[{datetime.now().isoformat()}] {clean_message}\n")
-            f.flush()  # 立即写入，确保日志及时保存
+        with open(log_file_path, "a", encoding="utf-8", errors="replace") as f:
+            f.write(f"[{datetime.now().isoformat()}] {message}\n")
+            f.flush()
     except Exception as e:
         logger.error(f"Failed to write log: {e}")
 
@@ -285,7 +260,7 @@ def _get_project_root():
 @knowledgeBaseRouter.post("/deep-research/kb/start-service")
 async def kb_start_service():
     """启动 LightRAG 服务 - 直接在 Python 中启动 lightrag-server"""
-    global _lightrag_process, _lightrag_log_lines, _lightrag_pid, _lightrag_port, _lightrag_log_file
+    global _lightrag_process, _lightrag_log_lines, _lightrag_pid, _lightrag_port
 
     # 先检查是否已在运行
     try:
@@ -315,7 +290,6 @@ async def kb_start_service():
                 logger.warning("LightRAG process unresponsive, killing and restarting...")
                 try:
                     _kill_process_tree(_lightrag_process.pid)
-                    _write_log_message(f"LightRAG process killed (pid={_lightrag_process.pid})")
                 except Exception as e:
                     logger.error(f"Failed to kill process: {e}")
                 _lightrag_process = None
@@ -329,21 +303,19 @@ async def kb_start_service():
         os.makedirs(logs_dir, exist_ok=True)
         log_file_path = _get_log_file_path()
         
-        # 打开日志文件（UTF-8 编码），用于接收 LightRAG 输出
-        raw_log_file = open(log_file_path, "a", encoding="utf-8", errors="replace")
-        # 使用包装器自动过滤 ANSI 转义码
-        _lightrag_log_file = AnsiStrippingWrapper(raw_log_file)
+        # 获取日志目录和日志文件路径
+        logs_dir = os.path.join(project_root, "logs")
+        os.makedirs(logs_dir, exist_ok=True)
         
         # 记录启动信息到日志
         _write_log_message("===== LightRAG Service Starting =====")
         
         # 构建 lightrag-server 启动命令和环境变量
         env = os.environ.copy()
-        env["PYTHONUTF8"] = "1"  # 强制 Python 使用 UTF-8 编码
-        env["PYTHONIOENCODING"] = "utf-8"  # 强制标准输入输出使用 UTF-8
+        env["PYTHONUTF8"] = "1"
+        env["PYTHONIOENCODING"] = "utf-8"
         # 禁用颜色输出
         env["NO_COLOR"] = "1"
-        env["FORCE_COLOR"] = "0"
         
         # 设置 LightRAG 配置
         env.setdefault("LLM_BINDING", "openai")
@@ -364,27 +336,9 @@ async def kb_start_service():
                 ["lightrag-server", "--port", "9621", "--llm-binding", "openai", "--embedding-binding", "openai"],
                 cwd=project_root,
                 env=env,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,  # 使用管道而非直接文件重定向
-                stderr=subprocess.STDOUT,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                universal_newlines=True,
-                bufsize=1,
             )
-            
-            # 启动后台线程读取输出并写入日志（自动过滤 ANSI 码）
-            def read_output():
-                try:
-                    for line in _lightrag_process.stdout:
-                        if _lightrag_log_file and not _lightrag_log_file.closed:
-                            _lightrag_log_file.write(line)
-                except Exception:
-                    pass
-            
-            asyncio.create_task(asyncio.to_thread(read_output))
         else:
-            if _lightrag_log_file:
-                _lightrag_log_file.close()
             return {"code": 1, "msg": "当前仅支持 Windows 平台"}
 
         _lightrag_pid = _lightrag_process.pid
@@ -397,16 +351,12 @@ async def kb_start_service():
         for i in range(30):
             await asyncio.sleep(2)
             if _lightrag_process is not None and _lightrag_process.poll() is not None:
-                # 进程已退出，关闭日志文件句柄并读取输出
-                if _lightrag_log_file:
-                    _lightrag_log_file.flush()
-                    _lightrag_log_file.close()
-                    _lightrag_log_file = None
+                # 进程已退出，读取日志输出
                 try:
                     with open(log_file_path, "r", encoding="utf-8", errors="replace") as f:
                         all_lines = f.readlines()
-                    # 移除 ANSI 码和空行
-                    _lightrag_log_lines = [_strip_ansi_codes(l.rstrip()) for l in all_lines[-50:] if l.strip()]
+                    # 过滤 ANSI 码和空行
+                    _lightrag_log_lines = [_strip_ansi(l.rstrip()) for l in all_lines[-50:] if l.strip()]
                 except Exception:
                     _lightrag_log_lines = []
                 _lightrag_process = None
@@ -427,22 +377,10 @@ async def kb_start_service():
     except FileNotFoundError as e:
         _lightrag_process = None
         _lightrag_pid = None
-        if _lightrag_log_file:
-            try:
-                _lightrag_log_file.close()
-            except Exception:
-                pass
-            _lightrag_log_file = None
         return {"code": 1, "msg": f"启动失败：{str(e)}"}
     except Exception as e:
         _lightrag_process = None
         _lightrag_pid = None
-        if _lightrag_log_file:
-            try:
-                _lightrag_log_file.close()
-            except Exception:
-                pass
-            _lightrag_log_file = None
         logger.error(f"Failed to start LightRAG: {e}", exc_info=True)
         return {"code": 1, "msg": f"启动失败：{str(e)}"}
 
@@ -450,7 +388,7 @@ async def kb_start_service():
 @knowledgeBaseRouter.post("/deep-research/kb/stop-service")
 async def kb_stop_service():
     """停止 LightRAG 服务 - 使用记录的 PID 杀死进程"""
-    global _lightrag_process, _lightrag_pid, _lightrag_port, _lightrag_log_file
+    global _lightrag_process, _lightrag_pid, _lightrag_port
 
     stopped = False
     stop_method = ""
@@ -505,14 +443,6 @@ async def kb_stop_service():
         _write_log_message(f"LightRAG service stopped (method={stop_method})")
         logger.info(f"LightRAG service stopped (method={stop_method})")
         
-        # 关闭日志文件句柄（如果有）
-        if _lightrag_log_file:
-            try:
-                _lightrag_log_file.close()
-            except Exception:
-                pass
-            _lightrag_log_file = None
-        
         _lightrag_process = None
         _lightrag_pid = None
         return {"code": 0, "data": {"status": "stopped", "message": "LightRAG 服务已停止"}}
@@ -534,7 +464,8 @@ async def kb_service_logs():
         if os.path.exists(log_file_path):
             with open(log_file_path, "r", encoding="utf-8", errors="replace") as f:
                 all_lines = f.readlines()
-            _lightrag_log_lines = [l.rstrip() for l in all_lines[-100:]]
+            # 过滤 ANSI 码
+            _lightrag_log_lines = [_strip_ansi(l.rstrip()) for l in all_lines[-100:] if l.strip()]
     except Exception:
         pass
     return {"code": 0, "data": {"logs": _lightrag_log_lines[-30:]}}
@@ -545,6 +476,26 @@ async def kb_service_logs():
 @knowledgeBaseRouter.get("/deep-research/kb/health")
 async def kb_health():
     """检查 LightRAG 服务健康状态"""
+    # 如果服务正在启动中（有进程引用但健康检查失败），返回 starting 状态
+    if _lightrag_process is not None and _lightrag_process.poll() is None:
+        # 进程在运行，但健康检查可能还没通过
+        try:
+            result = await _proxy_get("/health")
+            return {"code": 0, "data": {"status": "connected", "detail": result}}
+        except Exception as e:
+            logger.warning(f"LightRAG health check failed but process is running: {e}")
+            return {"code": 0, "data": {"status": "starting", "detail": "服务正在启动中，请稍候...", "pid": _lightrag_pid}}
+    
+    # 检查是否有进程在运行
+    if _lightrag_pid is not None:
+        try:
+            result = await _proxy_get("/health")
+            return {"code": 0, "data": {"status": "connected", "detail": result}}
+        except Exception as e:
+            # 进程可能正在启动中
+            return {"code": 0, "data": {"status": "starting", "detail": "服务正在启动中，请稍候...", "pid": _lightrag_pid}}
+    
+    # 没有进程引用，直接检查健康状态
     try:
         result = await _proxy_get("/health")
         return {"code": 0, "data": {"status": "connected", "detail": result}}
