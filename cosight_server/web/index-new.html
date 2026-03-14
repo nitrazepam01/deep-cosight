@@ -115,6 +115,9 @@
                                 <button class="btn-input-action" id="knowledge-base-btn" title="知识库管理" onclick="KnowledgeService.open()">
                                     <i class="fas fa-book"></i>
                                 </button>
+                                    <button class="btn-input-action" id="agent-base-btn" title="运行时智能体配置" onclick="AgentRuntimeService.open()">
+                                    <i class="fas fa-robot"></i>
+                                </button>
                             </div>
                             <button class="btn-send" id="send-btn">
                                 <i class="fas fa-paper-plane"></i>
@@ -309,6 +312,8 @@
     <div id="settings-modal"></div>
     <!-- 知识库管理弹窗容器 -->
     <div id="knowledge-modal"></div>
+    <!-- 智能体管理弹窗容器 -->
+    <div id="agent-modal"></div>
 
     <div class="tooltip" id="tooltip"></div>
     <div class="steps-tooltip" id="steps-tooltip"></div>
@@ -323,6 +328,7 @@
     <script src="js/dag.js"></script>
     <script src="js/settings.js"></script>
     <script src="js/knowledge.js"></script>
+    <script src="js/agents.js"></script>
     <script>
         // 页面加载时初始化知识库服务状态
         window.addEventListener('DOMContentLoaded', function() {

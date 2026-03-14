@@ -109,12 +109,17 @@ const SettingsService = (function () {
         }
 
         if (isInitialRender) {
-            // 构建侧边栏：先加"大模型"，再加"个性化"，再加原有分组
+            // 构建侧边栏：先加"大模型"，再加"智能体"，再加"个性化"，再加原有分组
             const sidebarItems = `
                 <div class="settings-sidebar-item ${'providers' === _activeGroup ? 'active' : ''}" 
                      data-group="providers" onclick="SettingsService.switchGroup('providers')">
                     <i class="fas fa-cube"></i>
                     <span>大模型</span>
+                </div>
+                <div class="settings-sidebar-item ${'agents' === _activeGroup ? 'active' : ''}" 
+                     data-group="agents" onclick="SettingsService.switchGroup('agents')">
+                    <i class="fas fa-robot"></i>
+                    <span>智能体</span>
                 </div>
                 <div class="settings-sidebar-item ${'personalization' === _activeGroup ? 'active' : ''}" 
                      data-group="personalization" onclick="SettingsService.switchGroup('personalization')">
@@ -129,8 +134,10 @@ const SettingsService = (function () {
                 </div>
             `).join('');
 
-            const contentHtml = _activeGroup === 'providers'
+        const contentHtml = _activeGroup === 'providers'
                 ? renderProvidersPage()
+                : _activeGroup === 'agents'
+                ? renderAgentsPage()
                 : _activeGroup === 'personalization'
                 ? renderPersonalizationPage()
                 : renderSettingsContent(_currentData);
@@ -202,6 +209,8 @@ const SettingsService = (function () {
 
         if (_activeGroup === 'providers') {
             contentDiv.innerHTML = renderProvidersPage();
+        } else if (_activeGroup === 'agents') {
+            contentDiv.innerHTML = renderAgentsPage();
         } else if (_activeGroup === 'personalization') {
             contentDiv.innerHTML = renderPersonalizationPage();
         } else {
@@ -272,6 +281,387 @@ const SettingsService = (function () {
         const contentDiv = document.getElementById('settings-content-area');
         if (contentDiv) {
             contentDiv.innerHTML = renderPersonalizationPage();
+        }
+    }
+
+    /* ---------- 智能体管理页面 ---------- */
+    let _agentEditingId = null;
+    let _agentIsAdding = false;
+
+    function renderAgentsPage() {
+        // 数据已在 open() 中预加载，这里直接渲染
+        if (_agentEditingId || _agentIsAdding) {
+            return renderAgentForm();
+        } else {
+            return renderAgentList();
+        }
+    }
+
+    function renderAgentList() {
+        const agents = AgentManagementService.getAgents();
+        const providers = AgentManagementService.getProviders();
+        
+        const agentCards = agents.length === 0
+            ? '<div style="text-align:center;padding:40px;color:#aaa;font-size:14px;">暂无智能体配置</div>'
+            : agents.map(agent => {
+                const defaultBadge = agent.is_default ? `<span class="agent-badge agent-badge-default"><i class="fas fa-star"></i> 默认</span>` : '';
+                const builtinBadge = agent.builtin ? `<span class="agent-badge agent-badge-locked"><i class="fas fa-lock"></i> 内置</span>` : '';
+                
+                // 根据智能体类型设置图标和背景颜色
+                // 规划者 (Planner)：大脑图标 🧠，粉色渐变背景
+                // 执行者 (Actor)：闪电图标 ⚡，橙色渐变背景
+                let icon = '⚡';
+                let iconBg = '';
+                let agentTypeLabel = '';
+                
+                if (agent.agent_type === 'planner') {
+                    icon = '🧠';
+                    iconBg = 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)';
+                    agentTypeLabel = '规划者';
+                } else {
+                    // 默认都是执行者
+                    icon = '⚡';
+                    iconBg = 'linear-gradient(135deg, #ff6a6a 0%, #ff9a6e 100%)';
+                    agentTypeLabel = '执行者';
+                }
+
+                return `
+                    <div class="agent-item" data-agent-id="${AgentManagementService.escapeHtml(agent.id)}">
+                        <div class="agent-icon" style="width:48px;height:48px;border-radius:12px;background:${iconBg};display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;" title="${agentTypeLabel}">${icon}</div>
+                        <div class="agent-content">
+                            <div class="agent-title-row">
+                                <span class="agent-name">${AgentManagementService.escapeHtml(agent.name || '未命名智能体')}</span>
+                                ${defaultBadge}
+                                ${builtinBadge}
+                            </div>
+                            <p class="agent-desc">${AgentManagementService.escapeHtml(agent.description || '暂无描述')}</p>
+                        </div>
+                        <button class="agent-edit-btn" onclick="SettingsService.editAgent('${AgentManagementService.escapeHtml(agent.id)}')">
+                            <i class="fas fa-pen"></i> 编辑
+                        </button>
+                    </div>
+                `;
+            }).join('');
+
+        return `
+            <div class="cs-header-title">
+                <i class="fas fa-robot" style="color:#a18cd1;"></i>
+                智能体管理 <span class="cs-header-sub">Agent Management</span>
+            </div>
+            <div class="cs-divider"></div>
+            <div class="agent-list-container">
+                ${agentCards}
+                <div class="agent-add-placeholder" onclick="SettingsService.startAddAgent()">
+                    <i class="fas fa-plus"></i> 添加自定义智能体
+                </div>
+            </div>
+        `;
+    }
+
+    function renderAgentForm() {
+        const providers = AgentManagementService.getProviders();
+        const skills = AgentManagementService.getAvailableSkills();
+        
+        let agent;
+        if (_agentIsAdding) {
+            agent = AgentManagementService.getNewAgentTemplate();
+        } else {
+            agent = AgentManagementService.getAgentById(_agentEditingId);
+        }
+        
+        if (!agent) {
+            _agentEditingId = null;
+            _agentIsAdding = false;
+            return renderAgentList();
+        }
+        
+        const isBuiltin = agent.builtin;
+
+        // 构建模型选项
+        let modelOptions = '<option value="">-- 系统默认模型 --</option>';
+        providers.forEach(p => {
+            modelOptions += `<optgroup label="${AgentManagementService.escapeHtml(p.name)}">`;
+            (p.models || []).forEach(m => {
+                const val = `${p.id}|${m}`;
+                const currentVal = `${agent.provider_id}|${agent.model_name}`;
+                modelOptions += `<option value="${AgentManagementService.escapeHtml(val)}" ${val === currentVal ? 'selected' : ''}>${AgentManagementService.escapeHtml(m)}</option>`;
+            });
+            modelOptions += `</optgroup>`;
+        });
+
+        const builtinBadge = isBuiltin ? `<span class="agent-badge agent-badge-locked"><i class="fas fa-lock"></i> 系统内置</span>` : '';
+
+        // 技能选项
+        const skillOptions = skills.map(skill => {
+            const selected = (agent.skills || []).includes(skill.name) ? 'selected' : '';
+            return `<option value="${AgentManagementService.escapeHtml(skill.name)}" ${selected}>${AgentManagementService.escapeHtml(skill.display_name_zh)} - ${AgentManagementService.escapeHtml(skill.description_zh)}</option>`;
+        }).join('');
+
+        const actionButtons = !isBuiltin ? `
+            <div class="agent-form-header-actions">
+                ${!_agentIsAdding ? `
+                <button class="agent-form-header-btn" onclick="SettingsService.deleteAgent('${AgentManagementService.escapeHtml(agent.id)}')" title="删除">
+                    <i class="fas fa-trash"></i>
+                </button>
+                ` : ''}
+                <button class="agent-form-header-btn agent-form-header-btn-save" onclick="SettingsService.saveAgent()" title="保存">
+                    <i class="fas fa-save"></i>
+                </button>
+            </div>
+        ` : '';
+
+        return `
+            <div class="agent-form-container">
+                <div class="agent-form-header">
+                    <button class="agent-form-back-btn" onclick="SettingsService.cancelAgentEdit()" title="返回">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <span class="agent-form-title">${_agentIsAdding ? '✨ 创建智能体' : '✏️ 编辑智能体'}</span>
+                    ${actionButtons}
+                </div>
+                ${builtinBadge ? `<div class="agent-form-badge-container">${builtinBadge}</div>` : ''}
+
+                <input type="hidden" id="af-id" value="${AgentManagementService.escapeHtml(agent.id)}">
+
+                <div class="agent-form-row">
+                    <label class="agent-form-label">智能体名称</label>
+                    <input type="text" id="af-name" class="agent-form-input" value="${AgentManagementService.escapeHtml(agent.name)}" placeholder="例如：前端开发专家" ${isBuiltin ? 'readonly' : ''} />
+                </div>
+
+                <div class="agent-form-row">
+                    <label class="agent-form-label">描述</label>
+                    <input type="text" id="af-desc" class="agent-form-input" value="${AgentManagementService.escapeHtml(agent.description)}" placeholder="该智能体的职责简介" ${isBuiltin ? 'readonly' : ''} />
+                </div>
+
+                <div class="agent-form-row">
+                    <label class="agent-form-label">智能体类型</label>
+                    <select id="af-type" class="agent-form-input" ${isBuiltin ? 'disabled' : ''}>
+                        <option value="actor" ${agent.agent_type === 'actor' || !agent.agent_type ? 'selected' : ''}>执行者 (Actor)</option>
+                        <option value="planner" ${agent.agent_type === 'planner' ? 'selected' : ''}>规划者 (Planner)</option>
+                    </select>
+                </div>
+
+                <div class="agent-form-row" id="skills-container" style="display: ${agent.agent_type === 'planner' ? 'none' : 'block'}">
+                    <label class="agent-form-label">执行技能配置 <span class="agent-form-hint">（按住 Ctrl/Cmd 多选）</span></label>
+                    <select id="af-skills" class="agent-form-input" multiple size="6" ${isBuiltin ? 'disabled' : ''}>
+                        ${skillOptions}
+                    </select>
+                    <div class="agent-form-hint">仅 Actor 类型的智能体可配置执行技能。</div>
+                </div>
+
+                <div class="agent-form-row">
+                    <label class="agent-form-label">系统提示词 (System Prompt)</label>
+                    <textarea id="af-prompt" class="agent-form-textarea" rows="8" placeholder="在这里定义智能体的身份、目标、规则和输出格式..." ${isBuiltin ? 'readonly' : ''}>${AgentManagementService.escapeHtml(agent.system_prompt)}</textarea>
+                </div>
+
+                <div class="agent-form-row">
+                    <label class="agent-form-label">Thinking Mode</label>
+                    <select id="af-thinking-mode" class="agent-form-input">
+                        <option value="" ${agent.thinking_mode === null || typeof agent.thinking_mode === 'undefined' ? 'selected' : ''}>继承系统默认</option>
+                        <option value="true" ${agent.thinking_mode === true ? 'selected' : ''}>开启 thinking mode</option>
+                        <option value="false" ${agent.thinking_mode === false ? 'selected' : ''}>关闭 thinking mode</option>
+                    </select>
+                    <div class="agent-form-hint">不设置时使用系统默认；开启或关闭则仅对当前智能体生效。</div>
+                </div>
+
+                <div class="agent-form-row agent-form-row-inline">
+                    <div class="agent-form-group">
+                        <label class="agent-form-label">绑定大模型</label>
+                        <select id="af-model" class="agent-form-input">${modelOptions}</select>
+                        <div class="agent-form-hint">留空则使用全局默认大模型</div>
+                    </div>
+                    ${!isBuiltin ? `
+                    <div class="agent-form-group">
+                        <label class="agent-form-label">状态</label>
+                        <select id="af-enabled" class="agent-form-input">
+                            <option value="true" ${agent.enabled !== false ? 'selected' : ''}>启用</option>
+                            <option value="false" ${agent.enabled === false ? 'selected' : ''}>停用</option>
+                        </select>
+                    </div>
+                    ` : '<input type="hidden" id="af-enabled" value="true">'}
+                </div>
+
+                <div class="agent-form-row">
+                    <label class="agent-form-label-checkbox">
+                        <input type="checkbox" id="af-default" ${agent.is_default ? 'checked' : ''} ${isBuiltin ? 'disabled' : ''} />
+                        设为默认智能体 (启动任务时默认选中)
+                    </label>
+                </div>
+            </div>
+        `;
+    }
+
+    /* ---------- 智能体管理页面操作函数 ---------- */
+    function editAgent(agentId) {
+        _agentEditingId = agentId;
+        _agentIsAdding = false;
+        refreshAgentsPage();
+    }
+
+    function startAddAgent() {
+        _agentEditingId = null;
+        _agentIsAdding = true;
+        refreshAgentsPage();
+    }
+
+    function cancelAgentEdit() {
+        _agentEditingId = null;
+        _agentIsAdding = false;
+        refreshAgentsPage();
+    }
+
+    async function saveAgent() {
+        const name = document.getElementById('af-name').value.trim();
+        const description = document.getElementById('af-desc').value.trim();
+        const systemPrompt = document.getElementById('af-prompt').value.trim();
+        const modelVal = document.getElementById('af-model').value;
+        const thinkingModeVal = document.getElementById('af-thinking-mode')?.value ?? '';
+        const enabledEl = document.getElementById('af-enabled');
+        const enabled = enabledEl ? enabledEl.value === 'true' : true;
+        const isDefault = document.getElementById('af-default').checked;
+
+        if (!name) { 
+            AgentManagementService.showToast('请输入智能体名称', 'error'); 
+            return; 
+        }
+
+        let providerId = '', modelName = '';
+        if (modelVal) {
+            const parts = modelVal.split('|');
+            providerId = parts[0] || '';
+            modelName = parts[1] || '';
+        }
+
+        const agentType = document.getElementById('af-type')?.value || 'actor';
+        let skills = [];
+        if (agentType === 'actor') {
+            const skillsEl = document.getElementById('af-skills');
+            if (skillsEl) {
+                skills = Array.from(skillsEl.selectedOptions).map(opt => opt.value);
+            }
+            // Actor 类型的智能体必须至少选择一个技能
+            if (skills.length === 0) {
+                AgentManagementService.showToast('执行者 (Actor) 类型的智能体必须至少配置 1 个技能', 'error');
+                return;
+            }
+        }
+
+        let thinkingMode = null;
+        if (thinkingModeVal === 'true') {
+            thinkingMode = true;
+        } else if (thinkingModeVal === 'false') {
+            thinkingMode = false;
+        }
+
+        const data = {
+            id: _agentEditingId || '',
+            name, description,
+            system_prompt: systemPrompt,
+            provider_id: providerId,
+            model_name: modelName,
+            thinking_mode: thinkingMode,
+            enabled, is_default: isDefault,
+            agent_type: agentType,
+            skills: skills
+        };
+
+        try {
+            await AgentManagementService.saveAgent(data);
+            AgentManagementService.showToast('保存成功', 'success');
+            refreshAgentsPage();
+        } catch (e) {
+            AgentManagementService.showToast('保存失败：' + e.message, 'error');
+        }
+    }
+
+    async function deleteAgent(agentId) {
+        const agent = AgentManagementService.getAgentById(agentId);
+        if (!agent) return;
+        
+        // 使用与删除供应商相同的确认弹窗样式
+        const modalOverlay = document.getElementById('delete-provider-modal-overlay');
+        const messageEl = document.getElementById('delete-provider-message');
+        if (modalOverlay && messageEl) {
+            messageEl.textContent = `确定要删除智能体「${agent.name || '未命名'}」吗？此操作不可恢复。`;
+            modalOverlay.style.display = 'flex';
+            
+            const confirmBtn = document.getElementById('confirm-delete-provider-btn');
+            const cancelBtn = document.getElementById('cancel-delete-provider-btn');
+            const closeBtn = document.getElementById('close-delete-provider-modal');
+            
+            const cleanup = () => {
+                modalOverlay.style.display = 'none';
+                if (confirmBtn) confirmBtn.onclick = null;
+                if (cancelBtn) cancelBtn.onclick = null;
+                if (closeBtn) closeBtn.onclick = null;
+            };
+            
+            if (confirmBtn) {
+                confirmBtn.onclick = async () => {
+                    cleanup();
+                    try {
+                        await AgentManagementService.deleteAgent(agentId);
+                        AgentManagementService.showToast('删除成功', 'success');
+                        // 删除成功后返回列表页并刷新
+                        _agentEditingId = null;
+                        _agentIsAdding = false;
+                        refreshAgentsPage();
+                    } catch (e) {
+                        AgentManagementService.showToast('删除失败：' + e.message, 'error');
+                    }
+                };
+            }
+            
+            if (cancelBtn) {
+                cancelBtn.onclick = cleanup;
+            }
+            
+            if (closeBtn) {
+                closeBtn.onclick = cleanup;
+            }
+        }
+    }
+
+    function refreshAgentsPage() {
+        const contentDiv = document.getElementById('settings-content-area');
+        if (contentDiv && _activeGroup === 'agents') {
+            contentDiv.innerHTML = '';
+            const loading = document.createElement('div');
+            loading.className = 'agent-loading';
+            loading.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 加载中...';
+            contentDiv.appendChild(loading);
+            
+            setTimeout(() => {
+                if (_agentEditingId || _agentIsAdding) {
+                    contentDiv.innerHTML = renderAgentForm();
+                    bindAgentFormEvents();
+                } else {
+                    contentDiv.innerHTML = renderAgentList();
+                    bindAgentListEvents();
+                }
+            }, 100);
+        }
+    }
+
+    function bindAgentListEvents() {
+        // 编辑按钮使用 onclick 属性直接调用，不需要在这里绑定
+        // 但需要确保 SettingsService.editAgent 能正确获取 agentId
+        
+        const addBtn = document.querySelector('.agent-add-placeholder');
+        if (addBtn) {
+            addBtn.addEventListener('click', startAddAgent);
+        }
+    }
+
+    function bindAgentFormEvents() {
+        const typeSelect = document.getElementById('af-type');
+        if (typeSelect) {
+            typeSelect.addEventListener('change', function() {
+                const skillsContainer = document.getElementById('skills-container');
+                if (skillsContainer) {
+                    skillsContainer.style.display = typeSelect.value === 'actor' ? 'block' : 'none';
+                }
+            });
         }
     }
 
@@ -800,6 +1190,12 @@ const SettingsService = (function () {
         try {
             const [groups, providers] = await Promise.all([fetchSettings(), fetchProviders()]);
             _providers = providers;
+            // 预加载智能体数据
+            if (typeof AgentManagementService !== 'undefined') {
+                await AgentManagementService.init();
+            }
+            // 默认显示"智能体管理"页面
+            _activeGroup = 'agents';
             renderModal(groups);
         } catch (e) {
             console.error('获取设置失败:', e);
@@ -911,8 +1307,352 @@ const SettingsService = (function () {
         startAddProvider, startEditProvider, cancelProviderForm,
         pingProviderForm, deleteProvider, testProvider, addModelTag, removeModelTag,
         onQuickSelect, applyQuickSelect, selectBubbleColor, toggleBubbleColorExpand,
+        // 智能体管理相关
+        editAgent, startAddAgent, cancelAgentEdit, saveAgent, deleteAgent, refreshAgentsPage,
+        // 内部状态访问（用于调试）
+        getAgentEditingId: () => _agentEditingId,
+        getAgentIsAdding: () => _agentIsAdding,
     };
 })();
 
 // 导出到全局
 window.SettingsService = SettingsService;
+
+// 智能体配置服务
+const AgentConfigService = (function () {
+    const STORAGE_KEY = 'cosight:agentConfig';
+    
+    let _config = {
+        planner: '任务规划专家',
+        allocationMode: 'Single Actor',
+        defaultActor: '任务执行专家',
+        actors: ['任务执行专家']
+    };
+    
+    function load() {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                _config = JSON.parse(stored);
+            }
+        } catch (e) {
+            console.warn('加载智能体配置失败:', e);
+        }
+        return _config;
+    }
+    
+    function save() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(_config));
+            showToast('智能体配置已保存', 'success');
+        } catch (e) {
+            console.error('保存智能体配置失败:', e);
+            showToast('保存失败', 'error');
+        }
+    }
+    
+    function onPlannerChange(value) {
+        _config.planner = value;
+    }
+    
+    function onAllocationModeChange(value) {
+        _config.allocationMode = value;
+    }
+    
+    function onDefaultActorChange(value) {
+        _config.defaultActor = value;
+    }
+    
+    function showToast(message, type) {
+        const existing = document.querySelector('.settings-toast');
+        if (existing) existing.remove();
+
+        const toast = document.createElement('div');
+        toast.className = `settings-toast settings-toast-${type}`;
+        toast.innerHTML = `
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+            <span>${message}</span>
+        `;
+        document.body.appendChild(toast);
+
+        requestAnimationFrame(() => toast.classList.add('show'));
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+    
+    return {
+        load,
+        save,
+        onPlannerChange,
+        onAllocationModeChange,
+        onDefaultActorChange
+    };
+})();
+
+// 导出到全局
+window.AgentConfigService = AgentConfigService;
+
+// 运行时智能体配置服务（独立窗口）
+const AgentRuntimeService = (function () {
+    const API_BASE = '/api/nae-deep-research/v1';
+    const STORAGE_KEY = 'cosight:agentRunConfig';
+    
+    let _config = {
+        planner_id: '',
+        allowed_actor_ids: [],
+        default_actor_id: '',
+        dispatch_mode: 'single_actor'
+    };
+    
+    let _planners = [];
+    let _actors = [];
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>')
+            .replace(/"/g, '"').replace(/'/g, '&#039;');
+    }
+
+    function showToast(msg, type) {
+        if (typeof window.showToast === 'function') { 
+            window.showToast(msg, type); 
+            return; 
+        }
+        const existing = document.querySelector('.settings-toast');
+        if (existing) existing.remove();
+        const toast = document.createElement('div');
+        toast.className = `settings-toast settings-toast-${type}`;
+        toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i><span>${msg}</span>`;
+        document.body.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add('show'));
+        setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    async function fetchRuntimeDefaults() {
+        const resp = await fetch(`${API_BASE}/deep-research/runtime-agent-defaults`);
+        const json = await resp.json();
+        if (json.code !== 200 && json.code !== 0) throw new Error(json.msg || 'Failed to fetch runtime defaults');
+        return json.data || {};
+    }
+
+    function loadConfig() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) _config = JSON.parse(raw);
+        } catch (e) {
+            console.warn('loadConfig failed:', e);
+        }
+    }
+
+    function saveConfig() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(_config));
+            return true;
+        } catch (e) {
+            console.error('saveConfig failed:', e);
+            return false;
+        }
+    }
+
+    async function open() {
+        try {
+            const data = await fetchRuntimeDefaults();
+            _planners = data.planners || [];
+            _actors = data.actors || [];
+            loadConfig();
+            renderPanel();
+        } catch (e) {
+            console.error('open failed:', e);
+            showToast('加载配置失败：' + e.message, 'error');
+        }
+    }
+
+    function close() {
+        const modal = document.getElementById('agent-runtime-modal');
+        if (modal) {
+            modal.classList.remove('show');
+            modal.innerHTML = '';
+        }
+        document.body.style.overflow = '';
+    }
+
+    function renderPanel() {
+        let modal = document.getElementById('agent-runtime-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'agent-runtime-modal';
+            document.body.appendChild(modal);
+        }
+
+        modal.innerHTML = `
+            <div class="agent-runtime-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);z-index:10001;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;">
+                <div class="agent-runtime-panel" style="position:relative;width:720px;max-width:92vw;max-height:85vh;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);display:flex;flex-direction:column;overflow:hidden;pointer-events:auto;">
+                    <div class="agent-runtime-header" style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #eee;background:linear-gradient(135deg,#f8f9fa 0%,#fff 100%);">
+                        <h2 style="margin:0;font-size:20px;font-weight:600;color:#333;display:flex;align-items:center;gap:10px;">
+                            <i class="fas fa-cog" style="color:#667eea;"></i> 运行时智能体配置
+                        </h2>
+                        <button class="agent-runtime-close-btn" style="width:36px;height:36px;border:none;background:#f0f0f0;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#666;font-size:16px;transition:all 0.2s;" onclick="AgentRuntimeService.close()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="agent-runtime-body" style="flex:1;overflow-y:auto;padding:24px;">
+                        ${renderConfigForm()}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        bindEvents();
+        
+        const overlay = modal.querySelector('.agent-runtime-overlay');
+        if (overlay) {
+            overlay.addEventListener('click', function (event) {
+                if (event.target === overlay) close();
+            });
+        }
+
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function renderConfigForm() {
+        const plannerOptions = _planners.map(p => 
+            `<option value="${escapeHtml(p.id)}" ${_config.planner_id === p.id ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
+        ).join('') || '<option value="">无可用 Planner</option>';
+
+        const actorOptions = _actors.map(a => 
+            `<option value="${escapeHtml(a.id)}" ${(_config.allowed_actor_ids || []).includes(a.id) ? 'selected' : ''}>${escapeHtml(a.name)}</option>`
+        ).join('') || '<option value="">无可用 Actor</option>';
+
+        const defaultActorOptions = _actors
+            .filter(a => (_config.allowed_actor_ids || []).includes(a.id))
+            .map(a => `<option value="${escapeHtml(a.id)}" ${_config.default_actor_id === a.id ? 'selected' : ''}>${escapeHtml(a.name)}</option>`)
+            .join('') || '<option value="">请先选择 Actors</option>';
+
+        return `
+            <div class="agent-runtime-config-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;">
+                <div class="agent-runtime-card" style="background:#fafbfc;border:1px solid #e8e8e8;border-radius:12px;padding:20px;">
+                    <div class="agent-runtime-card-header" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;">
+                            <i class="fas fa-brain" style="color:#fff;font-size:18px;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:15px;font-weight:600;color:#333;">Planner</div>
+                            <div style="font-size:12px;color:#888;">任务规划器</div>
+                        </div>
+                    </div>
+                    <select id="agent-planner-select" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;background:#fff;outline:none;">
+                        ${plannerOptions}
+                    </select>
+                    <p style="font-size:12px;color:#888;margin-top:8px;">负责任务分解和规划的专业助手</p>
+                </div>
+
+                <div class="agent-runtime-card" style="background:#fafbfc;border:1px solid #e8e8e8;border-radius:12px;padding:20px;">
+                    <div class="agent-runtime-card-header" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);display:flex;align-items:center;justify-content:center;">
+                            <i class="fas fa-random" style="color:#fff;font-size:18px;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:15px;font-weight:600;color:#333;">分配模式</div>
+                            <div style="font-size:12px;color:#888;">Dispatch Mode</div>
+                        </div>
+                    </div>
+                    <select id="agent-allocation-mode-select" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;background:#fff;outline:none;">
+                        <option value="single_actor" ${_config.dispatch_mode === 'single_actor' ? 'selected' : ''}>Single Actor</option>
+                        <option value="planner_assign" ${_config.dispatch_mode === 'planner_assign' ? 'selected' : ''}>Planner Assign</option>
+                        <option value="multi_actor" ${_config.dispatch_mode === 'multi_actor' ? 'selected' : ''}>Multi Actor</option>
+                    </select>
+                    <p style="font-size:12px;color:#888;margin-top:8px;">选择智能体任务分配策略</p>
+                </div>
+
+                <div class="agent-runtime-card" style="background:#fafbfc;border:1px solid #e8e8e8;border-radius:12px;padding:20px;">
+                    <div class="agent-runtime-card-header" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);display:flex;align-items:center;justify-content:center;">
+                            <i class="fas fa-user" style="color:#fff;font-size:18px;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:15px;font-weight:600;color:#333;">Actor</div>
+                            <div style="font-size:12px;color:#888;">默认执行器</div>
+                        </div>
+                    </div>
+                    <select id="agent-default-actor-select" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;background:#fff;outline:none;">
+                        ${defaultActorOptions}
+                    </select>
+                    <p style="font-size:12px;color:#888;margin-top:8px;">默认的任务执行智能体</p>
+                </div>
+
+                <div class="agent-runtime-card" style="background:#fafbfc;border:1px solid #e8e8e8;border-radius:12px;padding:20px;">
+                    <div class="agent-runtime-card-header" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#43e97b 0%,#38f9d7 100%);display:flex;align-items:center;justify-content:center;">
+                            <i class="fas fa-users" style="color:#fff;font-size:18px;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:15px;font-weight:600;color:#333;">Actors</div>
+                            <div style="font-size:12px;color:#888;">执行器列表</div>
+                        </div>
+                    </div>
+                    <select id="agent-actors-select" multiple style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;background:#fff;outline:none;min-height:80px;">
+                        ${actorOptions}
+                    </select>
+                    <p style="font-size:12px;color:#888;margin-top:8px;">按住 Ctrl/Cmd 可多选</p>
+                </div>
+            </div>
+
+            <div class="agent-runtime-actions" style="display:flex;justify-content:center;gap:12px;margin-top:24px;padding-top:20px;border-top:1px solid #f0f0f0;">
+                <button id="agent-cancel-btn" type="button" style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border:1px solid #ddd;border-radius:10px;background:#fff;color:#555;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s;">
+                    <i class="fas fa-times"></i> 取消
+                </button>
+                <button id="agent-save-btn" type="button" style="display:inline-flex;align-items:center;gap:6px;padding:10px 24px;border:none;border-radius:10px;background:linear-gradient(135deg,#43e97b 0%,#38f9d7 100%);color:#fff;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 12px rgba(67,233,123,0.3);">
+                    <i class="fas fa-save"></i> 保存配置
+                </button>
+            </div>
+        `;
+    }
+
+    function bindEvents() {
+        const actorsSelect = document.getElementById('agent-actors-select');
+        const defaultActorSelect = document.getElementById('agent-default-actor-select');
+        const saveBtn = document.getElementById('agent-save-btn');
+        const cancelBtn = document.getElementById('agent-cancel-btn');
+
+        if (actorsSelect) {
+            actorsSelect.addEventListener('change', function() {
+                const selectedIds = Array.from(actorsSelect.selectedOptions).map(o => o.value);
+                const selectedActors = _actors.filter(a => selectedIds.includes(a.id));
+                if (defaultActorSelect) {
+                    defaultActorSelect.innerHTML = selectedActors.map(a => 
+                        `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name)}</option>`
+                    ).join('') || '<option value="">无可用 Actor</option>';
+                }
+            });
+        }
+
+        if (saveBtn) {
+            saveBtn.addEventListener('click', function() {
+                const plannerId = document.getElementById('agent-planner-select')?.value || '';
+                const allowedActorIds = Array.from(document.getElementById('agent-actors-select')?.selectedOptions || []).map(o => o.value);
+                const defaultActorId = document.getElementById('agent-default-actor-select')?.value || '';
+                const dispatchMode = document.getElementById('agent-allocation-mode-select')?.value || 'single_actor';
+
+                _config = { planner_id: plannerId, allowed_actor_ids: allowedActorIds, default_actor_id: defaultActorId, dispatch_mode: dispatchMode };
+
+                if (saveConfig()) {
+                    showToast('配置已保存', 'success');
+                    setTimeout(() => close(), 800);
+                } else {
+                    showToast('保存失败', 'error');
+                }
+            });
+        }
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function() { close(); });
+        }
+    }
+
+    return { open, close };
+})();
+
+window.AgentRuntimeService = AgentRuntimeService;
