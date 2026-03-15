@@ -389,7 +389,7 @@ const SettingsService = (function () {
             });
         });
 
-        const builtinBadge = isBuiltin ? `<span class="agent-badge agent-badge-locked"><i class="fas fa-lock"></i> 系统内置</span>` : '';
+        const builtinBadge = isBuiltin ? `<span class="agent-badge agent-badge-locked" style="margin-right: 8px;"><i class="fas fa-lock"></i> 系统内置</span>` : '';
 
         const actionButtons = !isBuiltin ? `
             <div class="agent-form-header-actions">
@@ -402,7 +402,11 @@ const SettingsService = (function () {
                     <i class="fas fa-save"></i>
                 </button>
             </div>
-        ` : '';
+        ` : `
+            <div class="agent-form-header-actions">
+                ${builtinBadge}
+            </div>
+        `;
 
         return `
             <div class="agent-form-container">
@@ -413,7 +417,7 @@ const SettingsService = (function () {
                     <span class="agent-form-title">${_agentIsAdding ? '✨ 创建智能体' : '✏️ 编辑智能体'}</span>
                     ${actionButtons}
                 </div>
-                ${builtinBadge ? `<div class="agent-form-badge-container">${builtinBadge}</div>` : ''}
+                
 
                 <input type="hidden" id="af-id" value="${AgentManagementService.escapeHtml(agent.id)}">
 
@@ -423,7 +427,7 @@ const SettingsService = (function () {
                 </div>
 
                 <div class="agent-form-row">
-                    <label class="agent-form-label">描述</label>
+                    <label class="agent-form-label">智能体描述</label>
                     <input type="text" id="af-desc" class="agent-form-input" value="${AgentManagementService.escapeHtml(agent.description)}" placeholder="该智能体的职责简介" ${isBuiltin ? 'readonly' : ''} />
                 </div>
 
@@ -433,9 +437,8 @@ const SettingsService = (function () {
                 </div>
 
                 <div class="agent-form-row" id="skills-container" style="display: ${agent.agent_type === 'planner' ? 'none' : 'block'}">
-                    <label class="agent-form-label">执行技能配置 <span class="agent-form-hint">（可多选）</span></label>
+                    <label class="agent-form-label">执行技能配置 <span class="agent-form-hint" style="font-style: normal;">可多选</span></label>
                     <div id="af-skills-container" data-values="${AgentManagementService.escapeHtml(JSON.stringify(agent.skills || []))}" data-disabled="${isBuiltin}"></div>
-                    <div class="agent-form-hint">仅 Actor 类型的智能体可配置执行技能。</div>
                 </div>
 
                 <div class="agent-form-row">
@@ -446,21 +449,13 @@ const SettingsService = (function () {
                 <div class="agent-form-row">
                     <label class="agent-form-label">Thinking Mode</label>
                     <div id="af-thinking-mode-container" data-value="${agent.thinking_mode === null || typeof agent.thinking_mode === 'undefined' ? '' : String(agent.thinking_mode)}" data-disabled="${isBuiltin}"></div>
-                    <div class="agent-form-hint">不设置时使用系统默认；开启或关闭则仅对当前智能体生效。</div>
                 </div>
 
                 <div class="agent-form-row agent-form-row-inline">
                     <div class="agent-form-group">
                         <label class="agent-form-label">绑定大模型</label>
                         <div id="af-model-container" data-value="${agent.provider_id && agent.model_name ? `${agent.provider_id}|${agent.model_name}` : ''}" data-placeholder="系统默认模型"></div>
-                        <div class="agent-form-hint">留空则使用全局默认大模型</div>
                     </div>
-                    ${!isBuiltin ? `
-                    <div class="agent-form-group">
-                        <label class="agent-form-label">状态</label>
-                        <div id="af-enabled-container" data-value="${agent.enabled !== false ? 'true' : 'false'}"></div>
-                    </div>
-                    ` : '<input type="hidden" id="af-enabled" value="true">'}
                 </div>
 
                 <div class="agent-form-row">
@@ -468,6 +463,13 @@ const SettingsService = (function () {
                         <input type="checkbox" id="af-default" ${agent.is_default ? 'checked' : ''} ${isBuiltin ? 'disabled' : ''} />
                         设为默认智能体 (启动任务时默认选中)
                     </label>
+                    ${!isBuiltin ? `
+                    <label class="agent-form-label-checkbox" style="margin-left: 20px;">
+                        <input type="hidden" id="af-enabled" value="true">
+                        <input type="checkbox" id="af-enabled-checkbox" ${agent.enabled !== false ? 'checked' : ''} />
+                        启用
+                    </label>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -501,7 +503,7 @@ const SettingsService = (function () {
         const agentType = getCustomSelectValue('af-type-container');
         const modelVal = getCustomSelectValue('af-model-container');
         const thinkingModeVal = getCustomSelectValue('af-thinking-mode-container');
-        const enabled = getCustomSelectValue('af-enabled-container') === 'true';
+        const enabled = document.getElementById('af-enabled-checkbox')?.checked !== false;
         const isDefault = document.getElementById('af-default').checked;
 
         if (!name) { 
@@ -721,7 +723,12 @@ const SettingsService = (function () {
         // Thinking Mode 下拉框
         const thinkingModeContainer = document.getElementById('af-thinking-mode-container');
         if (thinkingModeContainer) {
-            const thinkingModeValue = thinkingModeContainer.dataset.value || '';
+            // 从 data-value 属性获取值，如果没有设置则默认为空字符串（跟随用户实时配置）
+            let thinkingModeValue = thinkingModeContainer.dataset.value;
+            // 确保 null/undefined 都转换为空字符串
+            if (thinkingModeValue === null || thinkingModeValue === undefined || thinkingModeValue === 'null' || thinkingModeValue === 'undefined') {
+                thinkingModeValue = '';
+            }
             const thinkingModeItems = [
                 { value: '', label: '跟随用户实时配置' },
                 { value: 'true', label: '开启 thinking mode' },
@@ -729,7 +736,8 @@ const SettingsService = (function () {
             ];
             new CustomSelect(thinkingModeContainer, {
                 items: thinkingModeItems,
-                selectedValue: thinkingModeValue
+                selectedValue: thinkingModeValue,
+                placeholder: '跟随用户实时配置'
             });
         }
 

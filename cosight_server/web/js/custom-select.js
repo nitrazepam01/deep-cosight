@@ -20,7 +20,7 @@ class CustomSelect {
         };
 
         this.isOpen = false;
-        this.selectedValues = this.options.multiple ? (options.selectedValues || []) : (options.selectedValue || null);
+        this.selectedValues = this.options.multiple ? (options.selectedValues !== undefined ? options.selectedValues : []) : (options.selectedValue !== undefined ? options.selectedValue : null);
         this.items = options.items || [];
         
         this.init();
