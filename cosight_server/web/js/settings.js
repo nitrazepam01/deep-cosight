@@ -1445,21 +1445,6 @@ const AgentRuntimeService = (function () {
             .replace(/"/g, '"').replace(/'/g, '&#039;');
     }
 
-    function showToast(msg, type) {
-        if (typeof window.showToast === 'function') { 
-            window.showToast(msg, type); 
-            return; 
-        }
-        const existing = document.querySelector('.settings-toast');
-        if (existing) existing.remove();
-        const toast = document.createElement('div');
-        toast.className = `settings-toast settings-toast-${type}`;
-        toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i><span>${msg}</span>`;
-        document.body.appendChild(toast);
-        requestAnimationFrame(() => toast.classList.add('show'));
-        setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
-    }
-
     async function fetchRuntimeDefaults() {
         const resp = await fetch(`${API_BASE}/deep-research/runtime-agent-defaults`);
         const json = await resp.json();
@@ -1518,8 +1503,8 @@ const AgentRuntimeService = (function () {
 
         modal.innerHTML = `
             <div class="agent-runtime-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);z-index:10001;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;">
-                <div class="agent-runtime-panel" style="position:relative;width:720px;max-width:92vw;max-height:85vh;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);display:flex;flex-direction:column;overflow:hidden;pointer-events:auto;">
-                    <div class="agent-runtime-header" style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #eee;background:linear-gradient(135deg,#f8f9fa 0%,#fff 100%);">
+                <div class="agent-runtime-panel" style="position:relative;width:720px;max-width:92vw;height:490px;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);display:flex;flex-direction:column;overflow:hidden;pointer-events:auto;">
+                    <div class="agent-runtime-header" style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #eee;background:linear-gradient(135deg,#f8f9fa 0%,#fff 100%);flex-shrink:0;">
                         <h2 style="margin:0;font-size:20px;font-weight:600;color:#333;display:flex;align-items:center;gap:10px;">
                             <i class="fas fa-cog" style="color:#667eea;"></i> 运行时智能体配置
                         </h2>
@@ -1527,7 +1512,7 @@ const AgentRuntimeService = (function () {
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
-                    <div class="agent-runtime-body" style="flex:1;overflow-y:auto;padding:24px;">
+                    <div class="agent-runtime-body" style="flex:1;overflow-y:hidden;padding:24px;">
                         ${renderConfigForm()}
                     </div>
                 </div>
@@ -1548,137 +1533,207 @@ const AgentRuntimeService = (function () {
     }
 
     function renderConfigForm() {
-        const plannerOptions = _planners.map(p => 
-            `<option value="${escapeHtml(p.id)}" ${_config.planner_id === p.id ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
-        ).join('') || '<option value="">无可用 Planner</option>';
+        // 根据分配模式确定提示文字
+        const currentMode = _config.dispatch_mode || 'single_actor';
+        const isSingleActor = currentMode === 'single_actor';
+        const isMultiActor = currentMode === 'multi_actor';
+        const isPlannerAssign = currentMode === 'planner_assign';
 
-        const actorOptions = _actors.map(a => 
-            `<option value="${escapeHtml(a.id)}" ${(_config.allowed_actor_ids || []).includes(a.id) ? 'selected' : ''}>${escapeHtml(a.name)}</option>`
-        ).join('') || '<option value="">无可用 Actor</option>';
-
-        const defaultActorOptions = _actors
-            .filter(a => (_config.allowed_actor_ids || []).includes(a.id))
-            .map(a => `<option value="${escapeHtml(a.id)}" ${_config.default_actor_id === a.id ? 'selected' : ''}>${escapeHtml(a.name)}</option>`)
-            .join('') || '<option value="">请先选择 Actors</option>';
+        // 分配模式卡片的提示文字
+        let modeHintText = '';
+        if (isSingleActor) {
+            modeHintText = '当前使用「默认执行器」处理所有任务';
+        } else if (isMultiActor) {
+            modeHintText = '当前使用「执行器列表」中的多个执行器';
+        } else if (isPlannerAssign) {
+            modeHintText = '当前由规划器根据任务类型智能分配';
+        }
 
         return `
             <div class="agent-runtime-config-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;">
-                <div class="agent-runtime-card" style="background:#fafbfc;border:1px solid #e8e8e8;border-radius:12px;padding:20px;">
-                    <div class="agent-runtime-card-header" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;">
+                <div class="agent-runtime-card" style="background:#fafbfc;border:1px solid #e8e8e8;border-radius:12px;padding:20px;display:flex;flex-direction:column;">
+                    <div class="agent-runtime-card-header" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-shrink:0;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                             <i class="fas fa-brain" style="color:#fff;font-size:18px;"></i>
                         </div>
-                        <div>
-                            <div style="font-size:15px;font-weight:600;color:#333;">Planner</div>
-                            <div style="font-size:12px;color:#888;">任务规划器</div>
+                        <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:18px;font-weight:600;color:#333;">Planner</span>
+                                <span style="font-size:13px;color:#888;">任务规划器</span>
+                            </div>
+                            <span style="font-size:12px;color:#888;">负责任务分解和规划的专业助手</span>
                         </div>
                     </div>
-                    <select id="agent-planner-select" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;background:#fff;outline:none;">
-                        ${plannerOptions}
-                    </select>
-                    <p style="font-size:12px;color:#888;margin-top:8px;">负责任务分解和规划的专业助手</p>
+                    <div id="agent-planner-select-container" data-value="${escapeHtml(_config.planner_id)}" data-placeholder="无可用 Planner" style="flex:1;"></div>
+                    <div style="margin-top:auto;padding-top:10px;flex-shrink:0;">
+                        ${isPlannerAssign ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i> 当前模式正在使用此配置</div>' : '<div style="height:35px;"></div>'}
+                    </div>
                 </div>
 
-                <div class="agent-runtime-card" style="background:#fafbfc;border:1px solid #e8e8e8;border-radius:12px;padding:20px;">
-                    <div class="agent-runtime-card-header" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);display:flex;align-items:center;justify-content:center;">
+                <div class="agent-runtime-card" style="background:#fafbfc;border:1px solid #e8e8e8;border-radius:12px;padding:20px;display:flex;flex-direction:column;">
+                    <div class="agent-runtime-card-header" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-shrink:0;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                             <i class="fas fa-random" style="color:#fff;font-size:18px;"></i>
                         </div>
-                        <div>
-                            <div style="font-size:15px;font-weight:600;color:#333;">分配模式</div>
-                            <div style="font-size:12px;color:#888;">Dispatch Mode</div>
+                        <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:18px;font-weight:600;color:#333;">分配模式</span>
+                                <span style="font-size:13px;color:#888;">Dispatch Mode</span>
+                            </div>
+                            <span style="font-size:12px;color:#888;">选择智能体任务分配策略</span>
                         </div>
                     </div>
-                    <select id="agent-allocation-mode-select" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;background:#fff;outline:none;">
-                        <option value="single_actor" ${_config.dispatch_mode === 'single_actor' ? 'selected' : ''}>Single Actor</option>
-                        <option value="planner_assign" ${_config.dispatch_mode === 'planner_assign' ? 'selected' : ''}>Planner Assign</option>
-                        <option value="multi_actor" ${_config.dispatch_mode === 'multi_actor' ? 'selected' : ''}>Multi Actor</option>
-                    </select>
-                    <p style="font-size:12px;color:#888;margin-top:8px;">选择智能体任务分配策略</p>
+                    <div id="agent-allocation-mode-select-container" data-value="${_config.dispatch_mode || 'single_actor'}" style="flex:1;"></div>
+                    <div style="margin-top:auto;padding-top:10px;flex-shrink:0;">
+                        ${modeHintText ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i> ' + modeHintText + '</div>' : '<div style="height:35px;"></div>'}
+                    </div>
                 </div>
 
-                <div class="agent-runtime-card" style="background:#fafbfc;border:1px solid #e8e8e8;border-radius:12px;padding:20px;">
-                    <div class="agent-runtime-card-header" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);display:flex;align-items:center;justify-content:center;">
+                <div class="agent-runtime-card" style="background:#fafbfc;border:1px solid #e8e8e8;border-radius:12px;padding:20px;display:flex;flex-direction:column;">
+                    <div class="agent-runtime-card-header" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-shrink:0;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                             <i class="fas fa-user" style="color:#fff;font-size:18px;"></i>
                         </div>
-                        <div>
-                            <div style="font-size:15px;font-weight:600;color:#333;">Actor</div>
-                            <div style="font-size:12px;color:#888;">默认执行器</div>
+                        <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:18px;font-weight:600;color:#333;">Actor</span>
+                                <span style="font-size:13px;color:#888;">默认执行器</span>
+                            </div>
+                            <span style="font-size:12px;color:#888;">默认的任务执行智能体</span>
                         </div>
                     </div>
-                    <select id="agent-default-actor-select" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;background:#fff;outline:none;">
-                        ${defaultActorOptions}
-                    </select>
-                    <p style="font-size:12px;color:#888;margin-top:8px;">默认的任务执行智能体</p>
+                    <div id="agent-default-actor-select-container" data-value="${escapeHtml(_config.default_actor_id)}" data-placeholder="请先选择 Actors" style="flex:1;"></div>
+                    <div style="margin-top:auto;padding-top:10px;flex-shrink:0;">
+                        ${isSingleActor ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i> 当前模式正在使用此配置</div>' : '<div style="height:35px;"></div>'}
+                    </div>
                 </div>
 
-                <div class="agent-runtime-card" style="background:#fafbfc;border:1px solid #e8e8e8;border-radius:12px;padding:20px;">
-                    <div class="agent-runtime-card-header" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#43e97b 0%,#38f9d7 100%);display:flex;align-items:center;justify-content:center;">
+                <div class="agent-runtime-card" style="background:#fafbfc;border:1px solid #e8e8e8;border-radius:12px;padding:20px;display:flex;flex-direction:column;">
+                    <div class="agent-runtime-card-header" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-shrink:0;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#43e97b 0%,#38f9d7 100%);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                             <i class="fas fa-users" style="color:#fff;font-size:18px;"></i>
                         </div>
-                        <div>
-                            <div style="font-size:15px;font-weight:600;color:#333;">Actors</div>
-                            <div style="font-size:12px;color:#888;">执行器列表</div>
+                        <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:18px;font-weight:600;color:#333;">Actors</span>
+                                <span style="font-size:13px;color:#888;">执行器列表</span>
+                            </div>
+                            <span style="font-size:12px;color:#888;">按住 Ctrl/Cmd 可多选</span>
                         </div>
                     </div>
-                    <select id="agent-actors-select" multiple style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;background:#fff;outline:none;min-height:80px;">
-                        ${actorOptions}
-                    </select>
-                    <p style="font-size:12px;color:#888;margin-top:8px;">按住 Ctrl/Cmd 可多选</p>
+                    <div id="agent-actors-select-container" data-values="${escapeHtml(JSON.stringify(_config.allowed_actor_ids || []))}" data-placeholder="无可用 Actor" data-multiple="true" style="flex:1;"></div>
+                    <div style="margin-top:auto;padding-top:10px;flex-shrink:0;">
+                        ${isMultiActor ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i> 当前模式正在使用此配置</div>' : '<div style="height:35px;"></div>'}
+                    </div>
                 </div>
-            </div>
-
-            <div class="agent-runtime-actions" style="display:flex;justify-content:center;gap:12px;margin-top:24px;padding-top:20px;border-top:1px solid #f0f0f0;">
-                <button id="agent-cancel-btn" type="button" style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border:1px solid #ddd;border-radius:10px;background:#fff;color:#555;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s;">
-                    <i class="fas fa-times"></i> 取消
-                </button>
-                <button id="agent-save-btn" type="button" style="display:inline-flex;align-items:center;gap:6px;padding:10px 24px;border:none;border-radius:10px;background:linear-gradient(135deg,#43e97b 0%,#38f9d7 100%);color:#fff;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 12px rgba(67,233,123,0.3);">
-                    <i class="fas fa-save"></i> 保存配置
-                </button>
             </div>
         `;
     }
 
     function bindEvents() {
-        const actorsSelect = document.getElementById('agent-actors-select');
-        const defaultActorSelect = document.getElementById('agent-default-actor-select');
-        const saveBtn = document.getElementById('agent-save-btn');
-        const cancelBtn = document.getElementById('agent-cancel-btn');
+        // 使用自定义下拉组件
+        const plannerContainer = document.getElementById('agent-planner-select-container');
+        const modeContainer = document.getElementById('agent-allocation-mode-select-container');
+        const defaultActorContainer = document.getElementById('agent-default-actor-select-container');
+        const actorsContainer = document.getElementById('agent-actors-select-container');
 
-        if (actorsSelect) {
-            actorsSelect.addEventListener('change', function() {
-                const selectedIds = Array.from(actorsSelect.selectedOptions).map(o => o.value);
-                const selectedActors = _actors.filter(a => selectedIds.includes(a.id));
-                if (defaultActorSelect) {
-                    defaultActorSelect.innerHTML = selectedActors.map(a => 
-                        `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name)}</option>`
-                    ).join('') || '<option value="">无可用 Actor</option>';
+        // 构建分配模式选项
+        const allocationModeItems = [
+            { value: 'single_actor', label: 'Single Actor' },
+            { value: 'planner_assign', label: 'Planner Assign' },
+            { value: 'multi_actor', label: 'Multi Actor' }
+        ];
+
+        // 初始化 Planner 下拉框
+        if (plannerContainer && typeof CustomSelect !== 'undefined') {
+            const plannerValue = plannerContainer.dataset.value || '';
+            new CustomSelect(plannerContainer, {
+                items: _planners.map(p => ({ value: p.id, label: p.name })),
+                placeholder: plannerContainer.dataset.placeholder || '请选择 Planner',
+                selectedValue: plannerValue,
+                onChange: function(value) {
+                    _config.planner_id = value;
+                    saveConfigAndRefresh();
                 }
             });
         }
 
-        if (saveBtn) {
-            saveBtn.addEventListener('click', function() {
-                const plannerId = document.getElementById('agent-planner-select')?.value || '';
-                const allowedActorIds = Array.from(document.getElementById('agent-actors-select')?.selectedOptions || []).map(o => o.value);
-                const defaultActorId = document.getElementById('agent-default-actor-select')?.value || '';
-                const dispatchMode = document.getElementById('agent-allocation-mode-select')?.value || 'single_actor';
-
-                _config = { planner_id: plannerId, allowed_actor_ids: allowedActorIds, default_actor_id: defaultActorId, dispatch_mode: dispatchMode };
-
-                if (saveConfig()) {
-                    showToast('配置已保存', 'success');
-                    setTimeout(() => close(), 800);
-                } else {
-                    showToast('保存失败', 'error');
+        // 初始化分配模式下拉框
+        if (modeContainer && typeof CustomSelect !== 'undefined') {
+            const modeValue = modeContainer.dataset.value || 'single_actor';
+            new CustomSelect(modeContainer, {
+                items: allocationModeItems,
+                placeholder: '请选择分配模式',
+                selectedValue: modeValue,
+                onChange: function(value) {
+                    _config.dispatch_mode = value;
+                    saveConfigAndRefresh();
                 }
             });
         }
 
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', function() { close(); });
+        // 初始化默认 Actor 下拉框
+        if (defaultActorContainer && typeof CustomSelect !== 'undefined') {
+            const defaultActorValue = defaultActorContainer.dataset.value || '';
+            const allowedIds = _config.allowed_actor_ids || [];
+            const availableActors = _actors.filter(a => allowedIds.includes(a.id));
+            new CustomSelect(defaultActorContainer, {
+                items: availableActors.map(a => ({ value: a.id, label: a.name })),
+                placeholder: defaultActorContainer.dataset.placeholder || '请先选择 Actors',
+                selectedValue: defaultActorValue,
+                onChange: function(value) {
+                    _config.default_actor_id = value;
+                    saveConfigAndRefresh();
+                }
+            });
+        }
+
+        // 初始化 Actors 多选下拉框
+        if (actorsContainer && typeof CustomSelect !== 'undefined') {
+            let allowedActorIds = [];
+            try {
+                allowedActorIds = JSON.parse(actorsContainer.dataset.values || '[]');
+            } catch (e) {
+                allowedActorIds = [];
+            }
+            new CustomSelect(actorsContainer, {
+                items: _actors.map(a => ({ value: a.id, label: a.name })),
+                placeholder: actorsContainer.dataset.placeholder || '请选择 Actors',
+                multiple: true,
+                searchable: true,
+                selectedValues: allowedActorIds,
+                onChange: function(values) {
+                    _config.allowed_actor_ids = values;
+                    _config.default_actor_id = values.length > 0 ? values[0] : '';
+                    // 更新默认 Actor 下拉框的选项
+                    const defaultActorContainer2 = document.getElementById('agent-default-actor-select-container');
+                    if (defaultActorContainer2) {
+                        const selectedActors = _actors.filter(a => values.includes(a.id));
+                        const defaultActorSelect = defaultActorContainer2.querySelector('.custom-select-display');
+                        if (defaultActorSelect && typeof CustomSelect !== 'undefined') {
+                            // 重新渲染默认 Actor 下拉框
+                            const currentDefaultValue = defaultActorContainer2.dataset.value || '';
+                            defaultActorContainer2.innerHTML = '';
+                            new CustomSelect(defaultActorContainer2, {
+                                items: selectedActors.map(a => ({ value: a.id, label: a.name })),
+                                placeholder: '请先选择 Actors',
+                                selectedValue: currentDefaultValue,
+                                onChange: function(value) {
+                                    _config.default_actor_id = value;
+                                    saveConfigAndRefresh();
+                                }
+                            });
+                        }
+                    }
+                    saveConfigAndRefresh();
+                }
+            });
+        }
+    }
+
+    function saveConfigAndRefresh() {
+        if (saveConfig()) {
+            renderPanel();
         }
     }
 
