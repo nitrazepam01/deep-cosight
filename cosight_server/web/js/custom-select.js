@@ -38,9 +38,7 @@ class CustomSelect {
                 : item.value === this.selectedValues
         );
 
-        const displayText = selectedItems.length > 0
-            ? selectedItems.map(item => item.label).join(', ')
-            : this.options.placeholder;
+        const displayText = this.getDisplayText(selectedItems);
 
         this.container.innerHTML = `
             <div class="custom-select-wrapper">
@@ -67,6 +65,29 @@ class CustomSelect {
         this.optionsEl = this.container.querySelector('.custom-select-options');
         this.arrowEl = this.container.querySelector('.custom-select-arrow');
         this.searchInputEl = this.container.querySelector('.custom-select-search-input');
+
+        // 初始化时设置 data 属性
+        if (this.options.multiple) {
+            this.displayEl.dataset.selectedValues = JSON.stringify(this.selectedValues);
+        } else {
+            this.displayEl.dataset.value = this.selectedValues !== null ? String(this.selectedValues) : '';
+        }
+    }
+
+    getDisplayText(selectedItems) {
+        if (selectedItems.length === 0) {
+            return this.options.placeholder;
+        }
+        
+        if (this.options.multiple) {
+            // 多选模式下，按"-"分割只展示简要部分（第一部分）
+            return selectedItems.map(item => {
+                const parts = item.label.split(' - ');
+                return parts[0].trim();
+            }).join(', ');
+        }
+        
+        return selectedItems.map(item => item.label).join(', ');
     }
 
     renderOption(item) {
@@ -112,6 +133,7 @@ class CustomSelect {
         this.optionsEl.addEventListener('click', (e) => {
             const optionEl = e.target.closest('.custom-select-option');
             if (optionEl) {
+                e.stopPropagation();
                 this.selectOption(optionEl.dataset.value);
             }
         });
@@ -139,7 +161,6 @@ class CustomSelect {
         let closeTimeout = null;
         
         this.container.addEventListener('mouseenter', (e) => {
-            // 鼠标进入时清除关闭定时器
             if (closeTimeout) {
                 clearTimeout(closeTimeout);
                 closeTimeout = null;
@@ -147,15 +168,13 @@ class CustomSelect {
         });
         
         this.container.addEventListener('mouseleave', (e) => {
-            // 鼠标离开时设置延时关闭
             closeTimeout = setTimeout(() => {
                 if (this.isOpen) {
                     this.close();
                 }
-            }, 50); // 50ms 延时
+            }, 50);
         });
         
-        // 下拉菜单也要添加相同的行为
         this.dropdownEl.addEventListener('mouseenter', (e) => {
             if (closeTimeout) {
                 clearTimeout(closeTimeout);
@@ -227,9 +246,7 @@ class CustomSelect {
                 : item.value === this.selectedValues
         );
 
-        const displayText = selectedItems.length > 0
-            ? selectedItems.map(item => item.label).join(', ')
-            : this.options.placeholder;
+        const displayText = this.getDisplayText(selectedItems);
 
         const displayTextEl = this.container.querySelector('.custom-select-display-text');
         if (displayTextEl) {
@@ -274,7 +291,6 @@ class CustomSelect {
 
 // 全局工具函数：将页面中的原生 select 替换为自定义下拉组件
 window.initCustomSelects = function() {
-    // 查找所有带有 data-custom-select 属性的 select 元素
     const selects = document.querySelectorAll('select[data-custom-select]');
     selects.forEach(selectEl => {
         const container = selectEl.parentElement;
@@ -295,7 +311,6 @@ window.initCustomSelects = function() {
             }
         });
 
-        // 隐藏原生 select
         selectEl.style.display = 'none';
     });
 };

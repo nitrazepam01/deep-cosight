@@ -423,12 +423,12 @@ const SettingsService = (function () {
 
                 <div class="agent-form-row">
                     <label class="agent-form-label">智能体名称</label>
-                    <input type="text" id="af-name" class="agent-form-input" value="${AgentManagementService.escapeHtml(agent.name)}" placeholder="例如：前端开发专家" ${isBuiltin ? 'readonly' : ''} />
+                    <input type="text" id="af-name" class="agent-form-input" value="${AgentManagementService.escapeHtml(agent.name)}" placeholder="例如：前端开发专家" maxlength="15" ${isBuiltin ? 'readonly' : ''} />
                 </div>
 
                 <div class="agent-form-row">
                     <label class="agent-form-label">智能体描述</label>
-                    <input type="text" id="af-desc" class="agent-form-input" value="${AgentManagementService.escapeHtml(agent.description)}" placeholder="该智能体的职责简介" ${isBuiltin ? 'readonly' : ''} />
+                    <input type="text" id="af-desc" class="agent-form-input" value="${AgentManagementService.escapeHtml(agent.description)}" placeholder="该智能体的职责简介" maxlength="45" ${isBuiltin ? 'readonly' : ''} />
                 </div>
 
                 <div class="agent-form-row">

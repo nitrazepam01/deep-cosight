@@ -4949,6 +4949,13 @@ select.settings-input option:checked {
 
 .custom-select-option-label {
     flex: 1;
+}
+
+/* 多选模式下的提示文字样式 - 减小字号 */
+.agent-form-hint {
+    font-size: 10px;
+    color: #888;
+    font-weight: normal;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
