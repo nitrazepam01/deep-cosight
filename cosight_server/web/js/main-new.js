@@ -2383,6 +2383,9 @@ function initThreeColumnLayout() {
     // 初始化气泡颜色主题
     initBubbleColorTheme();
     
+    // 初始化 THINKING_MODE 状态
+    initThinkingMode();
+    
     // 初始化 WebSocket 连接（必须在其他初始化之前）
     if (window.WebSocketService) {
         WebSocketService.initWebSocket();
@@ -2537,6 +2540,40 @@ function showTestContentAsAIReply(content) {
     console.log("测试内容已作为 AI 回复显示");
 }
 
+// ==================== THINKING_MODE 切换功能 ====================
+
+// THINKING_MODE 状态管理
+let thinkingModeEnabled = false;
+
+// 初始化 THINKING_MODE 状态
+function initThinkingMode() {
+    const savedState = localStorage.getItem('cosight:thinkingMode');
+    thinkingModeEnabled = savedState === 'true';
+    updateThinkingModeButton();
+}
+
+// 更新深度思考按钮状态
+function updateThinkingModeButton() {
+    const btn = document.getElementById('thinking-mode-btn');
+    if (btn) {
+        if (thinkingModeEnabled) {
+            btn.classList.add('active');
+            btn.setAttribute('title', '深度思考：开启');
+        } else {
+            btn.classList.remove('active');
+            btn.setAttribute('title', '深度思考：关闭');
+        }
+    }
+}
+
+// 切换 THINKING_MODE
+function toggleThinkingMode() {
+    thinkingModeEnabled = !thinkingModeEnabled;
+    localStorage.setItem('cosight:thinkingMode', thinkingModeEnabled.toString());
+    updateThinkingModeButton();
+    console.log('Thinking Mode:', thinkingModeEnabled ? '已开启' : '已关闭');
+}
+
 // 暴露到全局
 window.AppState = AppState;
 window.updateProgressStats = updateProgressStats;
@@ -2546,3 +2583,4 @@ window.toggleRightSidebar = toggleRightSidebar;
 window.createThread = createNewThread;
 window.getThreadById = getThreadById;
 window.handleTestCommand = handleTestCommand;
+window.toggleThinkingMode = toggleThinkingMode;

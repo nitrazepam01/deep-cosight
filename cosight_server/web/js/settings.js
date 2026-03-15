@@ -109,17 +109,17 @@ const SettingsService = (function () {
         }
 
         if (isInitialRender) {
-            // 构建侧边栏：先加"大模型"，再加"智能体"，再加"个性化"，再加原有分组
+            // 构建侧边栏：先加"智能体"，再加"大模型"，再加"个性化"，再加原有分组
             const sidebarItems = `
-                <div class="settings-sidebar-item ${'providers' === _activeGroup ? 'active' : ''}" 
-                     data-group="providers" onclick="SettingsService.switchGroup('providers')">
-                    <i class="fas fa-cube"></i>
-                    <span>大模型</span>
-                </div>
                 <div class="settings-sidebar-item ${'agents' === _activeGroup ? 'active' : ''}" 
                      data-group="agents" onclick="SettingsService.switchGroup('agents')">
                     <i class="fas fa-robot"></i>
                     <span>智能体</span>
+                </div>
+                <div class="settings-sidebar-item ${'providers' === _activeGroup ? 'active' : ''}" 
+                     data-group="providers" onclick="SettingsService.switchGroup('providers')">
+                    <i class="fas fa-cube"></i>
+                    <span>大模型</span>
                 </div>
                 <div class="settings-sidebar-item ${'personalization' === _activeGroup ? 'active' : ''}" 
                      data-group="personalization" onclick="SettingsService.switchGroup('personalization')">
@@ -568,7 +568,17 @@ const SettingsService = (function () {
         try {
             await AgentManagementService.saveAgent(data);
             AgentManagementService.showToast('保存成功', 'success');
-            refreshAgentsPage();
+            // 保存成功后重置状态并刷新列表
+            _agentEditingId = null;
+            _agentIsAdding = false;
+            // 重新加载智能体数据
+            await AgentManagementService.init();
+            // 渲染列表页
+            const contentDiv = document.getElementById('settings-content-area');
+            if (contentDiv) {
+                contentDiv.innerHTML = renderAgentList();
+                bindAgentListEvents();
+            }
         } catch (e) {
             AgentManagementService.showToast('保存失败：' + e.message, 'error');
         }
@@ -602,10 +612,17 @@ const SettingsService = (function () {
                     try {
                         await AgentManagementService.deleteAgent(agentId);
                         AgentManagementService.showToast('删除成功', 'success');
-                        // 删除成功后返回列表页并刷新
+                        // 删除成功后重置状态并刷新列表
                         _agentEditingId = null;
                         _agentIsAdding = false;
-                        refreshAgentsPage();
+                        // 重新加载智能体数据
+                        await AgentManagementService.init();
+                        // 渲染列表页
+                        const contentDiv = document.getElementById('settings-content-area');
+                        if (contentDiv) {
+                            contentDiv.innerHTML = renderAgentList();
+                            bindAgentListEvents();
+                        }
                     } catch (e) {
                         AgentManagementService.showToast('删除失败：' + e.message, 'error');
                     }
@@ -1172,6 +1189,11 @@ const SettingsService = (function () {
 
     function switchGroup(groupName) {
         _activeGroup = groupName;
+        // 切换到智能体页面时，重置编辑状态，始终显示列表页
+        if (groupName === 'agents') {
+            _agentEditingId = null;
+            _agentIsAdding = false;
+        }
         if (_currentData) renderModal(_currentData, false);
     }
 
@@ -1190,6 +1212,11 @@ const SettingsService = (function () {
         try {
             const [groups, providers] = await Promise.all([fetchSettings(), fetchProviders()]);
             _providers = providers;
+            // 重置所有编辑状态
+            _agentEditingId = null;
+            _agentIsAdding = false;
+            _isAddingProvider = false;
+            _editingProvider = null;
             // 预加载智能体数据
             if (typeof AgentManagementService !== 'undefined') {
                 await AgentManagementService.init();
@@ -1213,6 +1240,9 @@ const SettingsService = (function () {
         _activeGroup = null;
         _isAddingProvider = false;
         _editingProvider = null;
+        // 重置智能体编辑状态
+        _agentEditingId = null;
+        _agentIsAdding = false;
     }
 
     async function save() {

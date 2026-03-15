@@ -2983,6 +2983,32 @@ select.settings-input option:checked {
     border-color: #059669;
 }
 
+/* ========== 深度思考按钮（输入区域） ========== */
+.btn-input-action#thinking-mode-btn {
+    background: #f3f4f6;
+    color: #9ca3af;
+    border: 1px solid #e5e7eb;
+}
+
+.btn-input-action#thinking-mode-btn:hover {
+    background: #e5e7eb;
+    color: #6b7280;
+    border-color: #d1d5db;
+}
+
+/* 深度思考按钮激活状态 - 蓝色 */
+.btn-input-action#thinking-mode-btn.active {
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    color: #1976d2;
+    border-color: #2196f3;
+}
+
+.btn-input-action#thinking-mode-btn.active:hover {
+    background: linear-gradient(135deg, #bbdefb, #90caf9);
+    color: #1565c0;
+    border-color: #1976d2;
+}
+
 /* ========== 知识库弹窗样式 ========== */
 #knowledge-modal {
     display: none;
