@@ -377,25 +377,19 @@ const SettingsService = (function () {
         
         const isBuiltin = agent.builtin;
 
-        // 构建模型选项
-        let modelOptions = '<option value="">-- 系统默认模型 --</option>';
+        // 构建模型选项 - 用于自定义下拉框
+        const modelItems = [];
         providers.forEach(p => {
-            modelOptions += `<optgroup label="${AgentManagementService.escapeHtml(p.name)}">`;
             (p.models || []).forEach(m => {
-                const val = `${p.id}|${m}`;
-                const currentVal = `${agent.provider_id}|${agent.model_name}`;
-                modelOptions += `<option value="${AgentManagementService.escapeHtml(val)}" ${val === currentVal ? 'selected' : ''}>${AgentManagementService.escapeHtml(m)}</option>`;
+                modelItems.push({
+                    value: `${p.id}|${m}`,
+                    label: `${p.name} / ${m}`,
+                    group: p.name
+                });
             });
-            modelOptions += `</optgroup>`;
         });
 
         const builtinBadge = isBuiltin ? `<span class="agent-badge agent-badge-locked"><i class="fas fa-lock"></i> 系统内置</span>` : '';
-
-        // 技能选项
-        const skillOptions = skills.map(skill => {
-            const selected = (agent.skills || []).includes(skill.name) ? 'selected' : '';
-            return `<option value="${AgentManagementService.escapeHtml(skill.name)}" ${selected}>${AgentManagementService.escapeHtml(skill.display_name_zh)} - ${AgentManagementService.escapeHtml(skill.description_zh)}</option>`;
-        }).join('');
 
         const actionButtons = !isBuiltin ? `
             <div class="agent-form-header-actions">
@@ -435,17 +429,12 @@ const SettingsService = (function () {
 
                 <div class="agent-form-row">
                     <label class="agent-form-label">智能体类型</label>
-                    <select id="af-type" class="agent-form-input" ${isBuiltin ? 'disabled' : ''}>
-                        <option value="actor" ${agent.agent_type === 'actor' || !agent.agent_type ? 'selected' : ''}>执行者 (Actor)</option>
-                        <option value="planner" ${agent.agent_type === 'planner' ? 'selected' : ''}>规划者 (Planner)</option>
-                    </select>
+                    <div id="af-type-container" data-value="${agent.agent_type || 'actor'}" data-disabled="${isBuiltin}"></div>
                 </div>
 
                 <div class="agent-form-row" id="skills-container" style="display: ${agent.agent_type === 'planner' ? 'none' : 'block'}">
-                    <label class="agent-form-label">执行技能配置 <span class="agent-form-hint">（按住 Ctrl/Cmd 多选）</span></label>
-                    <select id="af-skills" class="agent-form-input" multiple size="6" ${isBuiltin ? 'disabled' : ''}>
-                        ${skillOptions}
-                    </select>
+                    <label class="agent-form-label">执行技能配置 <span class="agent-form-hint">（可多选）</span></label>
+                    <div id="af-skills-container" data-values="${AgentManagementService.escapeHtml(JSON.stringify(agent.skills || []))}" data-disabled="${isBuiltin}"></div>
                     <div class="agent-form-hint">仅 Actor 类型的智能体可配置执行技能。</div>
                 </div>
 
@@ -456,27 +445,20 @@ const SettingsService = (function () {
 
                 <div class="agent-form-row">
                     <label class="agent-form-label">Thinking Mode</label>
-                    <select id="af-thinking-mode" class="agent-form-input">
-                        <option value="" ${agent.thinking_mode === null || typeof agent.thinking_mode === 'undefined' ? 'selected' : ''}>继承系统默认</option>
-                        <option value="true" ${agent.thinking_mode === true ? 'selected' : ''}>开启 thinking mode</option>
-                        <option value="false" ${agent.thinking_mode === false ? 'selected' : ''}>关闭 thinking mode</option>
-                    </select>
+                    <div id="af-thinking-mode-container" data-value="${agent.thinking_mode === null || typeof agent.thinking_mode === 'undefined' ? '' : String(agent.thinking_mode)}" data-disabled="${isBuiltin}"></div>
                     <div class="agent-form-hint">不设置时使用系统默认；开启或关闭则仅对当前智能体生效。</div>
                 </div>
 
                 <div class="agent-form-row agent-form-row-inline">
                     <div class="agent-form-group">
                         <label class="agent-form-label">绑定大模型</label>
-                        <select id="af-model" class="agent-form-input">${modelOptions}</select>
+                        <div id="af-model-container" data-value="${agent.provider_id && agent.model_name ? `${agent.provider_id}|${agent.model_name}` : ''}" data-placeholder="系统默认模型"></div>
                         <div class="agent-form-hint">留空则使用全局默认大模型</div>
                     </div>
                     ${!isBuiltin ? `
                     <div class="agent-form-group">
                         <label class="agent-form-label">状态</label>
-                        <select id="af-enabled" class="agent-form-input">
-                            <option value="true" ${agent.enabled !== false ? 'selected' : ''}>启用</option>
-                            <option value="false" ${agent.enabled === false ? 'selected' : ''}>停用</option>
-                        </select>
+                        <div id="af-enabled-container" data-value="${agent.enabled !== false ? 'true' : 'false'}"></div>
                     </div>
                     ` : '<input type="hidden" id="af-enabled" value="true">'}
                 </div>
@@ -514,10 +496,12 @@ const SettingsService = (function () {
         const name = document.getElementById('af-name').value.trim();
         const description = document.getElementById('af-desc').value.trim();
         const systemPrompt = document.getElementById('af-prompt').value.trim();
-        const modelVal = document.getElementById('af-model').value;
-        const thinkingModeVal = document.getElementById('af-thinking-mode')?.value ?? '';
-        const enabledEl = document.getElementById('af-enabled');
-        const enabled = enabledEl ? enabledEl.value === 'true' : true;
+        
+        // 从自定义下拉框获取值 - 通过 CustomSelect 实例
+        const agentType = getCustomSelectValue('af-type-container');
+        const modelVal = getCustomSelectValue('af-model-container');
+        const thinkingModeVal = getCustomSelectValue('af-thinking-mode-container');
+        const enabled = getCustomSelectValue('af-enabled-container') === 'true';
         const isDefault = document.getElementById('af-default').checked;
 
         if (!name) { 
@@ -532,13 +516,9 @@ const SettingsService = (function () {
             modelName = parts[1] || '';
         }
 
-        const agentType = document.getElementById('af-type')?.value || 'actor';
         let skills = [];
         if (agentType === 'actor') {
-            const skillsEl = document.getElementById('af-skills');
-            if (skillsEl) {
-                skills = Array.from(skillsEl.selectedOptions).map(opt => opt.value);
-            }
+            skills = getCustomSelectValues('af-skills-container');
             // Actor 类型的智能体必须至少选择一个技能
             if (skills.length === 0) {
                 AgentManagementService.showToast('执行者 (Actor) 类型的智能体必须至少配置 1 个技能', 'error');
@@ -581,6 +561,34 @@ const SettingsService = (function () {
             }
         } catch (e) {
             AgentManagementService.showToast('保存失败：' + e.message, 'error');
+        }
+    }
+
+    // 从自定义下拉框获取单选值
+    function getCustomSelectValue(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return null;
+        const wrapper = container.querySelector('.custom-select-wrapper');
+        if (!wrapper) return null;
+        const display = wrapper.querySelector('.custom-select-display');
+        if (!display) return null;
+        return display.dataset.value;
+    }
+
+    // 从自定义下拉框获取多选值
+    function getCustomSelectValues(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return [];
+        const wrapper = container.querySelector('.custom-select-wrapper');
+        if (!wrapper) return [];
+        const display = wrapper.querySelector('.custom-select-display');
+        if (!display) return [];
+        const selectedValues = display.dataset.selectedValues;
+        if (!selectedValues) return [];
+        try {
+            return JSON.parse(selectedValues);
+        } catch (e) {
+            return [];
         }
     }
 
@@ -678,6 +686,110 @@ const SettingsService = (function () {
                 if (skillsContainer) {
                     skillsContainer.style.display = typeSelect.value === 'actor' ? 'block' : 'none';
                 }
+            });
+        }
+
+        // 初始化自定义下拉框
+        initAgentFormCustomSelects();
+    }
+
+    // 初始化智能体表单中的自定义下拉框
+    function initAgentFormCustomSelects() {
+        if (typeof CustomSelect === 'undefined') return;
+
+        // 智能体类型下拉框
+        const typeContainer = document.getElementById('af-type-container');
+        if (typeContainer) {
+            const typeValue = typeContainer.dataset.value || 'actor';
+            const typeDisabled = typeContainer.dataset.disabled === 'true';
+            const typeItems = [
+                { value: 'actor', label: '执行者 (Actor)' },
+                { value: 'planner', label: '规划者 (Planner)' }
+            ];
+            new CustomSelect(typeContainer, {
+                items: typeItems,
+                selectedValue: typeValue,
+                onChange: function(value) {
+                    const skillsContainer = document.getElementById('skills-container');
+                    if (skillsContainer) {
+                        skillsContainer.style.display = value === 'actor' ? 'block' : 'none';
+                    }
+                }
+            });
+        }
+
+        // Thinking Mode 下拉框
+        const thinkingModeContainer = document.getElementById('af-thinking-mode-container');
+        if (thinkingModeContainer) {
+            const thinkingModeValue = thinkingModeContainer.dataset.value || '';
+            const thinkingModeItems = [
+                { value: '', label: '跟随用户实时配置' },
+                { value: 'true', label: '开启 thinking mode' },
+                { value: 'false', label: '关闭 thinking mode' }
+            ];
+            new CustomSelect(thinkingModeContainer, {
+                items: thinkingModeItems,
+                selectedValue: thinkingModeValue
+            });
+        }
+
+        // 绑定大模型下拉框
+        const modelContainer = document.getElementById('af-model-container');
+        if (modelContainer) {
+            const modelValue = modelContainer.dataset.value || '';
+            const modelPlaceholder = modelContainer.dataset.placeholder || '系统默认模型';
+            const providers = AgentManagementService.getProviders();
+            const modelItems = [];
+            providers.forEach(p => {
+                (p.models || []).forEach(m => {
+                    modelItems.push({
+                        value: `${p.id}|${m}`,
+                        label: `${p.name} / ${m}`
+                    });
+                });
+            });
+            new CustomSelect(modelContainer, {
+                items: modelItems,
+                placeholder: modelPlaceholder,
+                selectedValue: modelValue
+            });
+        }
+
+        // 状态下拉框
+        const enabledContainer = document.getElementById('af-enabled-container');
+        if (enabledContainer) {
+            const enabledValue = enabledContainer.dataset.value || 'true';
+            const enabledItems = [
+                { value: 'true', label: '启用' },
+                { value: 'false', label: '停用' }
+            ];
+            new CustomSelect(enabledContainer, {
+                items: enabledItems,
+                selectedValue: enabledValue
+            });
+        }
+
+        // 执行技能多选下拉框
+        const skillsContainer = document.getElementById('af-skills-container');
+        if (skillsContainer) {
+            let skillsValues = [];
+            try {
+                skillsValues = JSON.parse(skillsContainer.dataset.values || '[]');
+            } catch (e) {
+                skillsValues = [];
+            }
+            const skillsDisabled = skillsContainer.dataset.disabled === 'true';
+            const skills = AgentManagementService.getAvailableSkills();
+            const skillsItems = skills.map(skill => ({
+                value: skill.name,
+                label: `${skill.display_name_zh} - ${skill.description_zh}`
+            }));
+            new CustomSelect(skillsContainer, {
+                items: skillsItems,
+                multiple: true,
+                searchable: true,
+                selectedValues: skillsValues,
+                placeholder: '请选择执行技能'
             });
         }
     }
@@ -1183,8 +1295,10 @@ const SettingsService = (function () {
 
     function escapeHtml(str) {
         if (!str) return '';
-        return str.replace(/&/g, '&').replace(/</g, '<')
-            .replace(/>/g, '>').replace(/"/g, '"');
+        // 使用与 main-new.js 一致的方式：创建临时 div 元素，使用 textContent 转义
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 
     function switchGroup(groupName) {
@@ -1318,10 +1432,12 @@ const SettingsService = (function () {
 
         const toast = document.createElement('div');
         toast.className = `settings-toast settings-toast-${type}`;
-        toast.innerHTML = `
-            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
-            <span>${message}</span>
-        `;
+        // 使用 textContent 设置消息内容，避免 HTML 转义问题
+        toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i><span></span>`;
+        const span = toast.querySelector('span');
+        if (span) {
+            span.textContent = message;
+        }
         document.body.appendChild(toast);
 
         requestAnimationFrame(() => toast.classList.add('show'));
@@ -1399,10 +1515,12 @@ const AgentConfigService = (function () {
 
         const toast = document.createElement('div');
         toast.className = `settings-toast settings-toast-${type}`;
-        toast.innerHTML = `
-            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
-            <span>${message}</span>
-        `;
+        // 使用 textContent 设置消息内容，避免 HTML 转义问题
+        toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i><span></span>`;
+        const span = toast.querySelector('span');
+        if (span) {
+            span.textContent = message;
+        }
         document.body.appendChild(toast);
 
         requestAnimationFrame(() => toast.classList.add('show'));
@@ -1441,8 +1559,10 @@ const AgentRuntimeService = (function () {
 
     function escapeHtml(str) {
         if (!str) return '';
-        return String(str).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>')
-            .replace(/"/g, '"').replace(/'/g, '&#039;');
+        // 使用与 main-new.js 一致的方式：创建临时 div 元素，使用 textContent 转义
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 
     async function fetchRuntimeDefaults() {

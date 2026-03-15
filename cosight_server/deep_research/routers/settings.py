@@ -299,8 +299,8 @@ async def get_settings():
 
         return json_result(0, "success", {"groups": groups})
     except Exception as e:
-        logger.error(f"读取设置失败: {str(e)}", exc_info=True)
-        return json_result(-1, f"读取设置失败: {str(e)}", None)
+        logger.error(f"读取设置失败：{str(e)}", exc_info=True)
+        return json_result(-1, f"读取设置失败：{str(e)}", None)
 
 
 class SettingsUpdateRequest(BaseModel):
@@ -332,13 +332,13 @@ async def save_settings(body: SettingsUpdateRequest):
             for k, v in updates.items():
                 os.environ[k] = v
 
-            logger.info(f"设置已保存，更新了 {len(updates)} 个配置项: {list(updates.keys())}")
+            logger.info(f"设置已保存，更新了 {len(updates)} 个配置项：{list(updates.keys())}")
             return json_result(0, "保存成功", {"updated_keys": list(updates.keys())})
         else:
             return json_result(0, "无需更新", {"updated_keys": []})
     except Exception as e:
-        logger.error(f"保存设置失败: {str(e)}", exc_info=True)
-        return json_result(-1, f"保存设置失败: {str(e)}", None)
+        logger.error(f"保存设置失败：{str(e)}", exc_info=True)
+        return json_result(-1, f"保存设置失败：{str(e)}", None)
 
 
 # ==================== 供应商管理 ====================
@@ -359,7 +359,7 @@ def _read_providers() -> List[dict]:
             data = json.load(f)
         return data if isinstance(data, list) else []
     except Exception as e:
-        logger.warning(f"读取 providers.json 失败: {e}")
+        logger.warning(f"读取 providers.json 失败：{e}")
         return []
 
 
@@ -384,8 +384,8 @@ async def get_providers():
             safe_providers.append(sp)
         return json_result(0, "success", {"providers": safe_providers})
     except Exception as e:
-        logger.error(f"获取供应商列表失败: {e}", exc_info=True)
-        return json_result(-1, f"获取供应商列表失败: {str(e)}", None)
+        logger.error(f"获取供应商列表失败：{e}", exc_info=True)
+        return json_result(-1, f"获取供应商列表失败：{str(e)}", None)
 
 
 class ProvidersUpdateRequest(BaseModel):
@@ -415,8 +415,8 @@ async def save_providers(body: ProvidersUpdateRequest):
         logger.info(f"供应商列表已保存，共 {len(new_providers)} 个")
         return json_result(0, "保存成功", {"count": len(new_providers)})
     except Exception as e:
-        logger.error(f"保存供应商列表失败: {e}", exc_info=True)
-        return json_result(-1, f"保存失败: {str(e)}", None)
+        logger.error(f"保存供应商列表失败：{e}", exc_info=True)
+        return json_result(-1, f"保存失败：{str(e)}", None)
 
 
 class ProviderTestRequest(BaseModel):
@@ -446,7 +446,7 @@ async def test_provider(body: ProviderTestRequest):
         base_url = provider["base_url"]
         test_model = body.model
 
-        logger.info(f"测试供应商连接: base_url={base_url}, model={test_model}, api_key长度={len(api_key)}")
+        logger.info(f"测试供应商连接：base_url={base_url}, model={test_model}, api_key 长度={len(api_key)}")
 
         # 与 llm.py set_model() 完全一致的 httpx 客户端配置
         http_client = httpx.Client(
@@ -484,7 +484,7 @@ async def test_provider(body: ProviderTestRequest):
         latency_ms = int((time.monotonic() - start) * 1000)
 
         actual_model = response.model or test_model
-        logger.info(f"测试供应商成功: model={actual_model}, latency={latency_ms}ms")
+        logger.info(f"测试供应商成功：model={actual_model}, latency={latency_ms}ms")
 
         http_client.close()
 
@@ -494,16 +494,16 @@ async def test_provider(body: ProviderTestRequest):
         })
     except Exception as e:
         error_msg = str(e)
-        logger.error(f"测试供应商连接失败: {error_msg}")
+        logger.error(f"测试供应商连接失败：{error_msg}")
 
         if "timeout" in error_msg.lower():
-            return json_result(-1, "连接超时（30秒）", None)
+            return json_result(-1, "连接超时（30 秒）", None)
         elif "401" in error_msg or "Unauthorized" in error_msg:
             return json_result(-1, "认证失败：API Key 无效或已过期", {"error": error_msg})
         elif "404" in error_msg:
             return json_result(-1, "接口地址错误：未找到 chat/completions 端点", {"error": error_msg})
         else:
-            return json_result(-1, f"连接失败: {error_msg[:200]}", {"error": error_msg[:500]})
+            return json_result(-1, f"连接失败：{error_msg[:200]}", {"error": error_msg[:500]})
 
 
 class ProviderApplyRequest(BaseModel):
@@ -535,7 +535,7 @@ async def apply_provider(body: ProviderApplyRequest):
 
         prefix = _GROUP_PREFIX_MAP.get(body.target_group)
         if prefix is None:
-            return json_result(-1, f"未知的模型分组: {body.target_group}", None)
+            return json_result(-1, f"未知的模型分组：{body.target_group}", None)
 
         env_path = _find_env_path()
         updates = {
@@ -555,8 +555,8 @@ async def apply_provider(body: ProviderApplyRequest):
         logger.info(f"已将供应商 {provider.get('name')} 应用到 {body.target_group} 分组")
         return json_result(0, "应用成功", {"updated_keys": list(updates.keys())})
     except Exception as e:
-        logger.error(f"应用供应商配置失败: {e}", exc_info=True)
-        return json_result(-1, f"应用失败: {str(e)}", None)
+        logger.error(f"应用供应商配置失败：{e}", exc_info=True)
+        return json_result(-1, f"应用失败：{str(e)}", None)
 
 
 # ==================== 智能体管理 ====================
@@ -577,7 +577,7 @@ def _read_agents() -> List[dict]:
             data = json.load(f)
         return data if isinstance(data, list) else []
     except Exception as e:
-        logger.warning(f"读取 agents.json 失败: {e}")
+        logger.warning(f"读取 agents.json 失败：{e}")
         return []
 
 
@@ -597,8 +597,8 @@ async def get_agents():
         agents = load_agents()
         return json_result(0, "success", {"agents": agents})
     except Exception as e:
-        logger.error(f"读取智能体失败: {e}", exc_info=True)
-        return json_result(-1, f"读取失败: {str(e)}", None)
+        logger.error(f"读取智能体失败：{e}", exc_info=True)
+        return json_result(-1, f"读取失败：{str(e)}", None)
 
 
 class AgentSaveRequest(BaseModel):
@@ -630,7 +630,7 @@ async def save_agent(body: AgentSaveRequest):
         if agent_data.get("thinking_mode") is not None:
             agent_data["thinking_mode"] = bool(agent_data["thinking_mode"])
         if not agent_data["name"]:
-            return json_result(-1, "name 涓嶈兘涓虹┖", None)
+            return json_result(-1, "name 不能为空", None)
 
         # 校验 agent_type
         if agent_data.get("agent_type") not in ("planner", "actor"):
@@ -641,10 +641,10 @@ async def save_agent(body: AgentSaveRequest):
             agent_data["skills"] = []
         else:
             if not agent_data["skills"]:
-                return json_result(-1, "actor 绫诲瀷蹇呴』鑷冲皯鏈?1 涓?skill", None)
+                return json_result(-1, "actor 类型必须至少有 1 个 skill", None)
             invalid_skills = validate_skill_names(agent_data["skills"])
             if invalid_skills:
-                return json_result(-1, f"鍖呭惈鏃犳晥 skill: {invalid_skills}", None)
+                return json_result(-1, f"包含无效 skill: {invalid_skills}", None)
 
         if not agent_data["id"]:
             import uuid
@@ -664,11 +664,11 @@ async def save_agent(body: AgentSaveRequest):
             agents.append(agent_data)
 
         _write_agents(agents)
-        logger.info(f"保存智能体: {agent_data['name']} (id={agent_data['id']}, type={agent_data.get('agent_type')})")
+        logger.info(f"保存智能体：{agent_data['name']} (id={agent_data['id']}, type={agent_data.get('agent_type')})")
         return json_result(0, "保存成功", {"agent": agent_data})
     except Exception as e:
-        logger.error(f"保存智能体失败: {e}", exc_info=True)
-        return json_result(-1, f"保存失败: {str(e)}", None)
+        logger.error(f"保存智能体失败：{e}", exc_info=True)
+        return json_result(-1, f"保存失败：{str(e)}", None)
 
 
 @settingsRouter.delete("/deep-research/agents/{agent_id}")
@@ -683,11 +683,11 @@ async def delete_agent(agent_id: str):
         if len(new_agents) == len(agents):
             return json_result(-1, "智能体不存在", None)
         _write_agents(new_agents)
-        logger.info(f"删除智能体: id={agent_id}")
+        logger.info(f"删除智能体：id={agent_id}")
         return json_result(0, "删除成功", None)
     except Exception as e:
-        logger.error(f"删除智能体失败: {e}", exc_info=True)
-        return json_result(-1, f"删除失败: {str(e)}", None)
+        logger.error(f"删除智能体失败：{e}", exc_info=True)
+        return json_result(-1, f"删除失败：{str(e)}", None)
 
 
 @settingsRouter.get("/deep-research/available-skills")
@@ -698,8 +698,8 @@ async def get_available_skills():
         skills = get_available_actor_skills()
         return json_result(0, "success", {"skills": skills})
     except Exception as e:
-        logger.error(f"获取可用技能失败: {e}", exc_info=True)
-        return json_result(-1, f"获取失败: {str(e)}", None)
+        logger.error(f"获取可用技能失败：{e}", exc_info=True)
+        return json_result(-1, f"获取失败：{str(e)}", None)
 
 
 @settingsRouter.get("/deep-research/runtime-agent-defaults")
@@ -714,5 +714,5 @@ async def get_runtime_agent_defaults():
             "actors": get_actor_agents(),
         })
     except Exception as e:
-        logger.error(f"获取运行时默认配置失败: {e}", exc_info=True)
-        return json_result(-1, f"获取失败: {str(e)}", None)
+        logger.error(f"获取运行时默认配置失败：{e}", exc_info=True)
+        return json_result(-1, f"获取失败：{str(e)}", None)

@@ -10,20 +10,23 @@ const AgentManagementService = (function () {
 
     function escapeHtml(str) {
         if (!str) return '';
-        return String(str).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>')
-            .replace(/"/g, '"').replace(/'/g, '&#039;');
+        // 使用与 main-new.js 一致的方式：创建临时 div 元素，使用 textContent 转义
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 
     function showToast(msg, type) {
-        if (typeof window.showToast === 'function') { 
-            window.showToast(msg, type); 
-            return; 
-        }
         const existing = document.querySelector('.settings-toast');
         if (existing) existing.remove();
         const toast = document.createElement('div');
         toast.className = `settings-toast settings-toast-${type}`;
-        toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i><span>${msg}</span>`;
+        // 使用 textContent 设置消息内容，避免 HTML 转义问题
+        toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i><span></span>`;
+        const span = toast.querySelector('span');
+        if (span) {
+            span.textContent = msg;
+        }
         document.body.appendChild(toast);
         requestAnimationFrame(() => toast.classList.add('show'));
         setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
@@ -62,7 +65,12 @@ const AgentManagementService = (function () {
             body: JSON.stringify(agentData),
         });
         const json = await resp.json();
-        if (json.code !== 200 && json.code !== 0) throw new Error(json.msg || 'Save failed');
+        if (json.code !== 200 && json.code !== 0) {
+            // 直接使用 json.msg 作为错误消息，不做任何转义处理
+            // 因为 showToast 会使用 textContent 来设置消息内容
+            const errorMsg = json.msg || json.message || 'Save failed';
+            throw new Error(errorMsg);
+        }
         return json.data;
     }
 
