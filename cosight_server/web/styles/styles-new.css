@@ -722,6 +722,23 @@ body {
     max-width: 280px;
 }
 
+/* 智能体表单中的自定义下拉框容器样式 - 横向填满 */
+#af-model-container,
+#af-thinking-mode-container {
+    width: 100%;
+}
+
+/* 绑定大模型下拉框 - 横向填满容器 */
+#af-model-container .custom-select-wrapper,
+#af-thinking-mode-container .custom-select-wrapper {
+    width: 100%;
+}
+
+#af-model-container .custom-select-display,
+#af-thinking-mode-container .custom-select-display {
+    width: 100%;
+}
+
 .settings-label {
     font-size: 13px;
     font-weight: 500;
@@ -4867,18 +4884,43 @@ select.settings-input option:checked {
     z-index: 1000;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-8px);
+    transform: translateY(-6px);
     transition: all 0.2s ease;
-    max-height: 280px;
+    max-height: calc(var(--max-visible-items, 6) * 42px + 6px);
     overflow: hidden;
     display: flex;
     flex-direction: column;
+}
+
+/* 多选下拉框（带搜索）- 需要加上搜索栏高度 */
+.custom-select-dropdown:has(.custom-select-search) {
+    max-height: calc(var(--max-visible-items, 6) * 42px + 6px + 32px);
 }
 
 .custom-select-dropdown.show {
     opacity: 1;
     visibility: visible;
     transform: translateY(0);
+}
+
+/* 向上展开的下拉框 */
+.custom-select-dropup {
+    top: auto;
+    bottom: calc(100% + 4px);
+    transform: translateY(8px);
+}
+
+.custom-select-dropup.show {
+    transform: translateY(0);
+}
+
+/* 向上展开时箭头方向 */
+.custom-select-dropup .custom-select-arrow {
+    transform: rotate(180deg);
+}
+
+.custom-select-dropup.show .custom-select-arrow {
+    transform: rotate(0deg);
 }
 
 .custom-select-search {

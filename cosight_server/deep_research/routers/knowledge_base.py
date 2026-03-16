@@ -156,6 +156,14 @@ def _get_lightrag_work_dir() -> str:
     return storage
 
 
+def _get_lightrag_log_path() -> str:
+    """获取 LightRAG 日志文件路径（统一使用 logs 目录）"""
+    project_root = _get_project_root()
+    logs_dir = os.path.join(project_root, "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    return os.path.join(logs_dir, "lightrag.log")
+
+
 def _write_lightrag_env_file(work_dir: str):
     """在 LightRAG 工作目录下生成格式正确的 .env 文件"""
     lines = []
@@ -303,12 +311,11 @@ async def kb_start_service():
         os.makedirs(logs_dir, exist_ok=True)
         log_file_path = _get_log_file_path()
         
-        # 获取日志目录和日志文件路径
-        logs_dir = os.path.join(project_root, "logs")
-        os.makedirs(logs_dir, exist_ok=True)
-        
         # 记录启动信息到日志
         _write_log_message("===== LightRAG Service Starting =====")
+        
+        # 获取 LightRAG 专用工作目录
+        lightrag_work_dir = _get_lightrag_work_dir()
         
         # 构建 lightrag-server 启动命令和环境变量
         env = os.environ.copy()
@@ -330,12 +337,14 @@ async def kb_start_service():
         env.setdefault("EMBEDDING_DIM", os.getenv("LIGHTRAG_EMBEDDING_DIM", "2560"))
         env.setdefault("EMBEDDING_MAX_TOKEN_SIZE", os.getenv("LIGHTRAG_EMBEDDING_MAX_TOKENS", "8192"))
         
-        # 直接在 Python 中启动 lightrag-server
+        # 设置 LightRAG 日志路径，避免在根目录创建日志文件
+        env["LIGHTRAG_LOG_PATH"] = _get_lightrag_log_path()
+        
+        # 在 LightRAG 专用工作目录下运行，避免在项目根目录创建日志文件
         if sys.platform == "win32":
             _lightrag_process = subprocess.Popen(
                 ["lightrag-server", "--port", "9621", "--llm-binding", "openai", "--embedding-binding", "openai"],
-                cwd=project_root,
-                env=env,
+                cwd=project_root, env=env,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
             )
         else:

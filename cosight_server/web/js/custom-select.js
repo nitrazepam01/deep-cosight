@@ -1,6 +1,16 @@
 /**
  * Custom Select Component - 自定义下拉选择组件
  * 替代原生 select 元素，提供完全定制的样式支持
+ * 
+ * @param {HTMLElement|string} container - 容器元素或选择器
+ * @param {Object} options - 配置选项
+ * @param {string} options.placeholder - 占位符文本
+ * @param {boolean} options.multiple - 是否多选
+ * @param {boolean} options.searchable - 是否可搜索
+ * @param {boolean} options.expandUp - 是否向上展开（默认向下）
+ * @param {number} options.maxVisibleItems - 最大可见选项数量（超过时显示滚动条）
+ * @param {Array} options.items - 选项列表
+ * @param {Function} options.onChange - 值变化回调
  */
 
 class CustomSelect {
@@ -15,6 +25,8 @@ class CustomSelect {
             placeholder: options.placeholder || '请选择',
             multiple: options.multiple || false,
             searchable: options.searchable || false,
+            expandUp: options.expandUp || false,  // 是否向上展开
+            maxVisibleItems: options.maxVisibleItems !== undefined ? options.maxVisibleItems : 6,  // 最大可见选项数，默认为 6
             onChange: options.onChange || null,
             ...options
         };
@@ -40,13 +52,16 @@ class CustomSelect {
 
         const displayText = this.getDisplayText(selectedItems);
 
+        // 根据 expandUp 选项设置方向类名
+        const directionClass = this.options.expandUp ? 'custom-select-dropup' : 'custom-select-dropdown';
+
         this.container.innerHTML = `
             <div class="custom-select-wrapper">
                 <div class="custom-select-display" tabindex="0">
                     <span class="custom-select-display-text">${displayText}</span>
-                    <i class="custom-select-arrow fas fa-chevron-down"></i>
+                    <i class="custom-select-arrow fas fa-chevron-${this.options.expandUp ? 'up' : 'down'}"></i>
                 </div>
-                <div class="custom-select-dropdown">
+                <div class="custom-select-dropdown ${directionClass}" style="--max-visible-items: ${this.options.maxVisibleItems};">
                     ${this.options.searchable ? `
                         <div class="custom-select-search">
                             <i class="fas fa-search"></i>
@@ -203,14 +218,27 @@ class CustomSelect {
         this.isOpen = true;
         this.dropdownEl.classList.add('show');
         this.displayEl.classList.add('focused');
-        this.arrowEl.style.transform = 'rotate(180deg)';
+        
+        // 根据展开方向设置箭头旋转
+        if (this.options.expandUp) {
+            this.arrowEl.style.transform = 'rotate(0deg)';
+        } else {
+            this.arrowEl.style.transform = 'rotate(180deg)';
+        }
     }
 
     close() {
         this.isOpen = false;
         this.dropdownEl.classList.remove('show');
         this.displayEl.classList.remove('focused');
-        this.arrowEl.style.transform = 'rotate(0deg)';
+        
+        // 恢复箭头初始方向
+        if (this.options.expandUp) {
+            this.arrowEl.style.transform = 'rotate(180deg)';
+        } else {
+            this.arrowEl.style.transform = 'rotate(0deg)';
+        }
+        
         if (this.searchInputEl) {
             this.searchInputEl.value = '';
             const options = this.optionsEl.querySelectorAll('.custom-select-option');
@@ -251,6 +279,16 @@ class CustomSelect {
         const displayTextEl = this.container.querySelector('.custom-select-display-text');
         if (displayTextEl) {
             displayTextEl.textContent = displayText;
+        }
+
+        // 同步更新 data 属性，确保 getValue() 能正确读取
+        const display = this.container.querySelector('.custom-select-display');
+        if (display) {
+            if (this.options.multiple) {
+                display.dataset.selectedValues = JSON.stringify(this.selectedValues);
+            } else {
+                display.dataset.value = this.selectedValues !== null ? String(this.selectedValues) : '';
+            }
         }
     }
 

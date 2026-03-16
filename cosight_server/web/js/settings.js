@@ -451,11 +451,9 @@ const SettingsService = (function () {
                     <div id="af-thinking-mode-container" data-value="${agent.thinking_mode === null || typeof agent.thinking_mode === 'undefined' ? '' : String(agent.thinking_mode)}" data-disabled="${isBuiltin}"></div>
                 </div>
 
-                <div class="agent-form-row agent-form-row-inline">
-                    <div class="agent-form-group">
-                        <label class="agent-form-label">绑定大模型</label>
-                        <div id="af-model-container" data-value="${agent.provider_id && agent.model_name ? `${agent.provider_id}|${agent.model_name}` : ''}" data-placeholder="系统默认模型"></div>
-                    </div>
+                <div class="agent-form-row">
+                    <label class="agent-form-label">绑定大模型</label>
+                    <div id="af-model-container" data-value="${agent.provider_id && agent.model_name ? `${agent.provider_id}|${agent.model_name}` : ''}" data-placeholder="系统默认模型"></div>
                 </div>
 
                 <div class="agent-form-row">
@@ -509,6 +507,17 @@ const SettingsService = (function () {
         if (!name) { 
             AgentManagementService.showToast('请输入智能体名称', 'error'); 
             return; 
+        }
+
+        // 重名检查
+        const agents = AgentManagementService.getAgents();
+        const isDuplicate = agents.some(agent => 
+            agent.name.toLowerCase() === name.toLowerCase() && 
+            agent.id !== (_agentEditingId || '')
+        );
+        if (isDuplicate) {
+            AgentManagementService.showToast(`智能体名称 "${name}" 已存在，请使用其他名称`, 'error');
+            return;
         }
 
         let providerId = '', modelName = '';
@@ -741,7 +750,7 @@ const SettingsService = (function () {
             });
         }
 
-        // 绑定大模型下拉框
+        // 绑定大模型下拉框 - 与 Thinking Mode 一样宽，向上展开
         const modelContainer = document.getElementById('af-model-container');
         if (modelContainer) {
             const modelValue = modelContainer.dataset.value || '';
@@ -759,7 +768,8 @@ const SettingsService = (function () {
             new CustomSelect(modelContainer, {
                 items: modelItems,
                 placeholder: modelPlaceholder,
-                selectedValue: modelValue
+                selectedValue: modelValue,
+                expandUp: true
             });
         }
 
@@ -780,12 +790,29 @@ const SettingsService = (function () {
         // 执行技能多选下拉框
         const skillsContainer = document.getElementById('af-skills-container');
         if (skillsContainer) {
+            // 优先从 agent 对象获取 skills，如果不存在再从 data 属性获取
             let skillsValues = [];
-            try {
-                skillsValues = JSON.parse(skillsContainer.dataset.values || '[]');
-            } catch (e) {
+            
+            // 尝试获取当前编辑的智能体对象
+            if (_agentEditingId) {
+                const agent = AgentManagementService.getAgentById(_agentEditingId);
+                if (agent && agent.skills) {
+                    skillsValues = agent.skills;
+                }
+            } else if (_agentIsAdding) {
+                // 新建智能体时，skills 为空数组
                 skillsValues = [];
             }
+            
+            // 如果上面没有获取到值，尝试从 data 属性获取作为后备
+            if (skillsValues.length === 0) {
+                try {
+                    skillsValues = JSON.parse(skillsContainer.dataset.values || '[]');
+                } catch (e) {
+                    skillsValues = [];
+                }
+            }
+            
             const skillsDisabled = skillsContainer.dataset.disabled === 'true';
             const skills = AgentManagementService.getAvailableSkills();
             const skillsItems = skills.map(skill => ({
@@ -1800,7 +1827,7 @@ const AgentRuntimeService = (function () {
             });
         }
 
-        // 初始化默认 Actor 下拉框
+        // 初始化默认 Actor 下拉框 - 向上展开
         if (defaultActorContainer && typeof CustomSelect !== 'undefined') {
             const defaultActorValue = defaultActorContainer.dataset.value || '';
             const allowedIds = _config.allowed_actor_ids || [];
@@ -1809,6 +1836,7 @@ const AgentRuntimeService = (function () {
                 items: availableActors.map(a => ({ value: a.id, label: a.name })),
                 placeholder: defaultActorContainer.dataset.placeholder || '请先选择 Actors',
                 selectedValue: defaultActorValue,
+                expandUp: true,
                 onChange: function(value) {
                     _config.default_actor_id = value;
                     saveConfigAndRefresh();
@@ -1816,7 +1844,7 @@ const AgentRuntimeService = (function () {
             });
         }
 
-        // 初始化 Actors 多选下拉框
+        // 初始化 Actors 多选下拉框 - 向上展开
         if (actorsContainer && typeof CustomSelect !== 'undefined') {
             let allowedActorIds = [];
             try {
@@ -1830,6 +1858,7 @@ const AgentRuntimeService = (function () {
                 multiple: true,
                 searchable: true,
                 selectedValues: allowedActorIds,
+                expandUp: true,
                 onChange: function(values) {
                     _config.allowed_actor_ids = values;
                     _config.default_actor_id = values.length > 0 ? values[0] : '';
@@ -1846,6 +1875,7 @@ const AgentRuntimeService = (function () {
                                 items: selectedActors.map(a => ({ value: a.id, label: a.name })),
                                 placeholder: '请先选择 Actors',
                                 selectedValue: currentDefaultValue,
+                                expandUp: true,
                                 onChange: function(value) {
                                     _config.default_actor_id = value;
                                     saveConfigAndRefresh();
