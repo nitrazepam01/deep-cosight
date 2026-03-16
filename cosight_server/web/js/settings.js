@@ -729,14 +729,14 @@ const SettingsService = (function () {
             new CustomSelect(thinkingModeContainer, {
                 items: thinkingModeItems,
                 selectedValue: thinkingModeValue,
-                placeholder: '跟随用户实时配置'
+                placeholder: '跟随用户实时配置',
+                expandUp: true
             });
         }
 
-        // 绑定大模型下拉框 - 与 Thinking Mode 一样宽，向上展开
+        // 绑定大模型下拉框，向上展开
         const modelContainer = document.getElementById('af-model-container');
         if (modelContainer) {
-            const modelValue = modelContainer.dataset.value || '';
             const modelPlaceholder = modelContainer.dataset.placeholder || '系统默认模型';
             const providers = AgentManagementService.getProviders();
             const modelItems = [];
@@ -751,7 +751,6 @@ const SettingsService = (function () {
             new CustomSelect(modelContainer, {
                 items: modelItems,
                 placeholder: modelPlaceholder,
-                selectedValue: modelValue,
                 expandUp: true
             });
         }

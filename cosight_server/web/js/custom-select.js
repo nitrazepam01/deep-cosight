@@ -218,13 +218,7 @@ class CustomSelect {
         this.isOpen = true;
         this.dropdownEl.classList.add('show');
         this.displayEl.classList.add('focused');
-        
-        // 根据展开方向设置箭头旋转
-        if (this.options.expandUp) {
-            this.arrowEl.style.transform = 'rotate(0deg)';
-        } else {
-            this.arrowEl.style.transform = 'rotate(180deg)';
-        }
+        this.arrowEl.style.transform = 'rotate(180deg)';
     }
 
     close() {
@@ -232,12 +226,7 @@ class CustomSelect {
         this.dropdownEl.classList.remove('show');
         this.displayEl.classList.remove('focused');
         
-        // 恢复箭头初始方向
-        if (this.options.expandUp) {
-            this.arrowEl.style.transform = 'rotate(180deg)';
-        } else {
-            this.arrowEl.style.transform = 'rotate(0deg)';
-        }
+        this.arrowEl.style.transform = 'rotate(0deg)';
         
         if (this.searchInputEl) {
             this.searchInputEl.value = '';

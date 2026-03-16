@@ -4914,15 +4914,6 @@ select.settings-input option:checked {
     transform: translateY(0);
 }
 
-/* 向上展开时箭头方向 */
-.custom-select-dropup .custom-select-arrow {
-    transform: rotate(180deg);
-}
-
-.custom-select-dropup.show .custom-select-arrow {
-    transform: rotate(0deg);
-}
-
 .custom-select-search {
     display: flex;
     align-items: center;
