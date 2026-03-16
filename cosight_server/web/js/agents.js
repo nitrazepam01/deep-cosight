@@ -1,12 +1,25 @@
 /**
  * Co-Sight Agent Management Service
  * 智能体管理模块 — 对接后端 API，提供智能体 CRUD 操作
+ * 
+ * agents.json 文件结构:
+ * {
+ *     "planner": {"builtin": "任务规划专家", "is_default": "任务规划专家"},
+ *     "actor": {"builtin": "任务执行专家", "is_default": "任务执行专家"},
+ *     "agents": [...]
+ * }
+ * 注意：is_default 字段存储的是默认智能体的名称（字符串），不是布尔值。
+ * agents 列表中的智能体没有 is_default 字段，默认状态由 planner/actor 配置决定。
  */
 const AgentManagementService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
     let _agents = [];
     let _providers = [];
     let _availableSkills = [];
+    let _agentDefaults = {
+        planner: { builtin: "任务规划专家", is_default: "任务规划专家" },
+        actor: { builtin: "任务执行专家", is_default: "任务执行专家" }
+    };
 
     function escapeHtml(str) {
         if (!str) return '';
@@ -81,11 +94,47 @@ const AgentManagementService = (function () {
         return json.data;
     }
 
+    async function toggleAgentDefault(agentId, agentType) {
+        const resp = await fetch(`${API_BASE}/deep-research/agents/toggle-default`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agent_id: agentId,
+                agent_type: agentType
+            }),
+        });
+        const json = await resp.json();
+        if (json.code !== 200 && json.code !== 0) throw new Error(json.msg || 'Toggle default failed');
+        return json.data;
+    }
+
+    async function fetchAgentDefaults() {
+        const resp = await fetch(`${API_BASE}/deep-research/agents/defaults`);
+        const json = await resp.json();
+        if (json.code !== 200 && json.code !== 0) throw new Error(json.msg || 'Failed to fetch agent defaults');
+        return (json.data && json.data.defaults) || {
+            planner: { builtin: "任务规划专家", is_default: "任务规划专家" },
+            actor: { builtin: "任务执行专家", is_default: "任务执行专家" }
+        };
+    }
+
     async function init() {
         try {
             _agents = await fetchAgents();
             _providers = await fetchProviders();
             _availableSkills = await fetchAvailableSkills();
+            _agentDefaults = await fetchAgentDefaults();
+            // 为 agents 列表中的每个智能体添加 is_default 属性（根据 planner/actor 配置计算）
+            _agents.forEach(agent => {
+                const agentType = agent.agent_type;
+                const agentName = agent.name;
+                if (agentType && agentName) {
+                    const defaultName = _agentDefaults[agentType]?.is_default;
+                    agent.is_default = (defaultName === agentName);
+                } else {
+                    agent.is_default = false;
+                }
+            });
         } catch (e) {
             console.warn('AgentManagementService init failed:', e);
         }
@@ -119,9 +168,12 @@ const AgentManagementService = (function () {
             model_name: '',
             thinking_mode: null,
             enabled: true,
-            is_default: false,
             builtin: false
         };
+    }
+
+    function getAgentDefaults() {
+        return _agentDefaults;
     }
 
     return {
@@ -131,8 +183,10 @@ const AgentManagementService = (function () {
         getAvailableSkills,
         getAgentById,
         getNewAgentTemplate,
+        getAgentDefaults,
         saveAgent,
         deleteAgent,
+        toggleAgentDefault,
         escapeHtml,
         showToast
     };

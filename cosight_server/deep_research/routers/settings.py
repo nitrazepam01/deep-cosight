@@ -567,34 +567,115 @@ def _find_agents_path() -> str:
     return os.path.join(os.path.dirname(env_path), "agents.json")
 
 
-def _read_agents() -> List[dict]:
-    """读取 agents.json"""
+def _read_agents_data() -> dict:
+    """读取 agents.json 完整数据（包含 planner、actor 和 agents 列表）
+    
+    文件结构:
+    {
+        "planner": {"builtin": "任务规划专家", "is_default": "任务规划专家"},
+        "actor": {"builtin": "任务执行专家", "is_default": "任务执行专家"},
+        "agents": [...]
+    }
+    """
     path = _find_agents_path()
     if not os.path.exists(path):
-        return []
+        return {
+            "planner": {"builtin": "任务规划专家", "is_default": "任务规划专家"},
+            "actor": {"builtin": "任务执行专家", "is_default": "任务执行专家"},
+            "agents": []
+        }
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return data if isinstance(data, list) else []
+        # 如果是旧版列表格式，转换为新版字典格式
+        if isinstance(data, list):
+            result = {
+                "planner": {"builtin": "任务规划专家", "is_default": "任务规划专家"},
+                "actor": {"builtin": "任务执行专家", "is_default": "任务执行专家"},
+                "agents": data
+            }
+            # 自动迁移：将旧数据的 is_default 字段设置为对应的 builtin 名称
+            for a in result["agents"]:
+                if a.get("agent_type") == "planner" and a.get("is_default"):
+                    result["planner"]["is_default"] = a.get("name", "任务规划专家")
+                elif a.get("agent_type") == "actor" and a.get("is_default"):
+                    result["actor"]["is_default"] = a.get("name", "任务执行专家")
+                # 清除 agents 中的 is_default 字段（使用 planner/actor 配置中的值）
+                if "is_default" in a:
+                    del a["is_default"]
+            _write_agents_data(result, path)
+            logger.info("agents.json 已自动迁移为新版格式")
+            return result
+        # 确保是字典格式
+        if isinstance(data, dict):
+            # 确保包含所有必需的键
+            if "planner" not in data:
+                data["planner"] = {"builtin": "任务规划专家", "is_default": "任务规划专家"}
+            if "actor" not in data:
+                data["actor"] = {"builtin": "任务执行专家", "is_default": "任务执行专家"}
+            if "agents" not in data:
+                data["agents"] = []
+            return data
+        return {
+            "planner": {"builtin": "任务规划专家", "is_default": "任务规划专家"},
+            "actor": {"builtin": "任务执行专家", "is_default": "任务执行专家"},
+            "agents": []
+        }
     except Exception as e:
         logger.warning(f"读取 agents.json 失败：{e}")
-        return []
+        return {
+            "planner": {"builtin": "任务规划专家", "is_default": "任务规划专家"},
+            "actor": {"builtin": "任务执行专家", "is_default": "任务执行专家"},
+            "agents": []
+        }
+
+
+def _read_agents() -> List[dict]:
+    """读取 agents.json 中的 agents 列表"""
+    data = _read_agents_data()
+    return data.get("agents", [])
 
 
 def _write_agents(agents: List[dict]):
-    """写入 agents.json"""
+    """写入 agents.json 中的 agents 列表（保留 planner 和 actor 配置）"""
     path = _find_agents_path()
+    existing_data = _read_agents_data()
+    existing_data["agents"] = agents
+    _write_agents_data(existing_data, path)
+
+
+def _write_agents_data(data: dict, path: str = None):
+    """写入 agents.json 完整数据"""
+    if path is None:
+        path = _find_agents_path()
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(agents, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def _read_agent_defaults() -> dict:
+    """读取 agents.json 中的 planner 和 actor 默认配置"""
+    return _read_agents_data()
+
+
+def _write_agent_defaults(planner: dict, actor: dict):
+    """写入 agents.json 中的 planner 和 actor 默认配置"""
+    path = _find_agents_path()
+    existing_data = _read_agents_data()
+    existing_data["planner"] = planner
+    existing_data["actor"] = actor
+    _write_agents_data(existing_data, path)
 
 
 @settingsRouter.get("/deep-research/agents")
 async def get_agents():
     """获取所有智能体配置"""
     try:
-        from app.cosight.agent.runtime.agent_registry import load_agents
-
-        agents = load_agents()
+        agents = _read_agents()
+        # 确保每个智能体都有 builtin 字段
+        for agent in agents:
+            if "builtin" not in agent:
+                # 根据 id 判断是否为内置智能体
+                agent["builtin"] = agent.get("id", "").startswith("builtin-")
         return json_result(0, "success", {"agents": agents})
     except Exception as e:
         logger.error(f"读取智能体失败：{e}", exc_info=True)
@@ -702,6 +783,32 @@ async def get_available_skills():
         return json_result(-1, f"获取失败：{str(e)}", None)
 
 
+@settingsRouter.get("/deep-research/agents/defaults")
+async def get_agent_defaults():
+    """返回 planner 和 actor 的默认配置
+    
+    返回结构:
+    {
+        "defaults": {
+            "planner": {"builtin": "任务规划专家", "is_default": "任务规划专家"},
+            "actor": {"builtin": "任务执行专家", "is_default": "任务执行专家"}
+        }
+    }
+    """
+    try:
+        from app.cosight.agent.runtime.agent_registry import get_agent_defaults
+        defaults = get_agent_defaults()
+        return json_result(0, "success", {
+            "defaults": {
+                "planner": defaults.get("planner", {"builtin": "任务规划专家", "is_default": "任务规划专家"}),
+                "actor": defaults.get("actor", {"builtin": "任务执行专家", "is_default": "任务执行专家"})
+            }
+        })
+    except Exception as e:
+        logger.error(f"获取智能体默认配置失败：{e}", exc_info=True)
+        return json_result(-1, f"获取失败：{str(e)}", None)
+
+
 @settingsRouter.get("/deep-research/runtime-agent-defaults")
 async def get_runtime_agent_defaults():
     """返回默认的 planner 和 actor 配置，供前端初始化运行时选择器"""
@@ -716,3 +823,54 @@ async def get_runtime_agent_defaults():
     except Exception as e:
         logger.error(f"获取运行时默认配置失败：{e}", exc_info=True)
         return json_result(-1, f"获取失败：{str(e)}", None)
+
+
+class AgentDefaultToggleRequest(BaseModel):
+    agent_id: str
+    agent_type: str  # "planner" or "actor"
+
+
+@settingsRouter.post("/deep-research/agents/toggle-default")
+async def toggle_agent_default(body: AgentDefaultToggleRequest):
+    """切换智能体的默认状态
+    
+    agents.json 的 is_default 字段存储的是智能体名称（字符串），不是布尔值。
+    此接口将对应类型的 is_default 设置为指定智能体的名称。
+    内置智能体也可以设置为默认。
+    """
+    try:
+        agents = _read_agents()
+        agent = next((a for a in agents if a.get("id") == body.agent_id), None)
+        if not agent:
+            return json_result(-1, "智能体不存在", None)
+        
+        if agent.get("agent_type") != body.agent_type:
+            return json_result(-1, "智能体类型不匹配", None)
+        
+        # 获取当前默认的智能体名称
+        defaults = _read_agent_defaults()
+        current_default_name = defaults.get(body.agent_type, {}).get("is_default")
+        
+        # 如果当前智能体已经是默认，则取消默认（设置为第一个智能体）
+        # 否则将其设置为默认
+        if current_default_name == agent.get("name"):
+            # 取消默认：找到第一个智能体作为新的默认
+            for a in agents:
+                if a.get("agent_type") == body.agent_type and a.get("id") != body.agent_id:
+                    defaults[body.agent_type]["is_default"] = a.get("name")
+                    break
+            else:
+                # 如果没有其他智能体，保持当前默认
+                pass
+        else:
+            # 设置为默认
+            defaults[body.agent_type]["is_default"] = agent.get("name")
+        
+        # 保存默认配置
+        _write_agent_defaults(defaults["planner"], defaults["actor"])
+        
+        logger.info(f"切换智能体默认状态：id={body.agent_id}, type={body.agent_type}, new_default={defaults[body.agent_type]['is_default']}")
+        return json_result(0, "操作成功", {"agent": agent, "defaults": defaults})
+    except Exception as e:
+        logger.error(f"切换智能体默认状态失败：{e}", exc_info=True)
+        return json_result(-1, f"操作失败：{str(e)}", None)

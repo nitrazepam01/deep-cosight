@@ -304,8 +304,18 @@ const SettingsService = (function () {
         const agentCards = agents.length === 0
             ? '<div style="text-align:center;padding:40px;color:#aaa;font-size:14px;">暂无智能体配置</div>'
             : agents.map(agent => {
-                const defaultBadge = agent.is_default ? `<span class="agent-badge agent-badge-default"><i class="fas fa-star"></i> 默认</span>` : '';
+                // 标签位置：内置在左，默认在右
                 const builtinBadge = agent.builtin ? `<span class="agent-badge agent-badge-locked"><i class="fas fa-lock"></i> 内置</span>` : '';
+                // 默认标签：已激活的默认标签不可点击，只能通过设置其他智能体为默认来取消
+                const defaultBadge = agent.is_default 
+                    ? `<span class="agent-badge agent-badge-default">
+                        <i class="fas fa-star"></i> 默认
+                    </span>`
+                    : `<span class="agent-badge agent-badge-default agent-badge-inactive" 
+                          onclick="SettingsService.toggleAgentDefault('${AgentManagementService.escapeHtml(agent.id)}')"
+                          style="cursor: pointer;">
+                        <i class="fas fa-star"></i> 默认
+                    </span>`;
                 
                 // 根据智能体类型设置图标和背景颜色
                 // 规划者 (Planner)：大脑图标 🧠，粉色渐变背景
@@ -331,8 +341,8 @@ const SettingsService = (function () {
                         <div class="agent-content">
                             <div class="agent-title-row">
                                 <span class="agent-name">${AgentManagementService.escapeHtml(agent.name || '未命名智能体')}</span>
-                                ${defaultBadge}
                                 ${builtinBadge}
+                                ${defaultBadge}
                             </div>
                             <p class="agent-desc">${AgentManagementService.escapeHtml(agent.description || '暂无描述')}</p>
                         </div>
@@ -1451,10 +1461,67 @@ const SettingsService = (function () {
         onQuickSelect, applyQuickSelect, selectBubbleColor, toggleBubbleColorExpand,
         // 智能体管理相关
         editAgent, startAddAgent, cancelAgentEdit, saveAgent, deleteAgent, refreshAgentsPage,
+        toggleAgentDefault,
         // 内部状态访问（用于调试）
         getAgentEditingId: () => _agentEditingId,
         getAgentIsAdding: () => _agentIsAdding,
     };
+
+    /* ---------- 智能体默认状态切换 ---------- */
+    async function toggleAgentDefault(agentId) {
+        const agent = AgentManagementService.getAgentById(agentId);
+        if (!agent) return;
+
+        try {
+            // 调用 API 端点（后端自动切换状态）
+            // 内置智能体也可以设置为默认
+            await AgentManagementService.toggleAgentDefault(agentId, agent.agent_type);
+            
+            // 本地更新数据，避免重新加载和重绘
+            const agents = AgentManagementService.getAgents();
+            const agentType = agent.agent_type;
+            
+            // 更新本地数据：将点击的智能体设为默认，同类型的其他智能体取消默认
+            agents.forEach(a => {
+                if (a.agent_type === agentType) {
+                    a.is_default = (a.id === agentId);
+                }
+            });
+            
+            // 只更新标签的视觉状态，避免整个页面重绘
+            updateDefaultBadges();
+        } catch (e) {
+            AgentManagementService.showToast('操作失败：' + e.message, 'error');
+        }
+    }
+
+    // 更新默认标签的视觉状态
+    function updateDefaultBadges() {
+        const agents = AgentManagementService.getAgents();
+        const agentItems = document.querySelectorAll('.agent-item');
+        
+        agentItems.forEach(item => {
+            const agentId = item.dataset.agentId;
+            const agent = agents.find(a => a.id === agentId);
+            if (!agent) return;
+            
+            // 找到默认标签
+            const defaultBadge = item.querySelector('.agent-badge-default');
+            if (!defaultBadge) return;
+            
+            if (agent.is_default) {
+                // 已激活的默认标签：移除 onclick 和样式
+                defaultBadge.classList.remove('agent-badge-inactive');
+                defaultBadge.style.cursor = 'default';
+                defaultBadge.removeAttribute('onclick');
+            } else {
+                // 非默认标签：添加 onclick 和样式
+                defaultBadge.classList.add('agent-badge-inactive');
+                defaultBadge.style.cursor = 'pointer';
+                defaultBadge.setAttribute('onclick', `SettingsService.toggleAgentDefault('${AgentManagementService.escapeHtml(agentId)}')`);
+            }
+        });
+    }
 })();
 
 // 导出到全局
@@ -1682,7 +1749,7 @@ const AgentRuntimeService = (function () {
                     </div>
                     <div id="agent-planner-select-container" data-value="${escapeHtml(_config.planner_id)}" data-placeholder="无可用 Planner" style="flex:1;"></div>
                     <div style="margin-top:auto;padding-top:10px;flex-shrink:0;">
-                        ${isPlannerAssign ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i> 当前模式正在使用此配置</div>' : '<div style="height:35px;"></div>'}
+                        ${isPlannerAssign ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i><span style="transform:translateY(-2px);">当前模式正在使用此配置</span></div>' : '<div style="height:35px;"></div>'}
                     </div>
                 </div>
 
@@ -1701,7 +1768,7 @@ const AgentRuntimeService = (function () {
                     </div>
                     <div id="agent-allocation-mode-select-container" data-value="${_config.dispatch_mode || 'single_actor'}" style="flex:1;"></div>
                     <div style="margin-top:auto;padding-top:10px;flex-shrink:0;">
-                        ${modeHintText ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i> ' + modeHintText + '</div>' : '<div style="height:35px;"></div>'}
+                        ${modeHintText ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i><span style="transform:translateY(-2px);">' + modeHintText + '</span></div>' : '<div style="height:35px;"></div>'}
                     </div>
                 </div>
 
@@ -1720,7 +1787,7 @@ const AgentRuntimeService = (function () {
                     </div>
                     <div id="agent-default-actor-select-container" data-value="${escapeHtml(_config.default_actor_id)}" data-placeholder="请先选择 Actors" style="flex:1;"></div>
                     <div style="margin-top:auto;padding-top:10px;flex-shrink:0;">
-                        ${isSingleActor ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i> 当前模式正在使用此配置</div>' : '<div style="height:35px;"></div>'}
+                        ${isSingleActor ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i><span style="transform:translateY(-1px);">当前模式正在使用此配置</span></div>' : '<div style="height:35px;"></div>'}
                     </div>
                 </div>
 
@@ -1739,7 +1806,7 @@ const AgentRuntimeService = (function () {
                     </div>
                     <div id="agent-actors-select-container" data-values="${escapeHtml(JSON.stringify(_config.allowed_actor_ids || []))}" data-placeholder="无可用 Actor" data-multiple="true" style="flex:1;"></div>
                     <div style="margin-top:auto;padding-top:10px;flex-shrink:0;">
-                        ${isMultiActor ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i> 当前模式正在使用此配置</div>' : '<div style="height:35px;"></div>'}
+                        ${isMultiActor ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i><span style="transform:translateY(-1px);">当前模式正在使用此配置</span></div>' : '<div style="height:35px;"></div>'}
                     </div>
                 </div>
             </div>

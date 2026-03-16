@@ -4565,6 +4565,12 @@ select.settings-input option:checked {
     color: #d97706;
 }
 
+/* 非激活状态的默认标签 - 灰色样式 */
+.agent-badge-inactive {
+    background: #e5e7eb;
+    color: #9ca3af;
+}
+
 .agent-desc {
     font-size: 13px;
     color: #666;
