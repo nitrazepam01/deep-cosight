@@ -29,4 +29,5 @@ test_api_key.py
 lightrag_data/
 lightrag_storage/
 upload_files/
+rag_storage/
 start_lightrag.bat

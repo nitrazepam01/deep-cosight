@@ -455,20 +455,6 @@ const SettingsService = (function () {
                     <label class="agent-form-label">绑定大模型</label>
                     <div id="af-model-container" data-value="${agent.provider_id && agent.model_name ? `${agent.provider_id}|${agent.model_name}` : ''}" data-placeholder="系统默认模型"></div>
                 </div>
-
-                <div class="agent-form-row">
-                    <label class="agent-form-label-checkbox">
-                        <input type="checkbox" id="af-default" ${agent.is_default ? 'checked' : ''} ${isBuiltin ? 'disabled' : ''} />
-                        设为默认智能体 (启动任务时默认选中)
-                    </label>
-                    ${!isBuiltin ? `
-                    <label class="agent-form-label-checkbox" style="margin-left: 20px;">
-                        <input type="hidden" id="af-enabled" value="true">
-                        <input type="checkbox" id="af-enabled-checkbox" ${agent.enabled !== false ? 'checked' : ''} />
-                        启用
-                    </label>
-                    ` : ''}
-                </div>
             </div>
         `;
     }
@@ -501,8 +487,6 @@ const SettingsService = (function () {
         const agentType = getCustomSelectValue('af-type-container');
         const modelVal = getCustomSelectValue('af-model-container');
         const thinkingModeVal = getCustomSelectValue('af-thinking-mode-container');
-        const enabled = document.getElementById('af-enabled-checkbox')?.checked !== false;
-        const isDefault = document.getElementById('af-default').checked;
 
         if (!name) { 
             AgentManagementService.showToast('请输入智能体名称', 'error'); 
@@ -551,7 +535,6 @@ const SettingsService = (function () {
             provider_id: providerId,
             model_name: modelName,
             thinking_mode: thinkingMode,
-            enabled, is_default: isDefault,
             agent_type: agentType,
             skills: skills
         };
@@ -1459,27 +1442,6 @@ const SettingsService = (function () {
                 saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存';
             }
         }
-    }
-
-    function showToast(message, type) {
-        const existing = document.querySelector('.settings-toast');
-        if (existing) existing.remove();
-
-        const toast = document.createElement('div');
-        toast.className = `settings-toast settings-toast-${type}`;
-        // 使用 textContent 设置消息内容，避免 HTML 转义问题
-        toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i><span></span>`;
-        const span = toast.querySelector('span');
-        if (span) {
-            span.textContent = message;
-        }
-        document.body.appendChild(toast);
-
-        requestAnimationFrame(() => toast.classList.add('show'));
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
     }
 
     /* ---------- 公开接口 ---------- */
