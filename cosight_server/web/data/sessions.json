@@ -1,0 +1,150 @@
+{
+  "version": "1.0",
+  "updatedAt": 1773749366284,
+  "lastVisitedThread": {
+    "folderId": "folder-life-001",
+    "threadId": "thread-life-001"
+  },
+  "folders": [
+    {
+      "id": "default",
+      "name": "默认分组",
+      "isDefault": true,
+      "expanded": true,
+      "createdAt": 1710604800000,
+      "threads": [
+        {
+          "id": "thread-1773746270682",
+          "title": "新对话",
+          "folderId": "default",
+          "createdAt": 1773746270682,
+          "updatedAt": 1773746270682,
+          "messageCount": 0,
+          "starred": false,
+          "messages": []
+        }
+      ]
+    },
+    {
+      "id": "folder-work-001",
+      "name": "工作项目",
+      "isDefault": false,
+      "expanded": true,
+      "createdAt": 1710604800000,
+      "threads": [
+        {
+          "id": "thread-work-002",
+          "title": "GDP 数据分析报告",
+          "folderId": "folder-work-001",
+          "createdAt": 1710604800000,
+          "updatedAt": 1773732078451,
+          "messageCount": 0,
+          "starred": false,
+          "messages": []
+        },
+        {
+          "id": "thread-work-001",
+          "title": "江苏足球联赛球队表现分析",
+          "folderId": "folder-work-001",
+          "createdAt": 1710604800000,
+          "updatedAt": 1773746217055,
+          "messageCount": 0,
+          "starred": false,
+          "messages": []
+        }
+      ]
+    },
+    {
+      "id": "folder-study-001",
+      "name": "学习资料",
+      "isDefault": false,
+      "expanded": true,
+      "createdAt": 1710604800000,
+      "threads": [
+        {
+          "id": "thread-study-001",
+          "title": "Python 机器学习笔记",
+          "folderId": "folder-study-001",
+          "createdAt": 1710604800000,
+          "updatedAt": 1773732079112,
+          "messageCount": 0,
+          "starred": false,
+          "messages": []
+        },
+        {
+          "id": "thread-work-003",
+          "title": "代码审查与优化",
+          "folderId": "folder-study-001",
+          "createdAt": 1710604800000,
+          "updatedAt": 1773731061338,
+          "messageCount": 0,
+          "starred": false,
+          "messages": []
+        }
+      ]
+    },
+    {
+      "id": "folder-life-001",
+      "name": "生活助手",
+      "isDefault": false,
+      "expanded": true,
+      "createdAt": 1710604800000,
+      "threads": [
+        {
+          "id": "thread-life-001",
+          "title": "周末旅行计划",
+          "folderId": "folder-life-001",
+          "createdAt": 1710604800000,
+          "updatedAt": 1773732159081,
+          "messageCount": 0,
+          "starred": false,
+          "messages": []
+        },
+        {
+          "id": "thread-1773732084842",
+          "title": "少女终末旅行",
+          "folderId": "folder-life-001",
+          "createdAt": 1773732084842,
+          "updatedAt": 1773732159712,
+          "messageCount": 0,
+          "starred": true,
+          "messages": []
+        },
+        {
+          "id": "thread-1773747378969",
+          "title": "新对话",
+          "folderId": "folder-life-001",
+          "createdAt": 1773747378969,
+          "updatedAt": 1773747378969,
+          "messageCount": 0,
+          "starred": false,
+          "messages": []
+        },
+        {
+          "id": "thread-1773747379663",
+          "title": "新对话",
+          "folderId": "folder-life-001",
+          "createdAt": 1773747379663,
+          "updatedAt": 1773747379663,
+          "messageCount": 0,
+          "starred": false,
+          "messages": []
+        },
+        {
+          "id": "thread-1773747380125",
+          "title": "新对话",
+          "folderId": "folder-life-001",
+          "createdAt": 1773747380125,
+          "updatedAt": 1773747380125,
+          "messageCount": 0,
+          "starred": false,
+          "messages": []
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "defaultFolderExpanded": true
+  },
+  "lastVisitedThreadId": "thread-1773743402959"
+}

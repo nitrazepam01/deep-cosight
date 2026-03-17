@@ -611,6 +611,7 @@ const AppState = {
     renamingThreadId: null,
     deletingThreadId: null,
     deletingFolderId: null,
+    initialized: false
 };
 
 // ==================== 侧边栏控制 ====================
@@ -789,6 +790,15 @@ function createFolderItem(folder) {
         
         if (folder.id === 'default') {
             AppState.defaultFolderExpanded = newExpandedState;
+            // 使用 SessionService 更新设置
+            if (window.SessionService) {
+                window.SessionService.save(); // 只保存到 localStorage
+            }
+        } else {
+            // 使用 SessionService 更新文件夹展开状态
+            if (window.SessionService) {
+                window.SessionService.updateFolder(folder.id, { expanded: newExpandedState });
+            }
         }
         
         if (newExpandedState) {
@@ -796,7 +806,6 @@ function createFolderItem(folder) {
         } else {
             playCollapseAnimation(content, toggle, folderIcon);
         }
-        saveState();
     });
     
     if (folder.isDefault) {
@@ -830,6 +839,9 @@ function createFolderItem(folder) {
     return div;
 }
 
+/**
+ * 渲染文件夹中的会话列表（按最后消息时间排序，最近的在上面）
+ */
 function renderFolderThreads(folder, folderItem) {
     const threadsContainer = folderItem.querySelector('.folder-threads');
     if (!threadsContainer) return;
@@ -837,10 +849,154 @@ function renderFolderThreads(folder, folderItem) {
     threadsContainer.innerHTML = '';
     
     const threads = folder.threads || [];
-    threads.forEach(thread => {
+    
+    // 按 updatedAt 降序排序（最近的在上面）
+    const sortedThreads = [...threads].sort((a, b) => {
+        return (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
+    
+    sortedThreads.forEach(thread => {
         const threadItem = createThreadItem(thread, folder.id);
         threadsContainer.appendChild(threadItem);
     });
+}
+
+/**
+ * 渲染文件夹列表并应用上浮动画
+ * 1. 先按旧顺序渲染列表（保持原位置）
+ * 2. 应用 transform 动画让当前会话上浮到顶部
+ * 3. 动画结束后重新渲染（新顺序）
+ */
+function renderFolderListWithAnimation(threadId, originalIndex) {
+    const thread = getThreadById(threadId);
+    if (!thread) {
+        renderFolderList();
+        return;
+    }
+    
+    // 第一步：按旧顺序渲染列表（不更新 updatedAt，保持原位置）
+    renderFolderList();
+    
+    // 等待 DOM 渲染完成
+    setTimeout(() => {
+        // 获取渲染后的列表
+        const threadsContainer = document.querySelector('.folder-threads');
+        if (!threadsContainer) return;
+        
+        const threadItem = document.querySelector(`.thread-item[data-thread-id="${threadId}"]`);
+        if (!threadItem) return;
+        
+        // 获取所有同级会话（按当前 DOM 顺序）
+        const allThreads = Array.from(threadsContainer.querySelectorAll('.thread-item'));
+        const currentIndex = allThreads.indexOf(threadItem);
+        
+        // 如果已经在顶部，不需要动画，直接更新数据
+        if (currentIndex <= 0) {
+            thread.updatedAt = Date.now();
+            renderFolderList();
+            return;
+        }
+        
+        // 获取当前会话的高度（包括 margin）
+        const threadHeight = threadItem.offsetHeight + 2;
+        
+        // 计算上浮距离：需要上浮到顶部，距离 = -(currentIndex * threadHeight)
+        const floatDistance = -(currentIndex * threadHeight);
+        
+        // 关键：先设置 CSS 变量，但不添加动画类
+        // 这样元素会立即应用 transform，但因为我们设置了 transition，会有动画效果
+        threadItem.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+        threadItem.style.zIndex = '10';
+        
+        // 为其他会话设置下移动画
+        allThreads.forEach((t, index) => {
+            if (index < currentIndex) {
+                t.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease';
+                t.style.setProperty('--shift-distance', `${threadHeight}px`);
+                t.style.transform = `translateY(var(--shift-distance))`;
+                t.style.opacity = '0.7';
+            }
+        });
+        
+        // 强制浏览器重排，确保上面的样式先应用
+        threadItem.offsetHeight;
+        
+        // 然后应用上浮 transform
+        threadItem.style.transform = `translateY(${floatDistance}px)`;
+        
+        // 动画结束后，更新数据并重新渲染
+        setTimeout(() => {
+            // 更新 updatedAt，让会话在数据层面排到第一位
+            thread.updatedAt = Date.now();
+            
+            // 重新渲染列表（新顺序）
+            renderFolderList();
+            
+            // 给新位置的会话添加淡入效果
+            const newThreadItem = document.querySelector(`.thread-item[data-thread-id="${threadId}"]`);
+            if (newThreadItem) {
+                newThreadItem.classList.add('thread-reorder-in');
+                setTimeout(() => {
+                    newThreadItem.classList.remove('thread-reorder-in');
+                }, 300);
+            }
+        }, 500); // 与动画时长匹配
+    }, 50);
+}
+
+/**
+ * 对指定会话项添加上浮到顶部的动画（带动画重排序效果）
+ * 当前会话上浮，其他会话下移，形成交换位置的感觉
+ */
+function animateThreadFloatToTop(threadId) {
+    const threadsContainer = document.querySelector('.folder-threads');
+    if (!threadsContainer) return;
+    
+    const threadItem = document.querySelector(`.thread-item[data-thread-id="${threadId}"]`);
+    if (!threadItem) return;
+    
+    // 获取所有同级会话
+    const allThreads = Array.from(threadsContainer.querySelectorAll('.thread-item'));
+    
+    // 如果已经是第一个，不需要动画
+    const currentIndex = allThreads.indexOf(threadItem);
+    if (currentIndex === 0) return;
+    
+    // 获取当前会话的高度（包括 margin）
+    const threadHeight = threadItem.offsetHeight + 2; // 44px + 2px gap
+    
+    // 计算上浮距离：当前索引 * 会话高度（负值表示向上）
+    const floatDistance = -(currentIndex * threadHeight);
+    
+    // 为当前会话设置上浮距离变量并添加动画
+    threadItem.style.setProperty('--float-distance', `${floatDistance}px`);
+    threadItem.classList.add('thread-float-to-top');
+    
+    // 为所有在它上面的会话添加下移动画
+    // 这些会话需要下移一个会话高度的位置
+    allThreads.forEach((thread, index) => {
+        if (index < currentIndex) {
+            // 在它上面的会话，下移一个会话高度
+            thread.style.setProperty('--shift-distance', `${threadHeight}px`);
+            thread.classList.add('thread-shift-down');
+            // 动画结束后移除类
+            setTimeout(() => {
+                thread.classList.remove('thread-shift-down');
+                thread.style.setProperty('--shift-distance', '46px');
+            }, 500);
+        }
+    });
+    
+    // 上浮动画结束后，重新渲染列表（此时数据已经排序，会话会在正确位置）
+    setTimeout(() => {
+        threadItem.classList.remove('thread-float-to-top');
+        threadItem.style.setProperty('--float-distance', '-52px');
+        // 触发淡入效果
+        threadItem.classList.add('thread-reorder-in');
+        setTimeout(() => {
+            threadItem.classList.remove('thread-reorder-in');
+        }, 300);
+    }, 500);
 }
 
 function createThreadItem(thread, folderId) {
@@ -848,6 +1004,7 @@ function createThreadItem(thread, folderId) {
     div.className = 'thread-item';
     div.dataset.threadId = thread.id;
     div.draggable = true;
+    
     if (thread.id === AppState.currentThreadId) {
         div.classList.add('active');
     }
@@ -992,7 +1149,16 @@ function initFolderDragDrop() {
     });
 }
 
-function createNewFolder(name) {
+async function createNewFolder(name) {
+    // 使用 SessionService 创建文件夹
+    if (window.SessionService) {
+        const newFolder = await window.SessionService.createFolder(name);
+        // syncToAppState 已经在 createFolder 中调用，但需要重新渲染 UI
+        syncFromSessionService();
+        return newFolder;
+    }
+    
+    // 降级方案
     const folder = {
         id: generateUniqueId('folder'),
         name: name,
@@ -1002,12 +1168,32 @@ function createNewFolder(name) {
     
     AppState.folders.push(folder);
     renderFolderList();
-    saveState();
+    await saveState();
     
     return folder;
 }
 
-function deleteFolder(folderId) {
+async function deleteFolder(folderId) {
+    // 使用 SessionService 删除文件夹
+    if (window.SessionService) {
+        // 检查是否有线程在当前文件夹中
+        const folder = window.SessionService.getFolder(folderId);
+        if (folder) {
+            const threadIdsInFolder = (folder.threads || []).map(t => t.id);
+            if (threadIdsInFolder.includes(AppState.currentThreadId)) {
+                AppState.currentThreadId = null;
+                loadMessages([]);
+                document.getElementById('conversation-title').textContent = '新对话';
+            }
+        }
+        
+        await window.SessionService.deleteFolder(folderId);
+        // syncToAppState 已经在 deleteFolder 中调用，但需要重新渲染 UI
+        syncFromSessionService();
+        return;
+    }
+    
+    // 降级方案
     const index = AppState.folders.findIndex(f => f.id === folderId);
     if (index !== -1) {
         const folder = AppState.folders[index];
@@ -1020,11 +1206,20 @@ function deleteFolder(folderId) {
         
         AppState.folders.splice(index, 1);
         renderFolderList();
-        saveState();
+        await saveState();
     }
 }
 
-function moveThreadToFolder(threadId, targetFolderId) {
+async function moveThreadToFolder(threadId, targetFolderId) {
+    // 使用 SessionService 移动会话
+    if (window.SessionService) {
+        await window.SessionService.moveThreadToFolder(threadId, targetFolderId);
+        // syncToAppState 已经在 moveThreadToFolder 中调用，但需要重新渲染 UI
+        syncFromSessionService();
+        return;
+    }
+    
+    // 降级方案
     let sourceThread = null;
     let sourceArray = null;
     let sourceIndex = -1;
@@ -1070,7 +1265,7 @@ function moveThreadToFolder(threadId, targetFolderId) {
     }
     
     renderFolderList();
-    saveState();
+    await saveState();
 }
 
 // ==================== 线程管理 ====================
@@ -1078,10 +1273,13 @@ function moveThreadToFolder(threadId, targetFolderId) {
 function getThreadById(threadId) {
     let thread = AppState.ungroupedThreads.find(t => t.id === threadId);
     if (!thread) {
-        AppState.folders.forEach(folder => {
+        for (const folder of AppState.folders) {
             const found = (folder.threads || []).find(t => t.id === threadId);
-            if (found) thread = found;
-        });
+            if (found) {
+                thread = found;
+                break;
+            }
+        }
     }
     return thread;
 }
@@ -1114,10 +1312,19 @@ function createNewThread(title, folderId = null) {
     return thread;
 }
 
-function switchThread(threadId) {
+async function switchThread(threadId) {
     if (threadId === AppState.currentThreadId) return;
     
     AppState.currentThreadId = threadId;
+    
+    // 获取当前会话所在的文件夹 ID
+    const thread = getThreadById(threadId);
+    const folderId = thread ? (thread.folderId || 'default') : 'default';
+    
+    // 记录访问的会话 ID 到后端 JSON 文件（存储文件夹 id+ 会话 id 的元组）
+    if (window.SessionService) {
+        await window.SessionService.setLastVisitedThreadId(threadId, folderId);
+    }
     
     updateThreadActiveState();
     loadThread(threadId);
@@ -1235,6 +1442,24 @@ function updateCurrentThread() {
         thread.updatedAt = Date.now();
         thread.messageCount = (thread.messages || []).length;
         saveState();
+        
+        // 在渲染列表之前，先记录当前会话的原始索引位置
+        const threadsContainer = document.querySelector('.folder-threads');
+        if (threadsContainer) {
+            const allThreads = Array.from(threadsContainer.querySelectorAll('.thread-item'));
+            const originalIndex = allThreads.findIndex(t => t.dataset.threadId === thread.id);
+            
+            // 只有当会话不在顶部时才播放动画
+            if (originalIndex > 0) {
+                // 先应用动画类，然后再渲染列表
+                // 这样动画会和列表重排同步进行
+                renderFolderListWithAnimation(thread.id, originalIndex);
+                return;
+            }
+        }
+        
+        // 没有动画，直接渲染列表
+        renderFolderList();
     }
 }
 
@@ -1542,11 +1767,33 @@ function initInputArea() {
     }
 }
 
+// 任务执行中状态
+let isTaskExecuting = false;
+
+/**
+ * 更新发送按钮状态
+ */
+function updateSendButtonState() {
+    const sendBtn = document.getElementById('send-btn');
+    const chatInput = document.getElementById('chat-input');
+    if (sendBtn && chatInput) {
+        if (isTaskExecuting) {
+            sendBtn.disabled = true;
+            sendBtn.classList.add('disabled');
+            chatInput.disabled = true;
+        } else {
+            sendBtn.disabled = false;
+            sendBtn.classList.remove('disabled');
+            chatInput.disabled = false;
+        }
+    }
+}
+
 function sendMessage() {
     const chatInput = document.getElementById('chat-input');
     const message = chatInput.value.trim();
     
-    if (!message) return;
+    if (!message || isTaskExecuting) return;
     
     const userMessage = {
         role: 'user',
@@ -1559,9 +1806,7 @@ function sendMessage() {
     if (thread) {
         if (!thread.messages) thread.messages = [];
         thread.messages.push(userMessage);
-        thread.updatedAt = Date.now();
-        thread.messageCount = thread.messages.length;
-        saveState();
+        // 注意：不在这里更新 updatedAt 和 messageCount，让 updateCurrentThread 处理
     }
     
     // 然后添加到 UI 显示
@@ -1575,7 +1820,6 @@ function sendMessage() {
 }
 
 async function sendToBackend(message) {
-    console.log('sendToBackend 被调用，message:', message);
     try {
         // 使用 WebSocket 发送消息（与 main.js 保持一致）
         if (!window.messageService || !window.WebSocketService) {
@@ -1589,23 +1833,14 @@ async function sendToBackend(message) {
             return;
         }
         
-        console.log('WebSocketService 状态:', WebSocketService.getConnectionInfo());
-        console.log('messageService 存在:', !!window.messageService);
-        
         // 检查是否为测试命令 - 测试命令绕过 WebSocket，直接显示 AI 回复
         if (message === '测试') {
-            console.log('检测到测试命令，绕过 WebSocket 直接显示 AI 回复');
             await handleTestCommand();
             return;
         }
         
         // 调用 messageService.sendMessage 通过 WebSocket 发送
-        console.log('准备调用 messageService.sendMessage, message:', message);
         window.messageService.sendMessage(message);
-        console.log('messageService.sendMessage 调用完成');
-        
-        // WebSocket 消息会通过 receiveMessage 回调接收，不需要在这里处理响应
-        // 消息会显示在 DAG 区域和工具面板中
         
     } catch (error) {
         console.error('发送消息失败:', error);
@@ -1640,27 +1875,26 @@ function initWebSocketMessageHandler() {
         handleWebSocketMessage(message);
     };
     
-    console.log('WebSocket 消息监听已初始化');
 }
 
 // 处理 WebSocket 消息
 function handleWebSocketMessage(message) {
     try {
         const messageData = typeof message === 'string' ? JSON.parse(message) : message;
-        console.log('main-new.js 收到消息:', messageData);
         
         // 检查是否是 lui-message-manus-step 类型的消息（DAG 步骤消息）
         const messageType = messageData.data?.contentType || messageData.data?.type;
         
         if (messageType === 'lui-message-manus-step') {
-            // DAG 步骤消息，已经在 message.js 中处理
-            console.log('收到 DAG 步骤消息');
+            // DAG 步骤消息，任务开始执行
+            isTaskExecuting = true;
+            updateSendButtonState();
+            // 已经在 message.js 中处理
             return;
         }
         
         if (messageType === 'lui-message-tool-event') {
             // 工具事件消息，已经在 message.js 中处理
-            console.log('收到工具事件消息');
             return;
         }
         
@@ -1700,8 +1934,19 @@ function handleWebSocketMessage(message) {
                     
                     // 添加到 UI 显示
                     addMessage(assistantMessage);
+                    
+                    // 任务执行结束，恢复发送按钮
+                    isTaskExecuting = false;
+                    updateSendButtonState();
                 }
             }
+        }
+        
+        // 检查是否是控制类结束信号
+        if (messageData.data && messageData.data.type === 'control-status-message') {
+            // 任务执行结束，恢复发送按钮
+            isTaskExecuting = false;
+            updateSendButtonState();
         }
     } catch (error) {
         console.error('处理 WebSocket 消息失败:', error);
@@ -1876,18 +2121,153 @@ function updateProgressStats(stats) {
     if (progressText) progressText.textContent = percentage + '%';
 }
 
-// ==================== 状态持久化 ====================
+// ==================== 状态持久化（使用 SessionService）====================
 
-function saveState() {
-    const state = {
-        folders: AppState.folders,
-        ungroupedThreads: AppState.ungroupedThreads,
-        currentThreadId: AppState.currentThreadId
-    };
-    localStorage.setItem('cosight:state', JSON.stringify(state));
+/**
+ * 同步 SessionService 数据到 AppState
+ */
+function syncSessionServiceToAppState() {
+    if (!window.SessionService || !window.SessionService.sessionsData) {
+        console.warn('syncSessionServiceToAppState: SessionService 或 sessionsData 不存在');
+        return;
+    }
+    
+    const sessionsData = window.SessionService.sessionsData;
+    
+    // 深拷贝文件夹数据（排除默认分组），避免引用被后续修改
+    AppState.folders = JSON.parse(JSON.stringify(sessionsData.folders.filter(f => !f.isDefault)));
+    
+    // 深拷贝默认分组的会话
+    const defaultFolder = sessionsData.folders.find(f => f.isDefault);
+    AppState.ungroupedThreads = defaultFolder?.threads ? JSON.parse(JSON.stringify(defaultFolder.threads)) : [];
+    
+    // 同步设置
+    AppState.defaultFolderExpanded = window.SessionService.getSetting('defaultFolderExpanded', true);
 }
 
-function loadState() {
+/**
+ * 保存状态到 SessionService（只保存到 localStorage）
+ * 注意：具体的数据操作（创建、删除、更新文件夹/会话）应该使用 SessionService 的细粒度 API 方法
+ * 
+ * 重要：这个函数主要用于保存以下操作后的状态：
+ * 1. 消息添加/更新（通过 addMessage 调用）
+ * 2. 线程消息计数更新
+ * 
+ * 对于文件夹/会话的结构变更（创建、删除、移动、重命名、标星），
+ * 应该直接使用 SessionService 的细粒度 API 方法
+ */
+async function saveState() {
+    if (!window.SessionService) {
+        // 降级方案：使用 localStorage
+        const state = {
+            folders: AppState.folders,
+            ungroupedThreads: AppState.ungroupedThreads,
+            currentThreadId: AppState.currentThreadId
+        };
+        localStorage.setItem('cosight:state', JSON.stringify(state));
+        return;
+    }
+    
+    // 同步 AppState 到 SessionService.sessionsData
+    const sessionsData = window.SessionService.sessionsData;
+    if (sessionsData) {
+        // 更新默认分组的会话（深拷贝）
+        const defaultFolder = sessionsData.folders.find(f => f.isDefault);
+        if (defaultFolder) {
+            defaultFolder.threads = JSON.parse(JSON.stringify(AppState.ungroupedThreads));
+        }
+        
+        // 同步所有文件夹
+        AppState.folders.forEach(appFolder => {
+            let existingFolder = sessionsData.folders.find(f => f.id === appFolder.id);
+            if (existingFolder) {
+                existingFolder.name = appFolder.name;
+                existingFolder.expanded = appFolder.expanded;
+                existingFolder.threads = JSON.parse(JSON.stringify(appFolder.threads));
+            } else {
+                sessionsData.folders.push({
+                    id: appFolder.id,
+                    name: appFolder.name,
+                    isDefault: false,
+                    expanded: appFolder.expanded,
+                    createdAt: Date.now(),
+                    threads: JSON.parse(JSON.stringify(appFolder.threads))
+                });
+            }
+        });
+        
+        // 移除在 AppState 中不存在的文件夹
+        sessionsData.folders = sessionsData.folders.filter(f => {
+            if (f.isDefault) return true;
+            return AppState.folders.some(af => af.id === f.id);
+        });
+        
+        sessionsData.updatedAt = Date.now();
+        
+        // 只保存到 localStorage
+        window.SessionService.save();
+    }
+}
+
+/**
+ * 从 SessionService 同步数据到 AppState（用于操作后刷新 UI）
+ */
+function syncFromSessionService() {
+    if (window.SessionService && window.SessionService.sessionsData) {
+        window.SessionService.syncToAppState();
+        renderFolderList();
+    }
+}
+
+/**
+ * 从 SessionService 加载状态
+ * 返回 lastVisited 信息供 initThreeColumnLayout 使用
+ */
+async function loadState() {
+    let lastVisited = null;
+    
+    // 优先使用 SessionService 加载（会从 JSON 文件或 localStorage 读取）
+    if (window.SessionService && typeof window.SessionService.init === 'function') {
+        try {
+            await window.SessionService.init();
+            // 使用 SessionService 的 syncToAppState 方法同步数据
+            window.SessionService.syncToAppState();
+            AppState.initialized = true;
+            
+            // 获取上次访问的会话 ID（使用新的元组格式）
+            // 注意：getLastVisitedThread 从 sessionsData 读取，而 sessionsData 在 init() 中已设置
+            lastVisited = window.SessionService.getLastVisitedThread();
+            
+            // 验证会话是否存在
+            if (lastVisited && lastVisited.threadId) {
+                const thread = getThreadById(lastVisited.threadId);
+                if (thread) {
+                    AppState.currentThreadId = lastVisited.threadId;
+                    return { lastVisited, restored: true };
+                }
+            }
+            
+            // 如果没有上次访问记录或会话不存在，检查是否有其他会话
+            const allThreads = window.SessionService.getAllThreads();
+            if (allThreads.length > 0) {
+                // 有会话但未访问过，使用第一个会话
+                AppState.currentThreadId = allThreads[0].id;
+                return { lastVisited: null, restored: false };
+            } else {
+                // 没有任何会话，创建一个新会话
+                const newThread = await window.SessionService.createThreadInDefault('新对话');
+                AppState.currentThreadId = newThread.id;
+                window.SessionService.syncToAppState();
+                return { lastVisited: null, restored: false };
+            }
+            
+            return { lastVisited: null, restored: false };
+        } catch (error) {
+            console.error('SessionService 初始化失败，使用降级方案:', error);
+        }
+    }
+    
+    // 降级方案：使用 localStorage
     const saved = localStorage.getItem('cosight:state');
     if (saved) {
         try {
@@ -1911,6 +2291,9 @@ function loadState() {
     } else {
         AppState.defaultFolderExpanded = true;
     }
+    AppState.initialized = true;
+    
+    return { lastVisited: null, restored: false };
 }
 
 function formatTime(timestamp) {
@@ -1933,33 +2316,96 @@ function getTimeAgo(timestamp) {
 function toggleThreadStar(threadId) {
     const thread = getThreadById(threadId);
     if (thread) {
+        // 1. 先立即更新本地数据（确保 UI 立即响应）
         thread.starred = !thread.starred;
-        renderFolderList();
+        
+        // 2. 立即重绘 UI（更新星号按钮状态）
+        const threadItem = document.querySelector(`.thread-item[data-thread-id="${threadId}"]`);
+        if (threadItem) {
+            const starBtn = threadItem.querySelector('.thread-item-star');
+            if (starBtn) {
+                starBtn.classList.toggle('starred');
+            }
+            threadItem.classList.toggle('starred');
+        }
+        
+        // 3. 保存到 localStorage
         saveState();
+        
+        // 4. 异步调用后端 API（不阻塞 UI）
+        if (window.SessionService) {
+            window.SessionService._put(`/thread/${threadId}`, { starred: thread.starred })
+                .catch(error => {
+                    console.error('[toggleThreadStar] 后端更新失败:', error);
+                });
+        }
     }
 }
 
-function deleteThread(threadId) {
-    const defaultIndex = AppState.ungroupedThreads.findIndex(t => t.id === threadId);
-    if (defaultIndex !== -1) {
-        AppState.ungroupedThreads.splice(defaultIndex, 1);
-    }
+async function deleteThread(threadId) {
+    const isCurrentThread = (threadId === AppState.currentThreadId);
     
-    AppState.folders.forEach(folder => {
-        const threadIndex = (folder.threads || []).findIndex(t => t.id === threadId);
-        if (threadIndex !== -1) {
-            folder.threads.splice(threadIndex, 1);
+    // 使用 SessionService 删除会话
+    if (window.SessionService) {
+        await window.SessionService.deleteThread(threadId);
+        // syncToAppState 已经在 deleteThread 中调用，但需要重新渲染 UI
+        syncFromSessionService();
+    } else {
+        // 降级方案
+        const defaultIndex = AppState.ungroupedThreads.findIndex(t => t.id === threadId);
+        if (defaultIndex !== -1) {
+            AppState.ungroupedThreads.splice(defaultIndex, 1);
         }
-    });
-    
-    if (threadId === AppState.currentThreadId) {
-        AppState.currentThreadId = null;
-        loadMessages([]);
-        document.getElementById('conversation-title').textContent = '新对话';
+        
+        AppState.folders.forEach(folder => {
+            const threadIndex = (folder.threads || []).findIndex(t => t.id === threadId);
+            if (threadIndex !== -1) {
+                folder.threads.splice(threadIndex, 1);
+            }
+        });
+        renderFolderList();
+        await saveState();
     }
     
+    // 如果删除的是当前会话，自动创建新会话并定位
+    if (isCurrentThread) {
+        await createNewThreadAndSwitch();
+    }
+}
+
+/**
+ * 创建新会话并切换（删除当前会话时使用）
+ */
+async function createNewThreadAndSwitch() {
+    let newThread;
+    
+    if (window.SessionService) {
+        // 使用 SessionService 创建新会话
+        newThread = await window.SessionService.createThreadInDefault('新对话');
+        syncSessionServiceToAppState();
+    } else {
+        // 降级方案
+        newThread = {
+            id: generateUniqueId('thread'),
+            title: '新对话',
+            folderId: 'default',
+            updatedAt: Date.now(),
+            messageCount: 0,
+            messages: []
+        };
+        AppState.ungroupedThreads.push(newThread);
+    }
+    
+    // 切换到新会话
+    AppState.currentThreadId = newThread.id;
     renderFolderList();
-    saveState();
+    await saveState();
+    
+    // 加载空消息列表
+    loadMessages([]);
+    document.getElementById('conversation-title').textContent = '新对话';
+    
+    return newThread;
 }
 
 // ==================== 重命名弹窗 ====================
@@ -1996,12 +2442,33 @@ function confirmRename() {
     if (newName && AppState.renamingThreadId) {
         const thread = getThreadById(AppState.renamingThreadId);
         if (thread) {
+            // 1. 先立即更新本地数据（确保 UI 立即响应）
             thread.title = newName;
-            renderFolderList();
-            saveState();
             
+            // 2. 立即重绘 UI
+            // 更新左侧栏中的线程标题
+            const threadItem = document.querySelector(`.thread-item[data-thread-id="${AppState.renamingThreadId}"]`);
+            if (threadItem) {
+                const titleEl = threadItem.querySelector('.thread-item-title');
+                if (titleEl) {
+                    titleEl.textContent = newName;
+                }
+            }
+            
+            // 更新顶部标题（如果是当前会话）
             if (AppState.renamingThreadId === AppState.currentThreadId) {
                 document.getElementById('conversation-title').textContent = newName;
+            }
+            
+            // 3. 保存到 localStorage
+            saveState();
+            
+            // 4. 异步调用后端 API（不阻塞 UI）
+            if (window.SessionService) {
+                window.SessionService._put(`/thread/${AppState.renamingThreadId}`, { title: newName })
+                    .catch(error => {
+                        console.error('[confirmRename] 后端更新失败:', error);
+                    });
             }
         }
     }
@@ -2286,7 +2753,19 @@ function getFolderById(folderId) {
     return null;
 }
 
-function createNewThreadInFolder(folderId) {
+async function createNewThreadInFolder(folderId) {
+    // 使用 SessionService 创建会话
+    if (window.SessionService) {
+        const newThread = await window.SessionService.createThread('新对话', folderId);
+        // syncToAppState 已经在 createThread 中调用，但需要重新渲染 UI
+        syncFromSessionService();
+        
+        // 切换到新会话
+        switchThread(newThread.id);
+        return newThread;
+    }
+    
+    // 降级方案
     let wasExpanded;
     let targetFolder = null;
     
@@ -2378,8 +2857,6 @@ function initSettingsModal() {
 // ==================== 初始化 ====================
 
 function initThreeColumnLayout() {
-    loadState();
-    
     // 初始化气泡颜色主题
     initBubbleColorTheme();
     
@@ -2392,7 +2869,6 @@ function initThreeColumnLayout() {
         
         // 等待 WebSocket 连接建立后设置消息处理
         WebSocketService.websocketConnected.addEventListener('connected', function() {
-            console.log('WebSocket 连接已建立，设置消息处理...');
             setupPendingRequests();
         });
     }
@@ -2412,15 +2888,80 @@ function initThreeColumnLayout() {
     // 初始化 WebSocket 消息监听（必须在 renderFolderList 之前）
     initWebSocketMessageHandler();
     
-    renderFolderList();
-    
-    if (AppState.folders.length === 0 && AppState.ungroupedThreads.length === 0) {
-        loadExampleData();
-    }
-    
-    if (AppState.currentThreadId) {
-        loadThread(AppState.currentThreadId);
-    }
+    // 先加载状态，等待加载完成后再渲染
+    loadState().then((loadResult) => {
+        console.log('[initThreeColumnLayout] loadResult:', loadResult);
+        console.log('[initThreeColumnLayout] AppState.currentThreadId:', AppState.currentThreadId);
+        console.log('[initThreeColumnLayout] AppState.folders:', AppState.folders);
+        console.log('[initThreeColumnLayout] AppState.ungroupedThreads:', AppState.ungroupedThreads);
+        
+        // 在渲染前展开对应的文件夹
+        let lastVisitedFolderId = null;
+        if (loadResult && loadResult.lastVisited && loadResult.restored) {
+            const lastVisited = loadResult.lastVisited;
+            lastVisitedFolderId = lastVisited.folderId;
+            console.log('[initThreeColumnLayout] 恢复上次访问的会话:', lastVisited);
+            
+            if (lastVisited.folderId === 'default') {
+                AppState.defaultFolderExpanded = true;
+            } else {
+                const folder = AppState.folders.find(f => f.id === lastVisited.folderId);
+                if (folder) {
+                    folder.expanded = true;
+                    console.log('[initThreeColumnLayout] 设置文件夹展开:', folder.id);
+                } else {
+                    console.warn('[initThreeColumnLayout] 未找到文件夹:', lastVisited.folderId);
+                }
+            }
+        }
+        
+        // 渲染文件夹列表
+        renderFolderList();
+        
+        // 使用 setTimeout 确保 DOM 已经完全渲染
+        setTimeout(() => {
+            console.log('[initThreeColumnLayout] setTimeout 开始更新 UI');
+            
+            // 1. 首先展开对应的文件夹（调用 UI 动画）
+            if (lastVisitedFolderId) {
+                const folderItem = document.querySelector(`.folder-item[data-folder-id="${lastVisitedFolderId}"]`);
+                if (folderItem) {
+                    const content = folderItem.querySelector('.folder-content');
+                    const toggle = folderItem.querySelector('.folder-toggle');
+                    const folderIcon = folderItem.querySelector('.folder-icon');
+                    
+                    if (content && toggle && folderIcon) {
+                        // 强制展开动画
+                        content.classList.add('expanded');
+                        toggle.classList.add('expanded');
+                        folderIcon.classList.add('expanded');
+                        console.log('[initThreeColumnLayout] 文件夹展开动画已应用:', lastVisitedFolderId);
+                    }
+                } else {
+                    console.warn('[initThreeColumnLayout] 未找到文件夹 DOM 元素:', lastVisitedFolderId);
+                }
+            }
+            
+            // 2. 渲染后更新 active 状态
+            updateThreadActiveState();
+            console.log('[initThreeColumnLayout] updateThreadActiveState 已调用');
+            
+            // 3. 只有当没有任何数据时才加载示例数据
+            if (AppState.folders.length === 0 && AppState.ungroupedThreads.length === 0) {
+                loadExampleData();
+            }
+            
+            // 4. 最后加载会话内容
+            if (AppState.currentThreadId) {
+                console.log('[initThreeColumnLayout] 加载会话内容:', AppState.currentThreadId);
+                loadThread(AppState.currentThreadId);
+            } else {
+                console.warn('[initThreeColumnLayout] 没有当前会话 ID');
+            }
+        }, 100); // 增加延迟确保 DOM 渲染完成
+    }).catch((error) => {
+        console.error('[initThreeColumnLayout] loadState 失败:', error);
+    });
 }
 
 // 检查是否有 pending 的请求需要重发
@@ -2431,14 +2972,12 @@ function setupPendingRequests() {
             const pendings = JSON.parse(pendingRaw);
             Object.entries(pendings).forEach(([topic, data]) => {
                 if (data && data.message) {
-                    console.log('恢复 pending 订阅:', topic);
                     // 重新订阅
                     if (window.messageService) {
                         WebSocketService.subscribe(topic, messageService.receiveMessage.bind(messageService));
                     }
                     // 仅当明确 stillPending===true 时才重发，避免刷新重复执行
                     if (data.stillPending === true) {
-                        console.log('重发 pending 请求:', topic);
                         WebSocketService.sendMessage(topic, JSON.stringify(data.message));
                     }
                 }
@@ -2483,14 +3022,11 @@ let testMarkdownContent = null;
  * 当用户输入"测试"时，直接作为 AI 回复显示 Markdown 测试文档内容
  */
 async function handleTestCommand() {
-    console.log("处理测试命令，直接显示 AI 回复...");
-
     // 隐藏思考状态
     hideThinkingState();
 
     // 如果已缓存，直接使用
     if (testMarkdownContent) {
-        console.log("使用缓存的测试内容");
         showTestContentAsAIReply(testMarkdownContent);
         return;
     }
@@ -2502,10 +3038,8 @@ async function handleTestCommand() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         testMarkdownContent = await response.text();
-        console.log("测试文档加载成功，长度:", testMarkdownContent.length);
         showTestContentAsAIReply(testMarkdownContent);
     } catch (error) {
-        console.error("加载测试文档失败:", error);
         addMessage({
             role: 'assistant',
             content: `加载测试内容失败：${error.message}`,
@@ -2536,8 +3070,6 @@ function showTestContentAsAIReply(content) {
     
     // 添加到 UI 显示
     addMessage(assistantMessage);
-    
-    console.log("测试内容已作为 AI 回复显示");
 }
 
 // ==================== THINKING_MODE 切换功能 ====================
@@ -2571,7 +3103,6 @@ function toggleThinkingMode() {
     thinkingModeEnabled = !thinkingModeEnabled;
     localStorage.setItem('cosight:thinkingMode', thinkingModeEnabled.toString());
     updateThinkingModeButton();
-    console.log('Thinking Mode:', thinkingModeEnabled ? '已开启' : '已关闭');
 }
 
 // 暴露到全局

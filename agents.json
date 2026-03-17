@@ -5,7 +5,7 @@
   },
   "actor": {
     "builtin": "任务执行专家",
-    "is_default": "nm"
+    "is_default": "任务执行专家"
   },
   "agents": [
     {
