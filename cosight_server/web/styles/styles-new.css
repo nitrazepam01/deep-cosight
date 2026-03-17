@@ -329,6 +329,10 @@ body {
     min-height: 0;
 }
 
+.folder-threads.thread-list-locked {
+    pointer-events: none;
+}
+
 .ungrouped-container {
     margin-bottom: 4px;
 }
@@ -356,83 +360,6 @@ body {
 
 /* 上浮动画 - 用于会话发送消息后上浮到顶部效果 */
 /* 当前会话上浮到第一个位置 - 使用 CSS 变量动态控制上浮距离 */
-@keyframes threadFloatToTop {
-    0% {
-        transform: translateY(0);
-        z-index: 10;
-    }
-    100% {
-        /* 上浮距离由 CSS 变量控制，根据上方会话数量动态计算 */
-        transform: translateY(var(--float-distance, -52px));
-        z-index: 10;
-    }
-}
-
-/* 其他会话下移动画 - 使用 CSS 变量动态控制下移距离 */
-@keyframes threadShiftDown {
-    0% {
-        transform: translateY(0);
-        opacity: 1;
-    }
-    100% {
-        /* 下移距离由 CSS 变量控制，形成交换效果 */
-        transform: translateY(var(--shift-distance, 46px));
-        opacity: 0.7;
-    }
-}
-
-/* 交换动画 - 当前会话与上方会话交换位置 */
-@keyframes threadSwapUp {
-    0% {
-        transform: translateY(0);
-        z-index: 10;
-    }
-    100% {
-        transform: translateY(var(--swap-distance, -46px));
-        z-index: 10;
-    }
-}
-
-@keyframes threadSwapDown {
-    0% {
-        transform: translateY(0);
-        z-index: 1;
-    }
-    100% {
-        transform: translateY(var(--swap-distance-down, 46px));
-        z-index: 1;
-    }
-}
-
-.thread-float-to-top {
-    animation: threadFloatToTop 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.thread-shift-down {
-    animation: threadShiftDown 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-/* 交换位置动画类 */
-.thread-swap-up {
-    animation: threadSwapUp 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.thread-swap-down {
-    animation: threadSwapDown 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-/* 重新排序时的淡出淡入效果 */
-@keyframes threadFadeOut {
-    0% {
-        opacity: 1;
-        transform: scale(1);
-    }
-    100% {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-}
-
 @keyframes threadFadeIn {
     0% {
         opacity: 0;
@@ -442,10 +369,6 @@ body {
         opacity: 1;
         transform: scale(1);
     }
-}
-
-.thread-reorder-out {
-    animation: threadFadeOut 0.25s ease-out forwards;
 }
 
 .thread-reorder-in {

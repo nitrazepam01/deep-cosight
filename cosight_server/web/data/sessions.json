@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updatedAt": 1773749366284,
+  "updatedAt": 1773764755357,
   "lastVisitedThread": {
     "folderId": "folder-life-001",
     "threadId": "thread-life-001"
@@ -14,11 +14,11 @@
       "createdAt": 1710604800000,
       "threads": [
         {
-          "id": "thread-1773746270682",
+          "id": "thread-1773761054582",
           "title": "新对话",
           "folderId": "default",
-          "createdAt": 1773746270682,
-          "updatedAt": 1773746270682,
+          "createdAt": 1773761054582,
+          "updatedAt": 1773761054582,
           "messageCount": 0,
           "starred": false,
           "messages": []
@@ -29,7 +29,7 @@
       "id": "folder-work-001",
       "name": "工作项目",
       "isDefault": false,
-      "expanded": true,
+      "expanded": false,
       "createdAt": 1710604800000,
       "threads": [
         {
@@ -58,7 +58,7 @@
       "id": "folder-study-001",
       "name": "学习资料",
       "isDefault": false,
-      "expanded": true,
+      "expanded": false,
       "createdAt": 1710604800000,
       "threads": [
         {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Co-Sight 三栏布局主逻辑
  * 
  * 注意：本文件需要与 message.js、dag.js、credibility.js 等配合使用
@@ -611,6 +611,7 @@ const AppState = {
     renamingThreadId: null,
     deletingThreadId: null,
     deletingFolderId: null,
+    isThreadReordering: false,
     initialized: false
 };
 
@@ -621,20 +622,20 @@ function initLeftSidebar() {
     const collapseBtn = document.getElementById('collapse-left-btn');
     const icon = collapseBtn.querySelector('i');
     const expandBtn = document.getElementById('sidebar-expand-btn');
-    
+
     if (!leftSidebar || !collapseBtn) return;
-    
+
     const savedState = localStorage.getItem('cosight:leftSidebarCollapsed');
     if (savedState === 'true') {
         leftSidebar.classList.add('collapsed');
         AppState.leftSidebarCollapsed = true;
         icon.classList.replace('fa-chevron-left', 'fa-chevron-right');
     }
-    
+
     collapseBtn.addEventListener('click', () => {
         toggleLeftSidebar();
     });
-    
+
     if (expandBtn) {
         expandBtn.addEventListener('click', () => {
             toggleLeftSidebar();
@@ -646,11 +647,11 @@ function toggleLeftSidebar() {
     const leftSidebar = document.getElementById('sidebar-left');
     const collapseBtn = document.getElementById('collapse-left-btn');
     const icon = collapseBtn.querySelector('i');
-    
+
     AppState.leftSidebarCollapsed = !AppState.leftSidebarCollapsed;
     leftSidebar.classList.toggle('collapsed');
     localStorage.setItem('cosight:leftSidebarCollapsed', AppState.leftSidebarCollapsed);
-    
+
     if (AppState.leftSidebarCollapsed) {
         icon.classList.replace('fa-chevron-left', 'fa-chevron-right');
     } else {
@@ -663,19 +664,19 @@ function initRightSidebar() {
     const expandBtn = document.getElementById('expand-right-btn');
     const closeBtn = document.getElementById('close-right-btn');
     const expandIcon = expandBtn.querySelector('i');
-    
+
     if (!rightSidebar || !expandBtn || !closeBtn) return;
-    
+
     const savedState = localStorage.getItem('cosight:rightSidebarCollapsed');
     if (savedState === 'true') {
         rightSidebar.classList.add('collapsed');
         AppState.rightSidebarCollapsed = true;
     }
-    
+
     expandBtn.addEventListener('click', () => {
         toggleRightSidebar();
     });
-    
+
     closeBtn.addEventListener('click', () => {
         rightSidebar.classList.add('collapsed');
         AppState.rightSidebarCollapsed = true;
@@ -687,11 +688,11 @@ function toggleRightSidebar() {
     const rightSidebar = document.getElementById('sidebar-right');
     const expandBtn = document.getElementById('expand-right-btn');
     const expandIcon = expandBtn.querySelector('i');
-    
+
     AppState.rightSidebarCollapsed = !AppState.rightSidebarCollapsed;
     rightSidebar.classList.toggle('collapsed');
     localStorage.setItem('cosight:rightSidebarCollapsed', AppState.rightSidebarCollapsed);
-    
+
     if (AppState.rightSidebarCollapsed) {
         expandIcon.classList.replace('fa-compress-alt', 'fa-expand-alt');
     } else {
@@ -716,9 +717,9 @@ function playCollapseAnimation(content, toggle, folderIcon) {
 function renderFolderList() {
     const folderList = document.getElementById('folder-list');
     if (!folderList) return;
-    
+
     folderList.innerHTML = '';
-    
+
     const defaultFolder = {
         id: 'default',
         name: '默认分组',
@@ -728,7 +729,7 @@ function renderFolderList() {
     };
     const defaultGroupContainer = createFolderItem(defaultFolder);
     folderList.appendChild(defaultGroupContainer);
-    
+
     AppState.folders.forEach(folder => {
         if (folder.expanded === undefined || folder.expanded === null) {
             folder.expanded = false;
@@ -742,12 +743,12 @@ function createFolderItem(folder) {
     const div = document.createElement('div');
     div.className = 'folder-item';
     div.dataset.folderId = folder.id;
-    
+
     if (folder.expanded === undefined || folder.expanded === null) {
         folder.expanded = false;
     }
     const isExpanded = folder.expanded;
-    
+
     const actionsHtml = folder.isDefault ? `
         <div class="folder-actions">
             <button class="folder-action-btn btn-add-thread-to-default" title="添加线程">
@@ -764,7 +765,7 @@ function createFolderItem(folder) {
             </button>
         </div>
     `;
-    
+
     div.innerHTML = `
         <div class="folder-header">
             <i class="fas fa-folder folder-icon ${isExpanded ? 'expanded' : ''}"></i>
@@ -776,18 +777,18 @@ function createFolderItem(folder) {
             <div class="folder-threads" data-folder-id="${folder.id}"></div>
         </div>
     `;
-    
+
     const header = div.querySelector('.folder-header');
     const content = div.querySelector('.folder-content');
     const toggle = div.querySelector('.folder-toggle');
     const folderIcon = div.querySelector('.folder-icon');
-    
+
     header.addEventListener('click', (e) => {
         if (e.target.closest('.folder-action-btn')) return;
-        
+
         const newExpandedState = !folder.expanded;
         folder.expanded = newExpandedState;
-        
+
         if (folder.id === 'default') {
             AppState.defaultFolderExpanded = newExpandedState;
             // 使用 SessionService 更新设置
@@ -800,14 +801,14 @@ function createFolderItem(folder) {
                 window.SessionService.updateFolder(folder.id, { expanded: newExpandedState });
             }
         }
-        
+
         if (newExpandedState) {
             playExpandAnimation(content, toggle, folderIcon);
         } else {
             playCollapseAnimation(content, toggle, folderIcon);
         }
     });
-    
+
     if (folder.isDefault) {
         const addThreadBtn = div.querySelector('.btn-add-thread-to-default');
         if (addThreadBtn) {
@@ -824,7 +825,7 @@ function createFolderItem(folder) {
                 createNewThreadInFolder(folder.id);
             });
         }
-        
+
         const deleteFolderBtn = div.querySelector('.btn-delete-folder');
         if (deleteFolderBtn) {
             deleteFolderBtn.addEventListener('click', (e) => {
@@ -833,9 +834,9 @@ function createFolderItem(folder) {
             });
         }
     }
-    
+
     renderFolderThreads(folder, div);
-    
+
     return div;
 }
 
@@ -845,16 +846,16 @@ function createFolderItem(folder) {
 function renderFolderThreads(folder, folderItem) {
     const threadsContainer = folderItem.querySelector('.folder-threads');
     if (!threadsContainer) return;
-    
+
     threadsContainer.innerHTML = '';
-    
+
     const threads = folder.threads || [];
-    
+
     // 按 updatedAt 降序排序（最近的在上面）
     const sortedThreads = [...threads].sort((a, b) => {
         return (b.updatedAt || 0) - (a.updatedAt || 0);
     });
-    
+
     sortedThreads.forEach(thread => {
         const threadItem = createThreadItem(thread, folder.id);
         threadsContainer.appendChild(threadItem);
@@ -867,136 +868,150 @@ function renderFolderThreads(folder, folderItem) {
  * 2. 应用 transform 动画让当前会话上浮到顶部
  * 3. 动画结束后重新渲染（新顺序）
  */
-function renderFolderListWithAnimation(threadId, originalIndex) {
+function getThreadsContainerByThread(thread) {
+    if (!thread) return null;
+    const folderId = thread.folderId || 'default';
+    return document.querySelector(`.folder-threads[data-folder-id="${folderId}"]`);
+}
+
+function getConvergentDurationBySteps(steps) {
+    const n = Math.max(1, steps);
+    const minTotalDuration = 2000;
+    const maxTotalDuration = 4000;
+    const ratio = 0.500;
+    const k = 0.250;
+
+    return k * (maxTotalDuration - minTotalDuration) * (1 - Math.pow(ratio, n));
+}
+
+function animateThreadFloatBySwap(threadId) {
     const thread = getThreadById(threadId);
     if (!thread) {
         renderFolderList();
-        return;
+        return Promise.resolve(false);
     }
-    
-    // 第一步：按旧顺序渲染列表（不更新 updatedAt，保持原位置）
-    renderFolderList();
-    
-    // 等待 DOM 渲染完成
-    setTimeout(() => {
-        // 获取渲染后的列表
-        const threadsContainer = document.querySelector('.folder-threads');
-        if (!threadsContainer) return;
-        
-        const threadItem = document.querySelector(`.thread-item[data-thread-id="${threadId}"]`);
-        if (!threadItem) return;
-        
-        // 获取所有同级会话（按当前 DOM 顺序）
-        const allThreads = Array.from(threadsContainer.querySelectorAll('.thread-item'));
-        const currentIndex = allThreads.indexOf(threadItem);
-        
-        // 如果已经在顶部，不需要动画，直接更新数据
-        if (currentIndex <= 0) {
-            thread.updatedAt = Date.now();
-            renderFolderList();
-            return;
-        }
-        
-        // 获取当前会话的高度（包括 margin）
-        const threadHeight = threadItem.offsetHeight + 2;
-        
-        // 计算上浮距离：需要上浮到顶部，距离 = -(currentIndex * threadHeight)
-        const floatDistance = -(currentIndex * threadHeight);
-        
-        // 关键：先设置 CSS 变量，但不添加动画类
-        // 这样元素会立即应用 transform，但因为我们设置了 transition，会有动画效果
-        threadItem.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
-        threadItem.style.zIndex = '10';
-        
-        // 为其他会话设置下移动画
-        allThreads.forEach((t, index) => {
-            if (index < currentIndex) {
-                t.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease';
-                t.style.setProperty('--shift-distance', `${threadHeight}px`);
-                t.style.transform = `translateY(var(--shift-distance))`;
-                t.style.opacity = '0.7';
+
+    const threadsContainer = getThreadsContainerByThread(thread);
+    if (!threadsContainer) {
+        renderFolderList();
+        return Promise.resolve(false);
+    }
+
+    const threadItem = threadsContainer.querySelector(`.thread-item[data-thread-id="${threadId}"]`);
+    if (!threadItem) {
+        renderFolderList();
+        return Promise.resolve(false);
+    }
+
+    const allThreads = Array.from(threadsContainer.querySelectorAll('.thread-item'));
+    const currentIndex = allThreads.indexOf(threadItem);
+    if (currentIndex <= 0) {
+        renderFolderList();
+        return Promise.resolve(false);
+    }
+
+    AppState.isThreadReordering = true;
+    threadsContainer.classList.add('thread-list-locked');
+    threadItem.style.willChange = 'transform';
+
+    const totalDuration = getConvergentDurationBySteps(currentIndex);
+    const perStepDuration = Math.max(12, Math.round(totalDuration / currentIndex));
+    const stepDistance = Math.max(
+        1,
+        (allThreads[currentIndex].offsetTop || 0) - (allThreads[currentIndex - 1].offsetTop || 0)
+    );
+
+    const swapOnce = (movingEl, upperEl) => {
+        return new Promise((resolve) => {
+            movingEl.style.zIndex = '12';
+            upperEl.style.zIndex = '11';
+
+            const finalize = () => {
+                threadsContainer.insertBefore(movingEl, upperEl);
+                movingEl.style.transform = '';
+                upperEl.style.transform = '';
+                movingEl.style.zIndex = '';
+                upperEl.style.zIndex = '';
+                resolve();
+            };
+
+            // Prefer WAAPI to avoid first-step transition timing jitter.
+            if (typeof movingEl.animate === 'function' && typeof upperEl.animate === 'function') {
+                const options = {
+                    duration: perStepDuration,
+                    easing: 'linear',
+                    fill: 'forwards'
+                };
+                const movingAnim = movingEl.animate(
+                    [
+                        { transform: 'translateY(0px)' },
+                        { transform: `translateY(-${stepDistance}px)` }
+                    ],
+                    options
+                );
+                const upperAnim = upperEl.animate(
+                    [
+                        { transform: 'translateY(0px)' },
+                        { transform: `translateY(${stepDistance}px)` }
+                    ],
+                    options
+                );
+
+                Promise.allSettled([movingAnim.finished, upperAnim.finished]).finally(() => {
+                    try {
+                        if (typeof movingAnim.commitStyles === 'function') movingAnim.commitStyles();
+                        if (typeof upperAnim.commitStyles === 'function') upperAnim.commitStyles();
+                    } catch (_) {}
+                    movingAnim.cancel();
+                    upperAnim.cancel();
+                    finalize();
+                });
+                return;
             }
+
+            // Fallback for old browsers without WAAPI.
+            movingEl.style.transition = `transform ${perStepDuration}ms linear`;
+            upperEl.style.transition = `transform ${perStepDuration}ms linear`;
+            movingEl.style.transform = `translateY(-${stepDistance}px)`;
+            upperEl.style.transform = `translateY(${stepDistance}px)`;
+            setTimeout(() => {
+                movingEl.style.transition = '';
+                upperEl.style.transition = '';
+                finalize();
+            }, perStepDuration);
         });
-        
-        // 强制浏览器重排，确保上面的样式先应用
-        threadItem.offsetHeight;
-        
-        // 然后应用上浮 transform
-        threadItem.style.transform = `translateY(${floatDistance}px)`;
-        
-        // 动画结束后，更新数据并重新渲染
-        setTimeout(() => {
-            // 更新 updatedAt，让会话在数据层面排到第一位
-            thread.updatedAt = Date.now();
-            
-            // 重新渲染列表（新顺序）
+    };
+
+    let chain = Promise.resolve();
+    let movingEl = threadItem;
+    for (let i = currentIndex; i > 0; i -= 1) {
+        const upperEl = allThreads[i - 1];
+        upperEl.style.willChange = 'transform';
+        chain = chain.then(() => swapOnce(movingEl, upperEl));
+        allThreads[i - 1] = movingEl;
+        allThreads[i] = upperEl;
+    }
+
+    return chain
+        .then(() => {
             renderFolderList();
-            
-            // 给新位置的会话添加淡入效果
             const newThreadItem = document.querySelector(`.thread-item[data-thread-id="${threadId}"]`);
             if (newThreadItem) {
                 newThreadItem.classList.add('thread-reorder-in');
                 setTimeout(() => {
                     newThreadItem.classList.remove('thread-reorder-in');
-                }, 300);
+                }, 280);
             }
-        }, 500); // 与动画时长匹配
-    }, 50);
-}
-
-/**
- * 对指定会话项添加上浮到顶部的动画（带动画重排序效果）
- * 当前会话上浮，其他会话下移，形成交换位置的感觉
- */
-function animateThreadFloatToTop(threadId) {
-    const threadsContainer = document.querySelector('.folder-threads');
-    if (!threadsContainer) return;
-    
-    const threadItem = document.querySelector(`.thread-item[data-thread-id="${threadId}"]`);
-    if (!threadItem) return;
-    
-    // 获取所有同级会话
-    const allThreads = Array.from(threadsContainer.querySelectorAll('.thread-item'));
-    
-    // 如果已经是第一个，不需要动画
-    const currentIndex = allThreads.indexOf(threadItem);
-    if (currentIndex === 0) return;
-    
-    // 获取当前会话的高度（包括 margin）
-    const threadHeight = threadItem.offsetHeight + 2; // 44px + 2px gap
-    
-    // 计算上浮距离：当前索引 * 会话高度（负值表示向上）
-    const floatDistance = -(currentIndex * threadHeight);
-    
-    // 为当前会话设置上浮距离变量并添加动画
-    threadItem.style.setProperty('--float-distance', `${floatDistance}px`);
-    threadItem.classList.add('thread-float-to-top');
-    
-    // 为所有在它上面的会话添加下移动画
-    // 这些会话需要下移一个会话高度的位置
-    allThreads.forEach((thread, index) => {
-        if (index < currentIndex) {
-            // 在它上面的会话，下移一个会话高度
-            thread.style.setProperty('--shift-distance', `${threadHeight}px`);
-            thread.classList.add('thread-shift-down');
-            // 动画结束后移除类
-            setTimeout(() => {
-                thread.classList.remove('thread-shift-down');
-                thread.style.setProperty('--shift-distance', '46px');
-            }, 500);
-        }
-    });
-    
-    // 上浮动画结束后，重新渲染列表（此时数据已经排序，会话会在正确位置）
-    setTimeout(() => {
-        threadItem.classList.remove('thread-float-to-top');
-        threadItem.style.setProperty('--float-distance', '-52px');
-        // 触发淡入效果
-        threadItem.classList.add('thread-reorder-in');
-        setTimeout(() => {
-            threadItem.classList.remove('thread-reorder-in');
-        }, 300);
-    }, 500);
+            return true;
+        })
+        .finally(() => {
+            AppState.isThreadReordering = false;
+            threadsContainer.classList.remove('thread-list-locked');
+            allThreads.forEach((el) => {
+                el.style.willChange = '';
+            });
+            flushPendingAssistantMessages();
+        });
 }
 
 function createThreadItem(thread, folderId) {
@@ -1004,16 +1019,16 @@ function createThreadItem(thread, folderId) {
     div.className = 'thread-item';
     div.dataset.threadId = thread.id;
     div.draggable = true;
-    
+
     if (thread.id === AppState.currentThreadId) {
         div.classList.add('active');
     }
     if (thread.starred) {
         div.classList.add('starred');
     }
-    
+
     const timeAgo = getTimeAgo(thread.updatedAt);
-    
+
     div.innerHTML = `
         <i class="fas fa-comment-dots thread-icon"></i>
         <div class="thread-item-info">
@@ -1036,32 +1051,32 @@ function createThreadItem(thread, folderId) {
             </button>
         </div>
     `;
-    
+
     div.addEventListener('click', (e) => {
         if (e.target.closest('.thread-item-star') || e.target.closest('.thread-action-btn')) return;
         switchThread(thread.id);
     });
-    
+
     const starBtn = div.querySelector('.thread-item-star');
     starBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         toggleThreadStar(thread.id);
     });
-    
+
     const renameBtn = div.querySelector('.btn-rename-thread');
     renameBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         openRenameModal(thread.id);
     });
-    
+
     const deleteBtn = div.querySelector('.btn-delete-thread');
     deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         openDeleteConfirmModal(thread.id);
     });
-    
+
     setupThreadDragDrop(div, thread.id, folderId);
-    
+
     return div;
 }
 
@@ -1079,7 +1094,7 @@ function setupThreadDragDrop(element, threadId, folderId) {
         e.dataTransfer.setDragImage(dragImage, 50, 25);
         setTimeout(() => document.body.removeChild(dragImage), 0);
     });
-    
+
     element.addEventListener('dragend', () => {
         element.classList.remove('dragging');
         AppState.draggedThreadId = null;
@@ -1093,18 +1108,18 @@ function setupThreadDragDrop(element, threadId, folderId) {
 function initFolderDragDrop() {
     document.addEventListener('dragover', (e) => {
         const folderItem = e.target.closest('.folder-item');
-        
+
         if (folderItem) {
             const targetFolderId = folderItem.dataset.folderId;
-            
+
             if (targetFolderId === AppState.draggedThreadSourceFolderId) {
                 folderItem.classList.remove('drag-over');
                 return;
             }
-            
+
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            
+
             if (!folderItem.classList.contains('drag-over')) {
                 document.querySelectorAll('.folder-item.drag-over').forEach(el => {
                     el.classList.remove('drag-over');
@@ -1113,35 +1128,35 @@ function initFolderDragDrop() {
             }
         }
     });
-    
+
     document.addEventListener('dragleave', (e) => {
         const folderItem = e.target.closest('.folder-item');
-        
+
         if (folderItem) {
             const rect = folderItem.getBoundingClientRect();
-            if (e.clientX < rect.left || e.clientX > rect.right || 
+            if (e.clientX < rect.left || e.clientX > rect.right ||
                 e.clientY < rect.top || e.clientY > rect.bottom) {
                 folderItem.classList.remove('drag-over');
             }
         }
     });
-    
+
     document.addEventListener('drop', (e) => {
         const folderItem = e.target.closest('.folder-item');
-        
+
         if (folderItem) {
             e.preventDefault();
             e.stopPropagation();
-            
+
             const targetFolderId = folderItem.dataset.folderId;
-            
+
             if (targetFolderId === AppState.draggedThreadSourceFolderId) {
                 folderItem.classList.remove('drag-over');
                 return;
             }
-            
+
             folderItem.classList.remove('drag-over');
-            
+
             if (AppState.draggedThreadId) {
                 moveThreadToFolder(AppState.draggedThreadId, targetFolderId === 'default' ? null : targetFolderId);
             }
@@ -1157,7 +1172,7 @@ async function createNewFolder(name) {
         syncFromSessionService();
         return newFolder;
     }
-    
+
     // 降级方案
     const folder = {
         id: generateUniqueId('folder'),
@@ -1165,11 +1180,11 @@ async function createNewFolder(name) {
         threads: [],
         expanded: false
     };
-    
+
     AppState.folders.push(folder);
     renderFolderList();
     await saveState();
-    
+
     return folder;
 }
 
@@ -1186,13 +1201,13 @@ async function deleteFolder(folderId) {
                 document.getElementById('conversation-title').textContent = '新对话';
             }
         }
-        
+
         await window.SessionService.deleteFolder(folderId);
         // syncToAppState 已经在 deleteFolder 中调用，但需要重新渲染 UI
         syncFromSessionService();
         return;
     }
-    
+
     // 降级方案
     const index = AppState.folders.findIndex(f => f.id === folderId);
     if (index !== -1) {
@@ -1203,7 +1218,7 @@ async function deleteFolder(folderId) {
             loadMessages([]);
             document.getElementById('conversation-title').textContent = '新对话';
         }
-        
+
         AppState.folders.splice(index, 1);
         renderFolderList();
         await saveState();
@@ -1218,19 +1233,19 @@ async function moveThreadToFolder(threadId, targetFolderId) {
         syncFromSessionService();
         return;
     }
-    
+
     // 降级方案
     let sourceThread = null;
     let sourceArray = null;
     let sourceIndex = -1;
-    
+
     const defaultIndex = AppState.ungroupedThreads.findIndex(t => t.id === threadId);
     if (defaultIndex !== -1) {
         sourceThread = AppState.ungroupedThreads[defaultIndex];
         sourceArray = AppState.ungroupedThreads;
         sourceIndex = defaultIndex;
     }
-    
+
     if (!sourceThread) {
         for (const folder of AppState.folders) {
             const threadIndex = (folder.threads || []).findIndex(t => t.id === threadId);
@@ -1242,16 +1257,16 @@ async function moveThreadToFolder(threadId, targetFolderId) {
             }
         }
     }
-    
+
     if (!sourceThread || sourceIndex === -1) {
         console.error('未找到源线程:', threadId);
         return;
     }
-    
+
     const threadCopy = JSON.parse(JSON.stringify(sourceThread));
-    
+
     sourceArray.splice(sourceIndex, 1);
-    
+
     if (targetFolderId) {
         const targetFolder = AppState.folders.find(f => f.id === targetFolderId);
         if (targetFolder) {
@@ -1263,7 +1278,7 @@ async function moveThreadToFolder(threadId, targetFolderId) {
         threadCopy.folderId = null;
         AppState.ungroupedThreads.push(threadCopy);
     }
-    
+
     renderFolderList();
     await saveState();
 }
@@ -1293,7 +1308,7 @@ function createNewThread(title, folderId = null) {
         messageCount: 0,
         messages: []
     };
-    
+
     if (folderId) {
         const folder = AppState.folders.find(f => f.id === folderId);
         if (folder) {
@@ -1304,28 +1319,28 @@ function createNewThread(title, folderId = null) {
     } else {
         AppState.ungroupedThreads.push(thread);
     }
-    
+
     renderFolderList();
     saveState();
     switchThread(thread.id);
-    
+
     return thread;
 }
 
 async function switchThread(threadId) {
     if (threadId === AppState.currentThreadId) return;
-    
+
     AppState.currentThreadId = threadId;
-    
+
     // 获取当前会话所在的文件夹 ID
     const thread = getThreadById(threadId);
     const folderId = thread ? (thread.folderId || 'default') : 'default';
-    
+
     // 记录访问的会话 ID 到后端 JSON 文件（存储文件夹 id+ 会话 id 的元组）
     if (window.SessionService) {
         await window.SessionService.setLastVisitedThreadId(threadId, folderId);
     }
-    
+
     updateThreadActiveState();
     loadThread(threadId);
 }
@@ -1334,7 +1349,7 @@ function updateThreadActiveState() {
     document.querySelectorAll('.thread-item').forEach(item => {
         item.classList.remove('active');
     });
-    
+
     const activeThread = document.querySelector(`.thread-item[data-thread-id="${AppState.currentThreadId}"]`);
     if (activeThread) {
         activeThread.classList.add('active');
@@ -1343,54 +1358,54 @@ function updateThreadActiveState() {
 
 function loadThread(threadId) {
     const thread = getThreadById(threadId);
-    
+
     if (!thread) return;
-    
+
     const titleEl = document.getElementById('conversation-title');
     if (titleEl) {
         titleEl.textContent = thread.title || '新对话';
     }
-    
+
     loadMessages(thread.messages || []);
 }
 
 function loadMessages(messages) {
     const messageList = document.getElementById('message-list');
     const welcomeScreen = document.getElementById('welcome-screen');
-    
+
     if (!messageList) return;
-    
+
     messageList.innerHTML = '';
-    
+
     if (messages.length === 0) {
         welcomeScreen.style.display = 'flex';
         messageList.style.display = 'none';
         return;
     }
-    
+
     welcomeScreen.style.display = 'none';
     messageList.style.display = 'flex';
-    
+
     messages.forEach(msg => {
         const messageItem = createMessageElement(msg);
         messageList.appendChild(messageItem);
     });
-    
+
     scrollToBottom();
 }
 
 function createMessageElement(message) {
     const div = document.createElement('div');
     div.className = `message-item ${message.role}`;
-    
+
     // 为用户消息应用气泡颜色主题
     if (message.role === 'user') {
         div.classList.add('theme-custom');
     }
-    
+
     const avatarIcon = message.role === 'user' ? 'fa-user' : 'fa-robot';
     const timeStr = formatTime(message.timestamp);
-    
+
     div.innerHTML = `
         <div class="message-avatar">
             <i class="fas ${avatarIcon}"></i>
@@ -1403,7 +1418,7 @@ function createMessageElement(message) {
             </div>
         </div>
     `;
-    
+
     // 渲染内容
     const messageBubble = div.querySelector('.message-bubble');
     if (message.role === 'assistant') {
@@ -1416,24 +1431,83 @@ function createMessageElement(message) {
     } else {
         messageBubble.textContent = message.content;
     }
-    
+
     return div;
 }
 
-function addMessage(message) {
+const pendingAssistantMessages = [];
+let pendingAssistantFlushTimer = null;
+
+function flushPendingAssistantMessages() {
+    if (pendingAssistantFlushTimer) return;
+
+    const schedule = (cb) => {
+        if (typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(cb);
+        } else {
+            setTimeout(cb, 16);
+        }
+    };
+
+    pendingAssistantFlushTimer = true;
+    schedule(() => {
+        pendingAssistantFlushTimer = null;
+
+        if (AppState.isThreadReordering) {
+            setTimeout(flushPendingAssistantMessages, 16);
+            return;
+        }
+
+        if (pendingAssistantMessages.length === 0) return;
+        const queue = pendingAssistantMessages.splice(0, pendingAssistantMessages.length);
+        queue.forEach((msg) => appendMessageNow(msg));
+        // Update thread ordering/persistence once per flush batch.
+        updateCurrentThread();
+    });
+}
+
+function appendMessageNow(message) {
     const messageList = document.getElementById('message-list');
     const welcomeScreen = document.getElementById('welcome-screen');
-    
+
     if (!messageList) return;
-    
+
     welcomeScreen.style.display = 'none';
     messageList.style.display = 'flex';
-    
+
     const messageItem = createMessageElement(message);
     messageList.appendChild(messageItem);
-    
+
     scrollToBottom();
+}
+
+function addMessage(message) {
+    // Always defer assistant rendering to async flush, and block it during reordering.
+    if (message.role === 'assistant') {
+        pendingAssistantMessages.push(message);
+        flushPendingAssistantMessages();
+        updateCurrentThread();
+        return;
+    }
+
+    appendMessageNow(message);
     updateCurrentThread();
+}
+
+let deferredSaveStateTimer = null;
+function deferSaveState() {
+    if (deferredSaveStateTimer) return;
+    const flush = () => {
+        deferredSaveStateTimer = null;
+        Promise.resolve(saveState()).catch((err) => {
+            console.warn('[deferSaveState] saveState failed:', err);
+        });
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+        deferredSaveStateTimer = window.requestIdleCallback(flush, { timeout: 400 });
+    } else {
+        deferredSaveStateTimer = setTimeout(flush, 0);
+    }
 }
 
 function updateCurrentThread() {
@@ -1441,28 +1515,28 @@ function updateCurrentThread() {
     if (thread) {
         thread.updatedAt = Date.now();
         thread.messageCount = (thread.messages || []).length;
-        saveState();
-        
-        // 在渲染列表之前，先记录当前会话的原始索引位置
-        const threadsContainer = document.querySelector('.folder-threads');
+
+        if (AppState.isThreadReordering) {
+            deferSaveState();
+            return;
+        }
+
+        const threadsContainer = getThreadsContainerByThread(thread);
         if (threadsContainer) {
             const allThreads = Array.from(threadsContainer.querySelectorAll('.thread-item'));
             const originalIndex = allThreads.findIndex(t => t.dataset.threadId === thread.id);
-            
-            // 只有当会话不在顶部时才播放动画
             if (originalIndex > 0) {
-                // 先应用动画类，然后再渲染列表
-                // 这样动画会和列表重排同步进行
-                renderFolderListWithAnimation(thread.id, originalIndex);
+                animateThreadFloatBySwap(thread.id).finally(() => {
+                    deferSaveState();
+                });
                 return;
             }
         }
-        
-        // 没有动画，直接渲染列表
+
         renderFolderList();
+        deferSaveState();
     }
 }
-
 function getCurrentThread() {
     if (!AppState.currentThreadId) return null;
     
