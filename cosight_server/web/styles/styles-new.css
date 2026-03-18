@@ -358,6 +358,46 @@ body {
     height: 44px;
 }
 
+.thread-item.thread-new-enter {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-6px);
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.thread-item.thread-new-enter.thread-new-enter-active {
+    max-height: 44px;
+    opacity: 1;
+    transform: translateY(0);
+    padding-top: 8px;
+    padding-bottom: 8px;
+    transition: max-height 0.28s ease, opacity 0.22s ease, transform 0.28s ease, padding 0.28s ease;
+}
+
+.thread-item.thread-delete-out {
+    overflow: hidden;
+    max-height: 44px;
+    opacity: 1;
+    transform: translateY(0);
+    padding-top: 8px;
+    padding-bottom: 8px;
+    pointer-events: none;
+}
+
+.thread-item.thread-delete-out.thread-delete-out-active {
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-6px);
+    padding-top: 0;
+    padding-bottom: 0;
+    border-width: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    transition: max-height 0.28s ease, opacity 0.2s ease, transform 0.28s ease, padding 0.28s ease, border-width 0.2s ease;
+}
+
 /* 上浮动画 - 用于会话发送消息后上浮到顶部效果 */
 /* 当前会话上浮到第一个位置 - 使用 CSS 变量动态控制上浮距离 */
 @keyframes threadFadeIn {

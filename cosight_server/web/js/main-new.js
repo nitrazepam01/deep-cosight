@@ -897,6 +897,58 @@ function renderFolderThreads(folder, folderItem) {
     });
 }
 
+function animateNewThreadPushDown(threadId) {
+    const threadItem = document.querySelector(`.thread-item[data-thread-id="${threadId}"]`);
+    if (!threadItem) return;
+
+    threadItem.classList.add('thread-new-enter');
+
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            threadItem.classList.add('thread-new-enter-active');
+        });
+    });
+
+    const cleanup = () => {
+        threadItem.classList.remove('thread-new-enter');
+        threadItem.classList.remove('thread-new-enter-active');
+    };
+
+    threadItem.addEventListener('transitionend', cleanup, { once: true });
+    setTimeout(cleanup, 420);
+}
+
+function animateThreadDeleteAndPushUp(threadId) {
+    const threadItem = document.querySelector(`.thread-item[data-thread-id="${threadId}"]`);
+    if (!threadItem) return Promise.resolve();
+
+    return new Promise((resolve) => {
+        threadItem.classList.add('thread-delete-out');
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                threadItem.classList.add('thread-delete-out-active');
+            });
+        });
+
+        const done = () => resolve();
+        threadItem.addEventListener('transitionend', done, { once: true });
+        setTimeout(done, 360);
+    });
+}
+
+function isReusableEmptyThread(thread) {
+    if (!thread) return false;
+
+    const hasNoMessages = Array.isArray(thread.messages)
+        ? thread.messages.length === 0
+        : (thread.messageCount || 0) === 0;
+    const notStarred = !thread.starred;
+    const notRenamed = (thread.title || '新对话').trim() === '新对话';
+
+    return hasNoMessages && notStarred && notRenamed;
+}
+
 /**
  * 渲染文件夹列表并应用上浮动画
  * 1. 先按旧顺序渲染列表（保持原位置）
@@ -1341,6 +1393,7 @@ function createNewThread(title, folderId = DEFAULT_FOLDER_ID) {
     }
 
     renderFolderList();
+    animateNewThreadPushDown(thread.id);
     saveState();
     switchThread(thread.id);
 
@@ -2400,6 +2453,8 @@ function toggleThreadStar(threadId) {
 }
 
 async function deleteThread(threadId) {
+    await animateThreadDeleteAndPushUp(threadId);
+
     // 使用 SessionService 删除会话
     if (window.SessionService) {
         await window.SessionService.deleteThread(threadId);
@@ -2427,13 +2482,7 @@ async function deleteThread(threadId) {
 async function createNewThreadAndSwitch() {
     const defaultFolder = getDefaultFolder();
     const sortedDefaultThreads = [...(defaultFolder.threads || [])].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    const emptyThread = sortedDefaultThreads.find(thread => {
-        if (!thread) return false;
-        if (Array.isArray(thread.messages)) {
-            return thread.messages.length === 0;
-        }
-        return (thread.messageCount || 0) === 0;
-    });
+    const emptyThread = sortedDefaultThreads.find(isReusableEmptyThread);
 
     if (emptyThread) {
         defaultFolder.expanded = true;
@@ -2807,9 +2856,10 @@ async function createNewThreadInFolder(folderId) {
         const newThread = await window.SessionService.createThread('新对话', normalizedFolderId);
         // syncToAppState 已经在 createThread 中调用，但需要重新渲染 UI
         syncFromSessionService();
+        animateNewThreadPushDown(newThread.id);
         
         // 切换到新会话
-        switchThread(newThread.id);
+        await switchThread(newThread.id);
         return newThread;
     }
     
@@ -2834,6 +2884,7 @@ async function createNewThreadInFolder(folderId) {
     if (!wasExpanded) {
         saveState();
         renderFolderList();
+        animateNewThreadPushDown(thread.id);
         
         setTimeout(() => {
             const folderItem = document.querySelector(`.folder-item[data-folder-id="${normalizedFolderId}"]`);
@@ -2853,10 +2904,11 @@ async function createNewThreadInFolder(folderId) {
         }
     } else {
         renderFolderList();
+        animateNewThreadPushDown(thread.id);
         saveState();
     }
     
-    switchThread(thread.id);
+    await switchThread(thread.id);
     
     return thread;
 }
