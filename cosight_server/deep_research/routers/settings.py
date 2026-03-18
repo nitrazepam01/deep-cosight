@@ -18,6 +18,8 @@ import re
 import json
 import time
 import uuid
+import subprocess
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 from fastapi import APIRouter
 from fastapi.params import Body
@@ -220,6 +222,58 @@ def _is_masked(value: str) -> bool:
     return "****" in value if value else False
 
 
+DES_TRANSPORT_PREFIX = "DES:"
+
+
+def _get_des_transport_key() -> str:
+    return (os.getenv("DES_TRANSPORT_KEY") or "ETO").strip() or "ETO"
+
+
+def _get_des_js_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "web" / "js" / "des.js"
+
+
+def _decrypt_transport_api_key(api_key: str) -> str:
+    value = (api_key or "").strip()
+    if not value or not value.startswith(DES_TRANSPORT_PREFIX):
+        return value
+
+    encrypted_hex = value[len(DES_TRANSPORT_PREFIX):].strip()
+    if not encrypted_hex:
+        raise ValueError("Empty DES payload")
+
+    des_js_path = _get_des_js_path()
+    if not des_js_path.exists():
+        raise ValueError(f"DES script not found: {des_js_path}")
+
+    node_script = (
+        "const fs=require('fs');"
+        "const vm=require('vm');"
+        "const desPath=process.argv[1];"
+        "const cipher=process.argv[2];"
+        "const key=process.argv[3];"
+        "const code=fs.readFileSync(desPath,'utf8');"
+        "vm.runInThisContext(code);"
+        "if(typeof strDec!=='function'){throw new Error('strDec not found in des.js');}"
+        "const plain=strDec(cipher,key,'','');"
+        "process.stdout.write(String(plain||''));"
+    )
+
+    try:
+        proc = subprocess.run(
+            ["node", "-e", node_script, str(des_js_path), encrypted_hex, _get_des_transport_key()],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=8,
+        )
+        return (proc.stdout or "").strip()
+    except Exception as e:
+        logger.error(f"DES api_key decrypt failed: {e}")
+        raise ValueError("DES api_key decrypt failed")
+
+
 def _parse_env_file(env_path: str) -> Dict[str, str]:
     """解析 .env 文件，返回 key->value 字典（忽略注释和空行）"""
     result = {}
@@ -401,6 +455,7 @@ async def save_providers(body: ProvidersUpdateRequest):
 
         new_providers = []
         for p in body.providers:
+            p = dict(p)
             # 如果没有 id，自动生成
             if not p.get("id"):
                 p["id"] = str(uuid.uuid4())[:8]
@@ -408,7 +463,9 @@ async def save_providers(body: ProvidersUpdateRequest):
             if p.get("api_key") and _is_masked(p["api_key"]):
                 old = existing_map.get(p["id"])
                 if old:
-                    p["api_key"] = old.get("api_key", "")
+                    p["api_key"] = _decrypt_transport_api_key(old.get("api_key", ""))
+            elif p.get("api_key"):
+                p["api_key"] = _decrypt_transport_api_key(p["api_key"])
             new_providers.append(p)
 
         _write_providers(new_providers)
@@ -431,14 +488,24 @@ def _normalize_base_url(base_url: str) -> str:
     return (base_url or "").strip().rstrip("/")
 
 
+def _to_bearer_token(api_key: str) -> str:
+    token = (api_key or "").strip()
+    if not token:
+        return token
+    if token.lower().startswith("bearer "):
+        return token
+    return f"Bearer {token}"
+
+
 def _resolve_provider_for_test(body: ProviderTestRequest) -> Optional[Dict[str, Any]]:
-    has_inline_config = bool(body.base_url and body.api_key and not _is_masked(body.api_key))
+    inline_api_key = _decrypt_transport_api_key(body.api_key or "")
+    has_inline_config = bool(body.base_url and inline_api_key and not _is_masked(inline_api_key))
     if has_inline_config:
         return {
             "id": body.provider_id or "",
             "provider": (body.provider or "openai").strip().lower(),
             "base_url": body.base_url.strip(),
-            "api_key": body.api_key.strip(),
+            "api_key": inline_api_key.strip(),
         }
 
     if not body.provider_id:
@@ -453,7 +520,7 @@ def _resolve_provider_for_test(body: ProviderTestRequest) -> Optional[Dict[str, 
         "id": provider.get("id", ""),
         "provider": (provider.get("provider") or body.provider or "openai").strip().lower(),
         "base_url": (provider.get("base_url") or body.base_url or "").strip(),
-        "api_key": (provider.get("api_key") or body.api_key or "").strip(),
+        "api_key": _decrypt_transport_api_key((provider.get("api_key") or body.api_key or "").strip()),
     }
 
 
@@ -468,7 +535,7 @@ def _test_with_openai_compatible(base_url: str, api_key: str, model: str) -> Dic
     http_client = httpx.Client(
         headers={
             "Content-Type": "application/json",
-            "Authorization": api_key,
+            "Authorization": _to_bearer_token(api_key),
         },
         verify=False,
         trust_env=False,
@@ -570,6 +637,11 @@ async def test_provider(body: ProviderTestRequest):
         logger.info(
             f"Testing provider connection: provider={provider_type}, base_url={base_url}, model={test_model}, api_key_len={len(api_key)}"
         )
+        logger.info(
+            "Provider key debug: encrypted_input=%s, resolved_key_suffix=%s",
+            bool((body.api_key or "").startswith(DES_TRANSPORT_PREFIX)),
+            (api_key[-4:] if api_key else "none"),
+        )
 
         start = time.monotonic()
 
@@ -646,7 +718,7 @@ async def apply_provider(body: ProviderApplyRequest):
 
         env_path = _find_env_path()
         updates = {
-            f"{prefix}API_KEY": provider.get("api_key", ""),
+            f"{prefix}API_KEY": _decrypt_transport_api_key(provider.get("api_key", "")),
             f"{prefix}API_BASE_URL": provider.get("base_url", ""),
             f"{prefix}MODEL_NAME": body.model_name,
         }

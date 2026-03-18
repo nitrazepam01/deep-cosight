@@ -1,8 +1,11 @@
 ﻿const SettingsService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
+    const DES_KEY = 'ETO';
+    const DES_PREFIX = 'DES:';
     let _currentData = null;
     let _activeGroup = null;
     let _providers = [];
+    let _providerTestResults = {};
     let _editingProvider = null;
     let _isAddingProvider = false;
 
@@ -29,6 +32,30 @@
     let _selectedBubbleColorIndex = 0;
 
     let _isBubbleColorExpanded = false;
+
+    function encryptApiKeyForTransport(apiKey) {
+        const raw = String(apiKey || '').trim();
+        if (!raw) return '';
+        if (raw.includes('****')) return raw;
+        if (raw.startsWith(DES_PREFIX)) return raw;
+        if (typeof strEnc !== 'function') {
+            console.warn('DES encrypt function strEnc not found, fallback to plain api_key transport');
+            return raw;
+        }
+        try {
+            return `${DES_PREFIX}${strEnc(raw, DES_KEY, '', '')}`;
+        } catch (e) {
+            console.error('DES encrypt api_key failed, fallback to plain text:', e);
+            return raw;
+        }
+    }
+
+    function buildEncryptedProvidersPayload(providers) {
+        return (providers || []).map(p => ({
+            ...p,
+            api_key: encryptApiKeyForTransport(p?.api_key || ''),
+        }));
+    }
 
     async function fetchSettings() {
         const resp = await fetch(`${API_BASE}/deep-research/settings`);
@@ -66,10 +93,11 @@
 
     async function postProviders(providers) {
         try {
+            const encryptedProviders = buildEncryptedProvidersPayload(providers);
             const resp = await fetch(`${API_BASE}/deep-research/providers`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ providers }),
+                body: JSON.stringify({ providers: encryptedProviders }),
             });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const json = await resp.json();
@@ -964,6 +992,16 @@
     function renderProviderCard(provider, idx) {
         const models = (provider.models || []).join(', ') || '未配置模型';
         const enabledClass = provider.enabled !== false ? 'enabled' : 'disabled';
+        const cachedResult = getCachedProviderTestResult(provider, idx);
+        const resultClasses = ['cs-item-info', 'provider-test-result'];
+        if (!cachedResult) {
+            resultClasses.push('is-empty');
+        } else if (cachedResult.statusClass) {
+            resultClasses.push(cachedResult.statusClass);
+        }
+        const resultInner = cachedResult
+            ? `<i class="fas fa-info-circle"></i><span class="${cachedResult.statusClass || ''}">${escapeHtml(cachedResult.text || '')}</span>`
+            : '';
 
         return `
             <div class="cs-item ${enabledClass}" data-provider-id="${provider.id}">
@@ -983,7 +1021,7 @@
                         <i class="fas fa-layer-group"></i>
                         <span>${escapeHtml(models)}</span>
                     </div>
-                    <div class="cs-item-info provider-test-result is-empty" id="test-result-${idx}"></div>
+                    <div class="${resultClasses.join(' ')}" id="test-result-${idx}">${resultInner}</div>
                 </div>
                 <div class="cs-item-actions">
                     <button class="cs-btn cs-btn-test" onclick="SettingsService.testProvider(${idx})" title="测试连接">
@@ -1183,6 +1221,28 @@
         resultEl.innerHTML = `<i class="fas fa-info-circle"></i><span class="${statusClass || ''}">${escapeHtml(text || '')}</span>`;
     }
 
+    function getProviderResultKey(provider, idx) {
+        if (provider && provider.id) return `id:${provider.id}`;
+        return `idx:${idx}`;
+    }
+
+    function getCachedProviderTestResult(provider, idx) {
+        return _providerTestResults[getProviderResultKey(provider, idx)] || null;
+    }
+
+    function setCachedProviderTestResult(provider, idx, statusClass, text) {
+        const key = getProviderResultKey(provider, idx);
+        if (!text) {
+            delete _providerTestResults[key];
+            return;
+        }
+        _providerTestResults[key] = { statusClass: statusClass || '', text: text || '' };
+    }
+
+    function removeCachedProviderTestResult(provider, idx) {
+        delete _providerTestResults[getProviderResultKey(provider, idx)];
+    }
+
     async function pingProviderForm() {
         const name = document.getElementById('pf-name').value.trim();
         const providerType = document.getElementById('pf-provider').value;
@@ -1226,7 +1286,7 @@
                         provider_id: effectiveProviderId || '',
                         provider: providerType,
                         base_url: baseUrl,
-                        api_key: apiKey,
+                        api_key: encryptApiKeyForTransport(apiKey),
                         model: modelName,
                     });
                     return { modelName, result };
@@ -1323,6 +1383,7 @@
             if (confirmBtn) {
                 confirmBtn.onclick = async () => {
                     cleanup();
+                    removeCachedProviderTestResult(provider, idx);
                     _providers.splice(idx, 1);
                     try {
                         await postProviders(_providers);
@@ -1356,6 +1417,7 @@
             .filter(Boolean);
 
         setProviderResultLine(resultEl, 'test-loading', 'Testing...');
+        setCachedProviderTestResult(p, idx, 'test-loading', 'Testing...');
 
         try {
             const jobs = modelsToTest.map(async (modelName) => {
@@ -1364,7 +1426,7 @@
                         provider_id: p.id || '',
                         provider: p.provider,
                         base_url: p.base_url,
-                        api_key: p.api_key,
+                        api_key: encryptApiKeyForTransport(p.api_key),
                         model: modelName,
                     });
                     return { modelName, result };
@@ -1383,6 +1445,7 @@
                 });
                 const errMsg = extractProviderTestError((allResults.find(x => x.result && x.result.code !== 0) || {}).result || null);
                 setProviderResultLine(resultEl, 'test-fail', errMsg);
+                setCachedProviderTestResult(p, idx, 'test-fail', errMsg);
                 return;
             }
 
@@ -1391,6 +1454,7 @@
                 .find(Boolean);
             const summary = buildModelTestSummary(allResults);
             setProviderResultLine(resultEl, summary.statusClass, summary.text);
+            setCachedProviderTestResult(p, idx, summary.statusClass, summary.text);
 
             p.models = successResults.map(x => x.modelName);
             if (compatibleBaseUrl) {
@@ -1398,7 +1462,9 @@
             }
         } catch (e) {
             console.error('[Provider List Test Request Error]', e);
-            setProviderResultLine(resultEl, 'test-fail', `Request failed: ${e.message || 'Unknown error'}`);
+            const errText = `Request failed: ${e.message || 'Unknown error'}`;
+            setProviderResultLine(resultEl, 'test-fail', errText);
+            setCachedProviderTestResult(p, idx, 'test-fail', errText);
         }
     }
 
