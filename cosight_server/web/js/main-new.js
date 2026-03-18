@@ -604,7 +604,6 @@ const AppState = {
     rightSidebarCollapsed: false,
     currentThreadId: null,
     folders: [],
-    ungroupedThreads: [],
     toolCalls: [],
     dagData: null,
     draggedThreadId: null,
@@ -614,6 +613,67 @@ const AppState = {
     isThreadReordering: false,
     initialized: false
 };
+
+const DEFAULT_FOLDER_ID = 'default';
+const DEFAULT_FOLDER_NAME = '默认分组';
+
+function ensureDefaultFolder() {
+    if (!Array.isArray(AppState.folders)) {
+        AppState.folders = [];
+    }
+
+    let defaultFolder = AppState.folders.find(f => f && f.id === DEFAULT_FOLDER_ID);
+    if (!defaultFolder) {
+        defaultFolder = {
+            id: DEFAULT_FOLDER_ID,
+            name: DEFAULT_FOLDER_NAME,
+            isDefault: true,
+            expanded: true,
+            threads: []
+        };
+        AppState.folders.unshift(defaultFolder);
+    } else {
+        defaultFolder.isDefault = true;
+        if (defaultFolder.expanded === undefined || defaultFolder.expanded === null) {
+            defaultFolder.expanded = true;
+        }
+        if (!Array.isArray(defaultFolder.threads)) {
+            defaultFolder.threads = [];
+        }
+    }
+
+    AppState.folders.forEach(folder => {
+        if (!folder || folder.id === DEFAULT_FOLDER_ID) return;
+        if (!Array.isArray(folder.threads)) {
+            folder.threads = [];
+        }
+        if (folder.expanded === undefined || folder.expanded === null) {
+            folder.expanded = false;
+        }
+        folder.isDefault = false;
+    });
+
+    AppState.folders.sort((a, b) => {
+        if (a.id === DEFAULT_FOLDER_ID) return -1;
+        if (b.id === DEFAULT_FOLDER_ID) return 1;
+        return 0;
+    });
+
+    return defaultFolder;
+}
+
+function getDefaultFolder() {
+    return ensureDefaultFolder();
+}
+
+function getAllFolders() {
+    ensureDefaultFolder();
+    return AppState.folders;
+}
+
+function getTotalThreadCount() {
+    return getAllFolders().reduce((sum, folder) => sum + ((folder.threads || []).length), 0);
+}
 
 // ==================== 侧边栏控制 ====================
 
@@ -718,22 +778,9 @@ function renderFolderList() {
     const folderList = document.getElementById('folder-list');
     if (!folderList) return;
 
+    const folders = getAllFolders();
     folderList.innerHTML = '';
-
-    const defaultFolder = {
-        id: 'default',
-        name: '默认分组',
-        threads: AppState.ungroupedThreads,
-        isDefault: true,
-        expanded: AppState.defaultFolderExpanded || false
-    };
-    const defaultGroupContainer = createFolderItem(defaultFolder);
-    folderList.appendChild(defaultGroupContainer);
-
-    AppState.folders.forEach(folder => {
-        if (folder.expanded === undefined || folder.expanded === null) {
-            folder.expanded = false;
-        }
+    folders.forEach(folder => {
         const folderItem = createFolderItem(folder);
         folderList.appendChild(folderItem);
     });
@@ -751,7 +798,7 @@ function createFolderItem(folder) {
 
     const actionsHtml = folder.isDefault ? `
         <div class="folder-actions">
-            <button class="folder-action-btn btn-add-thread-to-default" title="添加线程">
+            <button class="folder-action-btn btn-add-thread-to-folder" title="添加线程">
                 <i class="fas fa-plus"></i>
             </button>
         </div>
@@ -789,17 +836,13 @@ function createFolderItem(folder) {
         const newExpandedState = !folder.expanded;
         folder.expanded = newExpandedState;
 
-        if (folder.id === 'default') {
-            AppState.defaultFolderExpanded = newExpandedState;
-            // 使用 SessionService 更新设置
-            if (window.SessionService) {
-                window.SessionService.save(); // 只保存到 localStorage
-            }
-        } else {
+        if (folder.id !== DEFAULT_FOLDER_ID) {
             // 使用 SessionService 更新文件夹展开状态
             if (window.SessionService) {
                 window.SessionService.updateFolder(folder.id, { expanded: newExpandedState });
             }
+        } else if (window.SessionService) {
+            window.SessionService.save(); // 默认分组展开状态通过本地缓存保存
         }
 
         if (newExpandedState) {
@@ -809,23 +852,15 @@ function createFolderItem(folder) {
         }
     });
 
-    if (folder.isDefault) {
-        const addThreadBtn = div.querySelector('.btn-add-thread-to-default');
-        if (addThreadBtn) {
-            addThreadBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                createNewThreadInDefaultGroup();
-            });
-        }
-    } else {
-        const addThreadBtn = div.querySelector('.btn-add-thread-to-folder');
-        if (addThreadBtn) {
-            addThreadBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                createNewThreadInFolder(folder.id);
-            });
-        }
+    const addThreadBtn = div.querySelector('.btn-add-thread-to-folder');
+    if (addThreadBtn) {
+        addThreadBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            createNewThreadInFolder(folder.id);
+        });
+    }
 
+    if (!folder.isDefault) {
         const deleteFolderBtn = div.querySelector('.btn-delete-folder');
         if (deleteFolderBtn) {
             deleteFolderBtn.addEventListener('click', (e) => {
@@ -1158,7 +1193,7 @@ function initFolderDragDrop() {
             folderItem.classList.remove('drag-over');
 
             if (AppState.draggedThreadId) {
-                moveThreadToFolder(AppState.draggedThreadId, targetFolderId === 'default' ? null : targetFolderId);
+                moveThreadToFolder(AppState.draggedThreadId, targetFolderId);
             }
         }
     });
@@ -1189,6 +1224,8 @@ async function createNewFolder(name) {
 }
 
 async function deleteFolder(folderId) {
+    if (folderId === DEFAULT_FOLDER_ID) return;
+
     // 使用 SessionService 删除文件夹
     if (window.SessionService) {
         // 检查是否有线程在当前文件夹中
@@ -1238,23 +1275,14 @@ async function moveThreadToFolder(threadId, targetFolderId) {
     let sourceThread = null;
     let sourceArray = null;
     let sourceIndex = -1;
-
-    const defaultIndex = AppState.ungroupedThreads.findIndex(t => t.id === threadId);
-    if (defaultIndex !== -1) {
-        sourceThread = AppState.ungroupedThreads[defaultIndex];
-        sourceArray = AppState.ungroupedThreads;
-        sourceIndex = defaultIndex;
-    }
-
-    if (!sourceThread) {
-        for (const folder of AppState.folders) {
-            const threadIndex = (folder.threads || []).findIndex(t => t.id === threadId);
-            if (threadIndex !== -1) {
-                sourceThread = folder.threads[threadIndex];
-                sourceArray = folder.threads;
-                sourceIndex = threadIndex;
-                break;
-            }
+    const folders = getAllFolders();
+    for (const folder of folders) {
+        const threadIndex = (folder.threads || []).findIndex(t => t.id === threadId);
+        if (threadIndex !== -1) {
+            sourceThread = folder.threads[threadIndex];
+            sourceArray = folder.threads;
+            sourceIndex = threadIndex;
+            break;
         }
     }
 
@@ -1267,16 +1295,12 @@ async function moveThreadToFolder(threadId, targetFolderId) {
 
     sourceArray.splice(sourceIndex, 1);
 
-    if (targetFolderId) {
-        const targetFolder = AppState.folders.find(f => f.id === targetFolderId);
-        if (targetFolder) {
-            if (!targetFolder.threads) targetFolder.threads = [];
-            threadCopy.folderId = targetFolderId;
-            targetFolder.threads.push(threadCopy);
-        }
-    } else {
-        threadCopy.folderId = null;
-        AppState.ungroupedThreads.push(threadCopy);
+    const normalizedTargetFolderId = targetFolderId || DEFAULT_FOLDER_ID;
+    const targetFolder = getFolderById(normalizedTargetFolderId);
+    if (targetFolder) {
+        if (!targetFolder.threads) targetFolder.threads = [];
+        threadCopy.folderId = normalizedTargetFolderId;
+        targetFolder.threads.push(threadCopy);
     }
 
     renderFolderList();
@@ -1286,38 +1310,34 @@ async function moveThreadToFolder(threadId, targetFolderId) {
 // ==================== 线程管理 ====================
 
 function getThreadById(threadId) {
-    let thread = AppState.ungroupedThreads.find(t => t.id === threadId);
-    if (!thread) {
-        for (const folder of AppState.folders) {
-            const found = (folder.threads || []).find(t => t.id === threadId);
-            if (found) {
-                thread = found;
-                break;
-            }
+    for (const folder of getAllFolders()) {
+        const found = (folder.threads || []).find(t => t.id === threadId);
+        if (found) {
+            return found;
         }
     }
-    return thread;
+    return null;
 }
 
-function createNewThread(title, folderId = null) {
+function createNewThread(title, folderId = DEFAULT_FOLDER_ID) {
+    const normalizedFolderId = folderId || DEFAULT_FOLDER_ID;
     const thread = {
         id: generateUniqueId('thread'),
         title: title,
-        folderId: folderId,
+        folderId: normalizedFolderId,
         updatedAt: Date.now(),
         messageCount: 0,
         messages: []
     };
 
-    if (folderId) {
-        const folder = AppState.folders.find(f => f.id === folderId);
-        if (folder) {
-            if (!folder.threads) folder.threads = [];
-            folder.threads.push(thread);
-            folder.expanded = true;
-        }
+    const folder = getFolderById(normalizedFolderId);
+    if (folder) {
+        if (!folder.threads) folder.threads = [];
+        folder.threads.push(thread);
+        folder.expanded = true;
     } else {
-        AppState.ungroupedThreads.push(thread);
+        const defaultFolder = getDefaultFolder();
+        defaultFolder.threads.push({ ...thread, folderId: DEFAULT_FOLDER_ID });
     }
 
     renderFolderList();
@@ -1334,7 +1354,7 @@ async function switchThread(threadId) {
 
     // 获取当前会话所在的文件夹 ID
     const thread = getThreadById(threadId);
-    const folderId = thread ? (thread.folderId || 'default') : 'default';
+    const folderId = thread ? (thread.folderId || DEFAULT_FOLDER_ID) : DEFAULT_FOLDER_ID;
 
     // 记录访问的会话 ID 到后端 JSON 文件（存储文件夹 id+ 会话 id 的元组）
     if (window.SessionService) {
@@ -1849,16 +1869,13 @@ let isTaskExecuting = false;
  */
 function updateSendButtonState() {
     const sendBtn = document.getElementById('send-btn');
-    const chatInput = document.getElementById('chat-input');
-    if (sendBtn && chatInput) {
+    if (sendBtn) {
         if (isTaskExecuting) {
             sendBtn.disabled = true;
             sendBtn.classList.add('disabled');
-            chatInput.disabled = true;
         } else {
             sendBtn.disabled = false;
             sendBtn.classList.remove('disabled');
-            chatInput.disabled = false;
         }
     }
 }
@@ -1898,6 +1915,8 @@ async function sendToBackend(message) {
         // 使用 WebSocket 发送消息（与 main.js 保持一致）
         if (!window.messageService || !window.WebSocketService) {
             console.error('messageService 或 WebSocketService 未初始化');
+            isTaskExecuting = false;
+            updateSendButtonState();
             hideThinkingState();
             addMessage({
                 role: 'assistant',
@@ -1918,6 +1937,8 @@ async function sendToBackend(message) {
         
     } catch (error) {
         console.error('发送消息失败:', error);
+        isTaskExecuting = false;
+        updateSendButtonState();
         hideThinkingState();
         
         addMessage({
@@ -2208,15 +2229,9 @@ function syncSessionServiceToAppState() {
     
     const sessionsData = window.SessionService.sessionsData;
     
-    // 深拷贝文件夹数据（排除默认分组），避免引用被后续修改
-    AppState.folders = JSON.parse(JSON.stringify(sessionsData.folders.filter(f => !f.isDefault)));
-    
-    // 深拷贝默认分组的会话
-    const defaultFolder = sessionsData.folders.find(f => f.isDefault);
-    AppState.ungroupedThreads = defaultFolder?.threads ? JSON.parse(JSON.stringify(defaultFolder.threads)) : [];
-    
-    // 同步设置
-    AppState.defaultFolderExpanded = window.SessionService.getSetting('defaultFolderExpanded', true);
+    // 深拷贝全部文件夹数据（包含默认分组）
+    AppState.folders = JSON.parse(JSON.stringify(sessionsData.folders || []));
+    ensureDefaultFolder();
 }
 
 /**
@@ -2235,7 +2250,6 @@ async function saveState() {
         // 降级方案：使用 localStorage
         const state = {
             folders: AppState.folders,
-            ungroupedThreads: AppState.ungroupedThreads,
             currentThreadId: AppState.currentThreadId
         };
         localStorage.setItem('cosight:state', JSON.stringify(state));
@@ -2245,37 +2259,16 @@ async function saveState() {
     // 同步 AppState 到 SessionService.sessionsData
     const sessionsData = window.SessionService.sessionsData;
     if (sessionsData) {
-        // 更新默认分组的会话（深拷贝）
-        const defaultFolder = sessionsData.folders.find(f => f.isDefault);
+        ensureDefaultFolder();
+        sessionsData.folders = JSON.parse(JSON.stringify(AppState.folders));
+        const defaultFolder = sessionsData.folders.find(f => f.id === DEFAULT_FOLDER_ID);
         if (defaultFolder) {
-            defaultFolder.threads = JSON.parse(JSON.stringify(AppState.ungroupedThreads));
-        }
-        
-        // 同步所有文件夹
-        AppState.folders.forEach(appFolder => {
-            let existingFolder = sessionsData.folders.find(f => f.id === appFolder.id);
-            if (existingFolder) {
-                existingFolder.name = appFolder.name;
-                existingFolder.expanded = appFolder.expanded;
-                existingFolder.threads = JSON.parse(JSON.stringify(appFolder.threads));
-            } else {
-                sessionsData.folders.push({
-                    id: appFolder.id,
-                    name: appFolder.name,
-                    isDefault: false,
-                    expanded: appFolder.expanded,
-                    createdAt: Date.now(),
-                    threads: JSON.parse(JSON.stringify(appFolder.threads))
-                });
+            defaultFolder.isDefault = true;
+            if (!sessionsData.settings) {
+                sessionsData.settings = {};
             }
-        });
-        
-        // 移除在 AppState 中不存在的文件夹
-        sessionsData.folders = sessionsData.folders.filter(f => {
-            if (f.isDefault) return true;
-            return AppState.folders.some(af => af.id === f.id);
-        });
-        
+            sessionsData.settings.defaultFolderExpanded = defaultFolder.expanded !== false;
+        }
         sessionsData.updatedAt = Date.now();
         
         // 只保存到 localStorage
@@ -2347,23 +2340,13 @@ async function loadState() {
         try {
             const state = JSON.parse(saved);
             AppState.folders = state.folders || [];
-            AppState.ungroupedThreads = state.ungroupedThreads || [];
             AppState.currentThreadId = state.currentThreadId;
-            
-            AppState.folders.forEach(folder => {
-                if (folder.expanded === undefined || folder.expanded === null) {
-                    folder.expanded = true;
-                }
-            });
-            
-            if (AppState.defaultFolderExpanded === undefined || AppState.defaultFolderExpanded === null) {
-                AppState.defaultFolderExpanded = true;
-            }
+            ensureDefaultFolder();
         } catch (e) {
             console.error('加载状态失败:', e);
         }
     } else {
-        AppState.defaultFolderExpanded = true;
+        ensureDefaultFolder();
     }
     AppState.initialized = true;
     
@@ -2417,8 +2400,6 @@ function toggleThreadStar(threadId) {
 }
 
 async function deleteThread(threadId) {
-    const isCurrentThread = (threadId === AppState.currentThreadId);
-    
     // 使用 SessionService 删除会话
     if (window.SessionService) {
         await window.SessionService.deleteThread(threadId);
@@ -2426,12 +2407,7 @@ async function deleteThread(threadId) {
         syncFromSessionService();
     } else {
         // 降级方案
-        const defaultIndex = AppState.ungroupedThreads.findIndex(t => t.id === threadId);
-        if (defaultIndex !== -1) {
-            AppState.ungroupedThreads.splice(defaultIndex, 1);
-        }
-        
-        AppState.folders.forEach(folder => {
+        getAllFolders().forEach(folder => {
             const threadIndex = (folder.threads || []).findIndex(t => t.id === threadId);
             if (threadIndex !== -1) {
                 folder.threads.splice(threadIndex, 1);
@@ -2441,16 +2417,32 @@ async function deleteThread(threadId) {
         await saveState();
     }
     
-    // 如果删除的是当前会话，自动创建新会话并定位
-    if (isCurrentThread) {
-        await createNewThreadAndSwitch();
-    }
+    // 删除会话后，优先定位默认分组中的空会话；若不存在再新建
+    await createNewThreadAndSwitch();
 }
 
 /**
- * 创建新会话并切换（删除当前会话时使用）
+ * 删除会话后：优先定位默认分组中的空会话；若不存在则新建并切换
  */
 async function createNewThreadAndSwitch() {
+    const defaultFolder = getDefaultFolder();
+    const sortedDefaultThreads = [...(defaultFolder.threads || [])].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    const emptyThread = sortedDefaultThreads.find(thread => {
+        if (!thread) return false;
+        if (Array.isArray(thread.messages)) {
+            return thread.messages.length === 0;
+        }
+        return (thread.messageCount || 0) === 0;
+    });
+
+    if (emptyThread) {
+        defaultFolder.expanded = true;
+        renderFolderList();
+        await saveState();
+        await switchThread(emptyThread.id);
+        return emptyThread;
+    }
+
     let newThread;
     
     if (window.SessionService) {
@@ -2462,22 +2454,19 @@ async function createNewThreadAndSwitch() {
         newThread = {
             id: generateUniqueId('thread'),
             title: '新对话',
-            folderId: 'default',
+            folderId: DEFAULT_FOLDER_ID,
             updatedAt: Date.now(),
             messageCount: 0,
             messages: []
         };
-        AppState.ungroupedThreads.push(newThread);
+        defaultFolder.threads.push(newThread);
     }
     
     // 切换到新会话
-    AppState.currentThreadId = newThread.id;
+    getDefaultFolder().expanded = true;
     renderFolderList();
     await saveState();
-    
-    // 加载空消息列表
-    loadMessages([]);
-    document.getElementById('conversation-title').textContent = '新对话';
+    await switchThread(newThread.id);
     
     return newThread;
 }
@@ -2807,30 +2796,15 @@ function initNewThreadBtn() {
 }
 
 function getFolderById(folderId) {
-    if (folderId === 'default') {
-        return {
-            id: 'default',
-            name: '默认分组',
-            threads: AppState.ungroupedThreads,
-            expanded: AppState.defaultFolderExpanded || false,
-            isDefault: true
-        };
-    } else {
-        const folder = AppState.folders.find(f => f.id === folderId);
-        if (folder) {
-            return {
-                ...folder,
-                isDefault: false
-            };
-        }
-    }
-    return null;
+    const normalizedFolderId = folderId || DEFAULT_FOLDER_ID;
+    return getAllFolders().find(f => f.id === normalizedFolderId) || null;
 }
 
 async function createNewThreadInFolder(folderId) {
+    const normalizedFolderId = folderId || DEFAULT_FOLDER_ID;
     // 使用 SessionService 创建会话
     if (window.SessionService) {
-        const newThread = await window.SessionService.createThread('新对话', folderId);
+        const newThread = await window.SessionService.createThread('新对话', normalizedFolderId);
         // syncToAppState 已经在 createThread 中调用，但需要重新渲染 UI
         syncFromSessionService();
         
@@ -2840,32 +2814,21 @@ async function createNewThreadInFolder(folderId) {
     }
     
     // 降级方案
-    let wasExpanded;
-    let targetFolder = null;
-    
-    if (folderId === 'default') {
-        wasExpanded = AppState.defaultFolderExpanded || false;
-    } else {
-        targetFolder = AppState.folders.find(f => f.id === folderId);
-        wasExpanded = targetFolder ? (targetFolder.expanded ?? false) : false;
-    }
+    const targetFolder = getFolderById(normalizedFolderId) || getDefaultFolder();
+    const wasExpanded = targetFolder ? (targetFolder.expanded ?? false) : false;
     
     const thread = {
         id: generateUniqueId('thread'),
         title: '新对话',
-        folderId: folderId === 'default' ? null : folderId,
+        folderId: normalizedFolderId,
         updatedAt: Date.now(),
         messageCount: 0,
         messages: []
     };
     
-    if (folderId === 'default') {
-        AppState.ungroupedThreads.push(thread);
-    } else {
-        if (targetFolder) {
-            if (!targetFolder.threads) targetFolder.threads = [];
-            targetFolder.threads.push(thread);
-        }
+    if (targetFolder) {
+        if (!targetFolder.threads) targetFolder.threads = [];
+        targetFolder.threads.push(thread);
     }
     
     if (!wasExpanded) {
@@ -2873,7 +2836,7 @@ async function createNewThreadInFolder(folderId) {
         renderFolderList();
         
         setTimeout(() => {
-            const folderItem = document.querySelector(`.folder-item[data-folder-id="${folderId}"]`);
+            const folderItem = document.querySelector(`.folder-item[data-folder-id="${normalizedFolderId}"]`);
             if (folderItem) {
                 const content = folderItem.querySelector('.folder-content');
                 const toggle = folderItem.querySelector('.folder-toggle');
@@ -2885,12 +2848,8 @@ async function createNewThreadInFolder(folderId) {
             }
         }, 0);
 
-        if (folderId === 'default') {
-            AppState.defaultFolderExpanded = true;
-        } else {
-            if (targetFolder) {
-                targetFolder.expanded = true;
-            }
+        if (targetFolder) {
+            targetFolder.expanded = true;
         }
     } else {
         renderFolderList();
@@ -2967,7 +2926,6 @@ function initThreeColumnLayout() {
         console.log('[initThreeColumnLayout] loadResult:', loadResult);
         console.log('[initThreeColumnLayout] AppState.currentThreadId:', AppState.currentThreadId);
         console.log('[initThreeColumnLayout] AppState.folders:', AppState.folders);
-        console.log('[initThreeColumnLayout] AppState.ungroupedThreads:', AppState.ungroupedThreads);
         
         // 在渲染前展开对应的文件夹
         let lastVisitedFolderId = null;
@@ -2975,17 +2933,13 @@ function initThreeColumnLayout() {
             const lastVisited = loadResult.lastVisited;
             lastVisitedFolderId = lastVisited.folderId;
             console.log('[initThreeColumnLayout] 恢复上次访问的会话:', lastVisited);
-            
-            if (lastVisited.folderId === 'default') {
-                AppState.defaultFolderExpanded = true;
+
+            const folder = getFolderById(lastVisited.folderId);
+            if (folder) {
+                folder.expanded = true;
+                console.log('[initThreeColumnLayout] 设置文件夹展开:', folder.id);
             } else {
-                const folder = AppState.folders.find(f => f.id === lastVisited.folderId);
-                if (folder) {
-                    folder.expanded = true;
-                    console.log('[initThreeColumnLayout] 设置文件夹展开:', folder.id);
-                } else {
-                    console.warn('[initThreeColumnLayout] 未找到文件夹:', lastVisited.folderId);
-                }
+                console.warn('[initThreeColumnLayout] 未找到文件夹:', lastVisited.folderId);
             }
         }
         
@@ -3021,7 +2975,7 @@ function initThreeColumnLayout() {
             console.log('[initThreeColumnLayout] updateThreadActiveState 已调用');
             
             // 3. 只有当没有任何数据时才加载示例数据
-            if (AppState.folders.length === 0 && AppState.ungroupedThreads.length === 0) {
+            if (getTotalThreadCount() === 0) {
                 loadExampleData();
             }
             

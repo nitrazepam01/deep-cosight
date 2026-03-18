@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SessionService - 会话数据管理服务
  * 
  * 设计原则：
@@ -242,25 +242,6 @@ class SessionService {
             });
         }
 
-        // 处理未分组的会话（ungroupedThreads）
-        if (Array.isArray(data.ungroupedThreads)) {
-            const defaultFolder = normalized.folders.find(f => f.isDefault);
-            if (defaultFolder) {
-                data.ungroupedThreads.forEach(thread => {
-                    defaultFolder.threads.push({
-                        id: thread.id || this.generateId('thread'),
-                        title: thread.title || '新对话',
-                        folderId: 'default',
-                        createdAt: thread.createdAt || Date.now(),
-                        updatedAt: thread.updatedAt || Date.now(),
-                        messageCount: thread.messageCount || 0,
-                        starred: thread.starred || false,
-                        messages: Array.isArray(thread.messages) ? thread.messages : []
-                    });
-                });
-            }
-        }
-
         return normalized;
     }
 
@@ -348,19 +329,13 @@ class SessionService {
      * 获取指定会话
      */
     getThread(threadId) {
-        // 在默认分组中查找
-        let thread = this.getUngroupedThreads().find(t => t.id === threadId);
-        
-        if (!thread) {
-            // 在其他文件夹中查找
-            this.sessionsData?.folders.forEach(folder => {
-                if (folder.isDefault) return;
-                const found = folder.threads.find(t => t.id === threadId);
-                if (found) thread = found;
-            });
-        }
-
-        return thread || null;
+        let thread = null;
+        this.sessionsData?.folders.forEach(folder => {
+            if (thread) return;
+            const found = (folder.threads || []).find(t => t.id === threadId);
+            if (found) thread = found;
+        });
+        return thread;
     }
 
     /**
@@ -371,18 +346,10 @@ class SessionService {
             console.warn('syncToAppState: AppState 不存在');
             return;
         }
-        
-        // 深拷贝文件夹数据（排除默认分组）
-        window.AppState.folders = JSON.parse(JSON.stringify(this.sessionsData.folders.filter(f => !f.isDefault)));
-        
-        // 深拷贝默认分组的会话
-        const defaultFolder = this.sessionsData.folders.find(f => f.isDefault);
-        window.AppState.ungroupedThreads = defaultFolder?.threads ? JSON.parse(JSON.stringify(defaultFolder.threads)) : [];
-        
-        // 同步设置
-        window.AppState.defaultFolderExpanded = this.getSetting('defaultFolderExpanded', true);
-        
-        console.log('[SessionService.syncToAppState] AppState.folders:', window.AppState.folders.length, 'AppState.ungroupedThreads:', window.AppState.ungroupedThreads.length);
+
+        // 深拷贝全部文件夹数据（包含默认分组）
+        window.AppState.folders = JSON.parse(JSON.stringify(this.sessionsData.folders || []));
+        console.log('[SessionService.syncToAppState] AppState.folders:', window.AppState.folders.length);
     }
 
     /**
@@ -583,21 +550,7 @@ class SessionService {
      * 获取所有会话（包括默认分组和文件夹中的）
      */
     getAllThreads() {
-        const allThreads = [];
-        
-        // 获取默认分组的会话
-        const defaultFolder = this.getDefaultFolder();
-        if (defaultFolder) {
-            allThreads.push(...defaultFolder.threads);
-        }
-        
-        // 获取其他文件夹的会话
-        this.sessionsData?.folders.forEach(folder => {
-            if (folder.isDefault) return;
-            allThreads.push(...(folder.threads || []));
-        });
-        
-        return allThreads;
+        return (this.sessionsData?.folders || []).flatMap(folder => folder.threads || []);
     }
 
     /**
@@ -606,19 +559,6 @@ class SessionService {
     hasAnyThreads() {
         const allThreads = this.getAllThreads();
         return allThreads.length > 0;
-    }
-
-    /**
-     * 清除 localStorage 缓存（用于数据格式升级）
-     */
-    clearLocalStorageCache() {
-        try {
-            localStorage.removeItem('cosight:sessionsData');
-            localStorage.removeItem('cosight:state');
-            console.log('[SessionService] localStorage 缓存已清除');
-        } catch (error) {
-            console.error('清除 localStorage 缓存失败:', error);
-        }
     }
 
     /**
@@ -631,29 +571,6 @@ class SessionService {
 
 // 创建全局实例
 window.SessionService = new SessionService();
-
-// 页面加载时检查是否需要清除旧格式缓存
-(function checkAndClearOldCache() {
-    try {
-        const raw = localStorage.getItem('cosight:sessionsData');
-        if (raw) {
-            try {
-                const data = JSON.parse(raw);
-                // 检查是否存在旧格式字段
-                if (data.lastVisitedThreadId && !data.lastVisitedThread) {
-                    console.log('[SessionService] 检测到旧格式数据，清除缓存...');
-                    window.SessionService.clearLocalStorageCache();
-                }
-            } catch (e) {
-                // JSON 解析失败，也清除缓存
-                console.log('[SessionService] localStorage 数据格式错误，清除缓存...');
-                window.SessionService.clearLocalStorageCache();
-            }
-        }
-    } catch (error) {
-        console.warn('检查缓存格式失败:', error);
-    }
-})();
 
 // 导出类（如果使用模块化）
 if (typeof module !== 'undefined' && module.exports) {
