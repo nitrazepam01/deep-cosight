@@ -420,90 +420,197 @@ async def save_providers(body: ProvidersUpdateRequest):
 
 
 class ProviderTestRequest(BaseModel):
-    provider_id: str
+    provider_id: Optional[str] = None
+    provider: Optional[str] = None
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
     model: str = "gpt-4o-mini"
+
+
+def _normalize_base_url(base_url: str) -> str:
+    return (base_url or "").strip().rstrip("/")
+
+
+def _resolve_provider_for_test(body: ProviderTestRequest) -> Optional[Dict[str, Any]]:
+    has_inline_config = bool(body.base_url and body.api_key and not _is_masked(body.api_key))
+    if has_inline_config:
+        return {
+            "id": body.provider_id or "",
+            "provider": (body.provider or "openai").strip().lower(),
+            "base_url": body.base_url.strip(),
+            "api_key": body.api_key.strip(),
+        }
+
+    if not body.provider_id:
+        return None
+
+    providers = _read_providers()
+    provider = next((p for p in providers if p.get("id") == body.provider_id), None)
+    if not provider:
+        return None
+
+    return {
+        "id": provider.get("id", ""),
+        "provider": (provider.get("provider") or body.provider or "openai").strip().lower(),
+        "base_url": (provider.get("base_url") or body.base_url or "").strip(),
+        "api_key": (provider.get("api_key") or body.api_key or "").strip(),
+    }
+
+
+def _test_with_openai_compatible(base_url: str, api_key: str, model: str) -> Dict[str, Any]:
+    import httpx
+    from openai import OpenAI
+
+    normalized_base = _normalize_base_url(base_url)
+    if not normalized_base.endswith("/v1"):
+        normalized_base = f"{normalized_base}/v1"
+
+    http_client = httpx.Client(
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": api_key,
+        },
+        verify=False,
+        trust_env=False,
+        timeout=httpx.Timeout(connect=15.0, read=30.0, write=15.0, pool=10.0),
+    )
+    try:
+        client = OpenAI(base_url=normalized_base, api_key=api_key, http_client=http_client)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "hi"}],
+            max_tokens=1,
+        )
+        return {
+            "model": response.model or model,
+            "compatible_base_url": normalized_base,
+        }
+    finally:
+        http_client.close()
+
+
+def _test_with_anthropic(base_url: str, api_key: str, model: str) -> Dict[str, Any]:
+    import httpx
+
+    root = _normalize_base_url(base_url)
+    compatible_base = root if root.endswith("/v1") else f"{root}/v1"
+    endpoint = f"{compatible_base}/messages"
+
+    with httpx.Client(
+        verify=False,
+        trust_env=False,
+        timeout=httpx.Timeout(connect=15.0, read=30.0, write=15.0, pool=10.0),
+    ) as client:
+        response = client.post(
+            endpoint,
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": model,
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+        )
+        response.raise_for_status()
+        data = response.json() or {}
+        return {
+            "model": data.get("model") or model,
+            "compatible_base_url": compatible_base,
+        }
+
+
+def _test_with_google(base_url: str, api_key: str, model: str) -> Dict[str, Any]:
+    import httpx
+
+    root = _normalize_base_url(base_url)
+    endpoint = f"{root}/models/{model}:generateContent"
+
+    with httpx.Client(
+        verify=False,
+        trust_env=False,
+        timeout=httpx.Timeout(connect=15.0, read=30.0, write=15.0, pool=10.0),
+    ) as client:
+        response = client.post(
+            endpoint,
+            params={"key": api_key},
+            headers={"content-type": "application/json"},
+            json={"contents": [{"parts": [{"text": "hi"}]}]},
+        )
+        response.raise_for_status()
+        data = response.json() or {}
+        return {
+            "model": data.get("modelVersion") or model,
+            "compatible_base_url": root,
+        }
 
 
 @settingsRouter.post("/deep-research/providers/test")
 async def test_provider(body: ProviderTestRequest):
-    """测试供应商 API 连通性 — 从 providers.json 读取真实 API Key"""
+    """Test provider API connectivity."""
     try:
-        import httpx
-        from openai import OpenAI
+        import asyncio
 
-        # 从 providers.json 读取真实（未脱敏）的供应商信息
-        providers = _read_providers()
-        provider = None
-        for p in providers:
-            if p.get("id") == body.provider_id:
-                provider = p
-                break
-
+        provider = _resolve_provider_for_test(body)
         if not provider:
-            return json_result(-1, f"未找到供应商 (id={body.provider_id})", None)
+            if body.provider_id:
+                return json_result(-1, f"Provider not found (id={body.provider_id})", None)
+            return json_result(-1, "Missing provider config: provide provider_id or base_url/api_key", None)
 
-        api_key = provider["api_key"]
-        base_url = provider["base_url"]
+        api_key = provider.get("api_key", "")
+        base_url = provider.get("base_url", "")
+        provider_type = (provider.get("provider") or "openai").lower()
         test_model = body.model
 
-        logger.info(f"测试供应商连接：base_url={base_url}, model={test_model}, api_key 长度={len(api_key)}")
+        if not api_key or not base_url:
+            return json_result(-1, "Missing required config: API Key or Base URL is empty", None)
 
-        # 与 llm.py set_model() 完全一致的 httpx 客户端配置
-        http_client = httpx.Client(
-            headers={
-                'Content-Type': 'application/json',
-                'Authorization': api_key
-            },
-            verify=False,
-            trust_env=False,
-            timeout=httpx.Timeout(
-                connect=15.0,
-                read=30.0,
-                write=15.0,
-                pool=10.0
-            )
-        )
-
-        client = OpenAI(
-            base_url=base_url,
-            api_key=api_key,
-            http_client=http_client,
+        logger.info(
+            f"Testing provider connection: provider={provider_type}, base_url={base_url}, model={test_model}, api_key_len={len(api_key)}"
         )
 
         start = time.monotonic()
 
-        import asyncio
         def _do_test():
-            return client.chat.completions.create(
-                model=test_model,
-                messages=[{"role": "user", "content": "hi"}],
-                max_tokens=1,
-            )
+            if provider_type == "anthropic":
+                return _test_with_anthropic(base_url=base_url, api_key=api_key, model=test_model)
+            if provider_type == "google":
+                return _test_with_google(base_url=base_url, api_key=api_key, model=test_model)
+            return _test_with_openai_compatible(base_url=base_url, api_key=api_key, model=test_model)
 
-        response = await asyncio.to_thread(_do_test)
+        test_result = await asyncio.to_thread(_do_test)
         latency_ms = int((time.monotonic() - start) * 1000)
+        actual_model = test_result.get("model") or test_model
+        compatible_base_url = test_result.get("compatible_base_url") or _normalize_base_url(base_url)
 
-        actual_model = response.model or test_model
-        logger.info(f"测试供应商成功：model={actual_model}, latency={latency_ms}ms")
+        logger.info(f"Provider test success: provider={provider_type}, model={actual_model}, latency={latency_ms}ms")
 
-        http_client.close()
-
-        return json_result(0, "连接成功", {
+        return json_result(0, "Connection successful", {
             "model": actual_model,
             "latency_ms": latency_ms,
+            "provider": provider_type,
+            "compatible_base_url": compatible_base_url,
         })
     except Exception as e:
         error_msg = str(e)
-        logger.error(f"测试供应商连接失败：{error_msg}")
+        logger.exception(
+            "Provider test failed. request={provider_id=%s, provider=%s, base_url=%s, model=%s}",
+            body.provider_id,
+            body.provider,
+            body.base_url,
+            body.model,
+        )
 
         if "timeout" in error_msg.lower():
-            return json_result(-1, "连接超时（30 秒）", None)
+            return json_result(-1, "Connection timeout (30s)", None)
         elif "401" in error_msg or "Unauthorized" in error_msg:
-            return json_result(-1, "认证失败：API Key 无效或已过期", {"error": error_msg})
+            return json_result(-1, "Authentication failed: invalid or expired API key", {"error": error_msg})
         elif "404" in error_msg:
-            return json_result(-1, "接口地址错误：未找到 chat/completions 端点", {"error": error_msg})
+            return json_result(-1, "Endpoint not found", {"error": error_msg})
         else:
-            return json_result(-1, f"连接失败：{error_msg[:200]}", {"error": error_msg[:500]})
+            return json_result(-1, f"Connection failed: {error_msg[:200]}", {"error": error_msg[:500]})
 
 
 class ProviderApplyRequest(BaseModel):

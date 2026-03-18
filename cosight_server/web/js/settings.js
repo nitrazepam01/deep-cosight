@@ -1,4 +1,4 @@
-const SettingsService = (function () {
+﻿const SettingsService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
     let _currentData = null;
     let _activeGroup = null;
@@ -25,9 +25,9 @@ const SettingsService = (function () {
         { name: '渐变紫红', from: '#a18cd1', to: '#fbc2eb' },
         { name: '渐变金黄', from: '#ffd700', to: '#ffcc00' },
     ];
-    
+
     let _selectedBubbleColorIndex = 0;
-    
+
     let _isBubbleColorExpanded = false;
 
     async function fetchSettings() {
@@ -81,11 +81,11 @@ const SettingsService = (function () {
         }
     }
 
-    async function testProviderAPI(providerId, model) {
+    async function testProviderAPI(payload) {
         const resp = await fetch(`${API_BASE}/deep-research/providers/test`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ provider_id: providerId, model }),
+            body: JSON.stringify(payload),
         });
         return await resp.json();
     }
@@ -226,9 +226,9 @@ const SettingsService = (function () {
         }
 
         const currentColor = BUBBLE_COLORS[_selectedBubbleColorIndex] || BUBBLE_COLORS[2];
-        
+
         const displayCount = _isBubbleColorExpanded ? BUBBLE_COLORS.length : 0;
-        
+
         const colorItems = [];
         for (let i = 0; i < displayCount; i++) {
             const color = BUBBLE_COLORS[i];
@@ -300,14 +300,14 @@ const SettingsService = (function () {
     function renderAgentList() {
         const agents = AgentManagementService.getAgents();
         const providers = AgentManagementService.getProviders();
-        
+
         const agentCards = agents.length === 0
             ? '<div style="text-align:center;padding:40px;color:#aaa;font-size:14px;">暂无智能体配置</div>'
             : agents.map(agent => {
                 // 标签位置：内置在左，默认在右
                 const builtinBadge = agent.builtin ? `<span class="agent-badge agent-badge-locked"><i class="fas fa-lock"></i> 内置</span>` : '';
                 // 默认标签：已激活的默认标签不可点击，只能通过设置其他智能体为默认来取消
-                const defaultBadge = agent.is_default 
+                const defaultBadge = agent.is_default
                     ? `<span class="agent-badge agent-badge-default">
                         <i class="fas fa-star"></i> 默认
                     </span>`
@@ -316,14 +316,14 @@ const SettingsService = (function () {
                           style="cursor: pointer;">
                         <i class="fas fa-star"></i> 默认
                     </span>`;
-                
+
                 // 根据智能体类型设置图标和背景颜色
                 // 规划者 (Planner)：大脑图标 🧠，粉色渐变背景
                 // 执行者 (Actor)：闪电图标 ⚡，橙色渐变背景
                 let icon = '⚡';
                 let iconBg = '';
                 let agentTypeLabel = '';
-                
+
                 if (agent.agent_type === 'planner') {
                     icon = '🧠';
                     iconBg = 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)';
@@ -371,20 +371,20 @@ const SettingsService = (function () {
     function renderAgentForm() {
         const providers = AgentManagementService.getProviders();
         const skills = AgentManagementService.getAvailableSkills();
-        
+
         let agent;
         if (_agentIsAdding) {
             agent = AgentManagementService.getNewAgentTemplate();
         } else {
             agent = AgentManagementService.getAgentById(_agentEditingId);
         }
-        
+
         if (!agent) {
             _agentEditingId = null;
             _agentIsAdding = false;
             return renderAgentList();
         }
-        
+
         const isBuiltin = agent.builtin;
 
         // 构建模型选项 - 用于自定义下拉框
@@ -492,21 +492,21 @@ const SettingsService = (function () {
         const name = document.getElementById('af-name').value.trim();
         const description = document.getElementById('af-desc').value.trim();
         const systemPrompt = document.getElementById('af-prompt').value.trim();
-        
+
         // 从自定义下拉框获取值 - 通过 CustomSelect 实例
         const agentType = getCustomSelectValue('af-type-container');
         const modelVal = getCustomSelectValue('af-model-container');
         const thinkingModeVal = getCustomSelectValue('af-thinking-mode-container');
 
-        if (!name) { 
-            AgentManagementService.showToast('请输入智能体名称', 'error'); 
-            return; 
+        if (!name) {
+            AgentManagementService.showToast('请输入智能体名称', 'error');
+            return;
         }
 
         // 重名检查
         const agents = AgentManagementService.getAgents();
-        const isDuplicate = agents.some(agent => 
-            agent.name.toLowerCase() === name.toLowerCase() && 
+        const isDuplicate = agents.some(agent =>
+            agent.name.toLowerCase() === name.toLowerCase() &&
             agent.id !== (_agentEditingId || '')
         );
         if (isDuplicate) {
@@ -599,25 +599,25 @@ const SettingsService = (function () {
     async function deleteAgent(agentId) {
         const agent = AgentManagementService.getAgentById(agentId);
         if (!agent) return;
-        
+
         // 使用与删除供应商相同的确认弹窗样式
         const modalOverlay = document.getElementById('delete-provider-modal-overlay');
         const messageEl = document.getElementById('delete-provider-message');
         if (modalOverlay && messageEl) {
             messageEl.textContent = `确定要删除智能体「${agent.name || '未命名'}」吗？此操作不可恢复。`;
             modalOverlay.style.display = 'flex';
-            
+
             const confirmBtn = document.getElementById('confirm-delete-provider-btn');
             const cancelBtn = document.getElementById('cancel-delete-provider-btn');
             const closeBtn = document.getElementById('close-delete-provider-modal');
-            
+
             const cleanup = () => {
                 modalOverlay.style.display = 'none';
                 if (confirmBtn) confirmBtn.onclick = null;
                 if (cancelBtn) cancelBtn.onclick = null;
                 if (closeBtn) closeBtn.onclick = null;
             };
-            
+
             if (confirmBtn) {
                 confirmBtn.onclick = async () => {
                     cleanup();
@@ -640,11 +640,11 @@ const SettingsService = (function () {
                     }
                 };
             }
-            
+
             if (cancelBtn) {
                 cancelBtn.onclick = cleanup;
             }
-            
+
             if (closeBtn) {
                 closeBtn.onclick = cleanup;
             }
@@ -659,7 +659,7 @@ const SettingsService = (function () {
             loading.className = 'agent-loading';
             loading.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 加载中...';
             contentDiv.appendChild(loading);
-            
+
             setTimeout(() => {
                 if (_agentEditingId || _agentIsAdding) {
                     contentDiv.innerHTML = renderAgentForm();
@@ -675,7 +675,7 @@ const SettingsService = (function () {
     function bindAgentListEvents() {
         // 编辑按钮使用 onclick 属性直接调用，不需要在这里绑定
         // 但需要确保 SettingsService.editAgent 能正确获取 agentId
-        
+
         const addBtn = document.querySelector('.agent-add-placeholder');
         if (addBtn) {
             addBtn.addEventListener('click', startAddAgent);
@@ -784,7 +784,7 @@ const SettingsService = (function () {
         if (skillsContainer) {
             // 优先从 agent 对象获取 skills，如果不存在再从 data 属性获取
             let skillsValues = [];
-            
+
             // 尝试获取当前编辑的智能体对象
             if (_agentEditingId) {
                 const agent = AgentManagementService.getAgentById(_agentEditingId);
@@ -795,7 +795,7 @@ const SettingsService = (function () {
                 // 新建智能体时，skills 为空数组
                 skillsValues = [];
             }
-            
+
             // 如果上面没有获取到值，尝试从 data 属性获取作为后备
             if (skillsValues.length === 0) {
                 try {
@@ -804,7 +804,7 @@ const SettingsService = (function () {
                     skillsValues = [];
                 }
             }
-            
+
             const skillsDisabled = skillsContainer.dataset.disabled === 'true';
             const skills = AgentManagementService.getAvailableSkills();
             const skillsItems = skills.map(skill => ({
@@ -824,20 +824,20 @@ const SettingsService = (function () {
     function selectBubbleColor(index) {
         _selectedBubbleColorIndex = index;
         localStorage.setItem('cosight:bubbleColorIndex', index.toString());
-        
+
         // 更新 CSS 变量
         const color = BUBBLE_COLORS[index];
         if (color) {
             document.documentElement.style.setProperty('--bubble-gradient-from', color.from);
             document.documentElement.style.setProperty('--bubble-gradient-to', color.to);
         }
-        
+
         // 重新渲染页面以更新选中状态
         const contentDiv = document.getElementById('settings-content-area');
         if (contentDiv) {
             contentDiv.innerHTML = renderPersonalizationPage();
         }
-        
+
         showToast('气泡颜色已更新', 'success');
     }
 
@@ -983,6 +983,7 @@ const SettingsService = (function () {
                         <i class="fas fa-layer-group"></i>
                         <span>${escapeHtml(models)}</span>
                     </div>
+                    <div class="cs-item-info provider-test-result is-empty" id="test-result-${idx}"></div>
                 </div>
                 <div class="cs-item-actions">
                     <button class="cs-btn cs-btn-test" onclick="SettingsService.testProvider(${idx})" title="测试连接">
@@ -995,7 +996,6 @@ const SettingsService = (function () {
                         <i class="fas fa-trash-alt"></i> 删除
                     </button>
                 </div>
-                <div class="provider-test-result" id="test-result-${idx}"></div>
             </div>
         `;
     }
@@ -1015,7 +1015,7 @@ const SettingsService = (function () {
         const modelTags = (p.models || []).map(m =>
             `<span class="cs-model-tag" data-model="${escapeHtml(m)}">${escapeHtml(m)} <i class="fas fa-times cs-model-tag-remove" onclick="SettingsService.removeModelTag(this)"></i></span>`
         ).join('');
-        
+
         const isEditing = !!_editingProvider;
         const formId = isEditing ? `edit-form-${_editingProvider._idx}` : 'add-form';
 
@@ -1127,6 +1127,62 @@ const SettingsService = (function () {
         if (tag) tag.remove();
     }
 
+    function setProviderModelTags(models) {
+        const container = document.getElementById('pf-model-tags');
+        if (!container) return;
+        container.innerHTML = '';
+        (models || []).forEach(modelName => {
+            const safeModel = String(modelName || '').trim();
+            if (!safeModel) return;
+            const tag = document.createElement('span');
+            tag.className = 'cs-model-tag';
+            tag.dataset.model = safeModel;
+            tag.innerHTML = `${escapeHtml(safeModel)} <i class="fas fa-times cs-model-tag-remove" onclick="SettingsService.removeModelTag(this)"></i>`;
+            container.appendChild(tag);
+        });
+    }
+
+    function extractProviderTestError(result) {
+        if (result && result.data) {
+            if (result.data.error) {
+                return typeof result.data.error === 'object'
+                    ? JSON.stringify(result.data.error)
+                    : result.data.error;
+            }
+            if (result.data.message) return result.data.message;
+            return JSON.stringify(result.data);
+        }
+        if (result && result.msg) return result.msg;
+        if (result && result.message) return result.message;
+        return '未知错误';
+    }
+
+    function buildModelTestSummary(allResults) {
+        const total = allResults.length;
+        const passed = allResults.filter(x => x.result && x.result.code === 0).length;
+        const statusClass = passed === total ? 'test-success' : (passed === 0 ? 'test-fail' : 'test-warning');
+        const details = allResults.map(x => {
+            if (x.result && x.result.code === 0) {
+                const latency = Number(x.result?.data?.latency_ms || 0);
+                return `${x.modelName} (${latency}ms)`;
+            }
+            return `${x.modelName} (failure)`;
+        }).join(', ');
+        return {
+            statusClass,
+            text: `Passed ${passed}/${total} models: ${details}`,
+        };
+    }
+
+    function setProviderResultLine(resultEl, statusClass, text) {
+        if (!resultEl) return;
+        resultEl.classList.remove('test-success', 'test-warning', 'test-fail', 'test-loading');
+        resultEl.classList.remove('is-empty');
+        resultEl.style.display = '';
+        if (statusClass) resultEl.classList.add(statusClass);
+        resultEl.innerHTML = `<i class="fas fa-info-circle"></i><span class="${statusClass || ''}">${escapeHtml(text || '')}</span>`;
+    }
+
     async function pingProviderForm() {
         const name = document.getElementById('pf-name').value.trim();
         const providerType = document.getElementById('pf-provider').value;
@@ -1135,49 +1191,78 @@ const SettingsService = (function () {
         const modelTags = document.querySelectorAll('#pf-model-tags .cs-model-tag');
         const models = Array.from(modelTags).map(t => t.dataset.model).filter(Boolean);
 
-        if (!name) { showToast('请输入供应商名称', 'error'); return; }
-        if (!baseUrl) { showToast('请输入 API Base URL', 'error'); return; }
-        if (!apiKey) { showToast('请输入 API Key', 'error'); return; }
+        if (!name) { showToast('Please enter provider name', 'error'); return; }
+        if (!baseUrl) { showToast('Please enter API Base URL', 'error'); return; }
+        if (!apiKey) { showToast('Please enter API Key', 'error'); return; }
 
         const resultEl = document.getElementById('cs-form-result');
         if (!resultEl) return;
 
-        resultEl.innerHTML = '<span class="test-loading"><i class="fas fa-spinner fa-spin"></i> 正在 Ping 测试...</span>';
+        resultEl.innerHTML = '<span class="test-loading">Testing connectivity...</span>';
         resultEl.style.display = 'block';
 
-        const tempProvider = {
-            id: _editingProvider?.id || 'temp_' + Date.now(),
-            name, provider: providerType, api_key: apiKey, base_url: baseUrl, models, enabled: true,
-        };
+        const matchedProvider = _providers.find(p =>
+            p && (
+                (_editingProvider?.id && p.id === _editingProvider.id) ||
+                (p.name === name && p.provider === providerType) ||
+                (p.provider === providerType && p.base_url === baseUrl)
+            )
+        );
+        const effectiveProviderId = _editingProvider?.id || matchedProvider?.id || null;
+        const isMaskedApiKey = apiKey.includes('****');
+        if (isMaskedApiKey && !effectiveProviderId) {
+            resultEl.innerHTML = '<span class="test-fail">API key is masked. Please re-enter the full key and try again.</span>';
+            return;
+        }
 
-        const testModel = models.length > 0 ? models[0] : 'gpt-4o-mini';
+        const modelsToTest = (models.length > 0 ? models : ['gpt-4o-mini'])
+            .map(m => String(m || '').trim())
+            .filter(Boolean);
 
         try {
-            const result = await testProviderAPI(tempProvider.id, testModel);
-            if (result.code === 0) {
-                resultEl.innerHTML = `<span class="test-success"><i class="fas fa-check-circle"></i> 连接成功 · 模型：${result.data.model} · 延迟：${result.data.latency_ms}ms</span>`;
-                await saveProviderToBackend();
-            } else {
-                let errMsg = '';
-                if (result.data) {
-                    if (result.data.error) {
-                        errMsg = typeof result.data.error === 'object' 
-                            ? JSON.stringify(result.data.error) 
-                            : result.data.error;
-                    } else if (result.data.message) {
-                        errMsg = result.data.message;
-                    } else {
-                        errMsg = JSON.stringify(result.data);
-                    }
-                } else if (result.message) {
-                    errMsg = result.message;
-                } else {
-                    errMsg = '未知错误';
+            const jobs = modelsToTest.map(async (modelName) => {
+                try {
+                    const result = await testProviderAPI({
+                        provider_id: effectiveProviderId || '',
+                        provider: providerType,
+                        base_url: baseUrl,
+                        api_key: apiKey,
+                        model: modelName,
+                    });
+                    return { modelName, result };
+                } catch (error) {
+                    return { modelName, result: null, error };
                 }
-                resultEl.innerHTML = `<span class="test-fail"><i class="fas fa-times-circle"></i> ${escapeHtml(errMsg)}</span>`;
+            });
+            const allResults = await Promise.all(jobs);
+            const successResults = allResults.filter(x => x.result && x.result.code === 0);
+
+            if (successResults.length === 0) {
+                console.error('[Provider Ping Failed]', {
+                    request: { providerType, baseUrl, modelsToTest, effectiveProviderId, isMaskedApiKey },
+                    response: allResults,
+                });
+                const errMsg = extractProviderTestError((allResults.find(x => x.result && x.result.code !== 0) || {}).result || null);
+                resultEl.innerHTML = `<span class="test-fail">${escapeHtml(errMsg)}</span>`;
+                return;
             }
+
+            const passedModels = successResults.map(x => x.modelName);
+            setProviderModelTags(passedModels);
+
+            const compatibleBaseUrl = successResults
+                .map(x => x.result?.data?.compatible_base_url)
+                .find(Boolean);
+            if (compatibleBaseUrl) {
+                const baseUrlInput = document.getElementById('pf-base-url');
+                if (baseUrlInput) baseUrlInput.value = compatibleBaseUrl;
+            }
+
+            resultEl.innerHTML = buildModelTestSummary(allResults);
+            await saveProviderToBackend();
         } catch (e) {
-            resultEl.innerHTML = `<span class="test-fail"><i class="fas fa-times-circle"></i> 请求失败：${escapeHtml(e.message || '未知错误')}</span>`;
+            console.error('[Provider Ping Request Error]', e);
+            resultEl.innerHTML = `<span class="test-fail">Request failed: ${escapeHtml(e.message || 'Unknown error')}</span>`;
         }
     }
 
@@ -1217,24 +1302,24 @@ const SettingsService = (function () {
     async function deleteProvider(idx) {
         const provider = _providers[idx];
         if (!provider) return;
-        
+
         const modalOverlay = document.getElementById('delete-provider-modal-overlay');
         const messageEl = document.getElementById('delete-provider-message');
         if (modalOverlay && messageEl) {
             messageEl.textContent = `确定要删除供应商「${provider.name || '未命名'}」吗？此操作不可恢复。`;
             modalOverlay.style.display = 'flex';
-            
+
             const confirmBtn = document.getElementById('confirm-delete-provider-btn');
             const cancelBtn = document.getElementById('cancel-delete-provider-btn');
             const closeBtn = document.getElementById('close-delete-provider-modal');
-            
+
             const cleanup = () => {
                 modalOverlay.style.display = 'none';
                 if (confirmBtn) confirmBtn.onclick = null;
                 if (cancelBtn) cancelBtn.onclick = null;
                 if (closeBtn) closeBtn.onclick = null;
             };
-            
+
             if (confirmBtn) {
                 confirmBtn.onclick = async () => {
                     cleanup();
@@ -1249,11 +1334,11 @@ const SettingsService = (function () {
                     }
                 };
             }
-            
+
             if (cancelBtn) {
                 cancelBtn.onclick = cleanup;
             }
-            
+
             if (closeBtn) {
                 closeBtn.onclick = cleanup;
             }
@@ -1266,20 +1351,54 @@ const SettingsService = (function () {
         const resultEl = document.getElementById(`test-result-${idx}`);
         if (!resultEl) return;
 
-        const testModel = (p.models && p.models.length > 0) ? p.models[0] : 'gpt-4o-mini';
-        resultEl.innerHTML = '<span class="test-loading"><i class="fas fa-spinner fa-spin"></i> 测试中...</span>';
-        resultEl.style.display = 'block';
+        const modelsToTest = ((p.models && p.models.length > 0) ? p.models : ['gpt-4o-mini'])
+            .map(m => String(m || '').trim())
+            .filter(Boolean);
+
+        setProviderResultLine(resultEl, 'test-loading', 'Testing...');
 
         try {
-            const result = await testProviderAPI(p.id, testModel);
-            if (result.code === 0) {
-                resultEl.innerHTML = `<span class="test-success"><i class="fas fa-check-circle"></i> 连接成功 · 模型：${result.data.model} · 延迟：${result.data.latency_ms}ms</span>`;
-            } else {
-                const errMsg = (result.data && result.data.error) ? result.data.error : result.message;
-                resultEl.innerHTML = `<span class="test-fail"><i class="fas fa-times-circle"></i> ${escapeHtml(errMsg)}</span>`;
+            const jobs = modelsToTest.map(async (modelName) => {
+                try {
+                    const result = await testProviderAPI({
+                        provider_id: p.id || '',
+                        provider: p.provider,
+                        base_url: p.base_url,
+                        api_key: p.api_key,
+                        model: modelName,
+                    });
+                    return { modelName, result };
+                } catch (error) {
+                    return { modelName, result: null, error };
+                }
+            });
+            const allResults = await Promise.all(jobs);
+            const successResults = allResults.filter(x => x.result && x.result.code === 0);
+
+            if (successResults.length === 0) {
+                console.error('[Provider List Test Failed]', {
+                    provider: p,
+                    modelsToTest,
+                    response: allResults,
+                });
+                const errMsg = extractProviderTestError((allResults.find(x => x.result && x.result.code !== 0) || {}).result || null);
+                setProviderResultLine(resultEl, 'test-fail', errMsg);
+                return;
+            }
+
+            const compatibleBaseUrl = successResults
+                .map(x => x.result?.data?.compatible_base_url)
+                .find(Boolean);
+            const summary = buildModelTestSummary(allResults);
+            setProviderResultLine(resultEl, summary.statusClass, summary.text);
+
+            p.models = successResults.map(x => x.modelName);
+            if (compatibleBaseUrl) {
+                p.base_url = compatibleBaseUrl;
             }
         } catch (e) {
-            resultEl.innerHTML = `<span class="test-fail"><i class="fas fa-times-circle"></i> 请求失败：${escapeHtml(e.message)}</span>`;
+            console.error('[Provider List Test Request Error]', e);
+            setProviderResultLine(resultEl, 'test-fail', `Request failed: ${e.message || 'Unknown error'}`);
         }
     }
 
@@ -1391,7 +1510,7 @@ const SettingsService = (function () {
             showToast('供应商配置已自动保存', 'success');
             return;
         }
-        
+
         if (_activeGroup === 'personalization') {
             showToast('个性化设置已自动保存', 'success');
             return;
@@ -1454,6 +1573,26 @@ const SettingsService = (function () {
     }
 
     /* ---------- 公开接口 ---------- */
+    function showToast(message, type) {
+        const existing = document.querySelector('.settings-toast');
+        if (existing) existing.remove();
+
+        const toast = document.createElement('div');
+        toast.className = `settings-toast settings-toast-${type}`;
+        toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i><span></span>`;
+        const span = toast.querySelector('span');
+        if (span) {
+            span.textContent = message;
+        }
+        document.body.appendChild(toast);
+
+        requestAnimationFrame(() => toast.classList.add('show'));
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
     return {
         open, close, save, switchGroup, togglePassword,
         startAddProvider, startEditProvider, cancelProviderForm,
@@ -1476,18 +1615,18 @@ const SettingsService = (function () {
             // 调用 API 端点（后端自动切换状态）
             // 内置智能体也可以设置为默认
             await AgentManagementService.toggleAgentDefault(agentId, agent.agent_type);
-            
+
             // 本地更新数据，避免重新加载和重绘
             const agents = AgentManagementService.getAgents();
             const agentType = agent.agent_type;
-            
+
             // 更新本地数据：将点击的智能体设为默认，同类型的其他智能体取消默认
             agents.forEach(a => {
                 if (a.agent_type === agentType) {
                     a.is_default = (a.id === agentId);
                 }
             });
-            
+
             // 只更新标签的视觉状态，避免整个页面重绘
             updateDefaultBadges();
         } catch (e) {
@@ -1499,16 +1638,16 @@ const SettingsService = (function () {
     function updateDefaultBadges() {
         const agents = AgentManagementService.getAgents();
         const agentItems = document.querySelectorAll('.agent-item');
-        
+
         agentItems.forEach(item => {
             const agentId = item.dataset.agentId;
             const agent = agents.find(a => a.id === agentId);
             if (!agent) return;
-            
+
             // 找到默认标签
             const defaultBadge = item.querySelector('.agent-badge-default');
             if (!defaultBadge) return;
-            
+
             if (agent.is_default) {
                 // 已激活的默认标签：移除 onclick 和样式
                 defaultBadge.classList.remove('agent-badge-inactive');
@@ -1530,14 +1669,14 @@ window.SettingsService = SettingsService;
 // 智能体配置服务
 const AgentConfigService = (function () {
     const STORAGE_KEY = 'cosight:agentConfig';
-    
+
     let _config = {
         planner: '任务规划专家',
         allocationMode: 'Single Actor',
         defaultActor: '任务执行专家',
         actors: ['任务执行专家']
     };
-    
+
     function load() {
         try {
             const stored = localStorage.getItem(STORAGE_KEY);
@@ -1549,7 +1688,7 @@ const AgentConfigService = (function () {
         }
         return _config;
     }
-    
+
     function save() {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(_config));
@@ -1559,19 +1698,19 @@ const AgentConfigService = (function () {
             showToast('保存失败', 'error');
         }
     }
-    
+
     function onPlannerChange(value) {
         _config.planner = value;
     }
-    
+
     function onAllocationModeChange(value) {
         _config.allocationMode = value;
     }
-    
+
     function onDefaultActorChange(value) {
         _config.defaultActor = value;
     }
-    
+
     function showToast(message, type) {
         const existing = document.querySelector('.settings-toast');
         if (existing) existing.remove();
@@ -1592,7 +1731,7 @@ const AgentConfigService = (function () {
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
-    
+
     return {
         load,
         save,
@@ -1609,14 +1748,14 @@ window.AgentConfigService = AgentConfigService;
 const AgentRuntimeService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
     const STORAGE_KEY = 'cosight:agentRunConfig';
-    
+
     let _config = {
         planner_id: '',
         allowed_actor_ids: [],
         default_actor_id: '',
         dispatch_mode: 'single_actor'
     };
-    
+
     let _planners = [];
     let _actors = [];
 
@@ -1703,7 +1842,7 @@ const AgentRuntimeService = (function () {
         `;
 
         bindEvents();
-        
+
         const overlay = modal.querySelector('.agent-runtime-overlay');
         if (overlay) {
             overlay.addEventListener('click', function (event) {

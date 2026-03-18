@@ -266,7 +266,7 @@ async def update_folder(folder_id: str, body: dict = Body(...)):
 
 @commonRouter.put("/thread/{thread_id}")
 async def update_thread(thread_id: str, body: dict = Body(...)):
-    """更新会话（标题、标星状态等）"""
+    """更新会话（标题、标星状态、消息等）"""
     try:
         data = load_sessions()
         
@@ -280,8 +280,17 @@ async def update_thread(thread_id: str, body: dict = Body(...)):
                         thread["starred"] = body["starred"]
                     if "folderId" in body:
                         thread["folderId"] = body["folderId"]
+                    if "messages" in body and isinstance(body["messages"], list):
+                        thread["messages"] = body["messages"]
+                    if "messageCount" in body:
+                        thread["messageCount"] = body["messageCount"]
+                    elif "messages" in body and isinstance(body["messages"], list):
+                        thread["messageCount"] = len(body["messages"])
                     
-                    thread["updatedAt"] = int(datetime.now().timestamp() * 1000)
+                    if "updatedAt" in body:
+                        thread["updatedAt"] = body["updatedAt"]
+                    else:
+                        thread["updatedAt"] = int(datetime.now().timestamp() * 1000)
                     save_sessions(data)
                     logger.info(f"更新会话：{thread_id}")
                     return json_result(0, 'success', thread)

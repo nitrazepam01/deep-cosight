@@ -672,13 +672,14 @@ class MessageService {
         try {
             const pendingRaw = localStorage.getItem('cosight:pendingRequests');
             const pendings = pendingRaw ? JSON.parse(pendingRaw) : {};
-            pendings[topic] = { message, savedAt: Date.now(), stillPending: true };
+            pendings[topic] = { message, savedAt: Date.now(), stillPending: true, threadId: options.threadId || null };
             localStorage.setItem('cosight:pendingRequests', JSON.stringify(pendings));
             console.log('store pendingRequests',JSON.stringify(pendings));
         } catch (e) {
             console.warn('保存pending失败:', e);
         }
         WebSocketService.sendMessage(topic, JSON.stringify(message));
+        return topic;
     }
 
     /**

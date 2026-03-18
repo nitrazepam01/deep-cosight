@@ -1,9 +1,9 @@
 {
   "version": "1.0",
-  "updatedAt": 1773832500532,
+  "updatedAt": 1773842561151,
   "lastVisitedThread": {
-    "folderId": "default",
-    "threadId": "thread-1773832497586"
+    "folderId": "folder-life-001",
+    "threadId": "thread-life-001"
   },
   "folders": [
     {
@@ -95,10 +95,31 @@
           "title": "周末旅行计划",
           "folderId": "folder-life-001",
           "createdAt": 1710604800000,
-          "updatedAt": 1773732159081,
-          "messageCount": 0,
+          "updatedAt": 1773842561151,
+          "messageCount": 4,
           "starred": false,
-          "messages": []
+          "messages": [
+            {
+              "role": "user",
+              "content": "测试",
+              "timestamp": 1773833308588
+            },
+            {
+              "role": "user",
+              "content": "测试",
+              "timestamp": 1773833317937
+            },
+            {
+              "role": "user",
+              "content": "测试",
+              "timestamp": 1773833408679
+            },
+            {
+              "role": "assistant",
+              "content": "# 📊 Markdown 格式测试回复\r\n\r\n你好！这是一个完整的 Markdown 格式测试示例，展示 Co-Sight 支持的所有渲染格式。\r\n\r\n---\r\n\r\n## 📑 目录\r\n\r\n1. [标题层级](#标题层级)\r\n2. [列表](#列表)\r\n3. [代码块](#代码块)\r\n4. [表格](#表格)\r\n5. [图片](#图片)\r\n6. [LaTeX 公式](#latex 公式)\r\n7. [Mermaid 图表](#mermaid 图表)\r\n\r\n---\r\n\r\n## 📝 标题层级\r\n\r\n# 一级标题 H1\r\n## 二级标题 H2\r\n### 三级标题 H3\r\n#### 四级标题 H4\r\n\r\n---\r\n\r\n## 📋 列表\r\n\r\n### 无序列表\r\n\r\n- 🍎 苹果\r\n- 🍌 香蕉\r\n  - 🍌 小米蕉\r\n  - 🍌 帝王蕉\r\n- 🍇 葡萄\r\n- 🍊 橙子\r\n\r\n### 有序列表\r\n\r\n1. **第一步**：准备工作\r\n   - 收集资料\r\n   - 分析需求\r\n2. **第二步**：执行计划\r\n   - 编写代码\r\n   - 测试功能\r\n3. **第三步**：总结回顾\r\n\r\n### 任务列表\r\n\r\n- [x] ✅ 已完成的任务\r\n- [ ] ⏳ 进行中的任务\r\n- [ ] ❌ 未开始的任务\r\n\r\n---\r\n\r\n## 💻 代码块\r\n\r\n### 行内代码\r\n\r\n使用 `console.log()` 输出调试信息，或者用 `const` 声明常量。\r\n\r\n### Python 代码\r\n\r\n```python\r\n# 快速排序算法\r\ndef quick_sort(arr):\r\n    if len(arr) <= 1:\r\n        return arr\r\n    pivot = arr[len(arr) // 2]\r\n    left = [x for x in arr if x < pivot]\r\n    middle = [x for x in arr if x == pivot]\r\n    right = [x for x in arr if x > pivot]\r\n    return quick_sort(left) + middle + quick_sort(right)\r\n\r\ndata = [3, 6, 8, 10, 1, 2, 1]\r\nprint(f\"排序后：{quick_sort(data)}\")\r\n```\r\n\r\n### JavaScript 代码\r\n\r\n```javascript\r\n// React 组件示例\r\nimport React, { useState } from 'react';\r\n\r\nfunction Counter({ initialValue = 0 }) {\r\n    const [count, setCount] = useState(initialValue);\r\n    \r\n    return (\r\n        <div className=\"counter\">\r\n            <h1>计数：{count}</h1>\r\n            <button onClick={() => setCount(count + 1)}>\r\n                增加\r\n            </button>\r\n        </div>\r\n    );\r\n}\r\n```\r\n\r\n### SQL 代码\r\n\r\n```sql\r\nSELECT team_name, COUNT(*) as matches, SUM(goals) as total_goals\r\nFROM teams t JOIN matches m ON t.team_id = m.team_id\r\nWHERE season = '2025'\r\nGROUP BY team_id\r\nORDER BY total_goals DESC;\r\n```\r\n\r\n### JSON 数据\r\n\r\n```json\r\n{\r\n    \"league\": {\r\n        \"name\": \"江苏足球城市联赛\",\r\n        \"season\": \"2025\",\r\n        \"teams\": [\r\n            {\"id\": 1, \"name\": \"南京城市\", \"city\": \"南京\"},\r\n            {\"id\": 2, \"name\": \"苏州东吴\", \"city\": \"苏州\"}\r\n        ]\r\n    }\r\n}\r\n```\r\n\r\n---\r\n\r\n## 📊 表格\r\n\r\n### 简单表格\r\n\r\n| 球队名称 | 比赛场次 | 胜 | 平 | 负 | 进球 | 失球 | 积分 |\r\n|----------|----------|-----|-----|-----|------|------|------|\r\n| 南京城市 | 12 | 9 | 2 | 1 | 28 | 10 | 29 |\r\n| 苏州东吴 | 12 | 8 | 3 | 1 | 25 | 12 | 27 |\r\n| 无锡吴钩 | 12 | 6 | 2 | 4 | 20 | 15 | 20 |\r\n| 常州蓝之翼 | 12 | 4 | 3 | 5 | 18 | 20 | 15 |\r\n\r\n### 带对齐的表格\r\n\r\n| 左对齐 | 居中对齐 | 右对齐 |\r\n|:-------|:--------:|-------:|\r\n| 苹果 | 🍎 | $1.50 |\r\n| 香蕉 | 🍌 | $0.80 |\r\n| 橙子 | 🍊 | $2.00 |\r\n\r\n---\r\n\r\n## 🖼️ 图片\r\n\r\n![江苏足球联赛 Logo](https://www.logonews.cn/wp-content/uploads/2025/04/2025-jiangsu-football-city-league-logo.png)\r\n\r\n*上图：2025 年江苏足球城市联赛官方 Logo*\r\n\r\n---\r\n\r\n## 🧮 LaTeX 公式\r\n\r\n### 行内公式\r\n\r\n质能方程 $E = mc^2$，圆的面积 $A = \\pi r^2$，勾股定理 $a^2 + b^2 = c^2$。\r\n\r\n### 块级公式\r\n\r\n$$\r\nx = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}\r\n$$\r\n\r\n$$\r\ne^{i\\pi} + 1 = 0\r\n$$\r\n\r\n$$\r\n\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}\r\n$$\r\n\r\n$$\r\n\\begin{bmatrix}\r\n1 & 2 & 3 \\\\\r\n4 & 5 & 6 \\\\\r\n7 & 8 & 9\r\n\\end{bmatrix}\r\n$$\r\n\r\n---\r\n\r\n## 📈 Mermaid 图表\r\n\r\n### 流程图\r\n\r\n```mermaid\r\ngraph TD\r\n    A[开始] --> B{是否登录？}\r\n    B -->|是 | C[显示主页]\r\n    B -->|否 | D[显示登录页面]\r\n    D --> E[用户输入信息]\r\n    E --> F{验证通过？}\r\n    F -->|是 | C\r\n    F -->|否 | G[显示错误]\r\n    G --> D\r\n    C --> H[结束]\r\n```\r\n\r\n### 序列图\r\n\r\n```mermaid\r\nsequenceDiagram\r\n    participant U as 用户\r\n    participant F as 前端\r\n    participant A as API\r\n    participant D as 数据库\r\n    \r\n    U->>F: 输入查询\r\n    F->>A: 发送请求\r\n    A->>D: 查询数据\r\n    D-->>A: 返回结果\r\n    A-->>F: 返回 JSON\r\n    F-->>U: 显示结果\r\n```\r\n\r\n### 类图\r\n\r\n```mermaid\r\nclassDiagram\r\n    class Animal {\r\n        +String name\r\n        +int age\r\n        +makeSound()\r\n    }\r\n    class Dog {\r\n        +String breed\r\n        +bark()\r\n    }\r\n    class Cat {\r\n        +String color\r\n        +meow()\r\n    }\r\n    Animal <|-- Dog\r\n    Animal <|-- Cat\r\n```\r\n\r\n### 状态图\r\n\r\n```mermaid\r\nstateDiagram-v2\r\n    [*] --> 待机\r\n    待机 --> 运行：启动\r\n    运行 --> 暂停：暂停\r\n    暂停 --> 运行：继续\r\n    运行 --> 完成：结束\r\n    完成 --> [*]\r\n```\r\n\r\n### 饼图\r\n\r\n```mermaid\r\npie\r\n    \"南京城市\" : 29\r\n    \"苏州东吴\" : 27\r\n    \"无锡吴钩\" : 20\r\n    \"常州蓝之翼\" : 15\r\n```\r\n\r\n---\r\n\r\n## 📖 引用与注释\r\n\r\n### 块引用\r\n\r\n> \"足球是圆的，什么结果都可能出现。\"\r\n> \r\n> —— 著名足球教练 希斯菲尔德\r\n\r\n> **注意**：本文档中的所有数据均为示例数据。\r\n\r\n### 嵌套引用\r\n\r\n> 第一层引用\r\n> > 第二层引用\r\n> > > 第三层引用\r\n\r\n---\r\n\r\n## 🎨 其他格式\r\n\r\n### 强调文本\r\n\r\n- *斜体文本*\r\n- **粗体文本**\r\n- ***粗斜体文本***\r\n- ~~删除线文本~~\r\n- `行内代码`\r\n\r\n### 链接\r\n\r\n- [普通链接](https://example.com)\r\n- [带标题链接](https://example.com \"悬停显示标题\")\r\n\r\n### 水平分割线\r\n\r\n---\r\n\r\n***\r\n\r\n___\r\n\r\n### Emoji 表情\r\n\r\n🎉 💡 ✅ ❌ ⚠️ 💪 🔥 🎯 📈 📉 ⭐ 🏆\r\n\r\n### HTML 标签支持\r\n\r\n<details>\r\n<summary>点击展开详情</summary>\r\n\r\n这里是隐藏的内容，可以包含列表、**格式文本**、[链接](https://example.com)\r\n\r\n</details>\r\n\r\n---\r\n\r\n<div class=\"footer-center\">\r\n    <em>感谢阅读！</em> 📚\r\n</div>\r\n",
+              "timestamp": 1773833408693
+            }
+          ]
         },
         {
           "id": "thread-1773732084842",

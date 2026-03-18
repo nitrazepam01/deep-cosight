@@ -611,6 +611,7 @@ const AppState = {
     deletingThreadId: null,
     deletingFolderId: null,
     isThreadReordering: false,
+    topicThreadMap: {},
     initialized: false
 };
 
@@ -669,6 +670,33 @@ function getDefaultFolder() {
 function getAllFolders() {
     ensureDefaultFolder();
     return AppState.folders;
+}
+
+function bindTopicToThread(topic, threadId) {
+    if (!topic || !threadId) return;
+    AppState.topicThreadMap[topic] = threadId;
+}
+
+function unbindTopic(topic) {
+    if (!topic) return;
+    delete AppState.topicThreadMap[topic];
+}
+
+function getThreadIdByTopic(topic) {
+    if (!topic) return null;
+
+    if (AppState.topicThreadMap[topic]) {
+        return AppState.topicThreadMap[topic];
+    }
+
+    try {
+        const pendingRaw = localStorage.getItem('cosight:pendingRequests');
+        const pendings = pendingRaw ? JSON.parse(pendingRaw) : {};
+        return pendings[topic]?.threadId || null;
+    } catch (e) {
+        console.warn('从 pendingRequests 读取 threadId 失败:', e);
+        return null;
+    }
 }
 
 function getTotalThreadCount() {
@@ -1616,6 +1644,19 @@ function getCurrentThread() {
     return getThreadById(AppState.currentThreadId);
 }
 
+async function syncThreadMessagesToBackend(thread) {
+    if (!thread || !window.SessionService) return;
+    try {
+        await window.SessionService.updateThread(thread.id, {
+            messages: thread.messages || [],
+            messageCount: (thread.messages || []).length,
+            updatedAt: thread.updatedAt || Date.now()
+        });
+    } catch (error) {
+        console.warn('[syncThreadMessagesToBackend] 同步失败:', error);
+    }
+}
+
 function scrollToBottom() {
     const chatContainer = document.getElementById('chat-container');
     if (chatContainer) {
@@ -1950,6 +1991,9 @@ function sendMessage() {
     if (thread) {
         if (!thread.messages) thread.messages = [];
         thread.messages.push(userMessage);
+        thread.updatedAt = Date.now();
+        thread.messageCount = thread.messages.length;
+        syncThreadMessagesToBackend(thread);
         // 注意：不在这里更新 updatedAt 和 messageCount，让 updateCurrentThread 处理
     }
     
@@ -1985,8 +2029,13 @@ async function sendToBackend(message) {
             return;
         }
         
-        // 调用 messageService.sendMessage 通过 WebSocket 发送
-        window.messageService.sendMessage(message);
+        // 调用 messageService.sendMessage 通过 WebSocket 发送，并绑定当前线程
+        const topic = window.messageService.sendMessage(message, {
+            threadId: AppState.currentThreadId
+        });
+        if (topic) {
+            bindTopicToThread(topic, AppState.currentThreadId);
+        }
         
     } catch (error) {
         console.error('发送消息失败:', error);
@@ -2029,6 +2078,9 @@ function initWebSocketMessageHandler() {
 function handleWebSocketMessage(message) {
     try {
         const messageData = typeof message === 'string' ? JSON.parse(message) : message;
+        const topic = messageData.topic;
+        const targetThreadId = getThreadIdByTopic(topic) || AppState.currentThreadId;
+        const targetThread = getThreadById(targetThreadId);
         
         // 检查是否是 lui-message-manus-step 类型的消息（DAG 步骤消息）
         const messageType = messageData.data?.contentType || messageData.data?.type;
@@ -2070,18 +2122,22 @@ function handleWebSocketMessage(message) {
                         timestamp: Date.now()
                     };
                     
-                    // 保存到当前线程的消息数组
-                    const thread = getCurrentThread();
-                    if (thread) {
-                        if (!thread.messages) thread.messages = [];
-                        thread.messages.push(assistantMessage);
-                        thread.updatedAt = Date.now();
-                        thread.messageCount = thread.messages.length;
+                    // 保存到目标线程（由 topic 绑定）
+                    if (targetThread) {
+                        if (!targetThread.messages) targetThread.messages = [];
+                        targetThread.messages.push(assistantMessage);
+                        targetThread.updatedAt = Date.now();
+                        targetThread.messageCount = targetThread.messages.length;
                         saveState();
+                        syncThreadMessagesToBackend(targetThread);
                     }
                     
-                    // 添加到 UI 显示
-                    addMessage(assistantMessage);
+                    // 仅当目标线程就是当前线程时，才实时追加到 UI
+                    if (targetThreadId === AppState.currentThreadId) {
+                        addMessage(assistantMessage);
+                    } else {
+                        renderFolderList();
+                    }
                     
                     // 任务执行结束，恢复发送按钮
                     isTaskExecuting = false;
@@ -2095,6 +2151,7 @@ function handleWebSocketMessage(message) {
             // 任务执行结束，恢复发送按钮
             isTaskExecuting = false;
             updateSendButtonState();
+            unbindTopic(topic);
         }
     } catch (error) {
         console.error('处理 WebSocket 消息失败:', error);
@@ -2148,6 +2205,7 @@ function clearCurrentChat() {
         thread.messageCount = 0;
         thread.updatedAt = Date.now();
         saveState();
+        syncThreadMessagesToBackend(thread);
         loadMessages([]);
     }
 }
@@ -3147,6 +3205,7 @@ function showTestContentAsAIReply(content) {
         thread.updatedAt = Date.now();
         thread.messageCount = thread.messages.length;
         saveState();
+        syncThreadMessagesToBackend(thread);
     }
     
     // 添加到 UI 显示

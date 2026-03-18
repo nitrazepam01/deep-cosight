@@ -2885,26 +2885,45 @@ select.settings-input option:checked {
     font-size: 13px;
 }
 
+.test-warning {
+    color: #d97706;
+    font-size: 13px;
+}
+
 .test-fail {
     color: #ef4444;
     font-size: 13px;
 }
 
-#test-result-0,
-#test-result-1,
-#test-result-2,
-#test-result-3,
-#test-result-4,
-#test-result-5,
-#test-result-6,
-#test-result-7,
-#test-result-8,
-#test-result-9 {
-    margin-top: 8px;
-    padding: 8px;
-    border-radius: 6px;
-    background: #f8f9fa;
-    font-size: 13px;
+.provider-test-result.is-empty {
+    display: none;
+}
+
+.provider-test-result {
+    /* keep exactly same base metrics as .cs-item-info */
+    margin-top: 0;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.provider-test-result.test-loading i,
+.provider-test-result.test-loading span {
+    color: #f59e0b !important;
+}
+
+.provider-test-result.test-success i,
+.provider-test-result.test-success span {
+    color: #10b981 !important;
+}
+
+.provider-test-result.test-warning i,
+.provider-test-result.test-warning span {
+    color: #d97706 !important;
+}
+
+.provider-test-result.test-fail i,
+.provider-test-result.test-fail span {
+    color: #ef4444 !important;
 }
 
 /* ==================== 个性化页面样式 ==================== */
