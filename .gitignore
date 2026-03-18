@@ -32,3 +32,4 @@ upload_files/
 rag_storage/
 start_lightrag.bat
 sessions.json
+test_env_check.txt
