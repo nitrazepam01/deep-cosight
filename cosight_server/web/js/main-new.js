@@ -2514,6 +2514,7 @@ async function createNewThreadAndSwitch() {
     // 切换到新会话
     getDefaultFolder().expanded = true;
     renderFolderList();
+    animateNewThreadPushDown(newThread.id);
     await saveState();
     await switchThread(newThread.id);
     
