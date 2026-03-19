@@ -520,6 +520,38 @@ class SessionService {
     }
 
     /**
+     * 查询会话执行状态（优先后端）
+     */
+    async getThreadStatus(threadId) {
+        const result = await this._get(`/sessions/thread/${threadId}/status`);
+        if (this.sessionsData) {
+            const thread = this.getThread(threadId);
+            if (thread) {
+                thread.isExecuting = !!result?.isExecuting;
+                thread.statusUpdatedAt = result?.statusUpdatedAt || thread.statusUpdatedAt || Date.now();
+                this.saveToLocalStorage();
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 更新会话执行状态（优先后端）
+     */
+    async updateThreadStatus(threadId, isExecuting) {
+        const result = await this._put(`/thread/${threadId}/status`, { isExecuting: !!isExecuting });
+        if (this.sessionsData) {
+            const thread = this.getThread(threadId);
+            if (thread) {
+                thread.isExecuting = !!result?.isExecuting;
+                thread.statusUpdatedAt = result?.statusUpdatedAt || Date.now();
+                this.saveToLocalStorage();
+            }
+        }
+        return result;
+    }
+
+    /**
      * 生成唯一 ID
      */
     generateId(prefix = 'id') {

@@ -633,15 +633,6 @@ class MessageService {
         console.log('MessageService.sendMessage >>>>>>>>>>>>>> ', content);
         // 新消息发送前清理之前的tool events和历史数据
         this.clearStepToolEvents();
-
-        // 清理历史的planId和pending请求
-        try {
-            localStorage.removeItem('cosight:planIdByTopic');
-            localStorage.removeItem('cosight:pendingRequests');
-            console.log('清理历史localStorage数据cosight:planIdByTopic, cosight:pendingRequests');
-        } catch (e) {
-            console.warn('清理历史localStorage数据失败:', e);
-        }
         const topic = WebSocketService.generateUUID();
         WebSocketService.subscribe(topic, this.receiveMessage.bind(this));
 
@@ -665,7 +656,8 @@ class MessageService {
             },
             // 会被服务端解析的会话信息
             sessionInfo: {
-                messageSerialNumber: planId
+                messageSerialNumber: planId,
+                threadId: options.threadId || null
             }
         }
         // 记录pending请求，便于刷新后重发

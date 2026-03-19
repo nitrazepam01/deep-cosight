@@ -133,6 +133,35 @@ def get_thread_by_id(thread_id: str) -> Optional[Dict]:
     return None
 
 
+def get_thread_and_folder_by_id(thread_id: str) -> tuple[Optional[Dict], Optional[Dict], Optional[Dict]]:
+    """根据 ID 获取会话及其所在文件夹和完整数据对象"""
+    data = load_sessions()
+    for folder in data.get("folders", []):
+        for thread in folder.get("threads", []):
+            if thread.get("id") == thread_id:
+                return thread, folder, data
+    return None, None, data
+
+
+def set_thread_execution_status(thread_id: str, is_executing: bool) -> Optional[Dict]:
+    """内部方法：更新会话执行状态，返回状态对象；找不到会话时返回 None"""
+    data = load_sessions()
+    status_updated_at = int(datetime.now().timestamp() * 1000)
+
+    for folder in data.get("folders", []):
+        for thread in folder.get("threads", []):
+            if thread.get("id") == thread_id:
+                thread["isExecuting"] = bool(is_executing)
+                thread["statusUpdatedAt"] = status_updated_at
+                save_sessions(data)
+                return {
+                    "threadId": thread_id,
+                    "isExecuting": bool(is_executing),
+                    "statusUpdatedAt": status_updated_at
+                }
+    return None
+
+
 # ==================== GET API - 读取数据 ====================
 
 @commonRouter.get("/sessions")
@@ -171,6 +200,24 @@ async def get_thread(thread_id: str):
             return json_result(404, 'Thread not found', None)
     except Exception as e:
         logger.error(f"获取会话失败：{e}")
+        return json_result(500, str(e), None)
+
+
+@commonRouter.get("/sessions/thread/{thread_id}/status")
+async def get_thread_status(thread_id: str):
+    """查询指定会话执行状态"""
+    try:
+        thread = get_thread_by_id(thread_id)
+        if not thread:
+            return json_result(404, 'Thread not found', None)
+
+        return json_result(0, 'success', {
+            "threadId": thread_id,
+            "isExecuting": bool(thread.get("isExecuting", False)),
+            "statusUpdatedAt": thread.get("statusUpdatedAt", thread.get("updatedAt"))
+        })
+    except Exception as e:
+        logger.error(f"查询会话状态失败：{e}")
         return json_result(500, str(e), None)
 
 
@@ -298,6 +345,21 @@ async def update_thread(thread_id: str, body: dict = Body(...)):
         return json_result(404, 'Thread not found', None)
     except Exception as e:
         logger.error(f"更新会话失败：{e}")
+        return json_result(500, str(e), None)
+
+
+@commonRouter.put("/thread/{thread_id}/status")
+async def update_thread_status(thread_id: str, body: dict = Body(...)):
+    """更新会话执行状态"""
+    try:
+        is_executing = bool(body.get("isExecuting", False))
+        updated = set_thread_execution_status(thread_id, is_executing)
+        if not updated:
+            return json_result(404, 'Thread not found', None)
+        logger.info(f"更新会话状态：{thread_id} -> isExecuting={is_executing}")
+        return json_result(0, 'success', updated)
+    except Exception as e:
+        logger.error(f"更新会话状态失败：{e}")
         return json_result(500, str(e), None)
 
 

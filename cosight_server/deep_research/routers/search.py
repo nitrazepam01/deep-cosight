@@ -35,6 +35,7 @@ from app.common.logger_util import logger
 from app.cosight.task.plan_report_manager import plan_report_event_manager
 from app.cosight.task.todolist import Plan
 from CoSight import CoSight
+from cosight_server.deep_research.routers.common import set_thread_execution_status
 
 searchRouter = APIRouter()
 
@@ -506,6 +507,7 @@ async def search(request: Request, params: Any = Body(None)):
 
     session_info = params.get("sessionInfo", {})
     plan_id = session_info.get("messageSerialNumber", "")
+    thread_id = session_info.get("threadId", "")
     if not plan_id:
         # 退化方案：使用时间戳，建议前端传稳定ID
         plan_id = f"plan_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
@@ -750,6 +752,12 @@ async def search(request: Request, params: Any = Body(None)):
                 # 清理TaskManager中的映射与运行态
                 TaskManager.mark_completed(plan_id)
                 TaskManager.remove_plan(plan_id)
+                # 任务结束后由后端落会话状态，避免前端离线导致状态脏数据
+                try:
+                    if thread_id and not is_replay_request:
+                        set_thread_execution_status(thread_id, False)
+                except Exception as status_err:
+                    logger.warning(f"后端落会话结束状态失败: thread_id={thread_id}, err={status_err}")
 
         # 幂等：若已在运行，仅订阅并复用已有执行；否则启动新执行
         if TaskManager.is_running(plan_id):
@@ -761,6 +769,12 @@ async def search(request: Request, params: Any = Body(None)):
             plan_report_event_manager.subscribe("plan_result", plan_id, append_create_plan_local)
             plan_report_event_manager.subscribe("tool_event", plan_id, append_create_plan_local)
         else:
+            # 新任务启动前由后端落会话执行中状态
+            try:
+                if thread_id and not is_replay_request:
+                    set_thread_execution_status(thread_id, True)
+            except Exception as status_err:
+                logger.warning(f"后端落会话开始状态失败: thread_id={thread_id}, err={status_err}")
             TaskManager.mark_running(plan_id)
             logger.info(f"Starting new task for plan_id: {plan_id}")
             import threading

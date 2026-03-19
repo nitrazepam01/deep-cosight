@@ -150,6 +150,8 @@ async def websocket_handler(
 async def _send_resp(websocket, cookie, topic, message, lang):
     cookie_str = "; ".join([f"{key}={value}" for key, value in cookie.items()])
     assistants = [mention['name'] for mention in message['mentions']]
+    incoming_session_info = message.get("sessionInfo") if isinstance(message, dict) else {}
+    incoming_session_info = incoming_session_info if isinstance(incoming_session_info, dict) else {}
     params = {
         "content": message.get("initData"),
         "history": [],
@@ -157,7 +159,9 @@ async def _send_resp(websocket, cookie, topic, message, lang):
             "locale": lang,
             "sessionId": topic,
             "username": message.get("roleInfo").get("name"),
-            "assistantNames": assistants
+            "assistantNames": assistants,
+            "messageSerialNumber": incoming_session_info.get("messageSerialNumber"),
+            "threadId": incoming_session_info.get("threadId"),
         },
         "stream": True,
         "contentProperties": message.get("extra", {}).get("fromBackEnd", {}).get("actualPrompt")

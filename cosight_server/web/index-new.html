@@ -405,8 +405,8 @@
                 setTimeout(() => {
                     if (messageData && messageData.data) {
                         const ok = createDag(messageData);
-                        if (ok && typeof refreshCurrentThreadTaskState === 'function') {
-                            refreshCurrentThreadTaskState();
+                        if (ok && messageData.data.initData && messageData.data.initData.title) {
+                            updateDynamicTitle(messageData.data.initData.title);
                         }
                         if (typeof handleResize === 'function') {
                             setTimeout(() => handleResize(), 50);

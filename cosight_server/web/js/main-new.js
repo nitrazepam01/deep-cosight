@@ -482,9 +482,13 @@ function toggleMaximizePanel() {
 // 更新动态标题
 function updateDynamicTitle(title) {
     const titleEl = document.getElementById('conversation-title');
-    if (titleEl) {
-        titleEl.textContent = title;
-    }
+    if (!titleEl || !title) return;
+
+    // 跳过后端的等待占位标题，避免在等待阶段覆盖当前会话标题
+    const blockedTitles = new Set(['等待任务执行', 'Waiting for task execution']);
+    if (blockedTitles.has(String(title).trim())) return;
+
+    titleEl.textContent = title;
 }
 
 // ==================== 工具链展示 ====================
@@ -612,6 +616,7 @@ const AppState = {
     deletingFolderId: null,
     isThreadReordering: false,
     topicThreadMap: {},
+    threadExecutionState: {},
     initialized: false
 };
 
@@ -1316,6 +1321,7 @@ async function deleteFolder(folderId) {
                 AppState.currentThreadId = null;
                 loadMessages([]);
                 document.getElementById('conversation-title').textContent = '新对话';
+                void syncSendButtonStateWithCurrentThread();
             }
         }
 
@@ -1334,6 +1340,7 @@ async function deleteFolder(folderId) {
             AppState.currentThreadId = null;
             loadMessages([]);
             document.getElementById('conversation-title').textContent = '新对话';
+            void syncSendButtonStateWithCurrentThread();
         }
 
         AppState.folders.splice(index, 1);
@@ -1443,7 +1450,7 @@ async function switchThread(threadId) {
     }
 
     updateThreadActiveState();
-    loadThread(threadId);
+    await loadThread(threadId);
 }
 
 function updateThreadActiveState() {
@@ -1457,7 +1464,7 @@ function updateThreadActiveState() {
     }
 }
 
-function loadThread(threadId) {
+async function loadThread(threadId) {
     const thread = getThreadById(threadId);
 
     if (!thread) return;
@@ -1467,7 +1474,15 @@ function loadThread(threadId) {
         titleEl.textContent = thread.title || '新对话';
     }
 
-    loadMessages(thread.messages || []);
+    // 先取历史，再向后端确认状态，最后统一渲染（避免先显示错误思考态）
+    const messages = thread.messages || [];
+    const executing = await fetchThreadExecutionStatus(threadId);
+    if (threadId !== AppState.currentThreadId) return;
+
+    loadMessages(messages);
+    isTaskExecuting = executing;
+    updateSendButtonState();
+    syncThinkingStateWithCurrentThread();
 }
 
 function loadMessages(messages) {
@@ -1953,10 +1968,84 @@ function initInputArea() {
             exportCurrentChat();
         });
     }
+
+    // 初始化时按当前会话状态同步发送按钮（刷新后也生效）
+    void syncSendButtonStateWithCurrentThread();
 }
 
 // 任务执行中状态
 let isTaskExecuting = false;
+
+function isThreadExecuting(threadId) {
+    if (!threadId) return false;
+    return AppState.threadExecutionState[threadId] === true;
+}
+
+async function setThreadExecutingState(threadId, executing) {
+    if (!threadId) return;
+
+    if (window.SessionService && typeof window.SessionService.updateThreadStatus === 'function') {
+        try {
+            const status = await window.SessionService.updateThreadStatus(threadId, !!executing);
+            const backendExecuting = !!status?.isExecuting;
+            if (backendExecuting) {
+                AppState.threadExecutionState[threadId] = true;
+            } else {
+                delete AppState.threadExecutionState[threadId];
+            }
+        } catch (err) {
+            console.warn('[setThreadExecutingState] 同步会话状态失败:', err);
+        }
+    }
+
+    if (threadId === AppState.currentThreadId) {
+        isTaskExecuting = isThreadExecuting(AppState.currentThreadId);
+        updateSendButtonState();
+        syncThinkingStateWithCurrentThread();
+    }
+}
+
+async function fetchThreadExecutionStatus(threadId) {
+    if (!threadId) return false;
+
+    // 仅以后端接口为准
+    if (window.SessionService && typeof window.SessionService.getThreadStatus === 'function') {
+        try {
+            const status = await window.SessionService.getThreadStatus(threadId);
+            const executing = !!status?.isExecuting;
+            if (executing) {
+                AppState.threadExecutionState[threadId] = true;
+            } else {
+                delete AppState.threadExecutionState[threadId];
+            }
+            return executing;
+        } catch (e) {
+            console.warn('[fetchThreadExecutionStatus] 后端查询失败:', e);
+            return false;
+        }
+    }
+
+    return false;
+}
+
+async function syncSendButtonStateWithCurrentThread(expectedThreadId = null) {
+    if (expectedThreadId && AppState.currentThreadId !== expectedThreadId) return;
+
+    const currentThreadId = AppState.currentThreadId;
+    if (!currentThreadId) {
+        isTaskExecuting = false;
+        updateSendButtonState();
+        hideThinkingState();
+        return;
+    }
+
+    const executing = await fetchThreadExecutionStatus(currentThreadId);
+    if (expectedThreadId && AppState.currentThreadId !== expectedThreadId) return;
+
+    isTaskExecuting = executing;
+    updateSendButtonState();
+    syncThinkingStateWithCurrentThread();
+}
 
 /**
  * 更新发送按钮状态
@@ -1974,11 +2063,22 @@ function updateSendButtonState() {
     }
 }
 
-function sendMessage() {
+function syncThinkingStateWithCurrentThread() {
+    if (isThreadExecuting(AppState.currentThreadId)) {
+        showThinkingState();
+    } else {
+        hideThinkingState();
+    }
+}
+
+async function sendMessage() {
     const chatInput = document.getElementById('chat-input');
     const message = chatInput.value.trim();
-    
-    if (!message || isTaskExecuting) return;
+    const sourceThreadId = AppState.currentThreadId;
+
+    // 发送前强制同步一次后端会话状态，前端仅作为镜像
+    await syncSendButtonStateWithCurrentThread(sourceThreadId);
+    if (!message || isThreadExecuting(sourceThreadId)) return;
     
     const userMessage = {
         role: 'user',
@@ -2002,18 +2102,20 @@ function sendMessage() {
     
     chatInput.value = '';
     chatInput.style.height = 'auto';
+
+    // 发送后立即进入执行态，仅锁发送按钮，不锁输入框
+    await setThreadExecutingState(sourceThreadId, true);
     
     showThinkingState();
-    sendToBackend(message);
+    void sendToBackend(message, sourceThreadId);
 }
 
-async function sendToBackend(message) {
+async function sendToBackend(message, sourceThreadId = AppState.currentThreadId) {
     try {
         // 使用 WebSocket 发送消息（与 main.js 保持一致）
         if (!window.messageService || !window.WebSocketService) {
             console.error('messageService 或 WebSocketService 未初始化');
-            isTaskExecuting = false;
-            updateSendButtonState();
+            void setThreadExecutingState(sourceThreadId, false);
             hideThinkingState();
             addMessage({
                 role: 'assistant',
@@ -2026,21 +2128,21 @@ async function sendToBackend(message) {
         // 检查是否为测试命令 - 测试命令绕过 WebSocket，直接显示 AI 回复
         if (message === '测试') {
             await handleTestCommand();
+            void setThreadExecutingState(sourceThreadId, false);
             return;
         }
         
         // 调用 messageService.sendMessage 通过 WebSocket 发送，并绑定当前线程
         const topic = window.messageService.sendMessage(message, {
-            threadId: AppState.currentThreadId
+            threadId: sourceThreadId
         });
         if (topic) {
-            bindTopicToThread(topic, AppState.currentThreadId);
+            bindTopicToThread(topic, sourceThreadId);
         }
         
     } catch (error) {
         console.error('发送消息失败:', error);
-        isTaskExecuting = false;
-        updateSendButtonState();
+        void setThreadExecutingState(sourceThreadId, false);
         hideThinkingState();
         
         addMessage({
@@ -2087,8 +2189,7 @@ function handleWebSocketMessage(message) {
         
         if (messageType === 'lui-message-manus-step') {
             // DAG 步骤消息，任务开始执行
-            isTaskExecuting = true;
-            updateSendButtonState();
+            void setThreadExecutingState(targetThreadId, true);
             // 已经在 message.js 中处理
             return;
         }
@@ -2105,8 +2206,6 @@ function handleWebSocketMessage(message) {
             
             // 只处理 AI 返回的消息
             if (from === 'ai' && Array.isArray(initData)) {
-                hideThinkingState();
-                
                 // 合并所有文本内容
                 let content = '';
                 initData.forEach(item => {
@@ -2138,10 +2237,6 @@ function handleWebSocketMessage(message) {
                     } else {
                         renderFolderList();
                     }
-                    
-                    // 任务执行结束，恢复发送按钮
-                    isTaskExecuting = false;
-                    updateSendButtonState();
                 }
             }
         }
@@ -2149,8 +2244,7 @@ function handleWebSocketMessage(message) {
         // 检查是否是控制类结束信号
         if (messageData.data && messageData.data.type === 'control-status-message') {
             // 任务执行结束，恢复发送按钮
-            isTaskExecuting = false;
-            updateSendButtonState();
+            void setThreadExecutingState(targetThreadId, false);
             unbindTopic(topic);
         }
     } catch (error) {
@@ -2160,7 +2254,17 @@ function handleWebSocketMessage(message) {
 
 function showThinkingState() {
     const messageList = document.getElementById('message-list');
+    const welcomeScreen = document.getElementById('welcome-screen');
     if (!messageList) return;
+
+    // 避免重复插入思考气泡
+    if (document.getElementById('thinking-message')) return;
+
+    // 进入执行态时强制显示对话区
+    if (welcomeScreen) {
+        welcomeScreen.style.display = 'none';
+    }
+    messageList.style.display = 'flex';
     
     const thinkingDiv = document.createElement('div');
     thinkingDiv.className = 'message-item assistant';
@@ -2187,6 +2291,14 @@ function hideThinkingState() {
     const thinkingMessage = document.getElementById('thinking-message');
     if (thinkingMessage) {
         thinkingMessage.remove();
+    }
+
+    // 如果没有任何消息，恢复欢迎页显示
+    const messageList = document.getElementById('message-list');
+    const welcomeScreen = document.getElementById('welcome-screen');
+    if (messageList && welcomeScreen && messageList.children.length === 0) {
+        messageList.style.display = 'none';
+        welcomeScreen.style.display = 'flex';
     }
 }
 
@@ -3093,7 +3205,7 @@ function initThreeColumnLayout() {
             // 4. 最后加载会话内容
             if (AppState.currentThreadId) {
                 console.log('[initThreeColumnLayout] 加载会话内容:', AppState.currentThreadId);
-                loadThread(AppState.currentThreadId);
+                void loadThread(AppState.currentThreadId);
             } else {
                 console.warn('[initThreeColumnLayout] 没有当前会话 ID');
             }
