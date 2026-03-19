@@ -49,6 +49,14 @@ class MessageService {
             // 处理 lui-message-tool-event 类型的消息
             // 支持 contentType 和 type 两种字段名以保持兼容性
             const messageType = messageData.data?.contentType || messageData.data?.type;
+            const sessionBoundTypes = new Set([
+                'lui-message-tool-event',
+                'lui-message-credibility-analysis',
+                'lui-message-manus-step'
+            ]);
+            if (sessionBoundTypes.has(messageType) && !this._isForCurrentThread(messageData)) {
+                return;
+            }
             
             if (messageType === 'lui-message-tool-event') {
                 console.log('收到 lui-message-tool-event 消息:', messageData);
@@ -76,6 +84,19 @@ class MessageService {
         }
     }
 
+    _isForCurrentThread(messageData) {
+        try {
+            const topic = messageData?.topic;
+            const currentThreadId = window?.AppState?.currentThreadId;
+            if (!topic || !currentThreadId) return true;
+            if (typeof window.getThreadIdByTopic !== 'function') return true;
+            const targetThreadId = window.getThreadIdByTopic(topic) || currentThreadId;
+            return targetThreadId === currentThreadId;
+        } catch (_) {
+            return true;
+        }
+    }
+
     stepMessageHandler(messageData) {
         // 调用 createDag 方法来创建 DAG 图
         const result = createDag(messageData);
@@ -98,6 +119,9 @@ class MessageService {
         
         // 不再更新标题，仅显示步骤提示气泡
         if (initData && initData.title) {
+            if (typeof updateExecutionTitle === 'function') {
+                updateExecutionTitle(initData.title);
+            }
             showStepsTooltip();
             setTimeout(() => {
                 hideStepsTooltip();

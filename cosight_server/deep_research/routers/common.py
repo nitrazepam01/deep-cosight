@@ -333,6 +333,12 @@ async def update_thread(thread_id: str, body: dict = Body(...)):
                         thread["messageCount"] = body["messageCount"]
                     elif "messages" in body and isinstance(body["messages"], list):
                         thread["messageCount"] = len(body["messages"])
+                    if "rightPanelState" in body and isinstance(body["rightPanelState"], dict):
+                        thread["rightPanelState"] = body["rightPanelState"]
+                    if "isExecuting" in body:
+                        thread["isExecuting"] = bool(body["isExecuting"])
+                    if "statusUpdatedAt" in body:
+                        thread["statusUpdatedAt"] = body["statusUpdatedAt"]
                     
                     if "updatedAt" in body:
                         thread["updatedAt"] = body["updatedAt"]

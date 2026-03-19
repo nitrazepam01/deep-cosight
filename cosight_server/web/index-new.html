@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
@@ -162,7 +162,7 @@
             <div class="sidebar-right-header">
                 <div class="sidebar-right-title">
                     <i class="fas fa-project-diagram"></i>
-                    <span>任务执行</span>
+                    <span id="execution-title">任务执行</span>
                 </div>
                 <div class="sidebar-right-actions">
                     <button class="btn-icon-small" id="expand-right-btn" title="展开/收起">
@@ -175,48 +175,73 @@
             </div>
             
             <div class="sidebar-right-content">
-                <div class="progress-overview">
-                    <div class="progress-stats">
-                        <div class="stat-item completed">
-                            <div class="stat-number" id="completed-count">0</div>
-                            <div class="stat-label">已完成</div>
-                        </div>
-                        <div class="stat-item in-progress">
-                            <div class="stat-number" id="in-progress-count">0</div>
-                            <div class="stat-label">进行中</div>
-                        </div>
-                        <div class="stat-item blocked">
-                            <div class="stat-number" id="blocked-count">0</div>
-                            <div class="stat-label">阻塞</div>
-                        </div>
-                        <div class="stat-item not-started">
-                            <div class="stat-number" id="not-started-count">0</div>
-                            <div class="stat-label">未开始</div>
-                        </div>
-                    </div>
-                    <div class="progress-bar-container">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progress-fill"></div>
-                        </div>
-                        <span class="progress-text" id="progress-text">0%</span>
-                    </div>
-                </div>
-                
                 <div class="task-chain-section">
                     <div class="section-title-bar">
                         <span><i class="fas fa-sitemap"></i> 任务链</span>
+                        <div class="section-title-actions">
+                            <button class="btn-icon task-chain-reset-btn" id="dag-reset-view-btn" title="定位到初始视图">
+                                <i class="fas fa-crosshairs"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="dag-wrapper">
-                        <svg class="dag-svg" id="dag-svg"></svg>
+                        <svg class="dag-svg" id="dag-svg">
+                            <defs>
+                                <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="25" refY="0" orient="auto"
+                                    viewBox="0 -5 10 10">
+                                    <path d="M0,-5L10,0L0,5" fill="#2f7de1" />
+                                </marker>
+                            </defs>
+                        </svg>
+                    </div>
+                    <div class="progress-overview">
+                        <div class="progress-stats">
+                            <div class="stat-item completed">
+                                <div class="stat-number" id="completed-count">0</div>
+                                <div class="stat-label">已完成</div>
+                            </div>
+                            <div class="stat-item in-progress">
+                                <div class="stat-number" id="in-progress-count">0</div>
+                                <div class="stat-label">进行中</div>
+                            </div>
+                            <div class="stat-item blocked">
+                                <div class="stat-number" id="blocked-count">0</div>
+                                <div class="stat-label">阻塞</div>
+                            </div>
+                            <div class="stat-item not-started">
+                                <div class="stat-number" id="not-started-count">0</div>
+                                <div class="stat-label">未开始</div>
+                            </div>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text">0%</span>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="tool-chain-section">
+
+                <div class="task-info-section" id="task-info-section">
                     <div class="section-title-bar">
-                        <span><i class="fas fa-tools"></i> 工具链</span>
-                        <span class="tool-count" id="tool-count">0</span>
+                        <span id="task-info-title"><i class="fas fa-circle-info"></i> ????</span>
+                        <div class="section-title-actions">
+                            <span class="tool-count" id="tool-count">0</span>
+                            <button class="btn-icon task-info-switch-btn" id="task-info-switch-btn" title="??????/????">
+                                <i class="fas fa-arrows-rotate"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="tool-chain-list" id="tool-chain-list"></div>
+                    <div class="task-info-body" id="task-info-body">
+                        <div class="task-info-view" id="task-detail-view">
+                            <div class="task-detail-content" id="task-detail-content">
+                                <div class="task-detail-empty">??????</div>
+                            </div>
+                        </div>
+                        <div class="task-info-view hidden" id="task-log-view">
+                            <div class="tool-chain-list" id="tool-chain-list"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -407,6 +432,9 @@
                         const ok = createDag(messageData);
                         if (ok && messageData.data.initData && messageData.data.initData.title) {
                             updateDynamicTitle(messageData.data.initData.title);
+                            if (typeof updateExecutionTitle === 'function') {
+                                updateExecutionTitle(messageData.data.initData.title);
+                            }
                         }
                         if (typeof handleResize === 'function') {
                             setTimeout(() => handleResize(), 50);
@@ -473,3 +501,4 @@
 </body>
 
 </html>
+

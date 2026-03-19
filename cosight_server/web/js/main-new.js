@@ -16,6 +16,9 @@ let activeToolCalls = new Map();
 let toolCallCounter = 0;
 let nodeToolPanels = new Map();
 let autoOpenedPanels = new Set();
+let runtimeLogCounter = 0;
+let runtimeLogSignatures = new Set();
+const ENABLE_FLOATING_TOOL_PANELS = false;
 
 // ==================== 工具函数 ====================
 
@@ -77,10 +80,146 @@ function getToolSpecificIcon(tool) {
     return toolIcons[tool] || "fas fa-check";
 }
 
+// DAG 节点状态（供 dag.js 复用）
+const statusIcons = {
+    completed: "✓",
+    in_progress: "⋯",
+    blocked: "✕",
+    not_started: "○",
+};
+
+const statusTexts = {
+    completed: "已完成",
+    in_progress: "进行中",
+    blocked: "阻塞",
+    not_started: "未开始",
+};
+
+function getStatusIcon(status) {
+    return statusIcons[status] || "○";
+}
+
+function getStatusText(status) {
+    return statusTexts[status] || "未知";
+}
+
+// 兼容 dag.js 旧依赖：无历史映射时避免抛错
+const nodeToolMappings = {};
+
+function renderTaskDetail(node, showStatus = true) {
+    const detailEl = document.getElementById("task-detail-content");
+    if (!detailEl) return;
+    if (!node) {
+        detailEl.innerHTML = `<div class="task-detail-empty">将鼠标移动到任务节点上查看详情</div>`;
+        return;
+    }
+
+    const title = `${escapeHtml(node.name || "")}${node.fullName || node.title ? ` - ${escapeHtml(node.fullName || node.title || "")}` : ""}`;
+    const statusLine = showStatus ? `状态：${escapeHtml(getStatusText(node.status))}` : "";
+    const notes = node.step_notes ? escapeHtml(String(node.step_notes)) : "暂无说明";
+    detailEl.innerHTML = `
+        <div class="task-detail-title">${title}</div>
+        <div class="task-detail-meta">${statusLine}</div>
+        <div class="task-detail-notes">${notes}</div>
+    `;
+}
+window.renderTaskDetail = renderTaskDetail;
+
+function renderTaskDetailOverview() {
+    const detailEl = document.getElementById("task-detail-content");
+    if (!detailEl) return;
+
+    const nodes = (typeof dagData !== "undefined" && dagData && Array.isArray(dagData.nodes))
+        ? dagData.nodes
+        : [];
+
+    if (!nodes.length) {
+        detailEl.innerHTML = `<div class="task-detail-empty">暂无任务详情</div>`;
+        return;
+    }
+
+    const total = nodes.length;
+    const completed = nodes.filter(n => n.status === "completed").length;
+    const inProgress = nodes.filter(n => n.status === "in_progress").length;
+    const blocked = nodes.filter(n => n.status === "blocked").length;
+    const notStarted = nodes.filter(n => n.status === "not_started").length;
+
+    const focusNode =
+        nodes.find(n => n.status === "in_progress") ||
+        nodes.find(n => n.status === "blocked") ||
+        nodes.find(n => n.status === "not_started") ||
+        nodes[0];
+
+    const focusTitle = `${escapeHtml(focusNode.name || "")}${focusNode.fullName || focusNode.title ? ` - ${escapeHtml(focusNode.fullName || focusNode.title || "")}` : ""}`;
+    const focusStatus = getStatusText(focusNode.status);
+    const notes = focusNode.step_notes ? escapeHtml(String(focusNode.step_notes)) : "暂无说明";
+
+    detailEl.innerHTML = `
+        <div class="task-detail-title">${focusTitle}</div>
+        <div class="task-detail-meta">状态：${escapeHtml(focusStatus)} | 进度：${completed}/${total}</div>
+        <div class="task-detail-meta">已完成 ${completed} / 进行中 ${inProgress} / 阻塞 ${blocked} / 未开始 ${notStarted}</div>
+        <div class="task-detail-notes">${notes}</div>
+    `;
+}
+window.renderTaskDetailOverview = renderTaskDetailOverview;
+
+// 兼容 dag.js 旧依赖：将悬浮信息改为写入“任务详情”面板
+function showTooltip(event, d, showStatus = true) {
+    const tooltipEl = document.getElementById("tooltip");
+    if (tooltipEl) {
+        tooltipEl.style.opacity = "0";
+    }
+}
+
+function hideTooltip() {
+    const tooltipEl = document.getElementById("tooltip");
+    if (tooltipEl) {
+        tooltipEl.style.opacity = "0";
+    }
+}
+
+// 兼容 dag.js 点击节点时读取工具调用历史
+function getWorkflowByNodeId(nodeId) {
+    if (!window.messageService || typeof window.messageService.getStepToolEvents !== "function") {
+        return null;
+    }
+    const stepIndex = nodeId - 1;
+    const records = window.messageService.getStepToolEvents(stepIndex) || [];
+    if (!records.length) return null;
+
+    const tools = records
+        .filter((rec) => rec && rec.tool_name !== "mark_step")
+        .map((rec) => {
+            let converted = null;
+            try {
+                if (typeof window.messageService.convertToToolCallFormat === "function") {
+                    converted = window.messageService.convertToToolCallFormat(rec, nodeId);
+                }
+            } catch (_) {}
+
+            return {
+                id: converted?.id || rec.ui_id || `${rec.tool_name || 'tool'}_${rec.step_index || stepIndex}_${rec.start_time || rec.end_time || ''}`,
+                tool: converted?.tool || rec.tool_name,
+                toolName: converted?.toolName || getToolDisplayName(rec.tool_name),
+                status: converted?.status || rec.status || "completed",
+                duration: converted?.duration || ((rec.duration || 0) * 1000),
+                description: converted?.description || "",
+                result: converted?.result || rec.tool_result || "",
+                url: converted?.url || null,
+                path: converted?.path || null,
+                tool_args: rec.tool_args || null,
+                raw_result: rec.tool_result || null,
+            };
+        });
+
+    return { tools };
+}
+
 // ==================== 节点工具面板管理 ====================
 
 // 创建节点工具面板
 function createNodeToolPanel(nodeId, nodeName, sticky = false) {
+    if (!ENABLE_FLOATING_TOOL_PANELS) return null;
     const container = document.getElementById("tool-call-panels-container");
     const panelId = `tool-panel-${nodeId}`;
 
@@ -167,6 +306,9 @@ function closeNodeToolPanel(nodeId) {
 
 // 切换节点工具面板的显示状态
 function toggleNodeToolPanel(nodeId, nodeName) {
+    if (!ENABLE_FLOATING_TOOL_PANELS) {
+        return true;
+    }
     const panel = nodeToolPanels.get(nodeId);
 
     if (panel && panel.classList.contains("show")) {
@@ -179,7 +321,13 @@ function toggleNodeToolPanel(nodeId, nodeName) {
 }
 
 // 更新节点工具面板
-function updateNodeToolPanel(nodeId, toolCall) {
+function updateNodeToolPanel(nodeId, toolCall, options = {}) {
+    if (!ENABLE_FLOATING_TOOL_PANELS) {
+        if (!options.suppressRuntimeLog) {
+            appendRuntimeLogFromToolCall(nodeId, toolCall);
+        }
+        return;
+    }
     // 过滤内部工具：mark_step 不更新面板
     if (toolCall && toolCall.tool === "mark_step") {
         return;
@@ -240,6 +388,11 @@ function updateNodeToolPanel(nodeId, toolCall) {
             showRightPanelForTool(toolCall);
         }
     } catch (_) {}
+
+    // 将原“弹窗”中的每次状态更新同步到右侧“运行日志”
+    if (!options.suppressRuntimeLog) {
+        appendRuntimeLogFromToolCall(nodeId, toolCall);
+    }
 
     // 内容更新后，重新计算面板位置
     setTimeout(() => {
@@ -378,12 +531,29 @@ function updatePanelPosition(panel, nodeId) {
 
 // 更新所有面板位置
 function updateAllPanelPositions() {
+    if (!ENABLE_FLOATING_TOOL_PANELS) return;
     nodeToolPanels.forEach((panel, nodeId) => {
         if (panel.classList.contains("show")) {
             panel.style.top = "50px";
             panel.style.left = "16px";
         }
     });
+}
+
+function clearAllFloatingToolPanels() {
+    nodeToolPanels.forEach((panel) => {
+        try {
+            if (panel && panel.parentNode) {
+                panel.parentNode.removeChild(panel);
+            }
+        } catch (_) {}
+    });
+    nodeToolPanels.clear();
+    autoOpenedPanels.clear();
+    const container = document.getElementById("tool-call-panels-container");
+    if (container) {
+        container.innerHTML = "";
+    }
 }
 
 // ==================== 右侧内容面板控制 ====================
@@ -491,14 +661,26 @@ function updateDynamicTitle(title) {
     titleEl.textContent = title;
 }
 
+function updateExecutionTitle(title) {
+    const titleEl = document.getElementById('execution-title');
+    if (!titleEl || !title) return;
+    titleEl.textContent = String(title).trim();
+}
+
+function resetExecutionTitle() {
+    const titleEl = document.getElementById('execution-title');
+    if (!titleEl) return;
+    titleEl.textContent = '任务执行';
+}
+
 // ==================== 工具链展示 ====================
 
 // 添加工具调用到节点面板
-function addToolCallToNodePanel(nodeId, tool) {
+function addToolCallToNodePanel(nodeId, tool, options = {}) {
     if (tool && (tool.tool === "mark_step" || tool.tool_name === "mark_step")) {
         return;
     }
-    const callId = `tool_${++toolCallCounter}_${Date.now()}`;
+    const callId = tool?.id ? String(tool.id) : `tool_${++toolCallCounter}_${Date.now()}`;
     const startTime = Date.now() - tool.duration;
     const endTime = Date.now();
 
@@ -561,7 +743,7 @@ function addToolCallToNodePanel(nodeId, tool) {
         toolCallHistory = toolCallHistory.slice(0, 50);
     }
 
-    updateNodeToolPanel(nodeId, toolCall);
+    updateNodeToolPanel(nodeId, toolCall, options);
 }
 
 // 预设气泡颜色（与 settings.js 保持一致，6 种）
@@ -617,6 +799,10 @@ const AppState = {
     isThreadReordering: false,
     topicThreadMap: {},
     threadExecutionState: {},
+    taskInfoMode: 'detail',
+    runtimeLogFilterNodeId: null,
+    selectedTaskNodeId: null,
+    initialRuntimeLogsCleared: false,
     initialized: false
 };
 
@@ -1464,6 +1650,253 @@ function updateThreadActiveState() {
     }
 }
 
+function setTaskInfoMode(mode) {
+    const nextMode = mode === 'log' ? 'log' : 'detail';
+    AppState.taskInfoMode = nextMode;
+
+    const titleEl = document.getElementById('task-info-title');
+    const detailView = document.getElementById('task-detail-view');
+    const logView = document.getElementById('task-log-view');
+    const toolCountEl = document.getElementById('tool-count');
+    const switchBtn = document.getElementById('task-info-switch-btn');
+
+    if (titleEl) {
+        titleEl.innerHTML = nextMode === 'detail'
+            ? '<i class="fas fa-circle-info"></i> 任务详情'
+            : '<i class="fas fa-list-ul"></i> 任务日志';
+    }
+    if (detailView) {
+        detailView.classList.toggle('hidden', nextMode !== 'detail');
+    }
+    if (logView) {
+        logView.classList.toggle('hidden', nextMode !== 'log');
+    }
+    if (toolCountEl) {
+        toolCountEl.style.display = nextMode === 'log' ? 'inline-flex' : 'none';
+    }
+    if (switchBtn) {
+        switchBtn.setAttribute(
+            'title',
+            nextMode === 'detail' ? '切换到任务日志' : '切换到任务详情'
+        );
+    }
+
+    rerenderTaskInfoBySelection();
+}
+window.setTaskInfoMode = setTaskInfoMode;
+
+function toggleTaskInfoMode() {
+    setTaskInfoMode(AppState.taskInfoMode === 'detail' ? 'log' : 'detail');
+}
+
+function initTaskInfoSwitcher() {
+    const switchBtn = document.getElementById('task-info-switch-btn');
+    if (!switchBtn) return;
+
+    setTaskInfoMode('detail');
+    switchBtn.addEventListener('click', toggleTaskInfoMode);
+}
+
+function initDagResetButton() {
+    const resetBtn = document.getElementById('dag-reset-view-btn');
+    if (!resetBtn) return;
+
+    resetBtn.addEventListener('click', () => {
+        if (typeof window.resetDagViewport === 'function') {
+            window.resetDagViewport();
+        }
+    });
+}
+
+function clearDagViewState() {
+    try {
+        if (typeof createDag === 'function') {
+            createDag({
+                data: {
+                    content: {
+                        title: '',
+                        statusText: '',
+                        steps: [],
+                        step_statuses: {},
+                        dependencies: {},
+                        progress: {
+                            completed: 0,
+                            in_progress: 0,
+                            blocked: 0,
+                            not_started: 0,
+                            total: 0
+                        }
+                    }
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('[clearDagViewState] 清空 DAG 失败:', e);
+    }
+}
+
+function applyRuntimeLogFilter() {
+    const list = document.getElementById('tool-chain-list');
+    const toolCountEl = document.getElementById('tool-count');
+    if (!list) return;
+
+    const filterNodeId = Number.isFinite(Number(AppState.runtimeLogFilterNodeId))
+        ? Number(AppState.runtimeLogFilterNodeId)
+        : null;
+    const visibleCalls = AppState.toolCalls.filter(call => {
+        const callNodeId = Number.isFinite(Number(call?.nodeId)) ? Number(call.nodeId) : null;
+        return filterNodeId === null || (callNodeId !== null && callNodeId === filterNodeId);
+    });
+
+    // 先清理，再按顺序重建
+    list.innerHTML = '';
+    visibleCalls.forEach(call => {
+        const item = createToolChainItem(call);
+        list.appendChild(item);
+    });
+
+    if (toolCountEl) toolCountEl.textContent = String(visibleCalls.length);
+}
+
+function setRuntimeLogFilter(nodeId) {
+    AppState.runtimeLogFilterNodeId = Number.isFinite(Number(nodeId)) ? Number(nodeId) : null;
+    applyRuntimeLogFilter();
+}
+
+function clearRuntimeLogFilter() {
+    AppState.runtimeLogFilterNodeId = null;
+    applyRuntimeLogFilter();
+}
+
+function getDagNodeById(nodeId) {
+    const normalizedId = Number(nodeId);
+    if (!Number.isFinite(normalizedId)) return null;
+    const nodes = (typeof dagData !== 'undefined' && dagData && Array.isArray(dagData.nodes))
+        ? dagData.nodes
+        : [];
+    return nodes.find(node => Number(node.id) === normalizedId) || null;
+}
+
+function rerenderTaskInfoBySelection() {
+    const selectedNode = getDagNodeById(AppState.selectedTaskNodeId);
+
+    if (AppState.taskInfoMode === 'log') {
+        if (selectedNode) {
+            focusRuntimeLogByNode(selectedNode.id);
+        } else {
+            clearRuntimeLogFilter();
+        }
+        return;
+    }
+
+    if (selectedNode) {
+        renderTaskDetail(selectedNode, true);
+    } else {
+        renderTaskDetailOverview();
+    }
+}
+window.rerenderTaskInfoBySelection = rerenderTaskInfoBySelection;
+
+function handleTaskNodeSelection(nodeOrId) {
+    const nodeId = typeof nodeOrId === 'object' && nodeOrId
+        ? nodeOrId.id
+        : nodeOrId;
+    const selectedNode = getDagNodeById(nodeId) || (typeof nodeOrId === 'object' ? nodeOrId : null);
+    if (!selectedNode) return;
+
+    AppState.selectedTaskNodeId = Number(selectedNode.id);
+    rerenderTaskInfoBySelection();
+}
+window.handleTaskNodeSelection = handleTaskNodeSelection;
+
+function normalizeRuntimeLogItem(item) {
+    if (!item) return null;
+    let nodeId = Number.isFinite(Number(item.nodeId)) ? Number(item.nodeId) : null;
+    if (nodeId === null && typeof item.result === 'string') {
+        const matched = item.result.match(/Step\s+(\d+)\s*\|/i);
+        if (matched) {
+            nodeId = Number(matched[1]);
+        }
+    }
+    const normalizedResult = typeof item.result === 'string'
+        ? item.result
+        : (item.result ? JSON.stringify(item.result) : '');
+
+    return {
+        id: item.id || `runtime_log_restore_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        identityKey: item.identityKey || null,
+        sourceCallId: item.sourceCallId ? String(item.sourceCallId) : null,
+        tool: item.tool || 'tool_event',
+        status: item.status || 'completed',
+        nodeId: nodeId,
+        result: normalizedResult,
+        timestamp: item.timestamp || Date.now()
+    };
+}
+
+async function restoreRightPanelByThread(threadId) {
+    if (!threadId) return;
+
+    clearDagViewState();
+    resetExecutionTitle();
+    clearRuntimeLogs();
+    clearRuntimeLogFilter();
+    AppState.selectedTaskNodeId = null;
+
+    let backendThread = null;
+    try {
+        if (window.SessionService && typeof window.SessionService.getThreadFromBackend === 'function') {
+            backendThread = await window.SessionService.getThreadFromBackend(threadId);
+        }
+    } catch (e) {
+        console.warn('[restoreRightPanelByThread] 后端读取线程详情失败:', e);
+    }
+
+    if (threadId !== AppState.currentThreadId) return;
+
+    const localThread = getThreadById(threadId) || {};
+    const mergedThread = backendThread || localThread;
+    if (backendThread && localThread && typeof localThread === 'object') {
+        Object.assign(localThread, backendThread);
+    }
+    let rightPanelState = mergedThread.rightPanelState || {};
+    if (!AppState.initialRuntimeLogsCleared) {
+        AppState.initialRuntimeLogsCleared = true;
+        rightPanelState = {
+            ...rightPanelState,
+            runtimeLogs: []
+        };
+        if (localThread && typeof localThread === 'object') {
+            localThread.rightPanelState = rightPanelState;
+        }
+        try {
+            if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
+                await window.SessionService.updateThread(threadId, { rightPanelState });
+            }
+        } catch (e) {
+            console.warn('[restoreRightPanelByThread] 初始化清理旧日志失败:', e);
+        }
+    }
+    const dagInitData = rightPanelState.dagInitData || null;
+    const runtimeLogs = Array.isArray(rightPanelState.runtimeLogs) ? rightPanelState.runtimeLogs : [];
+
+    if (dagInitData && typeof createDag === 'function') {
+        createDag({ data: { content: dagInitData } });
+        if (dagInitData.title) {
+            updateExecutionTitle(dagInitData.title);
+        }
+    }
+
+    clearRuntimeLogs();
+    runtimeLogs
+        .map(normalizeRuntimeLogItem)
+        .filter(Boolean)
+        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+        .forEach((log) => addToolCallToChain(log));
+
+    rerenderTaskInfoBySelection();
+}
+
 async function loadThread(threadId) {
     const thread = getThreadById(threadId);
 
@@ -1473,6 +1906,11 @@ async function loadThread(threadId) {
     if (titleEl) {
         titleEl.textContent = thread.title || '新对话';
     }
+    resetExecutionTitle();
+    clearRuntimeLogs();
+    AppState.selectedTaskNodeId = null;
+    rerenderTaskInfoBySelection();
+    await restoreRightPanelByThread(threadId);
 
     // 先取历史，再向后端确认状态，最后统一渲染（避免先显示错误思考态）
     const messages = thread.messages || [];
@@ -2190,6 +2628,14 @@ function handleWebSocketMessage(message) {
         if (messageType === 'lui-message-manus-step') {
             // DAG 步骤消息，任务开始执行
             void setThreadExecutingState(targetThreadId, true);
+            try {
+                const initData = messageData.data?.content || messageData.data?.initData || null;
+                if (targetThreadId && initData && typeof initData === 'object') {
+                    schedulePersistRightPanelState(targetThreadId, { dagInitData: initData });
+                }
+            } catch (e) {
+                console.warn('[handleWebSocketMessage] 保存 DAG 快照失败:', e);
+            }
             // 已经在 message.js 中处理
             return;
         }
@@ -2342,30 +2788,137 @@ function exportCurrentChat() {
 
 // ==================== 工具链展示 ====================
 
+const rightPanelPersistTimers = new Map();
+
+function schedulePersistRightPanelState(threadId, partialState) {
+    if (!threadId || !partialState) return;
+    const thread = getThreadById(threadId);
+    if (!thread) return;
+
+    const currentState = thread.rightPanelState || {};
+    const nextState = {
+        ...currentState,
+        ...partialState
+    };
+    thread.rightPanelState = nextState;
+
+    const existingTimer = rightPanelPersistTimers.get(threadId);
+    if (existingTimer) {
+        clearTimeout(existingTimer);
+    }
+
+    const timer = setTimeout(async () => {
+        rightPanelPersistTimers.delete(threadId);
+        try {
+            if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
+                await window.SessionService.updateThread(threadId, { rightPanelState: nextState });
+            }
+        } catch (e) {
+            console.warn('[schedulePersistRightPanelState] 持久化右侧状态失败:', e);
+        }
+    }, 250);
+
+    rightPanelPersistTimers.set(threadId, timer);
+}
+
+function appendRuntimeLogFromToolCall(nodeId, toolCall) {
+    if (!toolCall) return;
+
+    const stepLabel = `Step ${nodeId}`;
+    const status = toolCall.status || 'completed';
+    const description = toolCall.description || '';
+    const resultText = toolCall.result
+        ? (typeof toolCall.result === 'string' ? toolCall.result : JSON.stringify(toolCall.result))
+        : '';
+
+    const sourceCallId = toolCall.id
+        ? String(toolCall.id)
+        : `${toolCall.tool || 'tool_event'}|${description}|${resultText.slice(0, 120)}`;
+    const identityKey = `step_${Number(nodeId) || 0}__call_${sourceCallId}`;
+    const nextLog = {
+        id: `runtime_log_${++runtimeLogCounter}`,
+        identityKey,
+        sourceCallId,
+        tool: toolCall.tool || 'tool_event',
+        status: status,
+        nodeId: Number(nodeId) || null,
+        result: `${stepLabel} | ${description}${resultText ? ` | ${resultText}` : ''}`,
+        timestamp: Date.now()
+    };
+
+    const signature = [
+        identityKey,
+        status,
+        description,
+        resultText
+    ].join('|');
+    if (runtimeLogSignatures.has(signature)) return;
+    runtimeLogSignatures.add(signature);
+
+    addToolCallToChain(nextLog);
+
+    if (AppState.currentThreadId) {
+        const currentThread = getThreadById(AppState.currentThreadId);
+        const prevLogs = Array.isArray(currentThread?.rightPanelState?.runtimeLogs)
+            ? currentThread.rightPanelState.runtimeLogs
+            : [];
+        const remainingLogs = prevLogs.filter(log => {
+            if (!log) return false;
+            if (log.identityKey && log.identityKey === identityKey) return false;
+            if (log.sourceCallId && String(log.sourceCallId) === sourceCallId && Number(log.nodeId) === (Number(nodeId) || null)) {
+                return false;
+            }
+            return true;
+        });
+        const mergedLogs = [nextLog, ...remainingLogs].slice(0, 300);
+        schedulePersistRightPanelState(AppState.currentThreadId, { runtimeLogs: mergedLogs });
+    }
+
+    // 控制签名集合大小，避免长期会话占用过大
+    if (runtimeLogSignatures.size > 500) {
+        runtimeLogSignatures = new Set(Array.from(runtimeLogSignatures).slice(-500));
+    }
+}
+
+function clearRuntimeLogs() {
+    AppState.toolCalls = [];
+    runtimeLogCounter = 0;
+    runtimeLogSignatures.clear();
+    AppState.runtimeLogFilterNodeId = null;
+    applyRuntimeLogFilter();
+}
+
 function addToolCallToChain(toolCall) {
     const toolChainList = document.getElementById('tool-chain-list');
-    const toolCountEl = document.getElementById('tool-count');
-    
     if (!toolChainList) return;
-    
-    AppState.toolCalls.push(toolCall);
-    
-    const toolItem = createToolChainItem(toolCall);
-    toolChainList.insertBefore(toolItem, toolChainList.firstChild);
-    
-    if (toolCountEl) {
-        toolCountEl.textContent = AppState.toolCalls.length;
+
+    const identityKey = toolCall?.identityKey || null;
+    if (identityKey) {
+        const existingIndex = AppState.toolCalls.findIndex(call => call?.identityKey === identityKey);
+        if (existingIndex >= 0) {
+            AppState.toolCalls.splice(existingIndex, 1);
+        }
     }
+
+    AppState.toolCalls.unshift(toolCall);
+    applyRuntimeLogFilter();
 }
 
 function createToolChainItem(toolCall) {
     const div = document.createElement('div');
     div.className = `tool-chain-item ${toolCall.status}`;
+    if (Number.isFinite(Number(toolCall.nodeId))) {
+        div.dataset.nodeId = String(Number(toolCall.nodeId));
+    }
     
     const iconClass = getToolIcon(toolCall.tool);
     const toolName = getToolDisplayName(toolCall.tool);
     const statusText = getToolStatusText(toolCall.status);
     
+    const resultText = typeof toolCall.result === 'string' ? toolCall.result : '';
+    const shortResult = resultText.substring(0, 100);
+    const resultSuffix = resultText.length > 100 ? '...' : '';
+
     div.innerHTML = `
         <div class="tool-chain-icon ${toolCall.status}">
             <i class="${iconClass}"></i>
@@ -2373,12 +2926,27 @@ function createToolChainItem(toolCall) {
         <div class="tool-chain-content">
             <div class="tool-chain-name">${toolName}</div>
             <div class="tool-chain-status">${statusText}</div>
-            ${toolCall.result ? `<div class="tool-chain-result">${escapeHtml(toolCall.result.substring(0, 100))}...</div>` : ''}
+            ${resultText ? `<div class="tool-chain-result">${escapeHtml(shortResult)}${resultSuffix}</div>` : ''}
         </div>
     `;
     
     return div;
 }
+
+function focusRuntimeLogByNode(nodeId) {
+    const list = document.getElementById('tool-chain-list');
+    if (!list || !Number.isFinite(Number(nodeId))) return;
+
+    setRuntimeLogFilter(nodeId);
+    const items = Array.from(list.querySelectorAll('.tool-chain-item'));
+    items.forEach(item => item.classList.remove('step-focused'));
+    const target = items.length ? items[0] : null;
+    if (!target) return;
+
+    target.classList.add('step-focused');
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+window.focusRuntimeLogByNode = focusRuntimeLogByNode;
 
 function getToolIcon(toolName) {
     const icons = {
@@ -2437,6 +3005,7 @@ function updateProgressStats(stats) {
     
     if (progressFill) progressFill.style.width = percentage + '%';
     if (progressText) progressText.textContent = percentage + '%';
+    rerenderTaskInfoBySelection();
 }
 
 // ==================== 状态持久化（使用 SessionService）====================
@@ -3131,6 +3700,8 @@ function initThreeColumnLayout() {
     
     initLeftSidebar();
     initRightSidebar();
+    initTaskInfoSwitcher();
+    initDagResetButton();
     initInputArea();
     initFolderModal();
     initNewThreadBtn();
@@ -3140,6 +3711,7 @@ function initThreeColumnLayout() {
     initClearChatConfirmModal();
     initSettingsModal();
     initFolderDragDrop();
+    clearAllFloatingToolPanels();
     
     // 初始化 WebSocket 消息监听（必须在 renderFolderList 之前）
     initWebSocketMessageHandler();

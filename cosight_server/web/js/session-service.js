@@ -221,7 +221,12 @@ class SessionService {
                             updatedAt: thread.updatedAt || Date.now(),
                             messageCount: thread.messageCount || 0,
                             starred: thread.starred || false,
-                            messages: Array.isArray(thread.messages) ? thread.messages : []
+                            messages: Array.isArray(thread.messages) ? thread.messages : [],
+                            rightPanelState: thread.rightPanelState && typeof thread.rightPanelState === 'object'
+                                ? thread.rightPanelState
+                                : {},
+                            isExecuting: !!thread.isExecuting,
+                            statusUpdatedAt: thread.statusUpdatedAt || thread.updatedAt || Date.now()
                         });
                     });
                 }
@@ -530,6 +535,22 @@ class SessionService {
                 thread.isExecuting = !!result?.isExecuting;
                 thread.statusUpdatedAt = result?.statusUpdatedAt || thread.statusUpdatedAt || Date.now();
                 this.saveToLocalStorage();
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 从后端获取线程完整信息（用于会话切换时恢复右侧状态）
+     */
+    async getThreadFromBackend(threadId) {
+        const result = await this._get(`/sessions/thread/${threadId}`);
+        if (this.sessionsData && result) {
+            const thread = this.getThread(threadId);
+            if (thread) {
+                Object.assign(thread, result);
+                this.saveToLocalStorage();
+                this.syncToAppState();
             }
         }
         return result;
