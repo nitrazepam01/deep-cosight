@@ -28,3 +28,5 @@ minify-html==0.16.4
 pdfplumber==0.11.0
 PyMuPDF==1.24.0
 langfuse==3.10.5
+lightrag_hku==1.4.10
+PyJWT==2.12.0

@@ -8,7 +8,6 @@ venv/
 *.egg-info
 .obsidian
 build/
-dist/
 dist - *
 node_modules
 **/.angular
@@ -28,4 +27,10 @@ agents.json
 test_api_key.py
 /tmp/test_api_key.py
 *.bak
-providers.json
+lightrag_data/
+lightrag_storage/
+upload_files/
+rag_storage/
+start_lightrag.bat
+sessions.json
+test_env_check.txt

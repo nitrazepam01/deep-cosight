@@ -12,7 +12,6 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-
 from datetime import datetime
 import os
 import time
@@ -370,5 +369,5 @@ if __name__ == "__main__":
     os.makedirs(work_space_path, exist_ok=True)
 
     cosight = CoSight(llm_for_plan, llm_for_act, llm_for_tool, llm_for_vision, work_space_path)
-    result = cosight.execute("帮我写一篇中兴通讯的分析报告")
+    result = cosight.execute("Write a short analysis report.")
     logger.info("final result is %s", result)

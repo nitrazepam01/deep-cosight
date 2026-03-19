@@ -1,0 +1,323 @@
+# 📊 Markdown 格式测试回复
+
+你好！这是一个完整的 Markdown 格式测试示例，展示 Co-Sight 支持的所有渲染格式。
+
+---
+
+## 📑 目录
+
+1. [标题层级](#标题层级)
+2. [列表](#列表)
+3. [代码块](#代码块)
+4. [表格](#表格)
+5. [图片](#图片)
+6. [LaTeX 公式](#latex 公式)
+7. [Mermaid 图表](#mermaid 图表)
+
+---
+
+## 📝 标题层级
+
+# 一级标题 H1
+## 二级标题 H2
+### 三级标题 H3
+#### 四级标题 H4
+
+---
+
+## 📋 列表
+
+### 无序列表
+
+- 🍎 苹果
+- 🍌 香蕉
+  - 🍌 小米蕉
+  - 🍌 帝王蕉
+- 🍇 葡萄
+- 🍊 橙子
+
+### 有序列表
+
+1. **第一步**：准备工作
+   - 收集资料
+   - 分析需求
+2. **第二步**：执行计划
+   - 编写代码
+   - 测试功能
+3. **第三步**：总结回顾
+
+### 任务列表
+
+- [x] ✅ 已完成的任务
+- [ ] ⏳ 进行中的任务
+- [ ] ❌ 未开始的任务
+
+---
+
+## 💻 代码块
+
+### 行内代码
+
+使用 `console.log()` 输出调试信息，或者用 `const` 声明常量。
+
+### Python 代码
+
+```python
+# 快速排序算法
+def quick_sort(arr):
+    if len(arr) <= 1:
+        return arr
+    pivot = arr[len(arr) // 2]
+    left = [x for x in arr if x < pivot]
+    middle = [x for x in arr if x == pivot]
+    right = [x for x in arr if x > pivot]
+    return quick_sort(left) + middle + quick_sort(right)
+
+data = [3, 6, 8, 10, 1, 2, 1]
+print(f"排序后：{quick_sort(data)}")
+```
+
+### JavaScript 代码
+
+```javascript
+// React 组件示例
+import React, { useState } from 'react';
+
+function Counter({ initialValue = 0 }) {
+    const [count, setCount] = useState(initialValue);
+    
+    return (
+        <div className="counter">
+            <h1>计数：{count}</h1>
+            <button onClick={() => setCount(count + 1)}>
+                增加
+            </button>
+        </div>
+    );
+}
+```
+
+### SQL 代码
+
+```sql
+SELECT team_name, COUNT(*) as matches, SUM(goals) as total_goals
+FROM teams t JOIN matches m ON t.team_id = m.team_id
+WHERE season = '2025'
+GROUP BY team_id
+ORDER BY total_goals DESC;
+```
+
+### JSON 数据
+
+```json
+{
+    "league": {
+        "name": "江苏足球城市联赛",
+        "season": "2025",
+        "teams": [
+            {"id": 1, "name": "南京城市", "city": "南京"},
+            {"id": 2, "name": "苏州东吴", "city": "苏州"}
+        ]
+    }
+}
+```
+
+---
+
+## 📊 表格
+
+### 简单表格
+
+| 球队名称 | 比赛场次 | 胜 | 平 | 负 | 进球 | 失球 | 积分 |
+|----------|----------|-----|-----|-----|------|------|------|
+| 南京城市 | 12 | 9 | 2 | 1 | 28 | 10 | 29 |
+| 苏州东吴 | 12 | 8 | 3 | 1 | 25 | 12 | 27 |
+| 无锡吴钩 | 12 | 6 | 2 | 4 | 20 | 15 | 20 |
+| 常州蓝之翼 | 12 | 4 | 3 | 5 | 18 | 20 | 15 |
+
+### 带对齐的表格
+
+| 左对齐 | 居中对齐 | 右对齐 |
+|:-------|:--------:|-------:|
+| 苹果 | 🍎 | $1.50 |
+| 香蕉 | 🍌 | $0.80 |
+| 橙子 | 🍊 | $2.00 |
+
+---
+
+## 🖼️ 图片
+
+![江苏足球联赛 Logo](https://www.logonews.cn/wp-content/uploads/2025/04/2025-jiangsu-football-city-league-logo.png)
+
+*上图：2025 年江苏足球城市联赛官方 Logo*
+
+---
+
+## 🧮 LaTeX 公式
+
+### 行内公式
+
+质能方程 $E = mc^2$，圆的面积 $A = \pi r^2$，勾股定理 $a^2 + b^2 = c^2$。
+
+### 块级公式
+
+$$
+x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
+$$
+
+$$
+e^{i\pi} + 1 = 0
+$$
+
+$$
+\int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}
+$$
+
+$$
+\begin{bmatrix}
+1 & 2 & 3 \\
+4 & 5 & 6 \\
+7 & 8 & 9
+\end{bmatrix}
+$$
+
+---
+
+## 📈 Mermaid 图表
+
+### 流程图
+
+```mermaid
+graph TD
+    A[开始] --> B{是否登录？}
+    B -->|是 | C[显示主页]
+    B -->|否 | D[显示登录页面]
+    D --> E[用户输入信息]
+    E --> F{验证通过？}
+    F -->|是 | C
+    F -->|否 | G[显示错误]
+    G --> D
+    C --> H[结束]
+```
+
+### 序列图
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant F as 前端
+    participant A as API
+    participant D as 数据库
+    
+    U->>F: 输入查询
+    F->>A: 发送请求
+    A->>D: 查询数据
+    D-->>A: 返回结果
+    A-->>F: 返回 JSON
+    F-->>U: 显示结果
+```
+
+### 类图
+
+```mermaid
+classDiagram
+    class Animal {
+        +String name
+        +int age
+        +makeSound()
+    }
+    class Dog {
+        +String breed
+        +bark()
+    }
+    class Cat {
+        +String color
+        +meow()
+    }
+    Animal <|-- Dog
+    Animal <|-- Cat
+```
+
+### 状态图
+
+```mermaid
+stateDiagram-v2
+    [*] --> 待机
+    待机 --> 运行：启动
+    运行 --> 暂停：暂停
+    暂停 --> 运行：继续
+    运行 --> 完成：结束
+    完成 --> [*]
+```
+
+### 饼图
+
+```mermaid
+pie
+    "南京城市" : 29
+    "苏州东吴" : 27
+    "无锡吴钩" : 20
+    "常州蓝之翼" : 15
+```
+
+---
+
+## 📖 引用与注释
+
+### 块引用
+
+> "足球是圆的，什么结果都可能出现。"
+> 
+> —— 著名足球教练 希斯菲尔德
+
+> **注意**：本文档中的所有数据均为示例数据。
+
+### 嵌套引用
+
+> 第一层引用
+> > 第二层引用
+> > > 第三层引用
+
+---
+
+## 🎨 其他格式
+
+### 强调文本
+
+- *斜体文本*
+- **粗体文本**
+- ***粗斜体文本***
+- ~~删除线文本~~
+- `行内代码`
+
+### 链接
+
+- [普通链接](https://example.com)
+- [带标题链接](https://example.com "悬停显示标题")
+
+### 水平分割线
+
+---
+
+***
+
+___
+
+### Emoji 表情
+
+🎉 💡 ✅ ❌ ⚠️ 💪 🔥 🎯 📈 📉 ⭐ 🏆
+
+### HTML 标签支持
+
+<details>
+<summary>点击展开详情</summary>
+
+这里是隐藏的内容，可以包含列表、**格式文本**、[链接](https://example.com)
+
+</details>
+
+---
+
+<div class="footer-center">
+    <em>感谢阅读！</em> 📚
+</div>
