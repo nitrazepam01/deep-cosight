@@ -20,6 +20,7 @@ let runtimeLogCounter = 0;
 let runtimeLogSignatures = new Set();
 const ENABLE_FLOATING_TOOL_PANELS = false;
 const DEFAULT_THREAD_TITLES = new Set(["新对话", "新会话"]);
+const finalConclusionContentSignatureByThread = new Map();
 
 // ==================== 工具函数 ====================
 
@@ -298,7 +299,6 @@ function closeNodeToolPanel(nodeId) {
                     panel.parentNode.removeChild(panel);
                 }
             } catch (e) {
-                console.warn(`[panel:${nodeId}] remove panel error`, e);
             }
             nodeToolPanels.delete(nodeId);
         }, 300);
@@ -561,12 +561,6 @@ function clearAllFloatingToolPanels() {
 
 // 显示右侧面板用于工具内容展示
 function showRightPanelForTool(toolCall) {
-    // 首先确保右侧面板可见
-    const rightSidebar = document.getElementById('sidebar-right');
-    if (rightSidebar && rightSidebar.classList.contains('collapsed')) {
-        toggleRightSidebar();
-    }
-
     // 获取右侧内容区域
     const rightContent = document.getElementById('right-container-content');
     const iframe = document.getElementById('content-iframe');
@@ -574,7 +568,6 @@ function showRightPanelForTool(toolCall) {
     const rightStatus = document.getElementById('right-container-status');
 
     if (!rightContent || !iframe || !markdownContent) {
-        console.warn('右侧面板元素不存在');
         return;
     }
 
@@ -607,27 +600,24 @@ function showFileContentInIframe(filePath) {
     const iframe = document.getElementById('content-iframe');
     if (!iframe) return;
 
-    // 构建 API URL
-    const apiUrl = `/api/workspace/file?path=${encodeURIComponent(filePath)}`;
+    // filePath 形如 work_space/work_space_xxx/最终报告.md，直接走静态挂载目录
+    const normalizedPath = String(filePath || '').replace(/^\/+/, '');
+    const apiBase = (window.SessionService && window.SessionService.apiBaseUrl)
+        ? window.SessionService.apiBaseUrl
+        : (window.location.origin + '/api/nae-deep-research/v1');
+    const apiUrl = `${apiBase}/${normalizedPath}`;
     iframe.src = apiUrl;
     iframe.style.display = 'block';
 }
 
 // 显示右侧面板（通用）
 function showRightPanel() {
-    const rightSidebar = document.getElementById('sidebar-right');
-    if (rightSidebar && rightSidebar.classList.contains('collapsed')) {
-        toggleRightSidebar();
-    }
     return true;
 }
 
 // 隐藏右侧面板
 function hideRightPanel() {
-    const rightSidebar = document.getElementById('sidebar-right');
-    if (rightSidebar && !rightSidebar.classList.contains('collapsed')) {
-        toggleRightSidebar();
-    }
+    return true;
 }
 
 // 切换右侧内容面板的显示/隐藏（与 index.html 保持一致）
@@ -695,7 +685,6 @@ function updateDynamicTitle(title) {
                     title: normalizedTitle,
                     autoRenamedByTask: true
                 }).catch((error) => {
-                    console.warn('[updateDynamicTitle] 自动改名持久化失败:', error);
                 });
             }
         }
@@ -769,7 +758,6 @@ function addToolCallToNodePanel(nodeId, tool, options = {}) {
                 }
             }
         } catch (e) {
-            console.warn("智能判断代码执行状态失败 (addToolCallToNodePanel):", e);
         }
     }
 
@@ -939,7 +927,6 @@ function getThreadIdByTopic(topic) {
         const pendings = pendingRaw ? JSON.parse(pendingRaw) : {};
         return pendings[topic]?.threadId || null;
     } catch (e) {
-        console.warn('从 pendingRequests 读取 threadId 失败:', e);
         return null;
     }
 }
@@ -993,44 +980,25 @@ function toggleLeftSidebar() {
 }
 
 function initRightSidebar() {
-    const rightSidebar = document.getElementById('sidebar-right');
     const expandBtn = document.getElementById('expand-right-btn');
-    const closeBtn = document.getElementById('close-right-btn');
-    const expandIcon = expandBtn.querySelector('i');
+    const expandIcon = expandBtn ? expandBtn.querySelector('i') : null;
 
-    if (!rightSidebar || !expandBtn || !closeBtn) return;
-
-    const savedState = localStorage.getItem('cosight:rightSidebarCollapsed');
-    if (savedState === 'true') {
-        rightSidebar.classList.add('collapsed');
-        AppState.rightSidebarCollapsed = true;
-    }
+    if (!expandBtn || !expandIcon) return;
+    AppState.rightSidebarCollapsed = false;
+    expandIcon.classList.remove('fa-expand-alt');
+    expandIcon.classList.add('fa-compress-alt');
+    expandBtn.setAttribute('title', '状态：展开');
 
     expandBtn.addEventListener('click', () => {
-        toggleRightSidebar();
+        AppState.rightSidebarCollapsed = !AppState.rightSidebarCollapsed;
+        if (AppState.rightSidebarCollapsed) {
+            expandIcon.classList.replace('fa-compress-alt', 'fa-expand-alt');
+            expandBtn.setAttribute('title', '状态：收起');
+        } else {
+            expandIcon.classList.replace('fa-expand-alt', 'fa-compress-alt');
+            expandBtn.setAttribute('title', '状态：展开');
+        }
     });
-
-    closeBtn.addEventListener('click', () => {
-        rightSidebar.classList.add('collapsed');
-        AppState.rightSidebarCollapsed = true;
-        localStorage.setItem('cosight:rightSidebarCollapsed', 'true');
-    });
-}
-
-function toggleRightSidebar() {
-    const rightSidebar = document.getElementById('sidebar-right');
-    const expandBtn = document.getElementById('expand-right-btn');
-    const expandIcon = expandBtn.querySelector('i');
-
-    AppState.rightSidebarCollapsed = !AppState.rightSidebarCollapsed;
-    rightSidebar.classList.toggle('collapsed');
-    localStorage.setItem('cosight:rightSidebarCollapsed', AppState.rightSidebarCollapsed);
-
-    if (AppState.rightSidebarCollapsed) {
-        expandIcon.classList.replace('fa-compress-alt', 'fa-expand-alt');
-    } else {
-        expandIcon.classList.replace('fa-expand-alt', 'fa-compress-alt');
-    }
 }
 
 // ==================== 文件夹管理 ====================
@@ -1788,7 +1756,6 @@ function clearDagViewState() {
             });
         }
     } catch (e) {
-        console.warn('[clearDagViewState] 清空 DAG 失败:', e);
     }
     
     // 同时清理 progress-overview 显示
@@ -2131,7 +2098,6 @@ async function restoreRightPanelByThread(threadId) {
             backendThread = await window.SessionService.getThreadFromBackend(threadId);
         }
     } catch (e) {
-        console.warn('[restoreRightPanelByThread] 后端读取线程详情失败:', e);
     }
 
     if (threadId !== AppState.currentThreadId) return;
@@ -2317,7 +2283,6 @@ function deferSaveState() {
     const flush = () => {
         deferredSaveStateTimer = null;
         Promise.resolve(saveState()).catch((err) => {
-            console.warn('[deferSaveState] saveState failed:', err);
         });
     };
     if (typeof window.requestIdleCallback === 'function') {
@@ -2369,7 +2334,6 @@ async function syncThreadMessagesToBackend(thread) {
             updatedAt: thread.updatedAt || Date.now()
         });
     } catch (error) {
-        console.warn('[syncThreadMessagesToBackend] 同步失败:', error);
     }
 }
 
@@ -2695,7 +2659,7 @@ async function setThreadExecutingState(threadId, executing) {
                 delete AppState.threadExecutionState[threadId];
             }
         } catch (err) {
-            console.warn('[setThreadExecutingState] 同步会话状态失败:', err);
+            console.warn('[setThreadExecutingState] 后端状态同步失败:', { threadId, executing, err });
         }
     }
 
@@ -2703,6 +2667,7 @@ async function setThreadExecutingState(threadId, executing) {
         isTaskExecuting = isThreadExecuting(AppState.currentThreadId);
         updateSendButtonState();
         syncThinkingStateWithCurrentThread();
+        console.info('[setThreadExecutingState] 当前会话执行态:', { threadId, isTaskExecuting });
     }
 }
 
@@ -2721,7 +2686,7 @@ async function fetchThreadExecutionStatus(threadId) {
             }
             return executing;
         } catch (e) {
-            console.warn('[fetchThreadExecutionStatus] 后端查询失败:', e);
+            console.warn('[fetchThreadExecutionStatus] 查询失败:', { threadId, e });
             return false;
         }
     }
@@ -2859,7 +2824,6 @@ async function sendToBackend(message, sourceThreadId = AppState.currentThreadId)
 // 初始化 WebSocket 消息监听
 function initWebSocketMessageHandler() {
     if (!window.messageService) {
-        console.warn('messageService 未初始化，无法设置消息监听');
         return;
     }
     
@@ -2931,7 +2895,6 @@ function handleWebSocketMessage(message) {
                                             title: nextTitle,
                                             autoRenamedByTask: true
                                         }).catch((error) => {
-                                            console.warn('[handleWebSocketMessage] 非激活会话自动改名持久化失败:', error);
                                         });
                                     }
                                 }
@@ -2940,7 +2903,6 @@ function handleWebSocketMessage(message) {
                     }
                 }
             } catch (e) {
-                console.warn('[handleWebSocketMessage] 保存 DAG 快照失败:', e);
             }
             // 已经在 message.js 中处理
             return;
@@ -2989,62 +2951,143 @@ function handleWebSocketMessage(message) {
                     } else {
                         renderFolderList();
                     }
+
                 }
             }
         }
         
         // 检查是否是控制类结束信号
-        if (messageData.data && messageData.data.type === 'control-status-message') {
-            // 任务执行结束，恢复发送按钮
-            void setThreadExecutingState(targetThreadId, false);
-            unbindTopic(topic);
-            
-            // 任务结束后，显示最后的结论（markdown 文件）
-            // 从当前线程的消息中查找最后一条 AI 消息并显示
-            showFinalConclusion(targetThreadId);
+        if (messageData.data && ((messageData.data.type === 'control-status-message') || messageType === 'control-status-message')) {
+            console.info('[handleWebSocketMessage] 收到结束信号:', { targetThreadId, topic });
+            // 结束时序：
+            // 1) 先清理“正在思考...”
+            // 2) 发送最终文件内容
+            // 3) 最后解除执行态并解禁发送按钮
+            if (targetThreadId === AppState.currentThreadId) {
+                hideThinkingState();
+            }
+
+            void emitLatestMarkdownContentToChat(targetThreadId, { force: true })
+                .finally(() => {
+                    void setThreadExecutingState(targetThreadId, false);
+                    unbindTopic(topic);
+                    console.info('[handleWebSocketMessage] 结束流程完成:', { targetThreadId, topic });
+                });
         }
     } catch (error) {
         console.error('处理 WebSocket 消息失败:', error);
     }
 }
 
-// 显示最后的结论（markdown 文件）
-function showFinalConclusion(targetThreadId) {
+async function fetchFinalReportByThreadId(targetThreadId) {
+    if (!targetThreadId) return null;
+    try {
+        const apiBase = (window.SessionService && window.SessionService.apiBaseUrl)
+            ? window.SessionService.apiBaseUrl
+            : (window.location.origin + '/api/nae-deep-research/v1');
+        const url = `${apiBase}/workspace/final-report/${encodeURIComponent(targetThreadId)}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            console.warn('[fetchFinalReportByThreadId] 请求失败:', { status: response.status, url, targetThreadId });
+            return null;
+        }
+        const payload = await response.json();
+        const data = payload && payload.data ? payload.data : null;
+        if (!data || !data.content || !data.filePath) {
+            console.warn('[fetchFinalReportByThreadId] 返回数据不完整:', { targetThreadId, payload });
+            return null;
+        }
+        console.info('[fetchFinalReportByThreadId] 获取成功:', {
+            targetThreadId,
+            workspaceId: data.workspaceId,
+            fileName: data.fileName
+        });
+        return data;
+    } catch (error) {
+        console.warn('[fetchFinalReportByThreadId] 异常:', { targetThreadId, error });
+        return null;
+    }
+}
+
+async function emitLatestMarkdownContentToChat(targetThreadId, options = {}) {
+    if (!targetThreadId) return false;
+
+    const force = options.force === true;
     const thread = getThreadById(targetThreadId);
-    if (!thread || !thread.messages) return;
-    
-    // 查找最后一条 AI 消息
-    const lastAssistantMessage = thread.messages.slice().reverse().find(msg => msg.role === 'assistant');
-    if (!lastAssistantMessage) return;
-    
-    const content = lastAssistantMessage.content;
-    if (!content) return;
-    
-    // 尝试从内容中提取 markdown 文件路径
-    // 通常格式为：已生成报告：[report.md](path/to/report.md)
-    const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+\.md)\)/g;
-    const matches = [...content.matchAll(markdownLinkRegex)];
-    
-    if (matches.length > 0) {
-        const fileName = matches[0][1];
-        const filePath = matches[0][2];
-        showMarkdownFileInRightPanel(filePath, fileName);
+    if (!thread) return false;
+
+    try {
+        const report = await fetchFinalReportByThreadId(targetThreadId);
+        if (!report) {
+            console.warn('[emitLatestMarkdownContentToChat] 未获取到最终文件:', { targetThreadId });
+            return false;
+        }
+
+        const filePath = report.filePath;
+        const content = String(report.content || '').trim();
+        if (!filePath || !content) return false;
+
+        const signature = `${report.workspaceId || ''}|${report.fileName || ''}|${filePath}`;
+        if (!force && finalConclusionContentSignatureByThread.get(targetThreadId) === signature) {
+            console.log('[emitLatestMarkdownContentToChat] 重复签名，跳过发送:', { targetThreadId, signature });
+            return true;
+        }
+
+        showMarkdownFileInRightPanel(filePath, report.fileName);
+
+        const lastAssistant = Array.isArray(thread.messages)
+            ? thread.messages[thread.messages.length - 1]
+            : null;
+        const alreadySame = !!(
+            lastAssistant &&
+            lastAssistant.role === 'assistant' &&
+            lastAssistant.meta &&
+            lastAssistant.meta.finalReportSignature === signature
+        );
+
+        if (!alreadySame) {
+            const reportMessage = {
+                role: 'assistant',
+                content: content,
+                timestamp: Date.now(),
+                meta: {
+                    type: 'final_markdown_content',
+                    finalMarkdownPath: filePath,
+                    finalReportSignature: signature
+                }
+            };
+
+            if (!thread.messages) thread.messages = [];
+            thread.messages.push(reportMessage);
+            thread.updatedAt = Date.now();
+            thread.messageCount = thread.messages.length;
+            saveState();
+            syncThreadMessagesToBackend(thread);
+
+            if (targetThreadId === AppState.currentThreadId) {
+                addMessage(reportMessage);
+            } else {
+                renderFolderList();
+            }
+        }
+
+        finalConclusionContentSignatureByThread.set(targetThreadId, signature);
+        console.info('[emitLatestMarkdownContentToChat] 最终文件发送成功:', { targetThreadId, filePath });
+        return true;
+    } catch (error) {
+        console.warn('[emitLatestMarkdownContentToChat] 发送异常:', { targetThreadId, error });
+        return false;
     }
 }
 
 // 在右侧面板显示 markdown 文件
 function showMarkdownFileInRightPanel(filePath, fileName) {
-    const rightSidebar = document.getElementById('sidebar-right');
-    if (rightSidebar && rightSidebar.classList.contains('collapsed')) {
-        toggleRightSidebar();
-    }
-
     const iframe = document.getElementById('content-iframe');
     const markdownContent = document.getElementById('markdown-content');
     const rightStatus = document.getElementById('right-container-status');
 
     if (!iframe || !markdownContent) {
-        console.warn('右侧面板元素不存在');
+        console.warn('[showMarkdownFileInRightPanel] 右侧面板元素不存在');
         return;
     }
 
@@ -3052,8 +3095,12 @@ function showMarkdownFileInRightPanel(filePath, fileName) {
         rightStatus.textContent = `正在查看：${fileName || '最终报告'}`;
     }
 
-    // 构建 API URL
-    const apiUrl = `/api/workspace/file?path=${encodeURIComponent(filePath)}`;
+    // filePath 形如 work_space/work_space_xxx/最终报告.md，直接走静态挂载目录
+    const normalizedPath = String(filePath || '').replace(/^\/+/, '');
+    const apiBase = (window.SessionService && window.SessionService.apiBaseUrl)
+        ? window.SessionService.apiBaseUrl
+        : (window.location.origin + '/api/nae-deep-research/v1');
+    const apiUrl = `${apiBase}/${normalizedPath}`;
     iframe.src = apiUrl;
     iframe.style.display = 'block';
     markdownContent.style.display = 'none';
@@ -3175,7 +3222,6 @@ function schedulePersistRightPanelState(threadId, partialState) {
                 await window.SessionService.updateThread(threadId, { rightPanelState: nextState });
             }
         } catch (e) {
-            console.warn('[schedulePersistRightPanelState] 持久化右侧状态失败:', e);
         }
     }, 250);
 
@@ -3410,7 +3456,6 @@ function updateProgressStats(stats) {
  */
 function syncSessionServiceToAppState() {
     if (!window.SessionService || !window.SessionService.sessionsData) {
-        console.warn('syncSessionServiceToAppState: SessionService 或 sessionsData 不存在');
         return;
     }
     
@@ -4123,23 +4168,15 @@ function initThreeColumnLayout() {
     
     // 先加载状态，等待加载完成后再渲染
     loadState().then((loadResult) => {
-        console.log('[initThreeColumnLayout] loadResult:', loadResult);
-        console.log('[initThreeColumnLayout] AppState.currentThreadId:', AppState.currentThreadId);
-        console.log('[initThreeColumnLayout] AppState.folders:', AppState.folders);
-        
         // 在渲染前展开对应的文件夹
         let lastVisitedFolderId = null;
         if (loadResult && loadResult.lastVisited && loadResult.restored) {
             const lastVisited = loadResult.lastVisited;
             lastVisitedFolderId = lastVisited.folderId;
-            console.log('[initThreeColumnLayout] 恢复上次访问的会话:', lastVisited);
-
             const folder = getFolderById(lastVisited.folderId);
             if (folder) {
                 folder.expanded = true;
-                console.log('[initThreeColumnLayout] 设置文件夹展开:', folder.id);
             } else {
-                console.warn('[initThreeColumnLayout] 未找到文件夹:', lastVisited.folderId);
             }
         }
         
@@ -4148,8 +4185,6 @@ function initThreeColumnLayout() {
         
         // 使用 setTimeout 确保 DOM 已经完全渲染
         setTimeout(() => {
-            console.log('[initThreeColumnLayout] setTimeout 开始更新 UI');
-            
             // 1. 首先展开对应的文件夹（调用 UI 动画）
             if (lastVisitedFolderId) {
                 const folderItem = document.querySelector(`.folder-item[data-folder-id="${lastVisitedFolderId}"]`);
@@ -4163,17 +4198,13 @@ function initThreeColumnLayout() {
                         content.classList.add('expanded');
                         toggle.classList.add('expanded');
                         folderIcon.classList.add('expanded');
-                        console.log('[initThreeColumnLayout] 文件夹展开动画已应用:', lastVisitedFolderId);
                     }
                 } else {
-                    console.warn('[initThreeColumnLayout] 未找到文件夹 DOM 元素:', lastVisitedFolderId);
                 }
             }
             
             // 2. 渲染后更新 active 状态
             updateThreadActiveState();
-            console.log('[initThreeColumnLayout] updateThreadActiveState 已调用');
-            
             // 3. 只有当没有任何数据时才加载示例数据
             if (getTotalThreadCount() === 0) {
                 loadExampleData();
@@ -4181,10 +4212,8 @@ function initThreeColumnLayout() {
             
             // 4. 最后加载会话内容
             if (AppState.currentThreadId) {
-                console.log('[initThreeColumnLayout] 加载会话内容:', AppState.currentThreadId);
                 void loadThread(AppState.currentThreadId);
             } else {
-                console.warn('[initThreeColumnLayout] 没有当前会话 ID');
             }
         }, 100); // 增加延迟确保 DOM 渲染完成
     }).catch((error) => {
@@ -4212,7 +4241,6 @@ function setupPendingRequests() {
             });
         }
     } catch (e) {
-        console.warn('处理 pending 请求失败:', e);
     }
 }
 
@@ -4339,8 +4367,8 @@ window.AppState = AppState;
 window.updateProgressStats = updateProgressStats;
 window.addToolCallToChain = addToolCallToChain;
 window.addMessage = addMessage;
-window.toggleRightSidebar = toggleRightSidebar;
 window.createThread = createNewThread;
 window.getThreadById = getThreadById;
 window.handleTestCommand = handleTestCommand;
 window.toggleThinkingMode = toggleThinkingMode;
+

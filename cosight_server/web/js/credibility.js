@@ -1,4 +1,4 @@
-// 搜索结果自洽性检测
+﻿// 搜索结果自洽性检测
 function checkSearchResultsConsistency(tool, result) {
     // 模拟检测10条搜索结果的自洽性
     let isConsistent = Math.random() > 0.3; // 70%概率自洽
@@ -22,9 +22,6 @@ function checkSearchResultsConsistency(tool, result) {
     if (tool === 'search_google' && result.includes('积分榜')) {
         isConsistent = false; // Google搜索积分榜时不自洽，触发交叉验证
     }
-
-    console.log(`自洽性检测: 工具=${tool}, 结果包含=${result.substring(0, 50)}..., 自洽=${isConsistent}`);
-
     return isConsistent;
 }
 
@@ -33,22 +30,18 @@ function getVerificationStepsForTool(tool, result) {
     const mapping = toolVerificationMapping[tool];
 
     if (!mapping) {
-        console.log(`未找到工具 ${tool} 的映射关系`);
         return [];
     }
 
     // 如果是搜索工具，需要检查自洽性
     if (tool === 'search_baidu' || tool === 'search_google') {
         const isConsistent = checkSearchResultsConsistency(tool, result);
-        console.log(`工具 ${tool} 自洽性检测结果: ${isConsistent}`);
         const steps = isConsistent ? mapping.consistent : mapping.inconsistent;
-        console.log(`返回的验证步骤: ${steps.join(', ')}`);
         return steps;
     }
 
     // 其他工具直接返回对应的验证步骤
     const steps = Array.isArray(mapping) ? mapping : [];
-    console.log(`工具 ${tool} 直接返回验证步骤: ${steps.join(', ')}`);
     return steps;
 }
 
@@ -77,7 +70,6 @@ class CredibilityService {
 
     // 添加节点运行状态指示器 - 在节点开始运行时显示灰色圆圈
     addNodeIndicators(nodeId) {
-        console.log("add node credibility indicator >>>>>>>>>>>>>>>>>>>>> nodeId: ", nodeId);
         const nodeElement = svg.selectAll(".node").filter(d => d.id === nodeId);
 
         // 移除现有的可信分级指示器
@@ -99,17 +91,14 @@ class CredibilityService {
     // 更新可信分级状态指示器 - 在节点完成时检查可信分级信息
     updateNodeCredibilityIndicator(stepIndex, credibilityData) {
         const nodeId = stepIndex + 1;
-        console.log("update node credibility indicator >>>>>>>>>>>>>>>>>>>>> nodeId: ", nodeId);
         const nodeElement = svg.selectAll(".node").filter(d => d.id === nodeId);
         const runningIndicator = nodeElement.selectAll(".node-indicator, .credibility-circle-group");
         if (runningIndicator.empty()) {
-            console.log("update node credibility indicator >>>>>>>>>>>>>>>>>>>>> 未找到可信分级指示器，跳过更新");
             return;
         }
 
         // 检查是否存在可信分级信息
         credibilityData = credibilityData ? credibilityData : this.getStepCredibilityData(stepIndex);
-        console.log("update node credibility indicator >>>>>>>>>>>>>>>>>>>>> credibilityData: ", credibilityData);
         if (credibilityData) {
             // 如果存在可信分级信息，将圆圈改为绿色并添加点击事件
             const circle = runningIndicator.select(".action-circle");
@@ -131,7 +120,6 @@ class CredibilityService {
             // 更新文字为 "T" 表示 Credibility
             runningIndicator.select("text")
                 .html(`T`);
-            console.log(`update node credibility indicator >>>>>>>>>>>>>>>>>>>>> 节点 ${nodeId} 存在可信分级信息，指示器已更新为绿色`);
         } else {
             // 如果没有可信分级信息，保持灰色，不添加点击事件
             const circle = runningIndicator.select(".action-circle");
@@ -144,13 +132,11 @@ class CredibilityService {
             // 更新文字为 "D" 表示 Done
             runningIndicator.select("text")
                 .html(`D`);
-            console.log(`update node credibility indicator >>>>>>>>>>>>>>>>>>>>> 节点 ${nodeId} 无可信分级信息，指示器保持灰色`);
         }
     }
 
     // 在右侧内容面板中显示可信分级信息
     showCredibilityInfoInRightPanel(nodeId, credibilityData) {
-        console.log(`在右侧内容面板中显示节点 ${nodeId} 的可信分级信息`);
         const result = showRightPanel();
         if (!result) {
             return;
@@ -234,8 +220,6 @@ class CredibilityService {
 
         // 设置内容并显示右侧面板
         rightContent.innerHTML = credibilityHTML;
-
-        console.log(`节点 ${nodeId} 的可信分级信息已显示在右侧内容面板中`);
     }
 
     // 获取可信分级颜色
@@ -275,7 +259,6 @@ class CredibilityService {
 
             this.allCredibilityData = JSON.parse(raw);
         } catch (e) {
-            console.warn('恢复可信分级信息失败:', e);
             this.allCredibilityData = {};
         }
     }

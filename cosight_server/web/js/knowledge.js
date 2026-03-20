@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Co-Sight Knowledge Base Management
  * 知识库管理模块 — 对接 LightRAG 服务
  */
@@ -393,7 +393,6 @@ const KnowledgeService = (function () {
                 stopPipelinePolling();
             }
         } catch (e) {
-            console.warn('loadDetailData error:', e);
         }
     }
 

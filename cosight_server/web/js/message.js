@@ -1,4 +1,4 @@
-class MessageService {
+﻿class MessageService {
     constructor() {
         // 按“会话-任务-步骤”组织 tool events：contextKey(thread|task) -> Map(stepIndex -> events[])
         this.stepToolEventsByContext = new Map();
@@ -11,8 +11,6 @@ class MessageService {
     }
 
     receiveMessage(message) {
-        console.log('MessageService.receiveMessage >>>>>>>>>>>>>> ', message);
-
         try {
             // 解析消息
             const messageData = typeof message === 'string' ? JSON.parse(message) : message;
@@ -29,7 +27,7 @@ class MessageService {
                     }
                 }
             } catch (e) {
-                console.warn('更新pending标记失败:', e);
+                console.warn('[MessageService.receiveMessage] 更新 pending 标记失败:', e);
             }
 
             // 处理控制类结束信号，标记pending完成
@@ -43,7 +41,7 @@ class MessageService {
                         localStorage.setItem('cosight:pendingRequests', JSON.stringify(pendings));
                     }
                 } catch (e) {
-                    console.warn('更新pending失败:', e);
+                    console.warn('[MessageService.receiveMessage] 清理 pending 失败:', e);
                 }
             }
 
@@ -58,27 +56,25 @@ class MessageService {
             if (sessionBoundTypes.has(messageType) && !this._isForCurrentThread(messageData)) {
                 return;
             }
+            if (messageType === 'control-status-message') {
+                console.info('[MessageService.receiveMessage] 收到结束信号');
+            }
             
             if (messageType === 'lui-message-tool-event') {
-                console.log('收到 lui-message-tool-event 消息:', messageData);
                 this.handleToolEvent(messageData);
                 return;
             }
 
             // 处理 lui-message-credibility-analysis 类型的消息
             if (messageType === 'lui-message-credibility-analysis') {
-                console.log('收到 lui-message-credibility-analysis 消息:', messageData);
                 credibilityService.credibilityMessageHandler(messageData);
                 return;
             }
 
             // 检查是否是 lui-message-manus-step 类型的消息
             if (messageType === 'lui-message-manus-step') {
-                console.log('收到 lui-message-manus-step 消息，开始创建DAG图');
-                console.log('完整消息数据:', messageData);
                 this.stepMessageHandler(messageData);
             } else {
-                console.log('收到其他类型的消息:', messageType || 'unknown');
             }
         } catch (error) {
             console.error('处理消息时发生错误:', error);
@@ -169,7 +165,7 @@ class MessageService {
                 savedAt: Date.now()
             }));
         } catch (e) {
-            console.warn('保存本地状态失败:', e);
+            console.warn('[MessageService.stepMessageHandler] 保存 local step 失败:', e);
         }
 
         // 获取 initData，支持多种格式
@@ -180,10 +176,14 @@ class MessageService {
             if (typeof updateExecutionTitle === 'function') {
                 updateExecutionTitle(initData.title);
             }
-            showStepsTooltip();
-            setTimeout(() => {
-                hideStepsTooltip();
-            }, 3000);
+            if (typeof showStepsTooltip === 'function') {
+                showStepsTooltip();
+                setTimeout(() => {
+                    if (typeof hideStepsTooltip === 'function') {
+                        hideStepsTooltip();
+                    }
+                }, 3000);
+            }
         }
         
         // 在接收到步骤状态更新后，自动关闭已完成且无运行中工具的步骤面板
@@ -192,7 +192,7 @@ class MessageService {
                 this._autoCloseCompletedStepPanels(initData, contextKey);
             }
         } catch (e) {
-            console.warn('自动关闭完成步骤面板时发生异常:', e);
+            console.warn('[MessageService.stepMessageHandler] 自动关闭步骤面板失败:', e);
         }
     }
 
@@ -209,11 +209,10 @@ class MessageService {
                 rec = { planId, stillPending: true, completed: false };
                 map[topic] = rec;
                 localStorage.setItem('cosight:planIdByTopic', JSON.stringify(map));
-                console.log('store planIdByTopic',JSON.stringify(map));                
             }
             return rec.planId;
         } catch (e) {
-            console.warn('生成/读取planId失败，退化为时间戳:', e);
+            console.warn('[MessageService.ensurePlanIdForTopic] 生成 planId 失败，使用降级方案:', e);
             return `${topic}-${Date.now()}`;
         }
     }
@@ -229,7 +228,7 @@ class MessageService {
         const toolEventData = messageData.data?.content || messageData.data?.initData?.plan || messageData.data?.initData;
         
         if (!toolEventData) {
-            console.warn('无法获取tool event数据:', messageData);
+            console.warn('[MessageService.handleToolEvent] toolEventData 为空，跳过');
             return;
         }
         
@@ -237,10 +236,6 @@ class MessageService {
         const eventType = toolEventData.event_type;
         const contextKey = this._getContextKey(messageData);
         this.activeContextKey = contextKey;
-        
-        console.log(`处理tool event: ${eventType}, step: ${stepIndex}, tool: ${toolEventData.tool_name}`);
-        console.log('完整的toolEventData:', toolEventData);
-        
         // 特殊处理 mark_step 工具事件，更新节点的 step_notes
         if (toolEventData.tool_name === 'mark_step' && eventType === 'tool_complete') {
             this.handleMarkStepEvent(toolEventData);
@@ -261,7 +256,6 @@ class MessageService {
             
             // 检查是否是该step的第一个tool event，如果是则弹出panel
             if (stepEvents.length === 0 && pendingStarts.length === 1) {
-                console.log(`Step ${stepIndex} 的第一个tool event，弹出panel`);
                 this.showStepPanel(stepIndex);
             }
             
@@ -310,14 +304,10 @@ class MessageService {
                 runningRecord.status = eventType === 'tool_complete' ? 'completed' : 'failed';
                 runningRecord.duration = toolEventData.duration || 0;
                 runningRecord.complete_event = toolEventData;
-
-                console.log(`更新运行中的工具记录: ${toolEventData.tool_name}, 状态: ${runningRecord.status}`);
-
                 // 更新step panel显示
                 this.updateStepPanel(stepIndex, runningRecord);
             } else {
                 // 如果没找到对应的运行中记录，创建新的完整记录（兼容旧逻辑）
-                console.log(`未找到运行中的记录，创建新记录: ${toolEventData.tool_name}`);
                 const toolCallRecord = {
                     tool_name: toolEventData.tool_name,
                     tool_args: toolEventData.tool_args,
@@ -358,24 +348,17 @@ class MessageService {
                     const args = JSON.parse(toolEventData.tool_args);
                     stepNotes = args.step_notes || '';
                 } catch (e) {
-                    console.warn('解析mark_step工具参数失败:', e);
                     return;
                 }
             }
-            
-            console.log(`handleMarkStepEvent: stepIndex=${stepIndex}, nodeId=${nodeId}, step_notes=`, stepNotes);
-            
             // 更新dagData中对应节点的step_notes
             if (typeof dagData !== 'undefined' && dagData.nodes) {
                 const node = dagData.nodes.find(n => n.id === nodeId);
                 if (node) {
                     node.step_notes = stepNotes;
-                    console.log(`已更新节点 ${nodeId} 的 step_notes:`, stepNotes);
                 } else {
-                    console.warn(`未找到节点 ID ${nodeId}`);
                 }
             } else {
-                console.warn('dagData 未定义或没有 nodes 数组');
             }
         } catch (error) {
             console.error('处理mark_step事件时发生错误:', error);
@@ -415,15 +398,10 @@ class MessageService {
      */
     updateStepPanel(stepIndex, toolCallRecord) {
         const nodeId = stepIndex + 1;
-        console.log(`更新Step Panel: stepIndex=${stepIndex}, nodeId=${nodeId}`, toolCallRecord);
-
         // 转换为main.js期望的格式
         const toolCall = this.convertToToolCallFormat(toolCallRecord, nodeId);
-        console.log('转换后的toolCall:', toolCall);
-
         // 更新panel显示
         if (typeof updateNodeToolPanel === 'function') {
-            console.log('调用updateNodeToolPanel函数');
             updateNodeToolPanel(nodeId, toolCall, {
                 threadId: toolCall.threadId || null,
                 externalTaskKey: toolCall.externalTaskKey || null
@@ -489,7 +467,6 @@ class MessageService {
                     }
                 }
             } catch (e) {
-                console.warn('解析文件保存工具参数失败:', e);
             }
         }
 
@@ -508,7 +485,6 @@ class MessageService {
                     path = buildApiWorkspacePath(filePath);
                 }
             } catch (e) {
-                console.warn('解析文件读取工具参数失败:', e);
             }
         }
 
@@ -521,7 +497,6 @@ class MessageService {
                     path = 'code://execute_code';
                 }
             } catch (e) {
-                console.warn('解析代码执行工具参数失败:', e);
             }
         }
         
@@ -555,7 +530,6 @@ class MessageService {
                         const args = JSON.parse(toolCallRecord.tool_args || '{}');
                         url = args.website_url || args.url || url;
                     } catch (e) {
-                        console.warn('解析网页抓取工具参数失败:', e);
                     }
                 }
                 // 再从结构化结果中兜底提取 url（with_images / images_only 会返回 dict，包含 url 字段）
@@ -563,7 +537,6 @@ class MessageService {
                     url = toolCallRecord.tool_result.url || toolCallRecord.tool_result.website_url || url;
                 }
             } catch (e) {
-                console.warn('为网页抓取工具提取 URL 失败:', e);
             }
         }
 
@@ -633,7 +606,6 @@ class MessageService {
                 savedAt: Date.now()
             }));
         } catch (e) {
-            console.warn('持久化step tool events失败:', e);
         }
     }
 
@@ -657,7 +629,6 @@ class MessageService {
             }
             this.activeContextKey = stored?.activeContextKey || this.activeContextKey;
         } catch (e) {
-            console.warn('恢复step tool events失败:', e);
         }
     }
 
@@ -682,7 +653,6 @@ class MessageService {
         try {
             localStorage.removeItem('cosight:stepToolEvents');
         } catch (e) {
-            console.warn('清理step tool events失败:', e);
         }
     }
 
@@ -713,7 +683,6 @@ class MessageService {
                 }
             });
         } catch (e) {
-            console.warn('_autoCloseCompletedStepPanels error:', e);
         }
     }
 
@@ -734,7 +703,6 @@ class MessageService {
     }
 
     sendMessage(content, options = {}) {
-        console.log('MessageService.sendMessage >>>>>>>>>>>>>> ', content);
         // 新消息发送前清理之前的tool events和历史数据
         this.clearStepToolEvents();
         const topic = WebSocketService.generateUUID();
@@ -770,9 +738,7 @@ class MessageService {
             const pendings = pendingRaw ? JSON.parse(pendingRaw) : {};
             pendings[topic] = { message, savedAt: Date.now(), stillPending: true, threadId: options.threadId || null };
             localStorage.setItem('cosight:pendingRequests', JSON.stringify(pendings));
-            console.log('store pendingRequests',JSON.stringify(pendings));
         } catch (e) {
-            console.warn('保存pending失败:', e);
         }
         WebSocketService.sendMessage(topic, JSON.stringify(message));
         return topic;
@@ -785,15 +751,12 @@ class MessageService {
      */
     sendReplay(workspacePath, replayPlanId) {
         try {
-            console.log('sendReplay 被调用，参数:', { workspacePath, replayPlanId });
-            
             // 解析 workspace
             let replayWorkspace = null;
             
             // 1) 优先使用传入的参数
             if (workspacePath && typeof workspacePath === 'string' && workspacePath.trim().length > 0) {
                 replayWorkspace = workspacePath.trim();
-                console.log('使用传入的工作区路径:', replayWorkspace);
             }
             
             // 2) 回退逻辑
@@ -803,7 +766,6 @@ class MessageService {
                     const wsRaw = localStorage.getItem('cosight:workspace');
                     if (wsRaw && typeof wsRaw === 'string' && wsRaw.trim().length > 0) {
                         replayWorkspace = wsRaw.trim();
-                        console.log('从 localStorage 获取工作区路径:', replayWorkspace);
                     }
                 }
                 // 2) 回退到从 lastManusStep 推断
@@ -831,7 +793,6 @@ class MessageService {
                     }
                 }
             } catch (e) {
-                console.warn('解析workspace失败:', e);
             }
 
             // 解析 planId
@@ -846,19 +807,15 @@ class MessageService {
                         if (entries.length > 0) {
                             // 取最后一个
                             replayPlanId = entries[entries.length - 1][1];
-                            console.log('从 localStorage 获取 planId:', replayPlanId);
                         }
                     }
                 } catch (e) {
-                    console.warn('解析planId失败:', e);
                 }
             } else {
-                console.log('使用传入的 planId:', replayPlanId);
             }
 
             // planId 是可选的，不强制要求
             if (!replayPlanId) {
-                console.log('未找到 planId，将生成新的');
                 replayPlanId = WebSocketService.generateUUID();
             }
             
@@ -867,9 +824,6 @@ class MessageService {
                 console.error('replayWorkspace 为空');
                 return;
             }
-            
-            console.log('最终使用的回放参数:', { replayWorkspace, replayPlanId });
-
             // 生成新的 topic 用于订阅这次回放
             const topic = WebSocketService.generateUUID();
             WebSocketService.subscribe(topic, this.receiveMessage.bind(this));
@@ -907,7 +861,6 @@ class MessageService {
                 pendings[topic] = { message, savedAt: Date.now(), stillPending: true };
                 localStorage.setItem('cosight:pendingRequests', JSON.stringify(pendings));
             } catch (e) {
-                console.warn('保存回放pending失败:', e);
             }
 
             WebSocketService.sendMessage(topic, JSON.stringify(message));
@@ -924,3 +877,4 @@ window.messageService = new MessageService();
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = MessageService;
 }
+

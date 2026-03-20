@@ -1,4 +1,4 @@
-// DAG图相关功能模块
+﻿// DAG图相关功能模块
 // 包含DAG图的初始化、布局计算、节点绘制、拖拽、响应式处理等功能
 
 // DAG图全局变量
@@ -338,10 +338,6 @@ function calculateHierarchicalLayout() {
             queue.push(node.id);
         }
     });
-
-    console.log('入度统计:', inDegree);
-    console.log('起始节点:', queue.slice());
-
     // 层次化遍历
     while (queue.length > 0) {
         const levelSize = queue.length;
@@ -378,9 +374,6 @@ function calculateHierarchicalLayout() {
         .filter(nodeId => !visited.has(nodeId))
         .sort((a, b) => a - b);
     remaining.forEach(nodeId => levels.push([nodeId]));
-
-    console.log('层级分配:', levels);
-
     const nodePositions = {};
     if (!levels.length) return nodePositions;
 
@@ -806,21 +799,6 @@ function createDag(messageData) {
         const initData = messageData.data?.content || messageData.content || messageData.data?.initData;
         
         // 调试日志：检查传入的数据结构
-        console.log('=============== createDag 开始 ===============');
-        console.log('1. 原始 messageData:', JSON.stringify(messageData, null, 2));
-        console.log('2. messageData.data 存在:', !!messageData.data);
-        console.log('3. messageData.data?.content 存在:', !!messageData.data?.content);
-        console.log('4. messageData.data?.content:', messageData.data?.content);
-        console.log('5. messageData.content 存在:', !!messageData.content);
-        console.log('6. messageData.content:', messageData.content);
-        console.log('7. messageData.data?.initData 存在:', !!messageData.data?.initData);
-        console.log('8. 最终获取的 initData:', initData);
-        console.log('9. initData?.step_notes 存在:', !!initData?.step_notes);
-        console.log('10. initData?.step_notes:', initData?.step_notes);
-        console.log('11. initData?.steps:', initData?.steps);
-        console.log('12. initData?.step_statuses:', initData?.step_statuses);
-        console.log('============================================');
-
         // 当 steps 为空或未提供时，不绘制且静默返回；允许 dependencies 缺省
         if (!initData || !Array.isArray(initData.steps) || initData.steps.length === 0) {
             if (svg) {
@@ -828,6 +806,7 @@ function createDag(messageData) {
             }
             dagData.nodes = [];
             dagData.edges = [];
+            console.warn('[createDag] steps 为空，已清空 DAG');
             return true;
         }
         if (!initData.dependencies || typeof initData.dependencies !== 'object') {
@@ -878,27 +857,12 @@ function createDag(messageData) {
                     }
                 }
             });
-            
-            console.log(`步骤${stepId}的依赖:`, dependencies);
-            
             // 详细调试日志
-            console.log(`======= 构建节点 ${stepId} (${step}) =======`);
-            console.log('  步骤名称 (step):', step);
-            console.log('  initData 对象:', initData);
-            console.log('  initData.step_notes 存在:', !!initData.step_notes);
-            console.log('  initData.step_notes 类型:', typeof initData.step_notes);
-            console.log('  initData.step_notes 内容:', initData.step_notes);
-            console.log('  initData.step_notes 的所有键:', initData.step_notes ? Object.keys(initData.step_notes) : 'N/A');
-            console.log('  initData.step_notes[step] 值:', initData.step_notes ? initData.step_notes[step] : 'N/A');
-            console.log('  initData.step_statuses[step] 值:', initData.step_statuses ? initData.step_statuses[step] : 'N/A');
-            
             const stepNotesValue = initData.step_notes ? (initData.step_notes[step] || "") : "";
             const plannedAgentId = initData.step_agents ? (initData.step_agents[String(index)] || null) : null;
             const executionAgentId = initData.step_execution_agents
                 ? (initData.step_execution_agents[String(index)] || null)
                 : null;
-            console.log('  计算出的 stepNotesValue:', stepNotesValue);
-            
             const nodeData = {
                 id: stepId,
                 name: `Step${stepId}`,
@@ -910,12 +874,6 @@ function createDag(messageData) {
                 executionAgentId: executionAgentId,
                 isFallback: Boolean(plannedAgentId && executionAgentId && plannedAgentId !== executionAgentId)
             };
-            
-            console.log('  最终节点数据:', nodeData);
-            console.log('  最终节点 step_notes 值:', nodeData.step_notes);
-            console.log('  最终节点 step_notes 长度:', nodeData.step_notes ? nodeData.step_notes.length : 0);
-            console.log('======================================');
-            
             return nodeData;
         });
 
@@ -941,10 +899,6 @@ function createDag(messageData) {
             nodes: nodes,
             edges: edges
         };
-
-        console.log('构建的节点数据:', nodes);
-        console.log('构建的边数据:', edges);
-
         // 更新全局DAG数据
         dagData.nodes = newDagData.nodes;
         dagData.edges = newDagData.edges;
@@ -953,7 +907,6 @@ function createDag(messageData) {
         dagData.nodes.forEach(node => {
             if (!node.hasOwnProperty('step_notes')) {
                 node.step_notes = "";
-                console.log(`为节点 ${node.id} 添加缺失的step_notes字段`);
             }
         });
 
@@ -969,6 +922,17 @@ function createDag(messageData) {
         if (initData.progress) {
             updateProgressFromData(initData.progress);
         }
+
+        const doneStatuses = Object.values(initData.step_statuses || {}).map(v => String(v));
+        const allGreen = doneStatuses.length > 0 && doneStatuses.every(v => v === 'completed');
+        const p = initData.progress || {};
+        const progressDone = Number(p.total || 0) > 0 && Number(p.completed || 0) >= Number(p.total || 0);
+        console.info('[createDag] DAG 已更新:', {
+            nodes: dagData.nodes.length,
+            edges: dagData.edges.length,
+            progressDone,
+            allGreen
+        });
 
         return true
     } catch (error) {
@@ -1020,3 +984,4 @@ if (typeof module !== 'undefined' && module.exports) {
         updateProgressFromData
     };
 }
+

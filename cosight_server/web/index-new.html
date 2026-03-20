@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Co-Sight 超级智能体</title>
     <link rel="icon" href="favicon.ico">
-
     <script src="libs/d3.v7.min.js"></script>
     <link href="libs/fontawesome-6.7.2/css/all.min.css" rel="stylesheet">
 
@@ -167,9 +166,6 @@
                 <div class="sidebar-right-actions">
                     <button class="btn-icon-small" id="expand-right-btn" title="展开/收起">
                         <i class="fas fa-expand-alt"></i>
-                    </button>
-                    <button class="btn-icon-small" id="close-right-btn" title="关闭">
-                        <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
@@ -439,7 +435,6 @@
                                             localStorage.setItem('cosight:pendingRequests', JSON.stringify(latestPendings));
                                         }
                                     } catch (e) {
-                                        console.warn('清除 pending 失败:', e);
                                     }
                                 }
                                 try { originalHandler(evt); } catch (e) { /* no-op */ }
@@ -453,12 +448,10 @@
                                 try {
                                     WebSocketService.sendMessage(topic, JSON.stringify(item.message));
                                 } catch (e) {
-                                    console.warn('重发 pending 消息失败:', e);
                                 }
                             }
                         });
                     } catch (e) {
-                        console.warn('恢复 pending 失败:', e);
                     }
                 };
                 // 如果已经连接，直接执行；否则等待连接事件
@@ -468,11 +461,11 @@
                     WebSocketService.websocketConnected.addEventListener('connected', onWsConnected, { once: true });
                 }
             } catch (e) {
-                console.warn('恢复本地状态失败:', e);
             }
         })();
     </script>
 </body>
 
 </html>
+
 
