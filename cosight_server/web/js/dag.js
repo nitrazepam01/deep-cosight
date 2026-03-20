@@ -108,6 +108,16 @@ function applyDagVisualMetrics() {
         .style("font-size", `${getDagNodeFontSizePx()}px`);
 }
 
+function renderDagEdgesAndPanels() {
+    if (!svg) return;
+    svg.selectAll(".edge")
+        .attr("x1", d => getEdgeEndpoints(d).x1)
+        .attr("y1", d => getEdgeEndpoints(d).y1)
+        .attr("x2", d => getEdgeEndpoints(d).x2)
+        .attr("y2", d => getEdgeEndpoints(d).y2);
+    updateAllPanelPositions();
+}
+
 function getDagBubbleGradientId(status) {
     return DAG_STATUS_BUBBLE_GRADIENTS[status] || DAG_STATUS_BUBBLE_GRADIENTS.not_started;
 }
@@ -520,18 +530,9 @@ function initDAG() {
         .style("font-size", `${getDagNodeFontSizePx()}px`)
         .text(d => `S${d.id}`);
 
-    // 更新位置
-    simulation.on("tick", () => {
-        // 更新边的位置 - 处理D3力导向图的对象引用
-        link
-            .attr("x1", d => getEdgeEndpoints(d).x1)
-            .attr("y1", d => getEdgeEndpoints(d).y1)
-            .attr("x2", d => getEdgeEndpoints(d).x2)
-            .attr("y2", d => getEdgeEndpoints(d).y2);
-
-        // 更新所有工具面板的位置
-        updateAllPanelPositions();
-    });
+    // 固定布局场景下不持续运行 simulation，按需重算边位置
+    renderDagEdgesAndPanels();
+    simulation.stop();
 
     // 不显示节点右上角小圆指示器
     playDagRedrawAnimation();
@@ -759,12 +760,12 @@ function handleResize() {
         .attr("x2", d => getEdgeEndpoints(d).x2)
         .attr("y2", d => getEdgeEndpoints(d).y2);
 
-    // 更新力导向模拟的中心并重启
+    // 更新力导向中心参数，但保持 simulation 停止（按需模式）
     simulation.force("center", d3.forceCenter(width / 2, height / 2));
-    simulation.alpha(0.5).restart();
+    simulation.stop();
 
-    // 更新所有面板位置
-    updateAllPanelPositions();
+    // 再做一次无动画的收敛更新，确保边和面板位置最终一致
+    renderDagEdgesAndPanels();
 }
 
 // 添加节点指示器
