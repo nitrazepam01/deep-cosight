@@ -65,19 +65,47 @@ function getDagArrowSize() {
     return Math.max(5, 10 * getDagScaleRatio());
 }
 
-function getDagArrowRefX() {
-    // 让线段终点对齐箭头尾部（x=0），线只到箭头尾巴
-    return 0;
-}
-
-function getDagArrowAdvance() {
-    // markerUnits=userSpaceOnUse 时，箭头从尾到尖端的前进量约等于 markerWidth
-    return getDagArrowSize();
+function getDagArrowGeometry() {
+    const arrowSize = getDagArrowSize();
+    const arrowLength = Math.max(4, arrowSize);
+    const halfHeight = Math.max(2, arrowLength / 2);
+    return {
+        viewBox: `0 -${halfHeight} ${arrowLength} ${arrowLength}`,
+        path: `M0,-${halfHeight}L${arrowLength},0L0,${halfHeight}`
+    };
 }
 
 function getDagHighlightStroke(selected = false) {
     const base = selected ? 5 : 3;
     return Math.max(1.6, base * getDagScaleRatio());
+}
+
+function applyDagVisualMetrics() {
+    if (!svg) return;
+
+    const marker = svg.select("#arrowhead");
+    if (!marker.empty()) {
+        const geometry = getDagArrowGeometry();
+        marker
+            .attr("viewBox", geometry.viewBox)
+            .attr("refX", 0)
+            .attr("markerWidth", getDagArrowSize())
+            .attr("markerHeight", getDagArrowSize());
+        marker.select("path").attr("d", geometry.path);
+    }
+
+    svg.selectAll(".edge")
+        .attr("stroke-width", getDagEdgeStrokeWidth())
+        .attr("stroke-dasharray", d => d.type === "dependency" ? getDagDashedPattern() : null)
+        .attr("marker-end", "url(#arrowhead)");
+
+    svg.selectAll(".node")
+        .select("circle")
+        .attr("r", getDagNodeRadius());
+
+    svg.selectAll(".node")
+        .select("text")
+        .style("font-size", `${getDagNodeFontSizePx()}px`);
 }
 
 function getDagBubbleGradientId(status) {
@@ -235,7 +263,7 @@ function getEdgeEndpoints(edge) {
     const ux = dx / distance;
     const uy = dy / distance;
     const sourceOffset = getDagNodeRadius() + getDagEdgeGap() + getDagArrowTipPadding();
-    const targetOffset = getDagNodeRadius() + getDagEdgeGap() + getDagArrowAdvance();
+    const targetOffset = getDagNodeRadius() + getDagEdgeGap() + getDagArrowSize();
 
     return {
         x1: source.x + ux * sourceOffset,
@@ -254,10 +282,7 @@ function calculateAdaptiveDiameter(levels) {
     const availableWidth = Math.max(1, width * 0.9);
     const availableHeight = Math.max(1, height * 0.9);
 
-    // 列间距 = 2.5 * 直径，行间距 = 1.5 * 直径
-    // 宽度需求：((L-1)*2.5d) + d = (2.5L-1.5)d
     const diameterByWidth = availableWidth / Math.max(1, (2.5 * levelCount - 1.5));
-    // 高度需求：((M-1)*1.5d) + d = (1.5M-0.5)d
     const diameterByHeight = availableHeight / Math.max(1, (1.5 * maxNodesInLevel - 0.5));
 
     const diameter = Math.floor(Math.min(diameterByWidth, diameterByHeight));
@@ -393,7 +418,7 @@ function initDAG() {
 
     // 创建缩放功能
     zoom = d3.zoom()
-        .scaleExtent([0.1, 4]) // 缩放范围：0.1x 到 4x
+        .scaleExtent([0.5, 4]) // 缩放范围：0.5x 到 4x
         .on("zoom", function (event) {
             // 应用缩放变换到主图形组
             mainGroup.attr("transform", event.transform);
@@ -434,17 +459,18 @@ function initDAG() {
     // 定义箭头标记
     const defs = svg.append("defs");
     appendDagBubbleDefs(defs);
+    const arrowGeometry = getDagArrowGeometry();
     defs.append("marker")
         .attr("id", "arrowhead")
-        .attr("viewBox", "0 -5 10 10")
+        .attr("viewBox", arrowGeometry.viewBox)
         .attr("markerUnits", "userSpaceOnUse")
-        .attr("refX", getDagArrowRefX())
+        .attr("refX", 0)
         .attr("refY", 0)
         .attr("markerWidth", getDagArrowSize())
         .attr("markerHeight", getDagArrowSize())
         .attr("orient", "auto")
         .append("path")
-        .attr("d", "M0,-5L10,0L0,5")
+        .attr("d", arrowGeometry.path)
         .attr("fill", DAG_LINK_COLOR);
 
     // 绘制边
@@ -508,7 +534,6 @@ function initDAG() {
     });
 
     // 不显示节点右上角小圆指示器
-
     playDagRedrawAnimation();
     updateProgress();
 }
@@ -707,6 +732,9 @@ function handleResize() {
     // 重新计算层次化布局
     const nodePositions = calculateHierarchicalLayout();
 
+    // 关键：本轮先算气泡大小，再同轮更新箭头与线条参数，保证同步渲染
+    applyDagVisualMetrics();
+
     // 更新节点数据和固定位置
     dagData.nodes.forEach(node => {
         const pos = nodePositions[node.id];
@@ -791,29 +819,6 @@ function createDag(messageData) {
         console.log('11. initData?.steps:', initData?.steps);
         console.log('12. initData?.step_statuses:', initData?.step_statuses);
         console.log('============================================');
-        
-        // 新会话检测：当 changeType=replace 或 话题/uuid 变化时，重置缓存
-        // try {
-        //     const changeType = messageData.data && messageData.data.changeType;
-        //     const topic = messageData.topic || (messageData.data && messageData.data.topic);
-        //     const uuid = messageData.data && messageData.data.uuid;
-
-        //     // 从 localStorage 读上一次记录的会话标识
-        //     const lastKey = 'cosight:lastSessionKey';
-        //     const currentKey = `${topic || ''}__${uuid || ''}`;
-        //     const lastSessionKey = localStorage.getItem(lastKey);
-
-        //     const isNewSession = changeType === 'replace' || 
-        //         (currentKey && lastSessionKey !== currentKey && topic !== 'restored');
-
-        //     if (isNewSession && typeof window !== 'undefined' && typeof window.resetSessionCaches === 'function') {
-        //         window.resetSessionCaches();
-        //         // 记录本次会话标识
-        //         localStorage.setItem(lastKey, currentKey);
-        //     }
-        // } catch (e) {
-        //     console.warn('新会话检测失败，跳过缓存重置:', e);
-        // }
 
         // 当 steps 为空或未提供时，不绘制且静默返回；允许 dependencies 缺省
         if (!initData || !Array.isArray(initData.steps) || initData.steps.length === 0) {
