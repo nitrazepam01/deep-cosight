@@ -650,15 +650,57 @@ function toggleMaximizePanel() {
 }
 
 // 更新动态标题
+// 左侧栏会话标题、主页面标题：只在第一次消息且用户未重命名标题时才更新
+// 右侧栏执行标题：每次任务都更新
 function updateDynamicTitle(title) {
-    const titleEl = document.getElementById('conversation-title');
-    if (!titleEl || !title) return;
+    if (!title) return;
 
     // 跳过后端的等待占位标题，避免在等待阶段覆盖当前会话标题
     const blockedTitles = new Set(['等待任务执行', 'Waiting for task execution']);
     if (blockedTitles.has(String(title).trim())) return;
 
-    titleEl.textContent = title;
+    // 1. 右侧栏执行标题：每次都更新（随着每一次任务变化）
+    const executionTitleEl = document.getElementById('execution-title');
+    if (executionTitleEl) {
+        executionTitleEl.textContent = title;
+    }
+
+    // 2. 左侧栏会话标题、主页面标题：只在第一次消息且未重命名时更新
+    const currentThread = getCurrentThread();
+    if (!currentThread) {
+        // 没有当前线程，更新主页面标题
+        const titleEl = document.getElementById('conversation-title');
+        if (titleEl) {
+            titleEl.textContent = title;
+        }
+        return;
+    }
+
+    // 检查是否未重命名（标题仍然是默认的"新对话"）
+    const isNotRenamed = (currentThread.title || '新对话').trim() === '新对话';
+
+    if (isNotRenamed) {
+        // 更新主页面标题
+        const titleEl = document.getElementById('conversation-title');
+        if (titleEl) {
+            titleEl.textContent = title;
+        }
+
+        // 更新左侧栏当前会话标题
+        const currentThreadId = AppState.currentThreadId;
+        if (currentThreadId) {
+            const threadItem = document.querySelector(`.thread-item[data-thread-id="${currentThreadId}"] .thread-item-title`);
+            if (threadItem) {
+                threadItem.textContent = title;
+            }
+
+            // 同时更新线程数据对象
+            const thread = getThreadById(currentThreadId);
+            if (thread) {
+                thread.title = title;
+            }
+        }
+    }
 }
 
 function updateExecutionTitle(title) {
@@ -1733,6 +1775,26 @@ function clearDagViewState() {
     } catch (e) {
         console.warn('[clearDagViewState] 清空 DAG 失败:', e);
     }
+    
+    // 同时清理 progress-overview 显示
+    clearProgressOverview();
+}
+
+// 清理 progress-overview 显示
+function clearProgressOverview() {
+    const completedCount = document.getElementById('completed-count');
+    const inProgressCount = document.getElementById('in-progress-count');
+    const blockedCount = document.getElementById('blocked-count');
+    const notStartedCount = document.getElementById('not-started-count');
+    const progressFill = document.getElementById('progress-fill');
+    const progressText = document.getElementById('progress-text');
+    
+    if (completedCount) completedCount.textContent = '0';
+    if (inProgressCount) inProgressCount.textContent = '0';
+    if (blockedCount) blockedCount.textContent = '0';
+    if (notStartedCount) notStartedCount.textContent = '0';
+    if (progressFill) progressFill.style.width = '0%';
+    if (progressText) progressText.textContent = '0%';
 }
 
 function applyRuntimeLogFilter() {
@@ -2692,10 +2754,65 @@ function handleWebSocketMessage(message) {
             // 任务执行结束，恢复发送按钮
             void setThreadExecutingState(targetThreadId, false);
             unbindTopic(topic);
+            
+            // 任务结束后，显示最后的结论（markdown 文件）
+            // 从当前线程的消息中查找最后一条 AI 消息并显示
+            showFinalConclusion(targetThreadId);
         }
     } catch (error) {
         console.error('处理 WebSocket 消息失败:', error);
     }
+}
+
+// 显示最后的结论（markdown 文件）
+function showFinalConclusion(targetThreadId) {
+    const thread = getThreadById(targetThreadId);
+    if (!thread || !thread.messages) return;
+    
+    // 查找最后一条 AI 消息
+    const lastAssistantMessage = thread.messages.slice().reverse().find(msg => msg.role === 'assistant');
+    if (!lastAssistantMessage) return;
+    
+    const content = lastAssistantMessage.content;
+    if (!content) return;
+    
+    // 尝试从内容中提取 markdown 文件路径
+    // 通常格式为：已生成报告：[report.md](path/to/report.md)
+    const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+\.md)\)/g;
+    const matches = [...content.matchAll(markdownLinkRegex)];
+    
+    if (matches.length > 0) {
+        const fileName = matches[0][1];
+        const filePath = matches[0][2];
+        showMarkdownFileInRightPanel(filePath, fileName);
+    }
+}
+
+// 在右侧面板显示 markdown 文件
+function showMarkdownFileInRightPanel(filePath, fileName) {
+    const rightSidebar = document.getElementById('sidebar-right');
+    if (rightSidebar && rightSidebar.classList.contains('collapsed')) {
+        toggleRightSidebar();
+    }
+
+    const iframe = document.getElementById('content-iframe');
+    const markdownContent = document.getElementById('markdown-content');
+    const rightStatus = document.getElementById('right-container-status');
+
+    if (!iframe || !markdownContent) {
+        console.warn('右侧面板元素不存在');
+        return;
+    }
+
+    if (rightStatus) {
+        rightStatus.textContent = `正在查看：${fileName || '最终报告'}`;
+    }
+
+    // 构建 API URL
+    const apiUrl = `/api/workspace/file?path=${encodeURIComponent(filePath)}`;
+    iframe.src = apiUrl;
+    iframe.style.display = 'block';
+    markdownContent.style.display = 'none';
 }
 
 function showThinkingState() {
