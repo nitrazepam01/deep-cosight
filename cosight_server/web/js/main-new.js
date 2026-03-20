@@ -3313,18 +3313,16 @@ function createToolChainItem(toolCall) {
     const statusText = getToolStatusText(toolCall.status);
     
     const resultText = typeof toolCall.result === 'string' ? toolCall.result : '';
-    const shortResult = resultText.substring(0, 100);
-    const resultSuffix = resultText.length > 100 ? '...' : '';
 
     div.innerHTML = `
         <div class="tool-chain-icon ${toolCall.status}">
             <i class="${iconClass}"></i>
         </div>
-        <div class="tool-chain-content">
+        <div class="tool-chain-header">
             <div class="tool-chain-name">${toolName}</div>
             <div class="tool-chain-status">${statusText}</div>
-            ${resultText ? `<div class="tool-chain-result">${escapeHtml(shortResult)}${resultSuffix}</div>` : ''}
         </div>
+        ${resultText ? `<div class="tool-chain-result">${escapeHtml(resultText)}</div>` : ''}
     `;
     
     return div;

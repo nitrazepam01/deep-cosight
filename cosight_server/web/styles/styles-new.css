@@ -2336,9 +2336,11 @@ select.settings-input option:checked {
 }
 
 .tool-chain-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    column-gap: 10px;
+    row-gap: 8px;
+    align-items: center;
     padding: 12px;
     background: #f8f9fa;
     border-radius: 10px;
@@ -2372,39 +2374,58 @@ select.settings-input option:checked {
 }
 
 .tool-chain-icon {
-    width: 36px;
-    height: 36px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #fff;
     flex-shrink: 0;
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+    justify-self: center;
+}
+
+.tool-chain-icon i {
+    font-size: 12px;
 }
 
 .tool-chain-icon.running { background: #ff9800; }
 .tool-chain-icon.completed { background: #4caf50; }
 .tool-chain-icon.failed { background: #f44336; }
 
-.tool-chain-content {
-    flex: 1;
+.tool-chain-header {
+    grid-column: 2;
+    grid-row: 1;
     min-width: 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
 }
 
 .tool-chain-name {
     font-weight: 600;
-    font-size: 13px;
+    font-size: 14px;
+    line-height: 1.1;
     color: #333;
-    margin-bottom: 4px;
+    margin: 0;
 }
 
 .tool-chain-status {
     font-size: 12px;
     color: #666;
+    white-space: nowrap;
 }
 
 .tool-chain-result {
-    margin-top: 8px;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    justify-self: stretch;
+    box-sizing: border-box;
     padding: 8px;
     background: rgba(0, 0, 0, 0.05);
     border-radius: 6px;
@@ -2412,6 +2433,7 @@ select.settings-input option:checked {
     color: #555;
     max-height: 80px;
     overflow-y: auto;
+    overflow-wrap: anywhere;
 }
 
 .tooltip {
