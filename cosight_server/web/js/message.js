@@ -1,9 +1,10 @@
 class MessageService {
     constructor() {
-        // 存储每个step的tool events
-        this.stepToolEvents = new Map(); // stepIndex -> Array of tool events
-        // 存储当前step的pending tool starts (等待complete的tool_start消息)
-        this.pendingToolStarts = new Map(); // stepIndex -> Array of tool_start events
+        // 按“会话-任务-步骤”组织 tool events：contextKey(thread|task) -> Map(stepIndex -> events[])
+        this.stepToolEventsByContext = new Map();
+        // 按“会话-任务-步骤”组织 pending starts：contextKey(thread|task) -> Map(stepIndex -> pending[])
+        this.pendingToolStartsByContext = new Map();
+        this.activeContextKey = null;
 
         // 恢复本地存储的step tool events
         this.restoreStepToolEvents();
@@ -97,7 +98,64 @@ class MessageService {
         }
     }
 
+    _resolveThreadIdFromMessage(messageData) {
+        try {
+            const topic = messageData?.topic;
+            if (!topic) return window?.AppState?.currentThreadId || null;
+            if (typeof window.getThreadIdByTopic === 'function') {
+                return window.getThreadIdByTopic(topic) || window?.AppState?.currentThreadId || null;
+            }
+            return window?.AppState?.currentThreadId || null;
+        } catch (_) {
+            return window?.AppState?.currentThreadId || null;
+        }
+    }
+
+    _resolveTaskKeyFromMessage(messageData) {
+        try {
+            return messageData?.data?.uuid || messageData?.topic || 'unknown_task';
+        } catch (_) {
+            return 'unknown_task';
+        }
+    }
+
+    _getContextKey(messageData) {
+        const threadId = this._resolveThreadIdFromMessage(messageData) || 'unknown_thread';
+        const taskKey = this._resolveTaskKeyFromMessage(messageData) || 'unknown_task';
+        return `${threadId}|${taskKey}`;
+    }
+
+    _ensureContextMaps(contextKey) {
+        if (!this.stepToolEventsByContext.has(contextKey)) {
+            this.stepToolEventsByContext.set(contextKey, new Map());
+        }
+        if (!this.pendingToolStartsByContext.has(contextKey)) {
+            this.pendingToolStartsByContext.set(contextKey, new Map());
+        }
+        return {
+            stepMap: this.stepToolEventsByContext.get(contextKey),
+            pendingMap: this.pendingToolStartsByContext.get(contextKey)
+        };
+    }
+
+    _ensureStepBuckets(contextKey, stepIndex) {
+        const { stepMap, pendingMap } = this._ensureContextMaps(contextKey);
+        if (!stepMap.has(stepIndex)) {
+            stepMap.set(stepIndex, []);
+        }
+        if (!pendingMap.has(stepIndex)) {
+            pendingMap.set(stepIndex, []);
+        }
+        return {
+            stepEvents: stepMap.get(stepIndex),
+            pendingStarts: pendingMap.get(stepIndex)
+        };
+    }
+
     stepMessageHandler(messageData) {
+        const contextKey = this._getContextKey(messageData);
+        this.activeContextKey = contextKey;
+
         // 调用 createDag 方法来创建 DAG 图
         const result = createDag(messageData);
         if (!result) {
@@ -131,7 +189,7 @@ class MessageService {
         // 在接收到步骤状态更新后，自动关闭已完成且无运行中工具的步骤面板
         try {
             if (initData) {
-                this._autoCloseCompletedStepPanels(initData);
+                this._autoCloseCompletedStepPanels(initData, contextKey);
             }
         } catch (e) {
             console.warn('自动关闭完成步骤面板时发生异常:', e);
@@ -177,6 +235,8 @@ class MessageService {
         
         const stepIndex = toolEventData.step_index;
         const eventType = toolEventData.event_type;
+        const contextKey = this._getContextKey(messageData);
+        this.activeContextKey = contextKey;
         
         console.log(`处理tool event: ${eventType}, step: ${stepIndex}, tool: ${toolEventData.tool_name}`);
         console.log('完整的toolEventData:', toolEventData);
@@ -186,16 +246,7 @@ class MessageService {
             this.handleMarkStepEvent(toolEventData);
         }
 
-        // 确保stepIndex对应的数组存在
-        if (!this.stepToolEvents.has(stepIndex)) {
-            this.stepToolEvents.set(stepIndex, []);
-        }
-        if (!this.pendingToolStarts.has(stepIndex)) {
-            this.pendingToolStarts.set(stepIndex, []);
-        }
-
-        const stepEvents = this.stepToolEvents.get(stepIndex);
-        const pendingStarts = this.pendingToolStarts.get(stepIndex);
+        const { stepEvents, pendingStarts } = this._ensureStepBuckets(contextKey, stepIndex);
 
         if (eventType === 'tool_start') {
             // 处理tool_start消息
@@ -373,7 +424,10 @@ class MessageService {
         // 更新panel显示
         if (typeof updateNodeToolPanel === 'function') {
             console.log('调用updateNodeToolPanel函数');
-            updateNodeToolPanel(nodeId, toolCall);
+            updateNodeToolPanel(nodeId, toolCall, {
+                threadId: toolCall.threadId || null,
+                externalTaskKey: toolCall.externalTaskKey || null
+            });
         } else {
             console.error('updateNodeToolPanel函数不存在');
         }
@@ -526,6 +580,12 @@ class MessageService {
         }
 
         const agentEvent = toolCallRecord.complete_event || toolCallRecord.start_event || {};
+        const topic = toolCallRecord?.messageData?.topic || null;
+        const threadId = (topic && typeof window.getThreadIdByTopic === 'function')
+            ? (window.getThreadIdByTopic(topic) || null)
+            : null;
+        const externalTaskKey = toolCallRecord?.messageData?.data?.uuid || topic || null;
+        const logPrefix = `${threadId || 'unknown_thread'}|${externalTaskKey || 'unknown_task'}|step_${nodeId}`;
 
         return {
             id: callId,
@@ -542,6 +602,9 @@ class MessageService {
             url: url,
             path: path,
             timestamp: toolCallRecord.timestamp,
+            threadId: threadId,
+            externalTaskKey: externalTaskKey,
+            logPrefix: logPrefix,
             agentId: agentEvent.agent_id || null,
             agentName: agentEvent.agent_name || null,
             agentType: agentEvent.agent_type || null,
@@ -555,13 +618,18 @@ class MessageService {
      */
     persistStepToolEvents() {
         try {
-            const eventsData = {};
-            this.stepToolEvents.forEach((events, stepIndex) => {
-                eventsData[stepIndex] = events;
+            const contexts = {};
+            this.stepToolEventsByContext.forEach((stepMap, contextKey) => {
+                const eventsData = {};
+                stepMap.forEach((events, stepIndex) => {
+                    eventsData[stepIndex] = events;
+                });
+                contexts[contextKey] = eventsData;
             });
 
             localStorage.setItem('cosight:stepToolEvents', JSON.stringify({
-                events: eventsData,
+                contexts: contexts,
+                activeContextKey: this.activeContextKey || null,
                 savedAt: Date.now()
             }));
         } catch (e) {
@@ -578,11 +646,16 @@ class MessageService {
             if (!raw) return;
 
             const stored = JSON.parse(raw);
-            if (stored && stored.events) {
-                Object.entries(stored.events).forEach(([stepIndex, events]) => {
-                    this.stepToolEvents.set(parseInt(stepIndex), events);
+            if (stored && stored.contexts) {
+                Object.entries(stored.contexts).forEach(([contextKey, eventsByStep]) => {
+                    const stepMap = new Map();
+                    Object.entries(eventsByStep || {}).forEach(([stepIndex, events]) => {
+                        stepMap.set(parseInt(stepIndex), Array.isArray(events) ? events : []);
+                    });
+                    this.stepToolEventsByContext.set(contextKey, stepMap);
                 });
             }
+            this.activeContextKey = stored?.activeContextKey || this.activeContextKey;
         } catch (e) {
             console.warn('恢复step tool events失败:', e);
         }
@@ -591,16 +664,21 @@ class MessageService {
     /**
      * 获取指定step的tool events
      */
-    getStepToolEvents(stepIndex) {
-        return this.stepToolEvents.get(stepIndex) || [];
+    getStepToolEvents(stepIndex, contextKey = null) {
+        const key = contextKey || this.activeContextKey;
+        if (!key) return [];
+        const stepMap = this.stepToolEventsByContext.get(key);
+        if (!stepMap) return [];
+        return stepMap.get(stepIndex) || [];
     }
 
     /**
      * 清理step tool events
      */
     clearStepToolEvents() {
-        this.stepToolEvents.clear();
-        this.pendingToolStarts.clear();
+        this.stepToolEventsByContext.clear();
+        this.pendingToolStartsByContext.clear();
+        this.activeContextKey = null;
         try {
             localStorage.removeItem('cosight:stepToolEvents');
         } catch (e) {
@@ -611,7 +689,7 @@ class MessageService {
     /**
      * 自动关闭已完成步骤的面板（前提：该步骤无运行中工具调用）
      */
-    _autoCloseCompletedStepPanels(initData) {
+    _autoCloseCompletedStepPanels(initData, contextKey = null) {
         try {
             const stepStatuses = initData?.step_statuses || {};
             const steps = initData?.steps || [];
@@ -623,7 +701,7 @@ class MessageService {
                 if (status === 'completed') {
                     const stepIndex = index; // steps 为0基
                     // 确认该step无运行中的工具调用
-                    const hasRunning = this._hasRunningTools(stepIndex);
+                    const hasRunning = this._hasRunningTools(stepIndex, contextKey);
                     if (!hasRunning) {
                         const nodeId = stepIndex + 1; // DAG节点从1开始
                         try {
@@ -642,12 +720,14 @@ class MessageService {
     /**
      * 判断指定step是否存在运行中的工具调用
      */
-    _hasRunningTools(stepIndex) {
+    _hasRunningTools(stepIndex, contextKey = null) {
         try {
-            const events = this.getStepToolEvents(stepIndex) || [];
+            const key = contextKey || this.activeContextKey;
+            const events = this.getStepToolEvents(stepIndex, key) || [];
             // 只要存在状态为running的记录或挂起的start事件，则认为仍在运行
             if (events.some(rec => rec?.status === 'running')) return true;
-            const pending = this.pendingToolStarts?.get(stepIndex) || [];
+            const pendingMap = key ? this.pendingToolStartsByContext.get(key) : null;
+            const pending = pendingMap?.get(stepIndex) || [];
             if (pending.length > 0) return true;
         } catch (_) {}
         return false;

@@ -25,8 +25,60 @@ const DAG_STATUS_SHADOW_FILTERS = {
     blocked: "dag-bubble-shadow-blocked",
     completed: "dag-bubble-shadow-completed"
 };
-const DAG_NODE_RADIUS = 25;
+const DAG_NODE_MIN_RADIUS = 8;
+let dagNodeRadius = 25;
 const DAG_EDGE_ENDPOINT_GAP = 4;
+const DAG_BASE_NODE_RADIUS = 25;
+
+function getDagNodeRadius() {
+    return dagNodeRadius;
+}
+
+function getDagScaleRatio() {
+    return Math.max(0.3, getDagNodeRadius() / DAG_BASE_NODE_RADIUS);
+}
+
+function getDagEdgeGap() {
+    return DAG_EDGE_ENDPOINT_GAP * getDagScaleRatio();
+}
+
+function getDagArrowTipPadding() {
+    return Math.max(1, 1.5 * getDagScaleRatio());
+}
+
+function getDagNodeFontSizePx() {
+    return Math.max(8, Math.floor(getDagNodeRadius() * 0.60));
+}
+
+function getDagEdgeStrokeWidth() {
+    return Math.max(1.2, 3 * getDagScaleRatio());
+}
+
+function getDagDashedPattern() {
+    const ratio = getDagScaleRatio();
+    const dash = Math.max(2, Math.round(6 * ratio));
+    const gap = Math.max(2, Math.round(5 * ratio));
+    return `${dash},${gap}`;
+}
+
+function getDagArrowSize() {
+    return Math.max(5, 10 * getDagScaleRatio());
+}
+
+function getDagArrowRefX() {
+    // 让线段终点对齐箭头尾部（x=0），线只到箭头尾巴
+    return 0;
+}
+
+function getDagArrowAdvance() {
+    // markerUnits=userSpaceOnUse 时，箭头从尾到尖端的前进量约等于 markerWidth
+    return getDagArrowSize();
+}
+
+function getDagHighlightStroke(selected = false) {
+    const base = selected ? 5 : 3;
+    return Math.max(1.6, base * getDagScaleRatio());
+}
 
 function getDagBubbleGradientId(status) {
     return DAG_STATUS_BUBBLE_GRADIENTS[status] || DAG_STATUS_BUBBLE_GRADIENTS.not_started;
@@ -182,14 +234,35 @@ function getEdgeEndpoints(edge) {
     const distance = Math.sqrt(dx * dx + dy * dy) || 1;
     const ux = dx / distance;
     const uy = dy / distance;
-    const offset = DAG_NODE_RADIUS + DAG_EDGE_ENDPOINT_GAP;
+    const sourceOffset = getDagNodeRadius() + getDagEdgeGap() + getDagArrowTipPadding();
+    const targetOffset = getDagNodeRadius() + getDagEdgeGap() + getDagArrowAdvance();
 
     return {
-        x1: source.x + ux * offset,
-        y1: source.y + uy * offset,
-        x2: target.x - ux * offset,
-        y2: target.y - uy * offset
+        x1: source.x + ux * sourceOffset,
+        y1: source.y + uy * sourceOffset,
+        x2: target.x - ux * targetOffset,
+        y2: target.y - uy * targetOffset
     };
+}
+
+function calculateAdaptiveDiameter(levels) {
+    const safeLevels = Array.isArray(levels) && levels.length ? levels : [[]];
+    const levelCount = Math.max(1, safeLevels.length);
+    const maxNodesInLevel = Math.max(1, ...safeLevels.map(level => level.length || 0));
+
+    // 气泡边缘离任务链框四边 >= 5%
+    const availableWidth = Math.max(1, width * 0.9);
+    const availableHeight = Math.max(1, height * 0.9);
+
+    // 列间距 = 2.5 * 直径，行间距 = 1.5 * 直径
+    // 宽度需求：((L-1)*2.5d) + d = (2.5L-1.5)d
+    const diameterByWidth = availableWidth / Math.max(1, (2.5 * levelCount - 1.5));
+    // 高度需求：((M-1)*1.5d) + d = (1.5M-0.5)d
+    const diameterByHeight = availableHeight / Math.max(1, (1.5 * maxNodesInLevel - 0.5));
+
+    const diameter = Math.floor(Math.min(diameterByWidth, diameterByHeight));
+    const minDiameter = DAG_NODE_MIN_RADIUS * 2;
+    return Math.max(minDiameter, diameter);
 }
 
 // 计算层次化布局
@@ -277,7 +350,8 @@ function calculateHierarchicalLayout() {
     if (!levels.length) return nodePositions;
 
     const maxNodesInLevel = Math.max(...levels.map(level => level.length));
-    const diameter = DAG_NODE_RADIUS * 2;
+    const diameter = calculateAdaptiveDiameter(levels);
+    dagNodeRadius = Math.floor(diameter / 2);
     const rowSpacing = diameter * 1.5;
     const columnSpacing = diameter * 2.5;
 
@@ -351,7 +425,7 @@ function initDAG() {
         .force("link", d3.forceLink(dagData.edges).id(d => d.id).distance(150))
         .force("charge", d3.forceManyBody().strength(0)) // 关闭排斥力
         .force("center", d3.forceCenter(width / 2, height / 2))
-        .force("collision", d3.forceCollide().radius(40));
+        .force("collision", d3.forceCollide().radius(getDagNodeRadius() + (12 * getDagScaleRatio())));
 
     // 创建主图形组，用于缩放和平移
     mainGroup = svg.append("g");
@@ -363,10 +437,11 @@ function initDAG() {
     defs.append("marker")
         .attr("id", "arrowhead")
         .attr("viewBox", "0 -5 10 10")
-        .attr("refX", 8)
+        .attr("markerUnits", "userSpaceOnUse")
+        .attr("refX", getDagArrowRefX())
         .attr("refY", 0)
-        .attr("markerWidth", 6)
-        .attr("markerHeight", 6)
+        .attr("markerWidth", getDagArrowSize())
+        .attr("markerHeight", getDagArrowSize())
         .attr("orient", "auto")
         .append("path")
         .attr("d", "M0,-5L10,0L0,5")
@@ -378,9 +453,9 @@ function initDAG() {
         .data(dagData.edges)
         .enter().append("line")
         .attr("class", d => `edge ${d.type}`)
-        .attr("stroke-width", 3)
+        .attr("stroke-width", getDagEdgeStrokeWidth())
         .attr("stroke", DAG_LINK_COLOR)
-        .attr("stroke-dasharray", d => d.type === "dependency" ? "6,5" : null)
+        .attr("stroke-dasharray", d => d.type === "dependency" ? getDagDashedPattern() : null)
         .attr("marker-end", "url(#arrowhead)");
 
     // 绘制节点
@@ -394,7 +469,7 @@ function initDAG() {
     // 添加节点圆圈
     node.append("circle")
         .attr("class", d => `node-circle ${d.status}`)
-        .attr("r", 25)
+        .attr("r", getDagNodeRadius())
         .attr("fill", d => getDagBubbleFill(d.status))
         .attr("stroke", d => getDagBubbleStroke(d.status))
         .attr("filter", d => getDagBubbleFilter(d.status))
@@ -410,23 +485,13 @@ function initDAG() {
         .on("click", function (event, d) {
             event.stopPropagation();
             showStepDetails(event, d);
-            // 点击节点时只同步到右侧“任务日志”，不再创建左侧浮窗面板
-            const workflow = getWorkflowByNodeId(d.id);
-            if (workflow && workflow.tools) {
-                workflow.tools.forEach((tool, index) => {
-                    addToolCallToNodePanel(d.id, tool);
-                });
-            } else {
-                const tool = nodeToolMappings[d.id];
-                if (tool) {
-                    addToolCallToNodePanel(d.id, tool);
-                }
-            }
+            // 点击节点仅触发右侧重渲染，不再回灌历史工具事件，避免跨会话/跨任务日志混入
         });
 
     // 添加节点文本
     node.append("text")
         .attr("class", "node-text")
+        .style("font-size", `${getDagNodeFontSizePx()}px`)
         .text(d => `S${d.id}`);
 
     // 更新位置
@@ -491,7 +556,7 @@ function highlightRelatedNodes(selectedNode) {
     svg.selectAll(".node")
         .select("circle")
         .style("opacity", d => relatedNodeIds.has(d.id) ? 1 : 0.3)
-        .style("stroke-width", d => d.id === selectedNode.id ? 5 : 3);
+        .style("stroke-width", d => d.id === selectedNode.id ? getDagHighlightStroke(true) : getDagHighlightStroke(false));
 
 }
 
@@ -500,7 +565,7 @@ function resetHighlight() {
     svg.selectAll(".node")
         .select("circle")
         .style("opacity", 1)
-        .style("stroke-width", 3);
+        .style("stroke-width", getDagHighlightStroke(false));
 
 }
 
@@ -830,7 +895,7 @@ function createDag(messageData) {
             
             const nodeData = {
                 id: stepId,
-                name: `step${stepId}`,
+                name: `Step${stepId}`,
                 fullName: step,  // 保留完整名称用于其他用途
                 status: initData.step_statuses[step] || "not_started",
                 step_notes: stepNotesValue,

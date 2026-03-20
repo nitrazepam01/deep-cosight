@@ -325,7 +325,7 @@ function toggleNodeToolPanel(nodeId, nodeName) {
 function updateNodeToolPanel(nodeId, toolCall, options = {}) {
     if (!ENABLE_FLOATING_TOOL_PANELS) {
         if (!options.suppressRuntimeLog) {
-            appendRuntimeLogFromToolCall(nodeId, toolCall);
+            appendRuntimeLogFromToolCall(nodeId, toolCall, options);
         }
         return;
     }
@@ -392,7 +392,7 @@ function updateNodeToolPanel(nodeId, toolCall, options = {}) {
 
     // 将原“弹窗”中的每次状态更新同步到右侧“运行日志”
     if (!options.suppressRuntimeLog) {
-        appendRuntimeLogFromToolCall(nodeId, toolCall);
+        appendRuntimeLogFromToolCall(nodeId, toolCall, options);
     }
 
     // 内容更新后，重新计算面板位置
@@ -854,6 +854,7 @@ const AppState = {
     threadExecutionState: {},
     taskInfoMode: 'detail',
     runtimeLogFilterNodeId: null,
+    runtimeLogActiveTaskId: null,
     selectedTaskNodeId: null,
     initialRuntimeLogsCleared: false,
     initialized: false
@@ -1906,8 +1907,213 @@ function normalizeRuntimeLogItem(item) {
         status: item.status || 'completed',
         nodeId: nodeId,
         result: normalizedResult,
-        timestamp: item.timestamp || Date.now()
+        timestamp: item.timestamp || Date.now(),
+        taskId: item.taskId ? String(item.taskId) : null
     };
+}
+
+function createRuntimeTaskId(threadId, externalTaskKey = null) {
+    const keyPart = externalTaskKey ? String(externalTaskKey) : `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    return `task_${threadId}_${keyPart}`;
+}
+
+function normalizeRuntimeLogBook(rawBook) {
+    const book = rawBook && typeof rawBook === 'object' ? rawBook : {};
+    const tasks = Array.isArray(book.tasks) ? book.tasks : [];
+    const normalizedTasks = tasks.map((task) => {
+        const normalizedStepLogs = {};
+        const rawStepLogs = task?.stepLogs && typeof task.stepLogs === 'object' ? task.stepLogs : {};
+        Object.keys(rawStepLogs).forEach((stepKey) => {
+            const logs = Array.isArray(rawStepLogs[stepKey]) ? rawStepLogs[stepKey] : [];
+            normalizedStepLogs[stepKey] = logs
+                .map(normalizeRuntimeLogItem)
+                .filter(Boolean)
+                .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        });
+
+        const normalizedOrdered = Array.isArray(task?.orderedTaskList)
+            ? task.orderedTaskList
+                .map((entry) => {
+                    const normalizedLog = normalizeRuntimeLogItem(entry?.log || entry);
+                    if (!normalizedLog) return null;
+                    return {
+                        seq: Number.isFinite(Number(entry?.seq)) ? Number(entry.seq) : 0,
+                        stepId: Number.isFinite(Number(entry?.stepId))
+                            ? Number(entry.stepId)
+                            : (Number.isFinite(Number(normalizedLog.nodeId)) ? Number(normalizedLog.nodeId) : null),
+                        log: normalizedLog
+                    };
+                })
+                .filter(Boolean)
+                .sort((a, b) => (b.seq || 0) - (a.seq || 0))
+            : [];
+
+        return {
+            taskId: task?.taskId ? String(task.taskId) : `task_restore_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            externalTaskKey: task?.externalTaskKey ? String(task.externalTaskKey) : null,
+            title: task?.title ? String(task.title) : '任务',
+            createdAt: task?.createdAt || Date.now(),
+            updatedAt: task?.updatedAt || Date.now(),
+            sequenceCounter: Number.isFinite(Number(task?.sequenceCounter)) ? Number(task.sequenceCounter) : 0,
+            stepOrder: Array.isArray(task?.stepOrder)
+                ? task.stepOrder.map((v) => Number(v)).filter((v) => Number.isFinite(v))
+                : [],
+            stepLogs: normalizedStepLogs,
+            orderedTaskList: normalizedOrdered
+        };
+    });
+
+    let activeTaskId = book.activeTaskId ? String(book.activeTaskId) : null;
+    if (!activeTaskId && normalizedTasks.length) {
+        activeTaskId = normalizedTasks[0].taskId;
+    }
+    if (activeTaskId && !normalizedTasks.some((task) => task.taskId === activeTaskId)) {
+        activeTaskId = normalizedTasks.length ? normalizedTasks[0].taskId : null;
+    }
+
+    return {
+        version: 2,
+        activeTaskId,
+        tasks: normalizedTasks
+    };
+}
+
+function ensureThreadRightPanelState(thread) {
+    if (!thread || typeof thread !== 'object') return {};
+    if (!thread.rightPanelState || typeof thread.rightPanelState !== 'object') {
+        thread.rightPanelState = {};
+    }
+    if (!thread.rightPanelState.runtimeLogBook || typeof thread.rightPanelState.runtimeLogBook !== 'object') {
+        thread.rightPanelState.runtimeLogBook = normalizeRuntimeLogBook(null);
+    } else {
+        thread.rightPanelState.runtimeLogBook = normalizeRuntimeLogBook(thread.rightPanelState.runtimeLogBook);
+    }
+    return thread.rightPanelState;
+}
+
+function getTaskByIdFromBook(book, taskId) {
+    if (!book || !Array.isArray(book.tasks) || !taskId) return null;
+    return book.tasks.find((task) => task.taskId === taskId) || null;
+}
+
+function ensureRuntimeTaskForThread(threadId, options = {}) {
+    const thread = getThreadById(threadId);
+    if (!thread) return { thread: null, book: normalizeRuntimeLogBook(null), task: null };
+
+    const rightPanelState = ensureThreadRightPanelState(thread);
+    const book = normalizeRuntimeLogBook(rightPanelState.runtimeLogBook);
+    rightPanelState.runtimeLogBook = book;
+
+    const externalTaskKey = options.externalTaskKey ? String(options.externalTaskKey) : null;
+    let task = null;
+    if (externalTaskKey) {
+        task = book.tasks.find((item) => item.externalTaskKey === externalTaskKey) || null;
+    }
+    if (!task && options.taskId) {
+        task = getTaskByIdFromBook(book, String(options.taskId));
+    }
+    if (!task && options.allowCreate !== false) {
+        const now = Date.now();
+        task = {
+            taskId: createRuntimeTaskId(threadId, externalTaskKey),
+            externalTaskKey: externalTaskKey,
+            title: options.title ? String(options.title).trim() : '任务',
+            createdAt: now,
+            updatedAt: now,
+            sequenceCounter: 0,
+            stepOrder: [],
+            stepLogs: {},
+            orderedTaskList: []
+        };
+        book.tasks.unshift(task);
+        if (book.tasks.length > 30) {
+            book.tasks = book.tasks.slice(0, 30);
+        }
+    }
+
+    if (task) {
+        if (options.title && String(options.title).trim()) {
+            task.title = String(options.title).trim();
+        }
+        task.updatedAt = Date.now();
+        book.activeTaskId = task.taskId;
+    }
+
+    rightPanelState.runtimeLogBook = book;
+    if (threadId === AppState.currentThreadId) {
+        AppState.runtimeLogActiveTaskId = book.activeTaskId || null;
+    }
+    return { thread, book, task };
+}
+
+function migrateLegacyRuntimeLogsToBook(thread) {
+    if (!thread || typeof thread !== 'object') return;
+    const rightPanelState = ensureThreadRightPanelState(thread);
+    const book = normalizeRuntimeLogBook(rightPanelState.runtimeLogBook);
+    const hasAnyTaskLogs = book.tasks.some(task => Array.isArray(task.orderedTaskList) && task.orderedTaskList.length > 0);
+    const legacyLogs = Array.isArray(rightPanelState.runtimeLogs) ? rightPanelState.runtimeLogs : [];
+    if (hasAnyTaskLogs || legacyLogs.length === 0) {
+        rightPanelState.runtimeLogBook = book;
+        return;
+    }
+
+    const now = Date.now();
+    const taskId = createRuntimeTaskId(thread.id || 'thread', 'legacy');
+    const migratedTask = {
+        taskId,
+        externalTaskKey: 'legacy',
+        title: rightPanelState?.dagInitData?.title || '历史任务',
+        createdAt: now,
+        updatedAt: now,
+        sequenceCounter: 0,
+        stepOrder: [],
+        stepLogs: {},
+        orderedTaskList: []
+    };
+
+    legacyLogs
+        .map(normalizeRuntimeLogItem)
+        .filter(Boolean)
+        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+        .forEach((log) => {
+            const stepId = Number.isFinite(Number(log.nodeId)) ? Number(log.nodeId) : null;
+            const stepKey = stepId !== null ? String(stepId) : 'unknown';
+            if (!migratedTask.stepLogs[stepKey]) migratedTask.stepLogs[stepKey] = [];
+            migratedTask.stepLogs[stepKey].unshift(log);
+            if (stepId !== null && !migratedTask.stepOrder.includes(stepId)) {
+                migratedTask.stepOrder.push(stepId);
+            }
+            migratedTask.sequenceCounter += 1;
+            migratedTask.orderedTaskList.unshift({
+                seq: migratedTask.sequenceCounter,
+                stepId,
+                log
+            });
+        });
+
+    book.tasks.unshift(migratedTask);
+    book.activeTaskId = migratedTask.taskId;
+    rightPanelState.runtimeLogBook = book;
+}
+
+function getActiveTaskLogsForThread(threadId) {
+    const thread = getThreadById(threadId);
+    if (!thread) return [];
+    const rightPanelState = ensureThreadRightPanelState(thread);
+    const book = normalizeRuntimeLogBook(rightPanelState.runtimeLogBook);
+    rightPanelState.runtimeLogBook = book;
+
+    const activeTaskId = AppState.runtimeLogActiveTaskId || book.activeTaskId;
+    const activeTask = getTaskByIdFromBook(book, activeTaskId) || (book.tasks.length ? book.tasks[0] : null);
+    if (!activeTask) return [];
+
+    AppState.runtimeLogActiveTaskId = activeTask.taskId;
+    book.activeTaskId = activeTask.taskId;
+
+    return (activeTask.orderedTaskList || [])
+        .map((entry) => normalizeRuntimeLogItem(entry?.log || entry))
+        .filter(Boolean)
+        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 }
 
 async function restoreRightPanelByThread(threadId) {
@@ -1935,26 +2141,10 @@ async function restoreRightPanelByThread(threadId) {
     if (backendThread && localThread && typeof localThread === 'object') {
         Object.assign(localThread, backendThread);
     }
-    let rightPanelState = mergedThread.rightPanelState || {};
-    if (!AppState.initialRuntimeLogsCleared) {
-        AppState.initialRuntimeLogsCleared = true;
-        rightPanelState = {
-            ...rightPanelState,
-            runtimeLogs: []
-        };
-        if (localThread && typeof localThread === 'object') {
-            localThread.rightPanelState = rightPanelState;
-        }
-        try {
-            if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
-                await window.SessionService.updateThread(threadId, { rightPanelState });
-            }
-        } catch (e) {
-            console.warn('[restoreRightPanelByThread] 初始化清理旧日志失败:', e);
-        }
-    }
+    migrateLegacyRuntimeLogsToBook(localThread);
+    const rightPanelState = ensureThreadRightPanelState(localThread);
     const dagInitData = rightPanelState.dagInitData || null;
-    const runtimeLogs = Array.isArray(rightPanelState.runtimeLogs) ? rightPanelState.runtimeLogs : [];
+    const runtimeLogs = getActiveTaskLogsForThread(threadId);
 
     if (dagInitData && typeof createDag === 'function') {
         createDag({ data: { content: dagInitData } });
@@ -2704,6 +2894,18 @@ function handleWebSocketMessage(message) {
             try {
                 const initData = messageData.data?.content || messageData.data?.initData || null;
                 if (targetThreadId && initData && typeof initData === 'object') {
+                    const externalTaskKey = messageData?.data?.uuid || topic || null;
+                    const ensured = ensureRuntimeTaskForThread(targetThreadId, {
+                        title: initData.title || '任务',
+                        externalTaskKey,
+                        allowCreate: true
+                    });
+                    if (ensured?.thread) {
+                        ensured.thread.rightPanelState.runtimeLogBook = ensured.book;
+                        ensured.thread.rightPanelState.runtimeLogs = ensured.task
+                            ? ensured.task.orderedTaskList.map(entry => entry.log).slice(0, 300)
+                            : [];
+                    }
                     schedulePersistRightPanelState(targetThreadId, { dagInitData: initData });
                     // 首次任务标题到达时，触发会话自动改名策略（仅当前激活会话会更新主标题）
                     if (typeof initData.title === 'string' && initData.title.trim()) {
@@ -2980,8 +3182,11 @@ function schedulePersistRightPanelState(threadId, partialState) {
     rightPanelPersistTimers.set(threadId, timer);
 }
 
-function appendRuntimeLogFromToolCall(nodeId, toolCall) {
+function appendRuntimeLogFromToolCall(nodeId, toolCall, options = {}) {
     if (!toolCall) return;
+    const targetThreadId = options.threadId || toolCall.threadId || AppState.currentThreadId;
+    const externalTaskKey = options.externalTaskKey || toolCall.externalTaskKey || null;
+    if (!targetThreadId) return;
 
     const stepLabel = `Step ${nodeId}`;
     const status = toolCall.status || 'completed';
@@ -2993,7 +3198,14 @@ function appendRuntimeLogFromToolCall(nodeId, toolCall) {
     const sourceCallId = toolCall.id
         ? String(toolCall.id)
         : `${toolCall.tool || 'tool_event'}|${description}|${resultText.slice(0, 120)}`;
-    const identityKey = `step_${Number(nodeId) || 0}__call_${sourceCallId}`;
+    const { thread, book, task } = ensureRuntimeTaskForThread(targetThreadId, {
+        allowCreate: true,
+        externalTaskKey
+    });
+    const runtimeTaskId = task ? String(task.taskId) : 'unknown_task';
+    const stepNo = Number(nodeId) || 0;
+    const prefix = `${targetThreadId}|${runtimeTaskId}|step_${stepNo}`;
+    const identityKey = `${prefix}|call_${sourceCallId}`;
     const nextLog = {
         id: `runtime_log_${++runtimeLogCounter}`,
         identityKey,
@@ -3001,10 +3213,10 @@ function appendRuntimeLogFromToolCall(nodeId, toolCall) {
         tool: toolCall.tool || 'tool_event',
         status: status,
         nodeId: Number(nodeId) || null,
-        result: `${stepLabel} | ${description}${resultText ? ` | ${resultText}` : ''}`,
-        timestamp: Date.now()
+        result: `[${prefix}] ${stepLabel} | ${description}${resultText ? ` | ${resultText}` : ''}`,
+        timestamp: Date.now(),
+        taskId: null
     };
-
     const signature = [
         identityKey,
         status,
@@ -3013,24 +3225,49 @@ function appendRuntimeLogFromToolCall(nodeId, toolCall) {
     ].join('|');
     if (runtimeLogSignatures.has(signature)) return;
     runtimeLogSignatures.add(signature);
+    if (task) {
+        nextLog.taskId = task.taskId;
+    }
 
-    addToolCallToChain(nextLog);
+    if (targetThreadId === AppState.currentThreadId) {
+        addToolCallToChain(nextLog);
+    }
 
-    if (AppState.currentThreadId) {
-        const currentThread = getThreadById(AppState.currentThreadId);
-        const prevLogs = Array.isArray(currentThread?.rightPanelState?.runtimeLogs)
-            ? currentThread.rightPanelState.runtimeLogs
-            : [];
-        const remainingLogs = prevLogs.filter(log => {
-            if (!log) return false;
-            if (log.identityKey && log.identityKey === identityKey) return false;
-            if (log.sourceCallId && String(log.sourceCallId) === sourceCallId && Number(log.nodeId) === (Number(nodeId) || null)) {
-                return false;
+    if (targetThreadId) {
+        if (thread && book && task) {
+            const stepId = Number.isFinite(Number(nextLog.nodeId)) ? Number(nextLog.nodeId) : null;
+            const stepKey = stepId !== null ? String(stepId) : 'unknown';
+            if (!task.stepLogs[stepKey]) task.stepLogs[stepKey] = [];
+            task.stepLogs[stepKey] = task.stepLogs[stepKey].filter(log => log?.identityKey !== identityKey);
+            task.stepLogs[stepKey].unshift(nextLog);
+
+            if (stepId !== null && !task.stepOrder.includes(stepId)) {
+                task.stepOrder.push(stepId);
             }
-            return true;
-        });
-        const mergedLogs = [nextLog, ...remainingLogs].slice(0, 300);
-        schedulePersistRightPanelState(AppState.currentThreadId, { runtimeLogs: mergedLogs });
+
+            task.orderedTaskList = (task.orderedTaskList || []).filter(entry => {
+                const log = entry?.log || null;
+                return !(log && log.identityKey === identityKey);
+            });
+            task.sequenceCounter = Number.isFinite(Number(task.sequenceCounter)) ? Number(task.sequenceCounter) : 0;
+            task.sequenceCounter += 1;
+            task.orderedTaskList.unshift({
+                seq: task.sequenceCounter,
+                stepId,
+                log: nextLog
+            });
+            if (task.orderedTaskList.length > 300) {
+                task.orderedTaskList = task.orderedTaskList.slice(0, 300);
+            }
+            task.updatedAt = Date.now();
+
+            thread.rightPanelState.runtimeLogBook = book;
+            thread.rightPanelState.runtimeLogs = task.orderedTaskList.map(entry => entry.log).slice(0, 300);
+            schedulePersistRightPanelState(targetThreadId, {
+                runtimeLogBook: book,
+                runtimeLogs: thread.rightPanelState.runtimeLogs
+            });
+        }
     }
 
     // 控制签名集合大小，避免长期会话占用过大
@@ -3044,6 +3281,7 @@ function clearRuntimeLogs() {
     runtimeLogCounter = 0;
     runtimeLogSignatures.clear();
     AppState.runtimeLogFilterNodeId = null;
+    AppState.runtimeLogActiveTaskId = null;
     applyRuntimeLogFilter();
 }
 
