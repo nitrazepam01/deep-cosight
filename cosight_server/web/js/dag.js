@@ -292,10 +292,6 @@ function calculateAdaptiveDiameter(levels) {
 
 // 计算层次化布局
 function calculateHierarchicalLayout() {
-    console.log('[DAG-DEBUG] ===== calculateHierarchicalLayout 开始 =====');
-    console.log('[DAG-DEBUG] dagData.nodes 数量:', dagData.nodes?.length);
-    console.log('[DAG-DEBUG] 调用前的 dagNodeRadius:', dagNodeRadius);
-    
     const nodes = dagData.nodes;
     const edges = dagData.edges;
 
@@ -379,11 +375,8 @@ function calculateHierarchicalLayout() {
     if (!levels.length) return nodePositions;
 
     const maxNodesInLevel = Math.max(...levels.map(level => level.length));
-    console.log('[DAG-DEBUG] calculateAdaptiveDiameter 输入 levels:', levels);
     const diameter = calculateAdaptiveDiameter(levels);
-    const oldRadius = dagNodeRadius;
     dagNodeRadius = Math.floor(diameter / 2);
-    console.log('[DAG-DEBUG] diameter:', diameter, 'dagNodeRadius:', oldRadius, '→', dagNodeRadius);
     const rowSpacing = diameter * 1.5;
     const columnSpacing = diameter * 2.5;
 
@@ -407,17 +400,12 @@ function calculateHierarchicalLayout() {
         });
     });
 
-    console.log('[DAG-DEBUG] calculateHierarchicalLayout 返回 nodePositions 数量:', Object.keys(nodePositions).length);
-    console.log('[DAG-DEBUG] ===== calculateHierarchicalLayout 结束 =====');
     return nodePositions;
 }
 
-// 初始化 DAG 可视化
+// 初始化DAG可视化
 function initDAG() {
-    console.log('[DAG-DEBUG] ===== initDAG 开始 =====');
-    console.log('[DAG-DEBUG] initDAG 调用时的 dagNodeRadius:', dagNodeRadius);
-    
-    // 确保 tooltip 已初始化
+    // 确保tooltip已初始化
     ensureTooltipInitialized();
     
     const container = d3.select("#dag-svg");
@@ -448,9 +436,7 @@ function initDAG() {
     svg.call(zoom);
 
     // 计算固定的层次化布局
-    console.log('[DAG-DEBUG] initDAG: 即将调用 calculateHierarchicalLayout()');
     const nodePositions = calculateHierarchicalLayout();
-    console.log('[DAG-DEBUG] initDAG: calculateHierarchicalLayout 返回后 dagNodeRadius:', dagNodeRadius);
 
     // 将位置信息添加到节点数据中
     dagData.nodes.forEach(node => {
@@ -471,14 +457,9 @@ function initDAG() {
     dagSceneGroup = mainGroup.append("g").attr("class", "dag-scene-group");
 
     // 定义箭头标记
-    console.log('[DAG-DEBUG] initDAG: 即将创建箭头 marker, dagNodeRadius=', dagNodeRadius);
-    console.log('[DAG-DEBUG] getDagArrowSize()=', getDagArrowSize());
-    console.log('[DAG-DEBUG] getDagScaleRatio()=', getDagScaleRatio());
-    
     const defs = svg.append("defs");
     appendDagBubbleDefs(defs);
     const arrowGeometry = getDagArrowGeometry();
-    console.log('[DAG-DEBUG] arrowGeometry:', arrowGeometry);
     defs.append("marker")
         .attr("id", "arrowhead")
         .attr("viewBox", arrowGeometry.viewBox)
@@ -491,20 +472,13 @@ function initDAG() {
         .append("path")
         .attr("d", arrowGeometry.path)
         .attr("fill", DAG_LINK_COLOR);
-    
-    console.log('[DAG-DEBUG] 箭头 marker 创建完成，markerWidth=', getDagArrowSize());
 
-    // 绘制边 - 同时设置初始位置
+    // 绘制边
     const link = dagSceneGroup.append("g")
         .selectAll("line")
         .data(dagData.edges)
         .enter().append("line")
         .attr("class", d => `edge ${d.type}`)
-        // 关键：在创建时立即设置边的初始位置，这样边和气泡会同时正确渲染
-        .attr("x1", d => getEdgeEndpoints(d).x1)
-        .attr("y1", d => getEdgeEndpoints(d).y1)
-        .attr("x2", d => getEdgeEndpoints(d).x2)
-        .attr("y2", d => getEdgeEndpoints(d).y2)
         .attr("stroke-width", getDagEdgeStrokeWidth())
         .attr("stroke", DAG_LINK_COLOR)
         .attr("stroke-dasharray", d => d.type === "dependency" ? getDagDashedPattern() : null)
@@ -518,26 +492,6 @@ function initDAG() {
         .attr("class", d => `node ${d.status}`)
         .attr("transform", d => `translate(${d.fx}, ${d.fy})`);
 
-    // 添加拖拽行为
-    const drag = d3.drag()
-        .on("start", function (event, d) {
-            // 拖拽开始时，临时启动 simulation
-            if (!simulation.alive()) {
-                simulation.alpha(1).restart();
-            }
-            event.sourceEvent.stopPropagation();
-        })
-        .on("drag", function (event, d) {
-            // 更新节点位置
-            d.fx = event.x;
-            d.fy = event.y;
-        })
-        .on("end", function (event, d) {
-            // 拖拽结束后，停止 simulation 以避免持续调用
-            simulation.stop();
-            event.sourceEvent.stopPropagation();
-        });
-
     // 添加节点圆圈
     node.append("circle")
         .attr("class", d => `node-circle ${d.status}`)
@@ -545,7 +499,6 @@ function initDAG() {
         .attr("fill", d => getDagBubbleFill(d.status))
         .attr("stroke", d => getDagBubbleStroke(d.status))
         .attr("filter", d => getDagBubbleFilter(d.status))
-        .call(drag) // 应用拖拽行为
         .on("mouseenter", function (event, d) {
             // 阻止事件冒泡，避免与拖拽冲突
             event.stopPropagation();
@@ -569,7 +522,7 @@ function initDAG() {
 
     // 更新位置
     simulation.on("tick", () => {
-        // 更新边的位置 - 处理 D3 力导向图的对象引用
+        // 更新边的位置 - 处理D3力导向图的对象引用
         link
             .attr("x1", d => getEdgeEndpoints(d).x1)
             .attr("y1", d => getEdgeEndpoints(d).y1)
@@ -579,14 +532,6 @@ function initDAG() {
         // 更新所有工具面板的位置
         updateAllPanelPositions();
     });
-
-    // 关键：在停止 simulation 之前，先手动触发一次 tick 来设置边的初始位置
-    // 这样边和气泡会在同一帧内同时正确渲染
-    simulation.tick();
-
-    // 节点位置已固定，停止 simulation 以避免 getDagNodeRadius 持续调用
-    // 只在拖拽节点时临时启动，拖拽结束后再次停止
-    simulation.stop();
 
     // 不显示节点右上角小圆指示器
     playDagRedrawAnimation();
