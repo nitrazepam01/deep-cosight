@@ -222,6 +222,8 @@ class SessionService {
                             messageCount: thread.messageCount || 0,
                             starred: thread.starred || false,
                             messages: Array.isArray(thread.messages) ? thread.messages : [],
+                            userRenamedTitle: thread.userRenamedTitle === true,
+                            autoRenamedByTask: thread.autoRenamedByTask === true,
                             rightPanelState: thread.rightPanelState && typeof thread.rightPanelState === 'object'
                                 ? thread.rightPanelState
                                 : {},

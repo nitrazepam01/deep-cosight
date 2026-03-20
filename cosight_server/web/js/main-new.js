@@ -19,6 +19,7 @@ let autoOpenedPanels = new Set();
 let runtimeLogCounter = 0;
 let runtimeLogSignatures = new Set();
 const ENABLE_FLOATING_TOOL_PANELS = false;
+const DEFAULT_THREAD_TITLES = new Set(["新对话", "新会话"]);
 
 // ==================== 工具函数 ====================
 
@@ -662,45 +663,55 @@ function updateDynamicTitle(title) {
     // 1. 右侧栏执行标题：每次都更新（随着每一次任务变化）
     const executionTitleEl = document.getElementById('execution-title');
     if (executionTitleEl) {
-        executionTitleEl.textContent = title;
+        executionTitleEl.textContent = String(title).trim();
     }
 
     // 2. 左侧栏会话标题、主页面标题：只在第一次消息且未重命名时更新
     const currentThread = getCurrentThread();
     if (!currentThread) {
-        // 没有当前线程，更新主页面标题
-        const titleEl = document.getElementById('conversation-title');
-        if (titleEl) {
-            titleEl.textContent = title;
-        }
         return;
     }
 
-    // 检查是否未重命名（标题仍然是默认的"新对话"）
-    const isNotRenamed = (currentThread.title || '新对话').trim() === '新对话';
+    const normalizedTitle = String(title).trim();
+    const isDefaultTitle = DEFAULT_THREAD_TITLES.has(String(currentThread.title || "新对话").trim());
+    const manuallyRenamed = currentThread.userRenamedTitle === true;
+    const autoRenamedOnce = currentThread.autoRenamedByTask === true;
+    const canAutoRename = isDefaultTitle && !manuallyRenamed && !autoRenamedOnce;
 
-    if (isNotRenamed) {
-        // 更新主页面标题
-        const titleEl = document.getElementById('conversation-title');
-        if (titleEl) {
-            titleEl.textContent = title;
-        }
+    if (canAutoRename) {
+        currentThread.title = normalizedTitle;
+        currentThread.autoRenamedByTask = true;
 
-        // 更新左侧栏当前会话标题
         const currentThreadId = AppState.currentThreadId;
         if (currentThreadId) {
             const threadItem = document.querySelector(`.thread-item[data-thread-id="${currentThreadId}"] .thread-item-title`);
             if (threadItem) {
-                threadItem.textContent = title;
+                threadItem.textContent = normalizedTitle;
             }
 
-            // 同时更新线程数据对象
-            const thread = getThreadById(currentThreadId);
-            if (thread) {
-                thread.title = title;
+            // 后端持久化自动改名（仅一次）
+            if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
+                window.SessionService.updateThread(currentThreadId, {
+                    title: normalizedTitle,
+                    autoRenamedByTask: true
+                }).catch((error) => {
+                    console.warn('[updateDynamicTitle] 自动改名持久化失败:', error);
+                });
             }
         }
     }
+
+    // 主页面标题始终与当前激活会话标题一致
+    syncConversationTitleWithCurrentThread();
+}
+
+function syncConversationTitleWithCurrentThread() {
+    const titleEl = document.getElementById('conversation-title');
+    if (!titleEl) return;
+    const currentThread = getCurrentThread();
+    titleEl.textContent = (currentThread && currentThread.title)
+        ? currentThread.title
+        : '新对话';
 }
 
 function updateExecutionTitle(title) {
@@ -1205,7 +1216,8 @@ function isReusableEmptyThread(thread) {
         ? thread.messages.length === 0
         : (thread.messageCount || 0) === 0;
     const notStarred = !thread.starred;
-    const notRenamed = (thread.title || '新对话').trim() === '新对话';
+    const isDefaultTitle = DEFAULT_THREAD_TITLES.has(String(thread.title || '新对话').trim());
+    const notRenamed = thread.userRenamedTitle !== true && thread.autoRenamedByTask !== true && isDefaultTitle;
 
     return hasNoMessages && notStarred && notRenamed;
 }
@@ -1642,7 +1654,9 @@ function createNewThread(title, folderId = DEFAULT_FOLDER_ID) {
         folderId: normalizedFolderId,
         updatedAt: Date.now(),
         messageCount: 0,
-        messages: []
+        messages: [],
+        userRenamedTitle: false,
+        autoRenamedByTask: false
     };
 
     const folder = getFolderById(normalizedFolderId);
@@ -1964,10 +1978,7 @@ async function loadThread(threadId) {
 
     if (!thread) return;
 
-    const titleEl = document.getElementById('conversation-title');
-    if (titleEl) {
-        titleEl.textContent = thread.title || '新对话';
-    }
+    syncConversationTitleWithCurrentThread();
     resetExecutionTitle();
     clearRuntimeLogs();
     AppState.selectedTaskNodeId = null;
@@ -2694,6 +2705,37 @@ function handleWebSocketMessage(message) {
                 const initData = messageData.data?.content || messageData.data?.initData || null;
                 if (targetThreadId && initData && typeof initData === 'object') {
                     schedulePersistRightPanelState(targetThreadId, { dagInitData: initData });
+                    // 首次任务标题到达时，触发会话自动改名策略（仅当前激活会话会更新主标题）
+                    if (typeof initData.title === 'string' && initData.title.trim()) {
+                        if (targetThreadId === AppState.currentThreadId) {
+                            updateDynamicTitle(initData.title);
+                        } else {
+                            const targetThread = getThreadById(targetThreadId);
+                            if (targetThread) {
+                                const isDefaultTitle = DEFAULT_THREAD_TITLES.has(String(targetThread.title || '新对话').trim());
+                                const canAutoRename = isDefaultTitle
+                                    && targetThread.userRenamedTitle !== true
+                                    && targetThread.autoRenamedByTask !== true;
+                                if (canAutoRename) {
+                                    const nextTitle = initData.title.trim();
+                                    targetThread.title = nextTitle;
+                                    targetThread.autoRenamedByTask = true;
+                                    const threadItemTitleEl = document.querySelector(`.thread-item[data-thread-id="${targetThreadId}"] .thread-item-title`);
+                                    if (threadItemTitleEl) {
+                                        threadItemTitleEl.textContent = nextTitle;
+                                    }
+                                    if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
+                                        window.SessionService.updateThread(targetThreadId, {
+                                            title: nextTitle,
+                                            autoRenamedByTask: true
+                                        }).catch((error) => {
+                                            console.warn('[handleWebSocketMessage] 非激活会话自动改名持久化失败:', error);
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             } catch (e) {
                 console.warn('[handleWebSocketMessage] 保存 DAG 快照失败:', e);
@@ -3362,7 +3404,9 @@ async function createNewThreadAndSwitch() {
             folderId: DEFAULT_FOLDER_ID,
             updatedAt: Date.now(),
             messageCount: 0,
-            messages: []
+            messages: [],
+            userRenamedTitle: false,
+            autoRenamedByTask: false
         };
         defaultFolder.threads.push(newThread);
     }
@@ -3413,6 +3457,8 @@ function confirmRename() {
         if (thread) {
             // 1. 先立即更新本地数据（确保 UI 立即响应）
             thread.title = newName;
+            thread.userRenamedTitle = true;
+            thread.autoRenamedByTask = true;
             
             // 2. 立即重绘 UI
             // 更新左侧栏中的线程标题
@@ -3426,7 +3472,7 @@ function confirmRename() {
             
             // 更新顶部标题（如果是当前会话）
             if (AppState.renamingThreadId === AppState.currentThreadId) {
-                document.getElementById('conversation-title').textContent = newName;
+                syncConversationTitleWithCurrentThread();
             }
             
             // 3. 保存到 localStorage
@@ -3434,7 +3480,11 @@ function confirmRename() {
             
             // 4. 异步调用后端 API（不阻塞 UI）
             if (window.SessionService) {
-                window.SessionService._put(`/thread/${AppState.renamingThreadId}`, { title: newName })
+                window.SessionService._put(`/thread/${AppState.renamingThreadId}`, {
+                    title: newName,
+                    userRenamedTitle: true,
+                    autoRenamedByTask: true
+                })
                     .catch(error => {
                         console.error('[confirmRename] 后端更新失败:', error);
                     });
@@ -3730,7 +3780,9 @@ async function createNewThreadInFolder(folderId) {
         folderId: normalizedFolderId,
         updatedAt: Date.now(),
         messageCount: 0,
-        messages: []
+        messages: [],
+        userRenamedTitle: false,
+        autoRenamedByTask: false
     };
     
     if (targetFolder) {

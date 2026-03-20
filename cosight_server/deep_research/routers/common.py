@@ -266,7 +266,9 @@ async def create_thread(body: dict = Body(...)):
             "updatedAt": int(datetime.now().timestamp() * 1000),
             "messageCount": 0,
             "starred": False,
-            "messages": []
+            "messages": [],
+            "userRenamedTitle": False,
+            "autoRenamedByTask": False
         }
         
         # 找到目标文件夹并添加会话
@@ -335,6 +337,10 @@ async def update_thread(thread_id: str, body: dict = Body(...)):
                         thread["messageCount"] = len(body["messages"])
                     if "rightPanelState" in body and isinstance(body["rightPanelState"], dict):
                         thread["rightPanelState"] = body["rightPanelState"]
+                    if "userRenamedTitle" in body:
+                        thread["userRenamedTitle"] = bool(body["userRenamedTitle"])
+                    if "autoRenamedByTask" in body:
+                        thread["autoRenamedByTask"] = bool(body["autoRenamedByTask"])
                     if "isExecuting" in body:
                         thread["isExecuting"] = bool(body["isExecuting"])
                     if "statusUpdatedAt" in body:

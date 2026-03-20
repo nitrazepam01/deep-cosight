@@ -412,35 +412,16 @@
     <script>
         (function restoreFromStorage() {
             try {
-                const raw = localStorage.getItem('cosight:lastManusStep');
                 const pendingRaw = localStorage.getItem('cosight:pendingRequests');
                 const pendings = pendingRaw ? JSON.parse(pendingRaw) : {};
                 const pendingTopics = Object.keys(pendings);
 
-                if (!raw && pendingTopics.length === 0) return;
-                const stored = raw ? JSON.parse(raw) : null;
-                const messageData = stored && stored.message;
+                if (pendingTopics.length === 0) return;
 
                 // 先切换到主布局（隐藏初始输入区，显示中间容器），不发送新消息
                 if (typeof hideInitialInputAndShowMain === 'function') {
                     hideInitialInputAndShowMain('');
                 }
-
-                // 等待布局切换动画完成后再恢复 DAG
-                setTimeout(() => {
-                    if (messageData && messageData.data) {
-                        const ok = createDag(messageData);
-                        if (ok && messageData.data.initData && messageData.data.initData.title) {
-                            updateDynamicTitle(messageData.data.initData.title);
-                            if (typeof updateExecutionTitle === 'function') {
-                                updateExecutionTitle(messageData.data.initData.title);
-                            }
-                        }
-                        if (typeof handleResize === 'function') {
-                            setTimeout(() => handleResize(), 50);
-                        }
-                    }
-                }, 400);
 
                 // 等待 WebSocket 连接成功后，恢复订阅；仅在 stillPending===true 时重发
                 const onWsConnected = () => {

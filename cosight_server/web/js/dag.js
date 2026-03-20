@@ -3,6 +3,7 @@
 
 // DAG图全局变量
 let svg, width, height, simulation, mainGroup;
+let dagSceneGroup = null;
 let tooltip = null; // 延迟初始化，等待DOM加载
 let zoom = null; // 缩放功能
 const DAG_LINK_COLOR = "#2f7de1";
@@ -116,6 +117,21 @@ function appendDagBubbleDefs(defs) {
             .attr("flood-color", color)
             .attr("flood-opacity", opacity);
     });
+}
+
+function playDagRedrawAnimation() {
+    if (!dagSceneGroup) return;
+    const cx = width / 2;
+    const cy = height / 2;
+    dagSceneGroup
+        .interrupt()
+        .attr("opacity", 0.75)
+        .attr("transform", `translate(${cx}, ${cy}) scale(0.75) translate(${-cx}, ${-cy})`)
+        .transition()
+        .duration(240)
+        .ease(d3.easeCubicOut)
+        .attr("opacity", 1)
+        .attr("transform", "translate(0, 0) scale(1)");
 }
 
 // 确保tooltip已初始化
@@ -339,6 +355,7 @@ function initDAG() {
 
     // 创建主图形组，用于缩放和平移
     mainGroup = svg.append("g");
+    dagSceneGroup = mainGroup.append("g").attr("class", "dag-scene-group");
 
     // 定义箭头标记
     const defs = svg.append("defs");
@@ -356,7 +373,7 @@ function initDAG() {
         .attr("fill", DAG_LINK_COLOR);
 
     // 绘制边
-    const link = mainGroup.append("g")
+    const link = dagSceneGroup.append("g")
         .selectAll("line")
         .data(dagData.edges)
         .enter().append("line")
@@ -367,7 +384,7 @@ function initDAG() {
         .attr("marker-end", "url(#arrowhead)");
 
     // 绘制节点
-    const node = mainGroup.append("g")
+    const node = dagSceneGroup.append("g")
         .selectAll("g")
         .data(dagData.nodes)
         .enter().append("g")
@@ -427,6 +444,7 @@ function initDAG() {
 
     // 不显示节点右上角小圆指示器
 
+    playDagRedrawAnimation();
     updateProgress();
 }
 
