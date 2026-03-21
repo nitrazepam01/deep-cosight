@@ -39,7 +39,6 @@
         if (raw.includes('****')) return raw;
         if (raw.startsWith(DES_PREFIX)) return raw;
         if (typeof strEnc !== 'function') {
-            console.warn('DES encrypt function strEnc not found, fallback to plain api_key transport');
             return raw;
         }
         try {
@@ -79,14 +78,12 @@
         try {
             const resp = await fetch(`${API_BASE}/deep-research/providers`);
             if (!resp.ok) {
-                console.log('供应商 API 不可用，将使用.env 文件直接配置');
                 return [];
             }
             const json = await resp.json();
             if (json.code !== 0) throw new Error(json.msg || json.message);
             return json.data.providers || [];
         } catch (e) {
-            console.log('获取供应商列表失败:', e.message, '将使用.env 文件直接配置');
             return [];
         }
     }
@@ -1750,7 +1747,6 @@ const AgentConfigService = (function () {
                 _config = JSON.parse(stored);
             }
         } catch (e) {
-            console.warn('加载智能体配置失败:', e);
         }
         return _config;
     }
@@ -1845,7 +1841,6 @@ const AgentRuntimeService = (function () {
             const raw = localStorage.getItem(STORAGE_KEY);
             if (raw) _config = JSON.parse(raw);
         } catch (e) {
-            console.warn('loadConfig failed:', e);
         }
     }
 
@@ -2132,3 +2127,4 @@ const AgentRuntimeService = (function () {
 })();
 
 window.AgentRuntimeService = AgentRuntimeService;
+

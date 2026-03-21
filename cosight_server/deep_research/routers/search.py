@@ -35,6 +35,7 @@ from app.common.logger_util import logger
 from app.cosight.task.plan_report_manager import plan_report_event_manager
 from app.cosight.task.todolist import Plan
 from CoSight import CoSight
+from cosight_server.deep_research.routers.common import set_thread_execution_status, load_sessions, save_sessions
 
 searchRouter = APIRouter()
 
@@ -96,6 +97,39 @@ def _resolve_replay_paths(workspace_path_value: str) -> dict[str, str | None]:
         "legacy_replay_file": os.path.join(work_space_path, workspace_name, "replay.json"),
         "workspace_dir": os.path.join(work_space_path, workspace_name),
     }
+
+
+def _bind_thread_workspace(thread_id: str, workspace_path_value: str):
+    """将会话绑定到当前工作区 ID，供最终报告直接按目录读取。"""
+    if not thread_id or not workspace_path_value:
+        return
+
+    workspace_name = _resolve_workspace_name(workspace_path_value)
+    if not workspace_name:
+        return
+
+    data = load_sessions()
+    updated = False
+    now_ms = int(datetime.now().timestamp() * 1000)
+
+    for folder in data.get("folders", []):
+        for thread in folder.get("threads", []):
+            if thread.get("id") != thread_id:
+                continue
+            right_panel_state = thread.get("rightPanelState")
+            if not isinstance(right_panel_state, dict):
+                right_panel_state = {}
+            right_panel_state["workspaceId"] = workspace_name
+            right_panel_state["workspacePath"] = f"work_space/{workspace_name}"
+            thread["rightPanelState"] = right_panel_state
+            thread["updatedAt"] = now_ms
+            updated = True
+            break
+        if updated:
+            break
+
+    if updated:
+        save_sessions(data)
 
 
 def _is_safe_workspace_target(path_value: str | None) -> bool:
@@ -506,6 +540,7 @@ async def search(request: Request, params: Any = Body(None)):
 
     session_info = params.get("sessionInfo", {})
     plan_id = session_info.get("messageSerialNumber", "")
+    thread_id = session_info.get("threadId", "")
     if not plan_id:
         # 退化方案：使用时间戳，建议前端传稳定ID
         plan_id = f"plan_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
@@ -548,6 +583,18 @@ async def search(request: Request, params: Any = Body(None)):
     else:
         # 回放场景下不需要新的工作区目录，这里仅占位，RecordGenerator 会使用 replayWorkspace
         work_space_path_time = None
+
+    # 会话与 workspace 绑定：后续按会话直接定位文件夹读取最终报告
+    try:
+        if thread_id:
+            if work_space_path_time:
+                _bind_thread_workspace(thread_id, work_space_path_time)
+            elif isinstance(params, dict):
+                replay_workspace = params.get("replayWorkspace")
+                if isinstance(replay_workspace, str) and replay_workspace:
+                    _bind_thread_workspace(thread_id, replay_workspace)
+    except Exception as e:
+        logger.warning(f"绑定会话 workspace 失败: {e}")
     
     # 处理上传的文件：将上传的文件复制到工作区
     uploaded_files = params.get('uploadedFiles', [])
@@ -750,6 +797,12 @@ async def search(request: Request, params: Any = Body(None)):
                 # 清理TaskManager中的映射与运行态
                 TaskManager.mark_completed(plan_id)
                 TaskManager.remove_plan(plan_id)
+                # 任务结束后由后端落会话状态，避免前端离线导致状态脏数据
+                try:
+                    if thread_id and not is_replay_request:
+                        set_thread_execution_status(thread_id, False)
+                except Exception as status_err:
+                    logger.warning(f"后端落会话结束状态失败: thread_id={thread_id}, err={status_err}")
 
         # 幂等：若已在运行，仅订阅并复用已有执行；否则启动新执行
         if TaskManager.is_running(plan_id):
@@ -761,6 +814,12 @@ async def search(request: Request, params: Any = Body(None)):
             plan_report_event_manager.subscribe("plan_result", plan_id, append_create_plan_local)
             plan_report_event_manager.subscribe("tool_event", plan_id, append_create_plan_local)
         else:
+            # 新任务启动前由后端落会话执行中状态
+            try:
+                if thread_id and not is_replay_request:
+                    set_thread_execution_status(thread_id, True)
+            except Exception as status_err:
+                logger.warning(f"后端落会话开始状态失败: thread_id={thread_id}, err={status_err}")
             TaskManager.mark_running(plan_id)
             logger.info(f"Starting new task for plan_id: {plan_id}")
             import threading

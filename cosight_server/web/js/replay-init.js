@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 回放初始化脚本
  * 检测URL参数中是否包含回放请求,如果有则自动启动回放
  */
@@ -10,8 +10,6 @@ function checkReplayRequest() {
     const workspacePath = urlParams.get('workspace');
     
     if (isReplay && workspacePath) {
-        console.log('检测到回放请求:', workspacePath);
-        
         // 清除URL参数,避免刷新时重复触发
         // window.history.replaceState({}, document.title, window.location.pathname);
         
@@ -36,19 +34,12 @@ function checkReplayRequest() {
 
 // 从工作区启动回放
 function startReplayFromWorkspace(workspacePath) {
-    console.log('========== 开始回放 ==========');
-    console.log('工作区路径:', workspacePath);
-    console.log('当前URL:', window.location.href);
-    console.log('WebSocket状态:', window.WebSocketService ? window.WebSocketService.isOpen : 'WebSocket未初始化');
-    
     // 清理现有状态
     try {
         if (typeof window.resetSessionCaches === 'function') {
             window.resetSessionCaches();
-            console.log('✓ 会话缓存已清理');
         }
     } catch (e) {
-        console.warn('清理状态失败:', e);
     }
     
     // 提取replayPlanId (如果需要的话)
@@ -64,33 +55,21 @@ function startReplayFromWorkspace(workspacePath) {
                 break;
             }
         }
-        console.log('replayPlanId:', replayPlanId || '(未找到)');
     } catch (e) {
-        console.warn('获取planId失败:', e);
     }
     
     // 发送回放请求
     if (window.messageService && typeof window.messageService.sendReplay === 'function') {
-        console.log('✓ messageService可用，准备发送回放请求');
-        console.log('回放参数:', {
-            workspacePath: workspacePath,
-            replayPlanId: replayPlanId
-        });
-        
         try {
             window.messageService.sendReplay(workspacePath, replayPlanId);
-            console.log('✓ 回放请求已发送');
         } catch (e) {
             console.error('✗ 发送回放请求失败:', e);
             alert('发送回放请求失败: ' + e.message);
         }
     } else {
         console.error('✗ messageService不可用');
-        console.log('messageService:', window.messageService);
         alert('消息服务未初始化，请刷新页面重试');
     }
-    
-    console.log('========== 回放请求完成 ==========');
 }
 
 // 显示回放状态
@@ -127,4 +106,5 @@ if (typeof window !== 'undefined') {
     window.checkReplayRequest = checkReplayRequest;
     window.startReplayFromWorkspace = startReplayFromWorkspace;
 }
+
 

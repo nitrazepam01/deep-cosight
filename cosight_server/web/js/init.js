@@ -1,4 +1,4 @@
-function cleanupWebSocket() {
+﻿function cleanupWebSocket() {
     // 取消所有订阅
     WebSocketService.unsubscribe();
     // 销毁连接
@@ -13,19 +13,16 @@ function setupMessageHandling() {
             const pendings = JSON.parse(pendingRaw);
             Object.entries(pendings).forEach(([topic, data]) => {
                 if (data && data.message) {
-                    console.log('恢复pending订阅:', topic);
                     // 重新订阅
                     WebSocketService.subscribe(topic, messageService.receiveMessage.bind(messageService));
                     // 仅当明确 stillPending===true 时才重发，避免刷新重复执行
                     if (data.stillPending === true) {
-                        console.log('重发pending请求:', topic);
                         WebSocketService.sendMessage(topic, JSON.stringify(data.message));
                     }
                 }
             });
         }
     } catch (e) {
-        console.warn('处理pending请求失败:', e);
     }
 }
 
@@ -37,7 +34,6 @@ document.addEventListener("DOMContentLoaded", function () {
     
     // 等待WebSocket连接建立后设置消息处理
     WebSocketService.websocketConnected.addEventListener('connected', function() {
-        console.log('WebSocket连接已建立，设置消息处理...');
         if (!shouldResetHome) {
             setupMessageHandling();
         }
@@ -52,7 +48,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 window.resetSessionCaches();
             }
         } catch (e) {
-            console.warn('resetSessionCaches failed during home reset:', e);
         }
 
         try {
@@ -60,7 +55,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 window.showInitialHomeView();
             }
         } catch (e) {
-            console.warn('showInitialHomeView failed during home reset:', e);
         }
     }
     
@@ -138,3 +132,4 @@ document.addEventListener("DOMContentLoaded", function () {
     // 页面卸载时清理
     window.addEventListener('beforeunload', cleanupWebSocket);
 });
+

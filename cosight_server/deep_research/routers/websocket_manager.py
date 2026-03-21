@@ -150,6 +150,8 @@ async def websocket_handler(
 async def _send_resp(websocket, cookie, topic, message, lang):
     cookie_str = "; ".join([f"{key}={value}" for key, value in cookie.items()])
     assistants = [mention['name'] for mention in message['mentions']]
+    incoming_session_info = message.get("sessionInfo") if isinstance(message, dict) else {}
+    incoming_session_info = incoming_session_info if isinstance(incoming_session_info, dict) else {}
     params = {
         "content": message.get("initData"),
         "history": [],
@@ -157,7 +159,9 @@ async def _send_resp(websocket, cookie, topic, message, lang):
             "locale": lang,
             "sessionId": topic,
             "username": message.get("roleInfo").get("name"),
-            "assistantNames": assistants
+            "assistantNames": assistants,
+            "messageSerialNumber": incoming_session_info.get("messageSerialNumber"),
+            "threadId": incoming_session_info.get("threadId"),
         },
         "stream": True,
         "contentProperties": message.get("extra", {}).get("fromBackEnd", {}).get("actualPrompt")
@@ -260,6 +264,20 @@ async def _stream_handler(params, url, headers, topic, websocket):
                 except Exception:
                     pass
                 control_sent = False
+                async def _send_finish_control_once():
+                    nonlocal control_sent
+                    if control_sent:
+                        return
+                    await manager.send_json_to_topic(topic, {
+                        "topic": topic,
+                        "data": {
+                            "type": "control-status-message",
+                            "initData": {
+                                "status": "finished_successfully"
+                            }
+                        }
+                    }, websocket)
+                    control_sent = True
                 # 为规避 aiohttp 对单行的内置限制，这里改为按块读取并按换行还原行，不会拆分业务消息
                 buffer = b''
                 try:
@@ -302,30 +320,45 @@ async def _stream_handler(params, url, headers, topic, websocket):
                                 }
                             }, websocket)
 
-                            # 如果这是plan更新数据，且progress显示已全部完成，则发送结束控制
+                            # 结束唯一判定：进度100% 且 DAG 全部节点 completed
                             try:
                                 if (not control_sent) and msg_type == "lui-message-manus-step" and isinstance(init_data, dict):
                                     progress = init_data.get("progress") or {}
                                     total = int(progress.get("total") or 0)
                                     completed = int(progress.get("completed") or 0)
-                                    if total > 0 and completed >= total:
+
+                                    all_green = False
+                                    step_statuses = init_data.get("step_statuses")
+                                    if isinstance(step_statuses, dict) and len(step_statuses) > 0:
+                                        values = [str(v) for v in step_statuses.values()]
+                                        all_green = all(v == "completed" for v in values)
+                                        # progress 缺失时，按 step_statuses 反推
+                                        if total <= 0:
+                                            total = len(values)
+                                            completed = sum(1 for v in values if v == "completed")
+                                    else:
+                                        nodes = init_data.get("nodes")
+                                        if isinstance(nodes, list) and len(nodes) > 0:
+                                            statuses = [str((n or {}).get("status", "")) for n in nodes if isinstance(n, dict)]
+                                            if len(statuses) > 0:
+                                                all_green = all(s == "completed" for s in statuses)
+                                                if total <= 0:
+                                                    total = len(statuses)
+                                                    completed = sum(1 for s in statuses if s == "completed")
+
+                                    progress_done = bool(total > 0 and completed >= total)
+
+                                    if progress_done and all_green:
                                         # 先让出事件循环，确保上面的最终PLAN更新已被前端渲染
                                         import asyncio as _asyncio
                                         await _asyncio.sleep(0)
-                                        await manager.send_json_to_topic(topic, {
-                                            "topic": topic,
-                                            "data": {
-                                                "type": "control-status-message",
-                                                "initData": {
-                                                    "status": "finished_successfully"
-                                                }
-                                            }
-                                        }, websocket)
-                                        control_sent = True
+                                        await _send_finish_control_once()
                                         # 计划已完成，后续如仍有流数据，继续透传；不强制关闭连接
                             except Exception:
                                 # 解析或字段缺失不阻断主流程
                                 pass
+                    # 流自然结束但未触发过进度完成分支时，兜底发送一次结束控制
+                    await _send_finish_control_once()
                 except Exception:
                     # 发生读取异常（包含超时），尝试把缓冲区中已到达的完整行消费掉
                     while True:

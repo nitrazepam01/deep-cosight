@@ -1,4 +1,4 @@
-/**
+﻿/**
  * WebSocket客户端服务类
  * 基于原生JavaScript实现，用于与后端WebSocket服务进行通信
  */
@@ -46,7 +46,6 @@ class WebsocketService {
         try {
             result = JSON.parse(content);
         } catch (e) {
-            console.warn('JSON解析失败:', e);
         }
         return result == null ? defaultValue : result;
     }
@@ -150,8 +149,6 @@ class WebsocketService {
      * @param {string} message - 消息内容
      */
     sendMessage(topic, message) {
-        console.log(`send message >>>>>> topic: ${topic}, state: ${this._webSocket ? this._webSocket.readyState : 'null'}, message: ${message}`);
-
         if (!this.isOpen) {
             console.error("WebSocket is not open");
             return;
@@ -202,10 +199,9 @@ class WebsocketService {
                 localStorage.setItem('cosight:wsClientKey', clientKey);
             }
         } catch (e) {
-            console.warn('读取/写入本地 client key 失败:', e);
+            console.warn('[WebsocketService] 读取 websocket-client-key 失败，使用空 key:', e);
         }
         const url = `${this._webSocketUrl}${this._webSocketPath}?lang=${this._lang}&websocket-client-key=${encodeURIComponent(clientKey || '')}`;
-        console.log(`try to connect ${url}: `, this._tryCount);
         this._webSocket = new WebSocket(url);
     }
 
@@ -221,7 +217,7 @@ class WebsocketService {
      * WebSocket连接成功回调
      */
     _onopen() {
-        console.log("WebSocket successfully connected!");
+        console.info('[WebsocketService] 连接成功');
         this.websocketConnected.dispatchEvent(new CustomEvent('connected'));
         // 断线重连后，重新向后端声明订阅过的所有topic
         if (Array.isArray(this._topics)) {
@@ -233,8 +229,8 @@ class WebsocketService {
      * WebSocket连接关闭回调
      */
     _onclose(event) {
-        console.warn("WebSocket disconnected, try to reconnect: ", event);
         this._tryCount++;
+        console.warn('[WebsocketService] 连接关闭，准备重连:', { tryCount: this._tryCount, event });
 
         if (this._tryCount <= this.MAX_RETRY) {
             setTimeout(() => this.initWebSocket(), 10000);
@@ -252,12 +248,13 @@ class WebsocketService {
      * WebSocket消息接收回调
      */
     _onmessage(event) {
-        console.log('WebSocket data received: ', event.data);
         const respData = this.safeParseJson(event.data);
 
         if (!respData || !respData.data) {
             return;
         }
+        const type = respData?.data?.contentType || respData?.data?.type || 'unknown';
+        console.log('[WebsocketService] 收到消息:', { type, topic: respData.topic });
 
         // 触发自定义事件
         this._receiveMessage.dispatchEvent(new CustomEvent('message', {
@@ -293,7 +290,7 @@ class WebsocketService {
             };
             this._webSocket.send(JSON.stringify(data));
         } catch (e) {
-            console.warn('发送subscribe失败:', e);
+            console.warn('[WebsocketService] 发送 subscribe 失败:', { topic, e });
         }
     }
 
@@ -366,8 +363,6 @@ class WebsocketService {
             }),
             lang: this._lang
         };
-
-        console.log('发送回放请求:', data);
         this._webSocket.send(JSON.stringify(data));
         return topic;
     }
@@ -380,3 +375,4 @@ window.WebSocketService = new WebsocketService();
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = WebsocketService;
 }
+

@@ -133,6 +133,52 @@ def get_thread_by_id(thread_id: str) -> Optional[Dict]:
     return None
 
 
+def get_thread_and_folder_by_id(thread_id: str) -> tuple[Optional[Dict], Optional[Dict], Optional[Dict]]:
+    """根据 ID 获取会话及其所在文件夹和完整数据对象"""
+    data = load_sessions()
+    for folder in data.get("folders", []):
+        for thread in folder.get("threads", []):
+            if thread.get("id") == thread_id:
+                return thread, folder, data
+    return None, None, data
+
+
+def set_thread_execution_status(thread_id: str, is_executing: bool) -> Optional[Dict]:
+    """内部方法：更新会话执行状态，返回状态对象；找不到会话时返回 None"""
+    data = load_sessions()
+    status_updated_at = int(datetime.now().timestamp() * 1000)
+
+    for folder in data.get("folders", []):
+        for thread in folder.get("threads", []):
+            if thread.get("id") == thread_id:
+                thread["isExecuting"] = bool(is_executing)
+                thread["statusUpdatedAt"] = status_updated_at
+                save_sessions(data)
+                return {
+                    "threadId": thread_id,
+                    "isExecuting": bool(is_executing),
+                    "statusUpdatedAt": status_updated_at
+                }
+    return None
+
+
+def _get_workspace_root_dir() -> str:
+    workspace_env = os.getenv("WORKSPACE_PATH_ENV")
+    if workspace_env:
+        return os.path.join(workspace_env, "work_space")
+    return os.path.join(os.getcwd(), "work_space")
+
+
+def _is_safe_workspace_dir(workspace_root: str, workspace_dir: str) -> bool:
+    try:
+        root_real = os.path.realpath(workspace_root)
+        dir_real = os.path.realpath(workspace_dir)
+        common_path = os.path.commonpath([root_real, dir_real])
+        return common_path == root_real
+    except Exception:
+        return False
+
+
 # ==================== GET API - 读取数据 ====================
 
 @commonRouter.get("/sessions")
@@ -171,6 +217,87 @@ async def get_thread(thread_id: str):
             return json_result(404, 'Thread not found', None)
     except Exception as e:
         logger.error(f"获取会话失败：{e}")
+        return json_result(500, str(e), None)
+
+
+@commonRouter.get("/sessions/thread/{thread_id}/status")
+async def get_thread_status(thread_id: str):
+    """查询指定会话执行状态"""
+    try:
+        thread = get_thread_by_id(thread_id)
+        if not thread:
+            return json_result(404, 'Thread not found', None)
+
+        return json_result(0, 'success', {
+            "threadId": thread_id,
+            "isExecuting": bool(thread.get("isExecuting", False)),
+            "statusUpdatedAt": thread.get("statusUpdatedAt", thread.get("updatedAt"))
+        })
+    except Exception as e:
+        logger.error(f"查询会话状态失败：{e}")
+        return json_result(500, str(e), None)
+
+
+@commonRouter.get("/workspace/final-report/{thread_id}")
+async def get_thread_final_report(thread_id: str):
+    """按会话绑定的 workspaceId 直接在文件夹中查找最后保存的文件。"""
+    try:
+        thread = get_thread_by_id(thread_id)
+        if not thread:
+            return json_result(404, 'Thread not found', None)
+
+        right_panel_state = thread.get("rightPanelState") if isinstance(thread, dict) else {}
+        if not isinstance(right_panel_state, dict):
+            right_panel_state = {}
+
+        workspace_id = right_panel_state.get("workspaceId")
+        if not workspace_id or not isinstance(workspace_id, str):
+            return json_result(404, 'Workspace binding not found for thread', None)
+
+        workspace_root = _get_workspace_root_dir()
+        workspace_dir = os.path.join(workspace_root, workspace_id)
+        if (not os.path.isdir(workspace_dir)) or (not _is_safe_workspace_dir(workspace_root, workspace_dir)):
+            return json_result(404, 'Workspace directory not found', None)
+
+        text_exts = {".md", ".html", ".txt", ".json", ".csv", ".xml"}
+        preferred_candidates = []
+        fallback_candidates = []
+        for name in os.listdir(workspace_dir):
+            abs_path = os.path.join(workspace_dir, name)
+            if not os.path.isfile(abs_path):
+                continue
+            try:
+                mtime = os.path.getmtime(abs_path)
+            except Exception:
+                continue
+            ext = os.path.splitext(name)[1].lower()
+            item = (name, abs_path, mtime)
+            if ext in text_exts:
+                preferred_candidates.append(item)
+            else:
+                fallback_candidates.append(item)
+
+        file_candidates = preferred_candidates if preferred_candidates else fallback_candidates
+        if not file_candidates:
+            return json_result(404, 'No file found in workspace', None)
+
+        # 直接取最后保存（修改时间最新）的文件
+        file_candidates.sort(key=lambda item: item[2])
+        target_name, target_abs_path, _ = file_candidates[-1]
+
+        with open(target_abs_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        rel_path = f"work_space/{workspace_id}/{target_name}"
+        return json_result(0, 'success', {
+            "threadId": thread_id,
+            "workspaceId": workspace_id,
+            "fileName": target_name,
+            "filePath": rel_path,
+            "content": content
+        })
+    except Exception as e:
+        logger.error(f"按会话读取最终报告失败：{e}", exc_info=True)
         return json_result(500, str(e), None)
 
 
@@ -219,7 +346,9 @@ async def create_thread(body: dict = Body(...)):
             "updatedAt": int(datetime.now().timestamp() * 1000),
             "messageCount": 0,
             "starred": False,
-            "messages": []
+            "messages": [],
+            "userRenamedTitle": False,
+            "autoRenamedByTask": False
         }
         
         # 找到目标文件夹并添加会话
@@ -286,6 +415,27 @@ async def update_thread(thread_id: str, body: dict = Body(...)):
                         thread["messageCount"] = body["messageCount"]
                     elif "messages" in body and isinstance(body["messages"], list):
                         thread["messageCount"] = len(body["messages"])
+                    if "rightPanelState" in body and isinstance(body["rightPanelState"], dict):
+                        current_state = thread.get("rightPanelState")
+                        if not isinstance(current_state, dict):
+                            current_state = {}
+                        incoming_state = body["rightPanelState"]
+                        merged_state = dict(current_state)
+                        merged_state.update(incoming_state)
+                        # 保护关键绑定字段，避免被前端局部更新覆盖丢失
+                        if "workspaceId" in current_state and "workspaceId" not in incoming_state:
+                            merged_state["workspaceId"] = current_state.get("workspaceId")
+                        if "workspacePath" in current_state and "workspacePath" not in incoming_state:
+                            merged_state["workspacePath"] = current_state.get("workspacePath")
+                        thread["rightPanelState"] = merged_state
+                    if "userRenamedTitle" in body:
+                        thread["userRenamedTitle"] = bool(body["userRenamedTitle"])
+                    if "autoRenamedByTask" in body:
+                        thread["autoRenamedByTask"] = bool(body["autoRenamedByTask"])
+                    if "isExecuting" in body:
+                        thread["isExecuting"] = bool(body["isExecuting"])
+                    if "statusUpdatedAt" in body:
+                        thread["statusUpdatedAt"] = body["statusUpdatedAt"]
                     
                     if "updatedAt" in body:
                         thread["updatedAt"] = body["updatedAt"]
@@ -298,6 +448,21 @@ async def update_thread(thread_id: str, body: dict = Body(...)):
         return json_result(404, 'Thread not found', None)
     except Exception as e:
         logger.error(f"更新会话失败：{e}")
+        return json_result(500, str(e), None)
+
+
+@commonRouter.put("/thread/{thread_id}/status")
+async def update_thread_status(thread_id: str, body: dict = Body(...)):
+    """更新会话执行状态"""
+    try:
+        is_executing = bool(body.get("isExecuting", False))
+        updated = set_thread_execution_status(thread_id, is_executing)
+        if not updated:
+            return json_result(404, 'Thread not found', None)
+        logger.info(f"更新会话状态：{thread_id} -> isExecuting={is_executing}")
+        return json_result(0, 'success', updated)
+    except Exception as e:
+        logger.error(f"更新会话状态失败：{e}")
         return json_result(500, str(e), None)
 
 

@@ -1,4 +1,4 @@
-// 工具调用状态管理
+﻿// 工具调用状态管理
 let toolCallHistory = [];
 let activeToolCalls = new Map();
 let toolCallCounter = 0;
@@ -143,7 +143,6 @@ function showTooltip(event, d, showStatus = true) {
 
   // 确保tooltip已初始化再使用
   if (!tooltip) {
-    console.warn("Tooltip未初始化");
     return;
   }
 
@@ -239,10 +238,7 @@ function hideTooltip() {
         hideTooltip();
       }
     });
-
-    console.log("Tooltip 智能悬停行为已初始化");
   } catch (err) {
-    console.warn("初始化 tooltip 行为失败:", err);
   }
 
   // 计算点到矩形的最短距离
@@ -272,10 +268,6 @@ function getWorkflowByNodeId(nodeId) {
     const toolEvents = messageService.getStepToolEvents(stepIndex);
 
     if (toolEvents && toolEvents.length > 0) {
-      console.log(
-        `从tool events获取Step ${nodeId}的数据，共${toolEvents.length}个工具调用`
-      );
-
       // 转换工具调用格式
       const tools = toolEvents
         // 过滤内部工具，不在面板展示
@@ -329,7 +321,6 @@ function getWorkflowByNodeId(nodeId) {
                 }
               }
             } catch (e) {
-              console.warn("解析文件保存工具参数失败:", e);
             }
           }
 
@@ -348,7 +339,6 @@ function getWorkflowByNodeId(nodeId) {
                 path = buildApiWorkspacePath(filePath);
               }
             } catch (e) {
-              console.warn("解析文件读取工具参数失败:", e);
             }
           }
 
@@ -389,7 +379,6 @@ function getWorkflowByNodeId(nodeId) {
                 }
               }
             } catch (e) {
-              console.warn("处理execute_code结果文本失败:", e);
             }
           }
 
@@ -407,10 +396,6 @@ function getWorkflowByNodeId(nodeId) {
                 path = "code://execute_code";
               }
             } catch (e) {
-              console.warn(
-                "解析代码执行工具参数失败(getWorkflowByNodeId/toolEvents):",
-                e
-              );
             }
           }
 
@@ -457,7 +442,6 @@ function getWorkflowByNodeId(nodeId) {
                 }
               }
             } catch (e) {
-              console.warn("智能判断代码执行状态失败(getWorkflowByNodeId):", e);
               // 判断失败时保持原始状态
             }
           }
@@ -585,7 +569,6 @@ function getWorkflowByNodeId(nodeId) {
             }
           }
         } catch (e) {
-          console.warn("解析搜索工具结果失败:", e);
         }
       }
 
@@ -617,7 +600,6 @@ function getWorkflowByNodeId(nodeId) {
             }
           }
         } catch (e) {
-          console.warn("解析文件保存工具参数失败:", e);
         }
       }
 
@@ -640,7 +622,6 @@ function getWorkflowByNodeId(nodeId) {
             path = buildApiWorkspacePath(filePath);
           }
         } catch (e) {
-          console.warn("解析文件读取工具参数失败:", e);
         }
       }
 
@@ -662,7 +643,6 @@ function getWorkflowByNodeId(nodeId) {
           }
         }
       } catch (e) {
-        console.warn("处理execute_code结果文本失败(step_tool_calls):", e);
       }
       // file_saver 将 result 替换为描述内容，并清空描述
       if (toolName === "file_saver" && descriptionOverride) {
@@ -678,7 +658,6 @@ function getWorkflowByNodeId(nodeId) {
             path = "code://execute_code";
           }
         } catch (e) {
-          console.warn("解析代码执行工具参数失败(step_tool_calls):", e);
         }
       }
 
@@ -726,11 +705,6 @@ function getWorkflowByNodeId(nodeId) {
             }
           }
         } catch (e) {
-          console.warn(
-            "智能判断代码执行状态失败(step_tool_calls):",
-            e,
-            toolResult
-          );
           // 判断失败时保持默认状态
         }
       }
@@ -794,7 +768,6 @@ function getLastManusStepMessage() {
     const stored = JSON.parse(raw);
     return stored && stored.message;
   } catch (e) {
-    console.warn("获取最新消息失败:", e);
     return null;
   }
 }
@@ -863,7 +836,6 @@ function parseSearchResults(raw) {
     const val = fn();
     return Array.isArray(val) ? val : [];
   } catch (e) {
-    console.warn("fallback 解析失败:", e);
     return [];
   }
 }
@@ -1006,7 +978,6 @@ function completeToolCall(callId, result, success = true) {
         }
       }
     } catch (e) {
-      console.warn("智能判断代码执行状态失败(completeToolCall):", e);
       // 判断失败时保持原始状态
     }
   }
@@ -1079,8 +1050,6 @@ function createNodeToolPanel(nodeId, nodeName, sticky = false) {
   panel.style.position = "absolute";
   panel.style.top = "50px";
   panel.style.left = "16px";
-  console.log(`[创建面板 ${nodeId}] 初始位置设置: top=50px, left=16px`);
-
   container.appendChild(panel);
   nodeToolPanels.set(nodeId, panel);
 
@@ -1109,24 +1078,19 @@ function createNodeToolPanel(nodeId, nodeName, sticky = false) {
 
       // 阻止事件冒泡，避免触发header的拖拽mousedown
       closeBtn.addEventListener("mousedown", function (e) {
-        console.log(`[panel:${nodeId}] close button mousedown`);
         e.stopPropagation();
       });
       closeBtn.addEventListener("click", function (e) {
-        console.log(`[panel:${nodeId}] close button clicked`);
         e.preventDefault();
         e.stopPropagation();
         try {
           closeNodeToolPanel(nodeId);
         } catch (err) {
-          console.warn(`[panel:${nodeId}] close error`, err);
         }
       });
     } else {
-      console.warn(`[panel:${nodeId}] close button not found`);
     }
   } catch (err) {
-    console.warn(`[panel:${nodeId}] bind close error`, err);
   }
 
   // 初始化拖拽功能
@@ -1140,8 +1104,6 @@ function createNodeToolPanel(nodeId, nodeName, sticky = false) {
   panel.style.left = "16px";
 
   // 添加调试信息
-  console.log(`Creating panel for node ${nodeId}`);
-  console.log(`[面板创建后] panel.style.top = ${panel.style.top}`);
   debugPanelPosition(nodeId);
 
   // 注释掉 updatePanelPosition，避免覆盖我们的固定位置
@@ -1178,8 +1140,6 @@ function updatePanelPosition(panel, nodeId) {
 
   // 直接设置为固定值，不再依赖任何计算
   panel.style.top = `${FORCED_TOP_OFFSET}px`;
-
-  console.log(`[Panel ${nodeId}] 强制设置位置: top=${FORCED_TOP_OFFSET}px`);
 }
 
 // 计算面板的最优垂直位置
@@ -1239,38 +1199,15 @@ function debugPanelPosition(nodeId) {
   if (nodeElement) {
     const nodeRect = nodeElement.getBoundingClientRect();
     const panel = nodeToolPanels.get(nodeId);
-
-    console.log(`Node ${nodeId} position:`, {
-      left: nodeRect.left,
-      top: nodeRect.top,
-      width: nodeRect.width,
-      height: nodeRect.height,
-    });
-
     if (panel) {
-      console.log(`Panel ${nodeId} info:`, {
-        currentHeight: panel.offsetHeight,
-        maxHeight: Math.min(400, window.innerHeight * 0.6),
-        windowHeight: window.innerHeight,
-      });
     }
-
-    console.log("Window size:", {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
   } else {
-    console.log(`Node ${nodeId} not found`);
   }
 }
 
 // 关闭节点工具面板
 function closeNodeToolPanel(nodeId) {
   const panel = nodeToolPanels.get(nodeId);
-  console.log(
-    `[panel:${nodeId}] closeNodeToolPanel invoked, hasPanel=`,
-    !!panel
-  );
   if (panel) {
     // 清理内容观察器
     if (panel._contentObserver) {
@@ -1284,16 +1221,12 @@ function closeNodeToolPanel(nodeId) {
       try {
         if (panel.parentNode) {
           panel.parentNode.removeChild(panel);
-          console.log(`[panel:${nodeId}] panel DOM removed`);
         }
       } catch (e) {
-        console.warn(`[panel:${nodeId}] remove panel error`, e);
       }
       nodeToolPanels.delete(nodeId);
-      console.log(`[panel:${nodeId}] panel map entry deleted`);
     }, 300);
   } else {
-    console.warn(`[panel:${nodeId}] panel not found in map`);
   }
 }
 
@@ -1612,7 +1545,6 @@ function updateNodeToolPanel(nodeId, toolCall) {
   setTimeout(() => {
     const panel = nodeToolPanels.get(nodeId);
     if (panel && panel.classList.contains("show")) {
-      console.log("Updating panel position after content change...");
       updatePanelPosition(panel, nodeId);
     }
   }, 100); // 进一步增加延迟时间确保DOM更新完成
@@ -1702,7 +1634,6 @@ function addToolCallToNodePanel(nodeId, tool) {
         }
       }
     } catch (e) {
-      console.warn("智能判断代码执行状态失败(addToolCallToNodePanel):", e);
       // 判断失败时保持原始状态
     }
   }
@@ -1760,10 +1691,8 @@ function updateAllPanelPositions() {
 function forceUpdatePanelPosition(nodeId) {
   const panel = nodeToolPanels.get(nodeId);
   if (panel && panel.classList.contains("show")) {
-    console.log(`Force updating panel position for node ${nodeId}`);
     updatePanelPosition(panel, nodeId);
   } else {
-    console.log(`Panel for node ${nodeId} not found or not visible`);
   }
 }
 
@@ -1962,7 +1891,6 @@ const RuntimeAgentSelector = (function () {
       const raw = localStorage.getItem(STORAGE_KEY);
       return raw ? JSON.parse(raw) : {};
     } catch (error) {
-      console.warn("Failed to parse stored agentRunConfig:", error);
       return {};
     }
   }
@@ -1971,7 +1899,6 @@ const RuntimeAgentSelector = (function () {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
-      console.warn("Failed to persist agentRunConfig:", error);
     }
   }
 
@@ -2198,7 +2125,6 @@ const RuntimeAgentSelector = (function () {
         persistState();
         renderAll();
       })().catch((error) => {
-        console.warn("RuntimeAgentSelector init failed:", error);
         initPromise = null;
       });
     }
@@ -2278,7 +2204,6 @@ function initInputHandler() {
       const endsWithMultiSpaces = /\s{2,}$/.test(raw);
       const message = raw.trim();
       if (message) {
-        console.log("发送消息:", message);
         // 清理之前的tool events和UI状态
         if (
           window.messageService &&
@@ -2403,8 +2328,6 @@ function initInputHandler() {
           } catch (_) {}
         }
       } catch (_) {}
-
-      console.log("发送初始消息:", message);
       // 隐藏初始输入框并显示主界面
       hideInitialInputAndShowMain(message);
       // 根据末尾空格决定回放还是正常请求
@@ -2598,14 +2521,10 @@ function cleanupContentResources() {
 
   // 隐藏加载指示器
   toggleLoadingIndicator(false);
-
-  console.log("iframe资源清理完成");
 }
 
 // 全面的内存清理机制
 function cleanupAllResources() {
-  console.log("开始全面资源清理...");
-
   // 1. 清理iframe资源
   cleanupContentResources();
 
@@ -2647,23 +2566,14 @@ function cleanupAllResources() {
   if (window.gc && typeof window.gc === "function") {
     try {
       window.gc();
-      console.log("执行了垃圾回收");
     } catch (e) {
-      console.log("垃圾回收不可用");
     }
   }
 
   // 6. 清理可能的内存泄漏
   if (window.performance && window.performance.memory) {
     const memory = window.performance.memory;
-    console.log("内存使用情况:", {
-      used: Math.round(memory.usedJSHeapSize / 1024 / 1024) + "MB",
-      total: Math.round(memory.totalJSHeapSize / 1024 / 1024) + "MB",
-      limit: Math.round(memory.jsHeapSizeLimit / 1024 / 1024) + "MB",
-    });
   }
-
-  console.log("全面资源清理完成");
 }
 
 // 检查并恢复DAG数据
@@ -2681,8 +2591,6 @@ function checkAndRestoreDAGData() {
     // 检查是否有保存的manus step消息
     const lastManusStep = getLastManusStepMessage();
     if (lastManusStep) {
-      console.log("发现保存的DAG数据，开始恢复...");
-
       // 恢复DAG图
       const result = createDag(lastManusStep);
       if (result) {
@@ -2694,12 +2602,9 @@ function checkAndRestoreDAGData() {
 
         // 显示主界面
         hideInitialInputAndShowMain("");
-
-        console.log("DAG数据恢复完成");
       }
     }
   } catch (e) {
-    console.warn("恢复DAG数据失败:", e);
   }
 }
 
@@ -2781,7 +2686,6 @@ function showRightPanelForTool(toolCall) {
         }
       })
       .catch((error) => {
-        console.warn("iframe嵌入检查失败，尝试直接加载:", error);
         // 检查失败时允许尝试加载
         loadIframeContent(url, iframe, statusElement, tool, path);
       });
@@ -2807,7 +2711,6 @@ function showRightPanelForTool(toolCall) {
 
       // 显示代码内容
       displayCodeContent(toolCall);
-      console.log("显示代码执行内容");
       return;
     }
 
@@ -2852,7 +2755,6 @@ function showRightPanelForTool(toolCall) {
               : `加载超时: ${relativePath}`;
             statusElement.className = "error";
           }
-          console.warn("iframe加载超时:", relativePath);
         }, 10000);
 
         iframe.onload = function () {
@@ -2874,7 +2776,6 @@ function showRightPanelForTool(toolCall) {
             );
             statusElement.className = "success";
           }
-          console.log("HTML 文件加载成功:", relativePath);
         };
 
         iframe.onerror = function () {
@@ -2898,8 +2799,6 @@ function showRightPanelForTool(toolCall) {
         iframe.src = relativePath;
         isBlank = false;
       }, 100);
-
-      console.log("通过 iframe 显示 HTML 文件:", relativePath);
     } else {
       // 显示 Markdown/文本内容
       iframe.style.display = "none";
@@ -2919,7 +2818,6 @@ function showRightPanelForTool(toolCall) {
       }
 
       loadMarkdownFile(path, tool, toolCall);
-      console.log("显示文件内容:", path);
     }
   }
 }
@@ -2986,7 +2884,6 @@ function displayCodeContent(toolCall) {
           : JSON.stringify(toolCall.result, null, 2);
     }
   } catch (e) {
-    console.warn("解析代码执行工具参数或结果失败:", e);
     if (!codeContent) {
       codeContent = "无法解析代码内容";
     }
@@ -3033,7 +2930,6 @@ function displayCodeContent(toolCall) {
       }
     }
   } catch (e) {
-    console.warn("解析代码执行状态失败:", e);
   }
 
   // 生成HTML内容
@@ -3216,7 +3112,6 @@ function displayCodeContent(toolCall) {
       });
     }
   } catch (e) {
-    console.warn("绑定代码折叠/展开事件失败:", e);
   }
 }
 
@@ -3254,9 +3149,6 @@ function loadMarkdownFile(filePath, tool, toolCall) {
   }
 
   const relativePath = buildApiWorkspacePath(filePath);
-
-  console.log("尝试加载文件:", relativePath);
-
   // 使用fetch加载文件内容
   fetch(relativePath)
     .then((response) => {
@@ -3606,10 +3498,7 @@ function resetSessionCaches() {
     if (container) {
       container.innerHTML = "";
     }
-
-    console.log("[session] 缓存已重置");
   } catch (e) {
-    console.warn("重置会话缓存时发生异常:", e);
   }
 }
 
@@ -3660,10 +3549,7 @@ function resetUICaches() {
     if (container) {
       container.innerHTML = "";
     }
-
-    console.log("[UI] 缓存已重置（保留localStorage数据）");
   } catch (e) {
-    console.warn("重置UI缓存时发生异常:", e);
   }
 }
 
@@ -3724,7 +3610,6 @@ function extractUrlFromSearchResult(toolResult, toolName) {
           parsed = fn();
         }
       } catch (e2) {
-        console.warn("extractUrlFromSearchResult 解析失败:", e2);
         parsed = null;
       }
     }
@@ -3813,12 +3698,10 @@ async function checkIframeEmbedding(url) {
     const result = await response.json();
 
     if (!result.allowed) {
-      console.warn(`iframe嵌入被拒绝: ${url}, 原因: ${result.reason}`);
     }
 
     return result.allowed;
   } catch (error) {
-    console.warn("iframe嵌入检查失败:", error);
     // 检查失败时允许尝试加载
     return true;
   }
@@ -3847,7 +3730,6 @@ function loadIframeContent(url, iframe, statusElement, tool, path) {
           : `加载超时: ${url}`;
         statusElement.className = "error";
       }
-      console.warn("iframe加载超时:", url);
     }, 15000);
 
     // 设置加载完成事件监听器
@@ -3867,7 +3749,6 @@ function loadIframeContent(url, iframe, statusElement, tool, path) {
         statusElement.textContent = generateStatusText(tool, url, path);
         statusElement.className = "success";
       }
-      console.log("iframe加载成功:", url);
     };
 
     // 设置加载错误事件监听器
@@ -4103,3 +3984,4 @@ async function copyUrlToClipboard(url) {
 // 将函数暴露到全局作用域
 window.openInNewWindow = openInNewWindow;
 window.copyUrlToClipboard = copyUrlToClipboard;
+

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 前端国际化服务类
  * 支持中英文自动切换和手动切换
  */
@@ -31,7 +31,6 @@ class I18nService {
             this.translations = await response.json();
             this.updatePageLanguage();
         } catch (error) {
-            console.warn('加载翻译文件失败:', error);
         }
     }
 

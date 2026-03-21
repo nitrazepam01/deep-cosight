@@ -21,47 +21,36 @@ class SessionService {
      * localStorage 仅作为缓存，不作为数据源
      */
     async init() {
-        console.log('[SessionService.init] 开始初始化...');
-        
         // 1. 优先从后端 API 加载（获取最新数据）
         try {
             const apiData = await this._get('/sessions');
             if (apiData) {
-                console.log('[SessionService.init] 从后端 API 加载成功');
                 this.sessionsData = this.normalizeData(apiData);
                 this.saveToLocalStorage(); // 更新 localStorage 缓存
-                console.log('[SessionService.init] sessionsData:', JSON.stringify(this.sessionsData, null, 2));
                 return this.sessionsData;
             }
         } catch (error) {
-            console.warn('[SessionService.init] 从后端 API 加载失败:', error);
         }
 
         // 2. 后端 API 不可用，从静态 JSON 文件加载（确保以 sessions.json 为主）
         try {
-            console.log('[SessionService.init] 尝试从静态 JSON 文件加载...');
             const jsonData = await this.loadFromJsonFile();
             if (jsonData) {
-                console.log('[SessionService.init] 从静态 JSON 文件加载成功');
                 this.sessionsData = this.normalizeData(jsonData);
                 this.saveToLocalStorage(); // 更新 localStorage 缓存
-                console.log('[SessionService.init] sessionsData:', JSON.stringify(this.sessionsData, null, 2));
                 return this.sessionsData;
             }
         } catch (error) {
-            console.warn('[SessionService.init] 从静态 JSON 文件加载失败:', error);
         }
 
         // 3. 如果都失败，从 localStorage 读取镜像（降级方案）
         const localData = this.loadFromLocalStorage();
         if (localData) {
-            console.log('[SessionService.init] 从 localStorage 加载（降级方案）');
             this.sessionsData = localData;
             return this.sessionsData;
         }
 
         // 4. 返回默认结构
-        console.log('[SessionService.init] 使用默认结构');
         this.sessionsData = this.getDefaultStructure();
         this.saveToLocalStorage();
         return this.sessionsData;
@@ -221,7 +210,14 @@ class SessionService {
                             updatedAt: thread.updatedAt || Date.now(),
                             messageCount: thread.messageCount || 0,
                             starred: thread.starred || false,
-                            messages: Array.isArray(thread.messages) ? thread.messages : []
+                            messages: Array.isArray(thread.messages) ? thread.messages : [],
+                            userRenamedTitle: thread.userRenamedTitle === true,
+                            autoRenamedByTask: thread.autoRenamedByTask === true,
+                            rightPanelState: thread.rightPanelState && typeof thread.rightPanelState === 'object'
+                                ? thread.rightPanelState
+                                : {},
+                            isExecuting: !!thread.isExecuting,
+                            statusUpdatedAt: thread.statusUpdatedAt || thread.updatedAt || Date.now()
                         });
                     });
                 }
@@ -343,13 +339,11 @@ class SessionService {
      */
     syncToAppState() {
         if (!window.AppState) {
-            console.warn('syncToAppState: AppState 不存在');
             return;
         }
 
         // 深拷贝全部文件夹数据（包含默认分组）
         window.AppState.folders = JSON.parse(JSON.stringify(this.sessionsData.folders || []));
-        console.log('[SessionService.syncToAppState] AppState.folders:', window.AppState.folders.length);
     }
 
     /**
@@ -357,7 +351,6 @@ class SessionService {
      */
     async createFolder(name) {
         const newFolder = await this._post('/folder', { name });
-        console.log('[SessionService.createFolder] 后端返回:', newFolder);
         // 更新本地缓存
         if (this.sessionsData) {
             this.sessionsData.folders.push(newFolder);
@@ -386,7 +379,6 @@ class SessionService {
      */
     async updateFolder(folderId, updates) {
         const result = await this._put(`/folder/${folderId}`, updates);
-        console.log('[SessionService.updateFolder] 后端返回:', result);
         // 先立即更新本地缓存（不等待后端响应）
         if (this.sessionsData) {
             const folder = this.sessionsData.folders.find(f => f.id === folderId);
@@ -404,7 +396,6 @@ class SessionService {
      */
     async createThread(title, folderId = 'default') {
         const newThread = await this._post('/thread', { title, folderId });
-        console.log('[SessionService.createThread] 后端返回:', newThread);
         // 更新本地缓存
         if (this.sessionsData) {
             const folder = this.sessionsData.folders.find(f => f.id === folderId);
@@ -440,11 +431,9 @@ class SessionService {
      * 更新会话（调用后端 API）- 标星、重命名等
      */
     async updateThread(threadId, updates) {
-        console.log('[SessionService.updateThread] threadId:', threadId, 'updates:', updates);
         // 先立即更新本地缓存（不等待后端响应，确保 UI 立即生效）
         if (this.sessionsData) {
             const thread = this.getThread(threadId);
-            console.log('[SessionService.updateThread] 找到 thread:', thread);
             if (thread) {
                 Object.assign(thread, updates);
                 thread.updatedAt = Date.now();
@@ -454,7 +443,6 @@ class SessionService {
         }
         // 然后调用后端 API 保存
         const result = await this._put(`/thread/${threadId}`, updates);
-        console.log('[SessionService.updateThread] 后端返回:', result);
         return result;
     }
 
@@ -520,6 +508,54 @@ class SessionService {
     }
 
     /**
+     * 查询会话执行状态（优先后端）
+     */
+    async getThreadStatus(threadId) {
+        const result = await this._get(`/sessions/thread/${threadId}/status`);
+        if (this.sessionsData) {
+            const thread = this.getThread(threadId);
+            if (thread) {
+                thread.isExecuting = !!result?.isExecuting;
+                thread.statusUpdatedAt = result?.statusUpdatedAt || thread.statusUpdatedAt || Date.now();
+                this.saveToLocalStorage();
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 从后端获取线程完整信息（用于会话切换时恢复右侧状态）
+     */
+    async getThreadFromBackend(threadId) {
+        const result = await this._get(`/sessions/thread/${threadId}`);
+        if (this.sessionsData && result) {
+            const thread = this.getThread(threadId);
+            if (thread) {
+                Object.assign(thread, result);
+                this.saveToLocalStorage();
+                this.syncToAppState();
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 更新会话执行状态（优先后端）
+     */
+    async updateThreadStatus(threadId, isExecuting) {
+        const result = await this._put(`/thread/${threadId}/status`, { isExecuting: !!isExecuting });
+        if (this.sessionsData) {
+            const thread = this.getThread(threadId);
+            if (thread) {
+                thread.isExecuting = !!result?.isExecuting;
+                thread.statusUpdatedAt = result?.statusUpdatedAt || Date.now();
+                this.saveToLocalStorage();
+            }
+        }
+        return result;
+    }
+
+    /**
      * 生成唯一 ID
      */
     generateId(prefix = 'id') {
@@ -576,3 +612,4 @@ window.SessionService = new SessionService();
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = SessionService;
 }
+

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Co-Sight Agent Management Service
  * 智能体管理模块 — 对接后端 API，提供智能体 CRUD 操作
  * 
@@ -66,7 +66,6 @@ const AgentManagementService = (function () {
             if (json.code !== 200 && json.code !== 0) throw new Error(json.msg || 'Failed to fetch skills');
             return (json.data && json.data.skills) || [];
         } catch (e) {
-            console.warn('fetchAvailableSkills failed:', e);
             return [];
         }
     }
@@ -136,7 +135,6 @@ const AgentManagementService = (function () {
                 }
             });
         } catch (e) {
-            console.warn('AgentManagementService init failed:', e);
         }
     }
 
