@@ -2894,6 +2894,30 @@ select.settings-input option:checked {
     border-color: #3b82f6;
 }
 
+/* 供应商表单：输入框与“类型”下拉统一高度与视觉风格 */
+.cs-form .cs-input,
+.cs-form #pf-provider-container .custom-select-display {
+    min-height: 40px;
+    box-sizing: border-box;
+    border-radius: 10px;
+    border: 1.5px solid #e5e7eb;
+}
+
+.cs-form #pf-provider-container .custom-select-display {
+    padding: 8px 12px;
+}
+
+.cs-form #pf-provider-container .custom-select-display:hover {
+    border-color: #10b981;
+    background: #fafafa;
+}
+
+.cs-form .cs-input:focus,
+.cs-form #pf-provider-container .custom-select-display.focused {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+}
+
 .cs-input-with-icon {
     position: relative;
     display: flex;
@@ -2917,6 +2941,20 @@ select.settings-input option:checked {
 
 .cs-eye-btn:hover {
     color: #4b5563;
+}
+
+/* 屏蔽 API Key 输入框的浏览器原生显隐/清除按钮，避免与自定义眼睛按钮重叠 */
+#pf-api-key::-ms-reveal,
+#pf-api-key::-ms-clear {
+    display: none;
+}
+
+#pf-api-key::-webkit-credentials-auto-fill-button,
+#pf-api-key::-webkit-contacts-auto-fill-button {
+    visibility: hidden;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
 }
 
 /* 表单动作区域样式 */
@@ -3144,11 +3182,27 @@ select.settings-input option:checked {
 .cs-model-add-row {
     display: flex;
     gap: 8px;
-    align-items: center;
+    align-items: stretch;
 }
 
 .cs-model-add-row .cs-input {
     flex: 1;
+    min-height: 40px;
+    height: 40px;
+    box-sizing: border-box;
+}
+
+/* 供应商表单按钮高度统一：添加 / Ping / 取消 */
+.cs-form-actions-buttons .settings-btn,
+.cs-model-add-row .cs-model-add-btn {
+    min-height: 40px;
+    height: 40px;
+    padding: 0 16px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
 }
 
 /* 测试结果显示样式 */
@@ -5264,7 +5318,7 @@ select.settings-input option:checked {
     visibility: hidden;
     transform: translateY(-6px);
     transition: all 0.2s ease;
-    max-height: calc(var(--max-visible-items, 6) * 42px + 6px);
+    max-height: calc(var(--max-visible-items, 6) * 40px + 6px);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -5272,7 +5326,7 @@ select.settings-input option:checked {
 
 /* 多选下拉框（带搜索）- 需要加上搜索栏高度 */
 .custom-select-dropdown:has(.custom-select-search) {
-    max-height: calc(var(--max-visible-items, 6) * 42px + 6px + 32px);
+    max-height: calc(var(--max-visible-items, 6) * 40px + 50px);
 }
 
 .custom-select-dropdown.show {

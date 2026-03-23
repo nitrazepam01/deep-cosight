@@ -234,6 +234,7 @@
 
         if (_activeGroup === 'providers') {
             contentDiv.innerHTML = renderProvidersPage();
+            initProviderFormCustomSelect();
         } else if (_activeGroup === 'agents') {
             contentDiv.innerHTML = renderAgentsPage();
         } else if (_activeGroup === 'personalization') {
@@ -1063,10 +1064,8 @@
                     </div>
                     <div class="cs-input-group">
                         <label>类型</label>
-                        <select id="pf-provider" class="cs-input">
-                            ${['openai', 'deepseek', 'anthropic', 'google', 'qwen', 'zhipu', 'moonshot', 'baichuan', 'minimax', 'yi', 'doubao', 'other']
-                .map(v => `<option value="${v}" ${v === p.provider ? 'selected' : ''}>${v}</option>`).join('')}
-                        </select>
+                        <input type="hidden" id="pf-provider" value="${escapeHtml(p.provider || 'openai')}"/>
+                        <div id="pf-provider-container" data-value="${escapeHtml(p.provider || 'openai')}"></div>
                     </div>
                 </div>
                 <div class="cs-form-row">
@@ -1092,7 +1091,7 @@
                         </div>
                         <div class="cs-model-add-row">
                             <input type="text" id="pf-model-input" class="cs-input" placeholder="输入模型名称 如 qwen3.5-plus" onkeydown="if(event.key==='Enter'){event.preventDefault();SettingsService.addModelTag()}"/>
-                            <button class="settings-btn settings-btn-save" style="padding: 6px 12px; border-radius: 8px; white-space: nowrap;" onclick="SettingsService.addModelTag()">
+                            <button class="settings-btn settings-btn-save cs-model-add-btn" onclick="SettingsService.addModelTag()">
                                 <i class="fas fa-plus"></i> 添加
                             </button>
                         </div>
@@ -1469,7 +1468,40 @@
         const contentDiv = document.getElementById('settings-content-area');
         if (contentDiv && _activeGroup === 'providers') {
             contentDiv.innerHTML = renderProvidersPage();
+            initProviderFormCustomSelect();
         }
+    }
+
+    function initProviderFormCustomSelect() {
+        if (typeof CustomSelect === 'undefined') return;
+
+        const providerInput = document.getElementById('pf-provider');
+        const providerContainer = document.getElementById('pf-provider-container');
+        if (!providerInput || !providerContainer) return;
+
+        const providerItems = [
+            { value: 'openai', label: 'openai' },
+            { value: 'deepseek', label: 'deepseek' },
+            { value: 'anthropic', label: 'anthropic' },
+            { value: 'google', label: 'google' },
+            { value: 'qwen', label: 'qwen' },
+            { value: 'zhipu', label: 'zhipu' },
+            { value: 'moonshot', label: 'moonshot' },
+            { value: 'baichuan', label: 'baichuan' },
+            { value: 'minimax', label: 'minimax' },
+            { value: 'yi', label: 'yi' },
+            { value: 'doubao', label: 'doubao' },
+            { value: 'other', label: 'other' }
+        ];
+
+        new CustomSelect(providerContainer, {
+            items: providerItems,
+            selectedValue: providerInput.value || providerContainer.dataset.value || 'openai',
+            maxVisibleItems: 6,
+            onChange: function(value) {
+                providerInput.value = value || '';
+            }
+        });
     }
 
     function onQuickSelect(targetGroup, value) {
