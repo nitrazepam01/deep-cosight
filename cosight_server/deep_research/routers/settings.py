@@ -525,98 +525,187 @@ def _resolve_provider_for_test(body: ProviderTestRequest) -> Optional[Dict[str, 
 
 
 def _test_with_openai_compatible(base_url: str, api_key: str, model: str) -> Dict[str, Any]:
+    """测试OpenAI兼容API，支持多种版本尝试"""
     import httpx
     from openai import OpenAI
-
-    normalized_base = _normalize_base_url(base_url)
-    if not normalized_base.endswith("/v1"):
-        normalized_base = f"{normalized_base}/v1"
-
-    http_client = httpx.Client(
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": _to_bearer_token(api_key),
-        },
-        verify=False,
-        trust_env=False,
-        timeout=httpx.Timeout(connect=15.0, read=30.0, write=15.0, pool=10.0),
-    )
-    try:
-        client = OpenAI(base_url=normalized_base, api_key=api_key, http_client=http_client)
-        response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": "hi"}],
-            max_tokens=1,
-        )
-        return {
-            "model": response.model or model,
-            "compatible_base_url": normalized_base,
-        }
-    finally:
-        http_client.close()
+    
+    # 定义可能的API版本路径
+    possible_paths = [
+        "",  # 原始地址
+        "/v1",  # OpenAI标准v1
+        "/v2",  # 可能的v2版本
+        "/api/v1",  # 一些供应商的API路径
+        "/api/v2",  # 一些供应商的API v2路径
+        "/openai/v1",  # 一些供应商的OpenAI兼容路径
+        "/chat/v1",  # 聊天API路径
+    ]
+    
+    # 尝试每个可能的路径
+    for path_suffix in possible_paths:
+        try:
+            if path_suffix:
+                test_url = f"{_normalize_base_url(base_url)}{path_suffix}"
+            else:
+                test_url = _normalize_base_url(base_url)
+            
+            http_client = httpx.Client(
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": _to_bearer_token(api_key),
+                },
+                verify=False,
+                trust_env=False,
+                timeout=httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=5.0),
+            )
+            
+            try:
+                client = OpenAI(base_url=test_url, api_key=api_key, http_client=http_client)
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": "hi"}],
+                    max_tokens=1,
+                )
+                
+                logger.info(f"OpenAI兼容API测试成功: base_url={test_url}, model={response.model or model}")
+                return {
+                    "model": response.model or model,
+                    "compatible_base_url": test_url,
+                    "tested_path": path_suffix if path_suffix else "original",
+                }
+            except Exception as e:
+                logger.debug(f"OpenAI兼容API路径尝试失败: {test_url}, error: {str(e)[:100]}")
+                continue
+            finally:
+                http_client.close()
+        except Exception as e:
+            logger.debug(f"OpenAI兼容API测试异常: {str(e)[:100]}")
+            continue
+    
+    # 所有尝试都失败，抛出最后一个异常
+    raise Exception("所有OpenAI兼容API路径尝试失败")
 
 
 def _test_with_anthropic(base_url: str, api_key: str, model: str) -> Dict[str, Any]:
+    """测试Anthropic兼容API，支持多种版本尝试"""
     import httpx
-
-    root = _normalize_base_url(base_url)
-    compatible_base = root if root.endswith("/v1") else f"{root}/v1"
-    endpoint = f"{compatible_base}/messages"
-
-    with httpx.Client(
-        verify=False,
-        trust_env=False,
-        timeout=httpx.Timeout(connect=15.0, read=30.0, write=15.0, pool=10.0),
-    ) as client:
-        response = client.post(
-            endpoint,
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": model,
-                "max_tokens": 1,
-                "messages": [{"role": "user", "content": "hi"}],
-            },
-        )
-        response.raise_for_status()
-        data = response.json() or {}
-        return {
-            "model": data.get("model") or model,
-            "compatible_base_url": compatible_base,
-        }
+    
+    # 定义可能的API版本路径
+    possible_paths = [
+        "",  # 原始地址
+        "/v1",  # Anthropic标准v1
+        "/api/v1",  # 一些供应商的API路径
+        "/anthropic/v1",  # 一些供应商的Anthropic兼容路径
+        "/messages",  # 直接messages端点
+    ]
+    
+    # Anthropic支持的版本
+    anthropic_versions = ["2023-06-01", "2023-01-01", "2024-01-01"]
+    
+    # 尝试每个可能的路径和版本组合
+    for path_suffix in possible_paths:
+        for anthropic_version in anthropic_versions:
+            try:
+                if path_suffix:
+                    test_url = f"{_normalize_base_url(base_url)}{path_suffix}"
+                    # 如果路径不是以/messages结尾，添加/messages
+                    if not test_url.endswith("/messages"):
+                        if path_suffix.endswith("/v1"):
+                            endpoint = f"{test_url}/messages"
+                        else:
+                            endpoint = f"{test_url}/v1/messages" if not test_url.endswith("/v1") else f"{test_url}/messages"
+                    else:
+                        endpoint = test_url
+                else:
+                    test_url = _normalize_base_url(base_url)
+                    endpoint = f"{test_url}/v1/messages" if not test_url.endswith("/v1") else f"{test_url}/messages"
+                
+                with httpx.Client(
+                    verify=False,
+                    trust_env=False,
+                    timeout=httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=5.0),
+                ) as client:
+                    response = client.post(
+                        endpoint,
+                        headers={
+                            "x-api-key": api_key,
+                            "anthropic-version": anthropic_version,
+                            "content-type": "application/json",
+                        },
+                        json={
+                            "model": model,
+                            "max_tokens": 1,
+                            "messages": [{"role": "user", "content": "hi"}],
+                        },
+                    )
+                    response.raise_for_status()
+                    data = response.json() or {}
+                    
+                    logger.info(f"Anthropic兼容API测试成功: base_url={test_url}, endpoint={endpoint}, version={anthropic_version}, model={data.get('model') or model}")
+                    return {
+                        "model": data.get("model") or model,
+                        "compatible_base_url": test_url,
+                        "tested_path": path_suffix if path_suffix else "original",
+                        "anthropic_version": anthropic_version,
+                    }
+            except Exception as e:
+                logger.debug(f"Anthropic兼容API尝试失败: base_url={base_url}, path={path_suffix}, version={anthropic_version}, error: {str(e)[:100]}")
+                continue
+    
+    # 所有尝试都失败，抛出异常
+    raise Exception("所有Anthropic兼容API路径尝试失败")
 
 
 def _test_with_google(base_url: str, api_key: str, model: str) -> Dict[str, Any]:
+    """测试Google兼容API，支持多种版本尝试"""
     import httpx
-
-    root = _normalize_base_url(base_url)
-    endpoint = f"{root}/models/{model}:generateContent"
-
-    with httpx.Client(
-        verify=False,
-        trust_env=False,
-        timeout=httpx.Timeout(connect=15.0, read=30.0, write=15.0, pool=10.0),
-    ) as client:
-        response = client.post(
-            endpoint,
-            params={"key": api_key},
-            headers={"content-type": "application/json"},
-            json={"contents": [{"parts": [{"text": "hi"}]}]},
-        )
-        response.raise_for_status()
-        data = response.json() or {}
-        return {
-            "model": data.get("modelVersion") or model,
-            "compatible_base_url": root,
-        }
+    
+    # 定义可能的API端点路径
+    possible_endpoints = [
+        f"/models/{model}:generateContent",  # Google标准端点
+        f"/v1/models/{model}:generateContent",  # 带v1版本
+        f"/v1beta/models/{model}:generateContent",  # v1beta版本
+        f"/v1alpha/models/{model}:generateContent",  # v1alpha版本
+        f"/generateContent",  # 简化端点
+        f"/v1/generateContent",  # 带v1的简化端点
+    ]
+    
+    # 尝试每个可能的端点
+    for endpoint_suffix in possible_endpoints:
+        try:
+            test_url = _normalize_base_url(base_url)
+            endpoint = f"{test_url}{endpoint_suffix}"
+            
+            with httpx.Client(
+                verify=False,
+                trust_env=False,
+                timeout=httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=5.0),
+            ) as client:
+                response = client.post(
+                    endpoint,
+                    params={"key": api_key},
+                    headers={"content-type": "application/json"},
+                    json={"contents": [{"parts": [{"text": "hi"}]}]},
+                )
+                response.raise_for_status()
+                data = response.json() or {}
+                
+                logger.info(f"Google兼容API测试成功: base_url={test_url}, endpoint={endpoint}, model={data.get('modelVersion') or model}")
+                return {
+                    "model": data.get("modelVersion") or model,
+                    "compatible_base_url": test_url,
+                    "tested_endpoint": endpoint_suffix,
+                }
+        except Exception as e:
+            logger.debug(f"Google兼容API端点尝试失败: base_url={base_url}, endpoint={endpoint_suffix}, error: {str(e)[:100]}")
+            continue
+    
+    # 所有尝试都失败，抛出异常
+    raise Exception("所有Google兼容API端点尝试失败")
 
 
 @settingsRouter.post("/deep-research/providers/test")
 async def test_provider(body: ProviderTestRequest):
-    """Test provider API connectivity."""
+    """Test provider API connectivity with automatic version detection."""
     try:
         import asyncio
 
@@ -656,15 +745,33 @@ async def test_provider(body: ProviderTestRequest):
         latency_ms = int((time.monotonic() - start) * 1000)
         actual_model = test_result.get("model") or test_model
         compatible_base_url = test_result.get("compatible_base_url") or _normalize_base_url(base_url)
+        
+        # 提取测试详情
+        tested_path = test_result.get("tested_path", "original")
+        tested_endpoint = test_result.get("tested_endpoint", "")
+        anthropic_version = test_result.get("anthropic_version", "")
 
-        logger.info(f"Provider test success: provider={provider_type}, model={actual_model}, latency={latency_ms}ms")
+        logger.info(f"Provider test success: provider={provider_type}, model={actual_model}, latency={latency_ms}ms, compatible_base_url={compatible_base_url}")
 
-        return json_result(0, "Connection successful", {
+        result_data = {
             "model": actual_model,
             "latency_ms": latency_ms,
             "provider": provider_type,
             "compatible_base_url": compatible_base_url,
-        })
+            "original_base_url": base_url,
+            "test_details": {
+                "tested_path": tested_path,
+                "successful": True,
+            }
+        }
+        
+        # 添加供应商特定的测试详情
+        if provider_type == "anthropic" and anthropic_version:
+            result_data["test_details"]["anthropic_version"] = anthropic_version
+        elif provider_type == "google" and tested_endpoint:
+            result_data["test_details"]["tested_endpoint"] = tested_endpoint
+
+        return json_result(0, "Connection successful", result_data)
     except Exception as e:
         error_msg = str(e)
         logger.exception(
@@ -675,14 +782,31 @@ async def test_provider(body: ProviderTestRequest):
             body.model,
         )
 
+        # 构建错误响应，包含原始地址信息
+        error_data = {
+            "original_base_url": body.base_url or "",
+            "provider": body.provider or "openai",
+            "test_details": {
+                "successful": False,
+                "error_type": "connection_failed",
+            }
+        }
+        
         if "timeout" in error_msg.lower():
-            return json_result(-1, "Connection timeout (30s)", None)
+            error_data["test_details"]["error_type"] = "timeout"
+            return json_result(-1, "Connection timeout (30s)", error_data)
         elif "401" in error_msg or "Unauthorized" in error_msg:
-            return json_result(-1, "Authentication failed: invalid or expired API key", {"error": error_msg})
+            error_data["test_details"]["error_type"] = "authentication"
+            return json_result(-1, "Authentication failed: invalid or expired API key", error_data)
         elif "404" in error_msg:
-            return json_result(-1, "Endpoint not found", {"error": error_msg})
+            error_data["test_details"]["error_type"] = "endpoint_not_found"
+            return json_result(-1, "Endpoint not found", error_data)
+        elif "所有" in error_msg and "尝试失败" in error_msg:
+            error_data["test_details"]["error_type"] = "all_attempts_failed"
+            return json_result(-1, f"All API path attempts failed for {body.base_url}", error_data)
         else:
-            return json_result(-1, f"Connection failed: {error_msg[:200]}", {"error": error_msg[:500]})
+            error_data["test_details"]["error_type"] = "connection_error"
+            return json_result(-1, f"Connection failed: {error_msg[:200]}", error_data)
 
 
 class ProviderApplyRequest(BaseModel):
