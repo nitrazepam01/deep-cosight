@@ -2259,6 +2259,25 @@ select.settings-input option:checked {
     max-height: none;
 }
 
+/* 任务日志卡片简约滚动条样式 */
+.tool-chain-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tool-chain-list::-webkit-scrollbar-track {
+    background: #f0f0f0;
+    border-radius: 3px;
+}
+
+.tool-chain-list::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.tool-chain-list::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
 .task-info-body {
     min-height: 0;
     flex: 1;

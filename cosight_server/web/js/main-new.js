@@ -2421,17 +2421,17 @@ function validateFile(file) {
 function addUploadedFile(file) {
     const validation = validateFile(file);
     if (!validation.valid) {
-        alert(validation.message);
+        showFileDuplicateModal(validation.message);
         return false;
     }
     
     if (uploadedFiles.length >= FileUploadConfig.maxFiles) {
-        alert(`最多只能上传 ${FileUploadConfig.maxFiles} 个文件`);
+        showFileDuplicateModal(`最多只能上传 ${FileUploadConfig.maxFiles} 个文件`);
         return false;
     }
     
     if (uploadedFiles.some(f => f.name === file.name && f.size === file.size)) {
-        alert('该文件已添加到上传列表');
+        showFileDuplicateModal('该文件已添加到上传列表');
         return false;
     }
     
@@ -2557,6 +2557,7 @@ function initInputArea() {
     const uploadFileBtn = document.getElementById('upload-file-btn');
     const clearChatBtn = document.getElementById('clear-chat-btn');
     const exportChatBtn = document.getElementById('export-chat-btn');
+    const inputWrapper = document.querySelector('.input-wrapper');
     
     if (!chatInput || !sendBtn) return;
     
@@ -2633,6 +2634,14 @@ function initInputArea() {
             exportCurrentChat();
         });
     }
+
+    // 初始化拖放功能
+    if (inputWrapper) {
+        initDragAndDrop(inputWrapper);
+    }
+
+    // 初始化剪切板粘贴功能
+    initClipboardPaste();
 
     // 初始化时按当前会话状态同步发送按钮（刷新后也生效）
     void syncSendButtonStateWithCurrentThread();
@@ -4159,6 +4168,7 @@ function initThreeColumnLayout() {
     initDeleteConfirmModal();
     initDeleteFolderConfirmModal();
     initClearChatConfirmModal();
+    initFileDuplicateModal();
     initSettingsModal();
     initFolderDragDrop();
     clearAllFloatingToolPanels();
@@ -4329,6 +4339,126 @@ function showTestContentAsAIReply(content) {
     addMessage(assistantMessage);
 }
 
+// ==================== 拖放功能 ====================
+
+/**
+ * 初始化拖放功能
+ * @param {HTMLElement} dropZone - 拖放区域元素
+ */
+function initDragAndDrop(dropZone) {
+    if (!dropZone) {
+        console.error('initDragAndDrop: dropZone is null or undefined');
+        return;
+    }
+    
+    // 添加拖放相关样式类
+    dropZone.classList.add('drop-zone');
+    
+    // 拖放事件处理
+    dropZone.addEventListener('dragover', handleDragOver);
+    dropZone.addEventListener('dragenter', handleDragEnter);
+    dropZone.addEventListener('dragleave', handleDragLeave);
+    dropZone.addEventListener('drop', handleDrop);
+
+    // 添加拖放提示样式
+    const style = document.createElement('style');
+    style.textContent = `
+        .input-wrapper.drop-zone {
+            position: relative;
+        }
+
+        .input-wrapper.drag-over {
+            border-color: #667eea !important;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1)) !important;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2) !important;
+        }
+
+        .input-wrapper.drag-over::before {
+            content: '释放文件以上传';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(102, 126, 234, 0.9);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 10;
+            pointer-events: none;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+            to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .input-wrapper.drag-over .chat-input,
+        .input-wrapper.drag-over .input-buttons,
+        .input-wrapper.drag-over .file-preview-container {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+/**
+ * 处理拖拽进入事件
+ */
+function handleDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+}
+
+/**
+ * 处理拖拽进入区域事件
+ */
+function handleDragEnter(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dropZone = e.currentTarget;
+    dropZone.classList.add('drag-over');
+}
+
+/**
+ * 处理拖拽离开区域事件
+ */
+function handleDragLeave(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dropZone = e.currentTarget;
+    
+    // 检查鼠标是否还在区域内
+    const rect = dropZone.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    // 如果鼠标离开区域，移除拖拽样式
+    if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+        dropZone.classList.remove('drag-over');
+    }
+}
+
+/**
+ * 处理文件拖放事件
+ */
+function handleDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const dropZone = e.currentTarget;
+    dropZone.classList.remove('drag-over');
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+        handleFileUpload(files);
+    }
+}
+
 // ==================== THINKING_MODE 切换功能 ====================
 
 // THINKING_MODE 状态管理
@@ -4360,6 +4490,167 @@ function toggleThinkingMode() {
     thinkingModeEnabled = !thinkingModeEnabled;
     localStorage.setItem('cosight:thinkingMode', thinkingModeEnabled.toString());
     updateThinkingModeButton();
+}
+
+// ==================== 文件重复弹窗控制 ====================
+
+function showFileDuplicateModal(message) {
+    const modal = document.getElementById('file-duplicate-confirm-modal-overlay');
+    const messageEl = document.getElementById('file-duplicate-confirm-message');
+    
+    if (modal && messageEl) {
+        messageEl.textContent = message;
+        modal.style.display = 'flex';
+    }
+}
+
+function closeFileDuplicateModal() {
+    const modal = document.getElementById('file-duplicate-confirm-modal-overlay');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function initFileDuplicateModal() {
+    const closeBtn = document.getElementById('close-file-duplicate-confirm-modal');
+    const confirmBtn = document.getElementById('confirm-file-duplicate-confirm-btn');
+    
+    if (!closeBtn) return;
+    
+    closeBtn.addEventListener('click', closeFileDuplicateModal);
+    
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', closeFileDuplicateModal);
+    }
+    
+    const modal = document.getElementById('file-duplicate-confirm-modal-overlay');
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeFileDuplicateModal();
+        }
+    });
+}
+
+// ==================== 剪切板图片粘贴功能 ====================
+
+/**
+ * 初始化剪切板粘贴功能
+ */
+function initClipboardPaste() {
+    const chatInput = document.getElementById('chat-input');
+    if (!chatInput) return;
+
+    // 监听剪切板粘贴事件
+    chatInput.addEventListener('paste', handleClipboardPaste);
+    
+    // 也可以监听整个文档的粘贴事件，以便在输入框未聚焦时也能粘贴
+    document.addEventListener('paste', handleDocumentClipboardPaste);
+}
+
+/**
+ * 处理文档级别的剪切板粘贴事件
+ */
+function handleDocumentClipboardPaste(e) {
+    // 如果焦点在输入框内，让输入框的监听器处理
+    const activeElement = document.activeElement;
+    if (activeElement && activeElement.id === 'chat-input') {
+        return;
+    }
+    
+    // 否则处理图片粘贴
+    handleClipboardPaste(e);
+}
+
+/**
+ * 处理剪切板粘贴事件
+ */
+function handleClipboardPaste(e) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    // 检查是否有图片数据
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        
+        if (item.type.indexOf('image') !== -1) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const file = item.getAsFile();
+            if (file) {
+                // 生成一个合适的文件名
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const fileName = `粘贴图片-${timestamp}.png`;
+                
+                // 创建一个新的File对象，设置文件名
+                const renamedFile = new File([file], fileName, { type: file.type });
+                
+                // 添加到上传列表
+                addUploadedFile(renamedFile);
+            }
+            return;
+        }
+    }
+}
+
+/**
+ * 显示剪切板粘贴通知
+ */
+function showClipboardPasteNotification(message) {
+    // 创建一个临时通知元素
+    const notification = document.createElement('div');
+    notification.className = 'clipboard-paste-notification';
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(102, 126, 234, 0.9);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+    `;
+    
+    // 添加动画样式
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(notification);
+    
+    // 3秒后移除通知
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+        if (style.parentNode) {
+            style.parentNode.removeChild(style);
+        }
+    }, 3000);
 }
 
 // 暴露到全局
