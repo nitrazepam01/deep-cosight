@@ -1534,14 +1534,111 @@ select.settings-input option:checked {
 .message-meta {
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: flex-start;
+    gap: 10px;
     margin-top: 8px;
+    padding: 0 8px;
     font-size: 12px;
     color: #999;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .message-item.user .message-meta {
-    justify-content: flex-end;
+    justify-content: flex-start;
+}
+
+.message-meta-right {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.message-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.message-action-btn {
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: #8b93a3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.message-action-btn:hover {
+    background: transparent;
+    color: #374151;
+}
+
+.message-action-btn i {
+    font-size: 12px;
+    line-height: 1;
+}
+
+.message-action-btn.copied {
+    color: #2563eb;
+    background: transparent;
+}
+
+.message-time {
+    white-space: nowrap;
+}
+
+.message-redo-placeholder {
+    margin-top: 0;
+}
+
+.message-redo-switch {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    color: #475569;
+    margin-left: 0;
+    transform: translateY(1px);
+}
+
+.message-redo-switch-btn {
+    width: 18px;
+    height: 18px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+.message-redo-switch-btn i {
+    font-size: 10px;
+}
+
+.message-redo-switch-text {
+    min-width: 30px;
+    text-align: center;
+    font-size: 12px;
+    color: #334155;
+}
+
+.message-redo-switch-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
 }
 
 .message-bubble pre {

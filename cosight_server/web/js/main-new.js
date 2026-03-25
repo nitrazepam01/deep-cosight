@@ -21,6 +21,12 @@ let runtimeLogSignatures = new Set();
 const ENABLE_FLOATING_TOOL_PANELS = false;
 const DEFAULT_THREAD_TITLES = new Set(["新对话", "新会话"]);
 const finalConclusionContentSignatureByThread = new Map();
+let messageTimeRefreshTimer = null;
+let pendingMetaMessageEvents = [];
+let pendingDeleteMessageActionContext = null;
+let lastNormalSendPayload = null;
+const redoTopicContextMap = new Map();
+const redoThreadContextMap = new Map();
 
 // ==================== 工具函数 ====================
 
@@ -2180,6 +2186,8 @@ function loadMessages(messages) {
 function createMessageElement(message) {
     const div = document.createElement('div');
     div.className = `message-item ${message.role}`;
+    const messageId = ensureMessageId(message);
+    div.dataset.messageId = messageId;
 
     // 为用户消息应用气泡颜色主题
     if (message.role === 'user') {
@@ -2187,7 +2195,33 @@ function createMessageElement(message) {
     }
 
     const avatarIcon = message.role === 'user' ? 'fa-user' : 'fa-robot';
-    const timeStr = formatTime(message.timestamp);
+    const safeTimestamp = Number(message.timestamp) || Date.now();
+    const timeStr = formatTime(safeTimestamp);
+    const timeTitle = new Date(safeTimestamp).toLocaleString('zh-CN');
+    const redoSwitcherHtml = message.role === 'assistant'
+        ? `
+            <div class="message-redo-switch" data-redo-switch>
+                <button class="message-redo-switch-btn" data-action="redo-prev" title="上一条">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span class="message-redo-switch-text" data-redo-switch-text>1/2</span>
+                <button class="message-redo-switch-btn" data-action="redo-next" title="下一条">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        `
+        : '';
+    const actionsHtml = message.role === 'assistant'
+        ? `
+            <div class="message-actions">
+                <button class="message-action-btn" data-action="copy" title="复制"><i class="fas fa-copy"></i></button>
+                <button class="message-action-btn" data-action="export" title="导出"><i class="fas fa-download"></i></button>
+                <button class="message-action-btn" data-action="redo" title="重做"><i class="fas fa-rotate-right"></i></button>
+                <button class="message-action-btn" data-action="delete" title="删除"><i class="fas fa-trash"></i></button>
+                <button class="message-action-btn" data-action="locate" title="定位"><i class="fas fa-location-crosshairs"></i></button>
+            </div>
+        `
+        : '';
 
     div.innerHTML = `
         <div class="message-avatar">
@@ -2196,26 +2230,536 @@ function createMessageElement(message) {
         <div class="message-content">
             <div class="message-bubble">
             </div>
+            <div class="message-bubble message-redo-placeholder" style="display: none;">
+                <div class="thinking-indicator">
+                    <i class="fas fa-cog loading-spinner"></i>
+                    <span>正在思考...</span>
+                </div>
+            </div>
+            <div class="message-bubble message-redo-result" style="display: none;"></div>
             <div class="message-meta">
-                <span>${timeStr}</span>
+                ${actionsHtml}
+                <div class="message-meta-right">
+                    ${redoSwitcherHtml}
+                    <span class="message-time" data-timestamp="${safeTimestamp}" title="${timeTitle}">${timeStr}</span>
+                </div>
             </div>
         </div>
     `;
 
     // 渲染内容
     const messageBubble = div.querySelector('.message-bubble');
-    if (message.role === 'assistant') {
-        // 使用 MarkdownRenderer 渲染 Markdown
-        if (window.MarkdownRenderer && typeof window.MarkdownRenderer.render === 'function') {
-            window.MarkdownRenderer.render(message.content, messageBubble);
-        } else {
-            messageBubble.textContent = message.content;
-        }
-    } else {
-        messageBubble.textContent = message.content;
+    renderMessageBubbleContent(message, messageBubble);
+    if (message.role === 'assistant' && message._redoState) {
+        ensureRedoState(message);
     }
 
+    bindMessageMetaActions(div, message);
+    applyRedoViewState(div, message);
     return div;
+}
+
+function ensureMessageId(message) {
+    if (!message) return generateUniqueId('msg');
+    if (!message._messageId) {
+        message._messageId = generateUniqueId('msg');
+    }
+    return message._messageId;
+}
+
+function renderAssistantContentToBubble(bubbleEl, content) {
+    if (!bubbleEl) return;
+    if (window.MarkdownRenderer && typeof window.MarkdownRenderer.render === 'function') {
+        window.MarkdownRenderer.render(content, bubbleEl);
+    } else {
+        bubbleEl.textContent = content;
+    }
+}
+
+function renderMessageBubbleContent(message, bubbleEl) {
+    if (!message || !bubbleEl) return;
+    if (message.role === 'assistant') {
+        renderAssistantContentToBubble(bubbleEl, message.content);
+    } else {
+        bubbleEl.textContent = message.content;
+    }
+}
+
+function bindMessageMetaActions(messageItem, message) {
+    const actionButtons = messageItem.querySelectorAll('.message-action-btn');
+
+    actionButtons.forEach((btn) => {
+        btn.addEventListener('click', async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const action = btn.dataset.action;
+            switch (action) {
+                case 'copy':
+                    await defaultCopyMessage(message, btn);
+                    break;
+                case 'export':
+                    defaultExportMessage(message);
+                    break;
+                case 'redo':
+                    await defaultRedoMessage(message, messageItem);
+                    break;
+                case 'delete':
+                    defaultDeleteMessage(message, messageItem);
+                    break;
+                case 'locate':
+                    defaultLocateMessage(message);
+                    break;
+                default:
+                    break;
+            }
+        });
+    });
+
+    const prevBtn = messageItem.querySelector('[data-action="redo-prev"]');
+    const nextBtn = messageItem.querySelector('[data-action="redo-next"]');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setRedoView(message, messageItem, -1);
+        });
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setRedoView(message, messageItem, 1);
+        });
+    }
+}
+
+async function defaultCopyMessage(message, btn) {
+    const text = String(message?.content ?? '');
+    if (!text) return;
+
+    try {
+        await navigator.clipboard.writeText(text);
+        btn.classList.add('copied');
+        setTimeout(() => btn.classList.remove('copied'), 1000);
+    } catch (error) {
+        console.error('[message-action] 复制失败:', error);
+    }
+}
+
+function defaultExportMessage(message) {
+    const text = String(message?.content ?? '');
+    const ts = Number(message?.timestamp) || Date.now();
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `message_${ts}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+async function defaultRedoMessage(message, messageItem) {
+    console.info('[REDO_FLOW] 点击重做', { threadId: AppState.currentThreadId, targetMessageId: ensureMessageId(message) });
+    queueMetaMessageEvent('redo', message);
+    markMessageAsRedoPending(message, messageItem);
+    const resent = await resendLastNormalPayloadByRedo(message);
+    if (!resent) {
+        if (message) {
+            const state = ensureRedoState(message);
+            state.pending = false;
+            state.currentIndex = 0;
+            applyRedoViewState(messageItem, message);
+        }
+        return;
+    }
+    console.info('[REDO_FLOW] 重做请求已发送，目标消息切到思考态');
+}
+
+function defaultDeleteMessage(message, messageItem) {
+    pendingDeleteMessageActionContext = { message, messageItem };
+    openDeleteMessageConfirmModal();
+}
+
+function defaultLocateMessage(message) {
+    console.info('[message-action] 默认定位函数，后续可接入业务逻辑', message);
+}
+
+function markMessageAsRedoPending(message, messageItem) {
+    if (!message) return;
+    const state = ensureRedoState(message);
+    state.enabled = true;
+    state.pending = true;
+    // pending 期间显示一个“虚拟页”：history.length + 1
+    state.currentIndex = state.history.length;
+    state.updatedAt = Date.now();
+    applyRedoViewState(messageItem, message);
+    scrollToBottom();
+}
+
+function setRedoView(message, messageItem, direction) {
+    const state = ensureRedoState(message);
+    if (!state.enabled) return;
+    const maxIndex = getRedoMaxIndex(state);
+    const nextIndex = Math.max(0, Math.min(maxIndex, (Number(state.currentIndex) || 0) + direction));
+    state.currentIndex = nextIndex;
+    applyRedoViewState(messageItem, message);
+    scrollToBottom();
+}
+
+function applyRedoViewState(messageItem, message) {
+    if (!messageItem || !message || message.role !== 'assistant') return;
+
+    const state = ensureRedoState(message);
+    const bubbleEl = messageItem.querySelector('.message-bubble');
+    const placeholderEl = messageItem.querySelector('.message-redo-placeholder');
+    const redoResultEl = messageItem.querySelector('.message-redo-result');
+    const switchRootEl = messageItem.querySelector('[data-redo-switch]');
+    const switchTextEl = messageItem.querySelector('[data-redo-switch-text]');
+    const prevBtnEl = messageItem.querySelector('[data-action="redo-prev"]');
+    const nextBtnEl = messageItem.querySelector('[data-action="redo-next"]');
+    const actionsEl = messageItem.querySelector('.message-actions');
+    const timeEl = messageItem.querySelector('.message-time');
+    const hasRedoState = !!state.enabled;
+    const currentIndex = Math.max(0, Number(state.currentIndex) || 0);
+    const maxIndex = getRedoMaxIndex(state);
+    const isPendingPage = state.pending === true && currentIndex === state.history.length;
+    const isOriginalPage = currentIndex === 0;
+    const currentVersion = getRedoHistoryItem(state, currentIndex);
+    const currentVersionContent = currentVersion ? String(currentVersion.content || '') : '';
+    if (redoResultEl && currentVersionContent) {
+        renderAssistantContentToBubble(redoResultEl, currentVersionContent);
+    }
+
+    messageItem.classList.toggle('has-redo-switch', hasRedoState);
+    if (switchRootEl) {
+        switchRootEl.style.display = hasRedoState ? 'inline-flex' : 'none';
+    }
+    if (bubbleEl) {
+        bubbleEl.style.display = isOriginalPage ? '' : 'none';
+    }
+    if (placeholderEl) {
+        placeholderEl.style.display = isPendingPage ? 'block' : 'none';
+    }
+    if (redoResultEl) {
+        redoResultEl.style.display = (!isOriginalPage && !isPendingPage) ? 'block' : 'none';
+    }
+    if (switchTextEl) {
+        switchTextEl.textContent = `${currentIndex + 1}/${maxIndex + 1}`;
+    }
+    if (actionsEl) {
+        actionsEl.style.display = isPendingPage ? 'none' : 'flex';
+    }
+    if (timeEl) {
+        timeEl.style.display = isPendingPage ? 'none' : 'inline';
+        if (!isPendingPage && currentVersion && currentVersion.timestamp) {
+            const ts = Number(currentVersion.timestamp) || Date.now();
+            timeEl.dataset.timestamp = String(ts);
+            timeEl.title = new Date(ts).toLocaleString('zh-CN');
+            timeEl.textContent = formatTime(ts);
+        }
+    }
+    if (prevBtnEl) {
+        prevBtnEl.disabled = !hasRedoState || currentIndex <= 0;
+    }
+    if (nextBtnEl) {
+        nextBtnEl.disabled = !hasRedoState || currentIndex >= maxIndex;
+    }
+}
+
+function ensureRedoState(message) {
+    if (!message) return { enabled: false, pending: false, history: [createRedoHistoryEntry('')], currentIndex: 0, updatedAt: Date.now() };
+    const original = String(message.content || '');
+    const legacy = message._redoState || {};
+    let history = Array.isArray(legacy.history) ? legacy.history.map((item, idx) => normalizeRedoHistoryEntry(item, message, idx)) : null;
+    if (!history || history.length === 0 || !history[0]) {
+        history = [createRedoHistoryEntry(String(legacy.originalContent || original), Number(message.timestamp) || Date.now())];
+        if (legacy.redoContent) {
+            history.push(createRedoHistoryEntry(String(legacy.redoContent), Date.now()));
+        }
+    }
+    message._redoState = {
+        enabled: !!legacy.enabled,
+        pending: !!legacy.pending,
+        history,
+        currentIndex: Number.isFinite(legacy.currentIndex) ? legacy.currentIndex : 0,
+        updatedAt: legacy.updatedAt || Date.now()
+    };
+    if (message._redoState.currentIndex < 0) message._redoState.currentIndex = 0;
+    return message._redoState;
+}
+
+function getRedoMaxIndex(state) {
+    if (!state) return 0;
+    const baseMax = Math.max(0, (state.history?.length || 1) - 1);
+    return state.pending ? baseMax + 1 : baseMax;
+}
+
+function createRedoHistoryEntry(content, timestamp = Date.now(), id = null) {
+    return {
+        id: id || generateUniqueId('redo'),
+        timestamp: Number(timestamp) || Date.now(),
+        content: String(content || '')
+    };
+}
+
+function normalizeRedoHistoryEntry(entry, message, index = 0) {
+    if (entry && typeof entry === 'object' && typeof entry.content !== 'undefined') {
+        return {
+            id: entry.id || generateUniqueId('redo'),
+            timestamp: Number(entry.timestamp) || Number(message?.timestamp) || Date.now(),
+            content: String(entry.content || '')
+        };
+    }
+    const fallbackTs = index === 0 ? (Number(message?.timestamp) || Date.now()) : Date.now();
+    return createRedoHistoryEntry(String(entry || ''), fallbackTs);
+}
+
+function getRedoHistoryItem(state, index) {
+    if (!state || !Array.isArray(state.history)) return null;
+    if (index < 0 || index >= state.history.length) return null;
+    return normalizeRedoHistoryEntry(state.history[index], null, index);
+}
+
+function queueMetaMessageEvent(action, message) {
+    const event = {
+        action,
+        timestamp: Date.now(),
+        target: {
+            role: message?.role || 'assistant',
+            timestamp: Number(message?.timestamp) || null,
+            preview: String(message?.content || '').slice(0, 120)
+        }
+    };
+    pendingMetaMessageEvents.push(event);
+}
+
+function snapshotUploadedFiles() {
+    return (uploadedFiles || []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        size: item.size,
+        type: item.type
+    }));
+}
+
+function clonePayload(payload) {
+    return JSON.parse(JSON.stringify(payload || {}));
+}
+
+async function resendLastNormalPayloadByRedo(redoTargetMessage) {
+    const sourceThreadId = AppState.currentThreadId;
+
+    await syncSendButtonStateWithCurrentThread(sourceThreadId);
+    if (isThreadExecuting(sourceThreadId)) {
+        console.warn('[REDO_FLOW] 当前线程仍在执行中，继续尝试重做发送', { threadId: sourceThreadId });
+    }
+
+    const payloadSource = resolveLastNormalPayload(sourceThreadId);
+    if (!payloadSource) {
+        console.error('[REDO_FLOW] 找不到可重做的 payloadSource', { threadId: sourceThreadId });
+        return false;
+    }
+    const payload = clonePayload(payloadSource);
+    const historicalMeta = Array.isArray(payload['meta-message']) ? payload['meta-message'] : [];
+    const currentMeta = pendingMetaMessageEvents.slice();
+    payload['meta-message'] = [...historicalMeta, ...currentMeta];
+    payload.files = Array.isArray(payload.files) ? payload.files : [];
+
+    const userContent = String(payload.user || '').trim();
+    if (!userContent) {
+        console.error('[REDO_FLOW] payload.user 为空，无法发送重做', payload);
+        return false;
+    }
+
+    // 特殊约定：测试消息始终走前端本地逻辑，不走后端
+    if (userContent === '测试') {
+        const localContent = await getTestMarkdownContentForRedo();
+        if (!localContent) {
+            console.error('[REDO_FLOW] 本地测试内容为空，重做失败');
+            return false;
+        }
+        const targetMessage = redoTargetMessage;
+        const targetMessageId = ensureMessageId(targetMessage);
+        const applied = applyRedoContentToTarget(sourceThreadId, targetMessage, targetMessageId, localContent);
+        if (applied) {
+            pendingMetaMessageEvents = [];
+        }
+        console.info('[REDO_FLOW] 测试消息本地重做完成', { threadId: sourceThreadId, applied });
+        return !!applied;
+    }
+
+    const topic = await sendToBackend(userContent, sourceThreadId, payload, { isRedo: true, redoTargetMessage });
+    console.info('[REDO_FLOW] resendLastNormalPayloadByRedo 发送结果', { threadId: sourceThreadId, topic });
+    return !!topic;
+}
+
+function resolveLastNormalPayload(threadId) {
+    if (!threadId) return lastNormalSendPayload;
+    if (!AppState.lastNormalSendPayloadByThread) {
+        AppState.lastNormalSendPayloadByThread = {};
+    }
+
+    const fromThreadMap = AppState.lastNormalSendPayloadByThread[threadId];
+    if (fromThreadMap && typeof fromThreadMap === 'object') {
+        return fromThreadMap;
+    }
+    if (lastNormalSendPayload && typeof lastNormalSendPayload === 'object') {
+        return lastNormalSendPayload;
+    }
+
+    // 回退：从当前线程最近一条用户消息恢复，保证重做可真实发送
+    const thread = getThreadById(threadId);
+    const messages = Array.isArray(thread?.messages) ? thread.messages : [];
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+        const msg = messages[i];
+        if (msg && msg.role === 'user' && String(msg.content || '').trim()) {
+            return {
+                user: String(msg.content || ''),
+                'meta-message': [],
+                files: []
+            };
+        }
+    }
+    return null;
+}
+
+function resolvePendingRedoTarget(threadId, topic = null) {
+    const thread = getThreadById(threadId);
+    if (!thread) return null;
+    const messages = Array.isArray(thread.messages) ? thread.messages : [];
+
+    const byContext = (ctx) => {
+        if (!ctx || !ctx.messageId) return null;
+        const msg = messages.find((m) => m && m._messageId === ctx.messageId);
+        if (!msg) return null;
+        return { thread, message: msg, messageId: ctx.messageId };
+    };
+
+    if (topic) {
+        const topicCtx = redoTopicContextMap.get(topic);
+        if (topicCtx && topicCtx.threadId === threadId) {
+            const found = byContext(topicCtx);
+            if (found) return found;
+        }
+    }
+
+    const threadCtx = redoThreadContextMap.get(threadId);
+    if (threadCtx) {
+        const found = byContext(threadCtx);
+        if (found) return found;
+    }
+
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+        const msg = messages[i];
+        if (msg && msg.role === 'assistant' && msg._redoState && msg._redoState.pending === true) {
+            const messageId = ensureMessageId(msg);
+            redoThreadContextMap.set(threadId, { topic: topic || null, messageId, pending: true, locked: true, createdAt: Date.now() });
+            if (topic) {
+                redoTopicContextMap.set(topic, { threadId, messageId });
+            }
+            return { thread, message: msg, messageId };
+        }
+    }
+
+    // 强兜底：redo 锁定期间，始终回填最近 assistant，绝不新增词条
+    const lockedCtx = redoThreadContextMap.get(threadId);
+    if (lockedCtx && lockedCtx.locked) {
+        for (let i = messages.length - 1; i >= 0; i -= 1) {
+            const msg = messages[i];
+            if (msg && msg.role === 'assistant') {
+                const messageId = ensureMessageId(msg);
+                lockedCtx.messageId = messageId;
+                redoThreadContextMap.set(threadId, lockedCtx);
+                if (topic) {
+                    redoTopicContextMap.set(topic, { threadId, messageId });
+                }
+                return { thread, message: msg, messageId };
+            }
+        }
+    }
+
+    return null;
+}
+
+function applyRedoContentToTarget(threadId, targetMessage, messageId, content) {
+    if (!targetMessage) return false;
+    const state = ensureRedoState(targetMessage);
+    state.enabled = true;
+    state.pending = false;
+    state.history.push(createRedoHistoryEntry(String(content || ''), Date.now()));
+    state.currentIndex = state.history.length - 1;
+    state.updatedAt = Date.now();
+
+    const thread = getThreadById(threadId);
+    if (thread) {
+        thread.updatedAt = Date.now();
+        thread.messageCount = Array.isArray(thread.messages) ? thread.messages.length : thread.messageCount;
+        saveState();
+        syncThreadMessagesToBackend(thread);
+    }
+
+    if (threadId === AppState.currentThreadId) {
+        const messageEl = document.querySelector(`.message-item[data-message-id="${messageId}"]`);
+        if (messageEl) {
+            const redoResultEl = messageEl.querySelector('.message-redo-result');
+            if (redoResultEl) {
+                renderAssistantContentToBubble(redoResultEl, content);
+            }
+            applyRedoViewState(messageEl, targetMessage);
+            scrollToBottom();
+        }
+    } else {
+        renderFolderList();
+    }
+    return true;
+}
+
+function hasPendingRedoInThread(threadId) {
+    const thread = getThreadById(threadId);
+    const messages = Array.isArray(thread?.messages) ? thread.messages : [];
+    return messages.some((m) => m && m.role === 'assistant' && m._redoState && m._redoState.pending === true);
+}
+
+async function getTestMarkdownContentForRedo() {
+    if (testMarkdownContent) {
+        return testMarkdownContent;
+    }
+    try {
+        const response = await fetch('markdown/markdown-response.txt');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        testMarkdownContent = await response.text();
+        return testMarkdownContent;
+    } catch (error) {
+        console.error('[REDO_FLOW] 加载本地测试内容失败:', error);
+        return null;
+    }
+}
+
+function tryConsumeRedoByAssistantMessage(message, threadId = AppState.currentThreadId) {
+    if (!message || message.role !== 'assistant' || !threadId) return false;
+    const ctx = redoThreadContextMap.get(threadId);
+    if (!ctx || !ctx.locked) return false;
+
+    const redoTarget = resolvePendingRedoTarget(threadId, ctx.topic || null);
+    if (!redoTarget || !redoTarget.message) {
+        console.warn('[REDO_FLOW] 锁定存在但未找到目标消息，拦截 assistant 追加');
+        return true;
+    }
+
+    const content = String(message.content || '').trim();
+    if (!content) return true;
+
+    applyRedoContentToTarget(threadId, redoTarget.message, redoTarget.messageId, content);
+    ctx.pending = false;
+    ctx.locked = false;
+    redoThreadContextMap.set(threadId, ctx);
+    console.info('[REDO_FLOW] assistant 已回填到 2/2，阻止新增词条', { threadId, messageId: redoTarget.messageId });
+    return true;
 }
 
 const pendingAssistantMessages = [];
@@ -2265,6 +2809,10 @@ function appendMessageNow(message) {
 }
 
 function addMessage(message) {
+    if (message.role === 'assistant' && tryConsumeRedoByAssistantMessage(message, AppState.currentThreadId)) {
+        return;
+    }
+
     // Always defer assistant rendering to async flush, and block it during reordering.
     if (message.role === 'assistant') {
         pendingAssistantMessages.push(message);
@@ -2755,10 +3303,16 @@ async function sendMessage() {
     await syncSendButtonStateWithCurrentThread(sourceThreadId);
     if (!message || isThreadExecuting(sourceThreadId)) return;
     
+    const sendTimestamp = Date.now();
     const userMessage = {
         role: 'user',
         content: message,
-        timestamp: Date.now()
+        timestamp: sendTimestamp
+    };
+    const outboundPayload = {
+        user: message,
+        'meta-message': pendingMetaMessageEvents.slice(),
+        files: snapshotUploadedFiles()
     };
     
     // 先保存到当前线程的消息数组
@@ -2782,10 +3336,10 @@ async function sendMessage() {
     await setThreadExecutingState(sourceThreadId, true);
     
     showThinkingState();
-    void sendToBackend(message, sourceThreadId);
+    void sendToBackend(message, sourceThreadId, outboundPayload);
 }
 
-async function sendToBackend(message, sourceThreadId = AppState.currentThreadId) {
+async function sendToBackend(message, sourceThreadId = AppState.currentThreadId, outboundPayload = null, sendOptions = {}) {
     try {
         // 使用 WebSocket 发送消息（与 main.js 保持一致）
         if (!window.messageService || !window.WebSocketService) {
@@ -2797,23 +3351,57 @@ async function sendToBackend(message, sourceThreadId = AppState.currentThreadId)
                 content: '抱歉，WebSocket 服务未初始化。请刷新页面重试。',
                 timestamp: Date.now()
             });
-            return;
+            return null;
         }
         
         // 检查是否为测试命令 - 测试命令绕过 WebSocket，直接显示 AI 回复
         if (message === '测试') {
             await handleTestCommand();
             void setThreadExecutingState(sourceThreadId, false);
-            return;
+            return null;
         }
         
         // 调用 messageService.sendMessage 通过 WebSocket 发送，并绑定当前线程
-        const topic = window.messageService.sendMessage(message, {
+        const topic = window.messageService.sendMessage(outboundPayload || message, {
             threadId: sourceThreadId
         });
+        if (sendOptions && sendOptions.isRedo) {
+            console.info('[REDO_FLOW] sendToBackend 已调用 messageService.sendMessage', {
+                threadId: sourceThreadId,
+                topic,
+                hasPayload: !!outboundPayload
+            });
+        }
         if (topic) {
             bindTopicToThread(topic, sourceThreadId);
+            if (sendOptions && sendOptions.isRedo && sendOptions.redoTargetMessage) {
+                const targetMessage = sendOptions.redoTargetMessage;
+                const messageId = ensureMessageId(targetMessage);
+                redoTopicContextMap.set(topic, {
+                    threadId: sourceThreadId,
+                    messageId
+                });
+                redoThreadContextMap.set(sourceThreadId, {
+                    topic,
+                    messageId,
+                    pending: true,
+                    locked: true,
+                    createdAt: Date.now()
+                });
+            }
+            if (outboundPayload && typeof outboundPayload === 'object') {
+                lastNormalSendPayload = clonePayload(outboundPayload);
+                if (!AppState.lastNormalSendPayloadByThread) {
+                    AppState.lastNormalSendPayloadByThread = {};
+                }
+                AppState.lastNormalSendPayloadByThread[sourceThreadId] = clonePayload(outboundPayload);
+            }
+            pendingMetaMessageEvents = [];
         }
+        if (!topic && sendOptions && sendOptions.isRedo) {
+            console.error('[REDO_FLOW] messageService.sendMessage 返回空 topic');
+        }
+        return topic || null;
         
     } catch (error) {
         console.error('发送消息失败:', error);
@@ -2825,6 +3413,7 @@ async function sendToBackend(message, sourceThreadId = AppState.currentThreadId)
             content: '抱歉，连接服务器失败。请确保后端服务正在运行。',
             timestamp: Date.now()
         });
+        return null;
     }
 }
 
@@ -2857,13 +3446,20 @@ function handleWebSocketMessage(message) {
         const topic = messageData.topic;
         const targetThreadId = getThreadIdByTopic(topic) || AppState.currentThreadId;
         const targetThread = getThreadById(targetThreadId);
+        console.info('[REDO_FLOW] 收到回包', {
+            topic,
+            targetThreadId,
+            hasRedoLock: !!redoThreadContextMap.get(targetThreadId)?.locked
+        });
         
         // 检查是否是 lui-message-manus-step 类型的消息（DAG 步骤消息）
         const messageType = messageData.data?.contentType || messageData.data?.type;
         
         if (messageType === 'lui-message-manus-step') {
             // DAG 步骤消息，任务开始执行
-            void setThreadExecutingState(targetThreadId, true);
+            if (!redoTopicContextMap.has(topic)) {
+                void setThreadExecutingState(targetThreadId, true);
+            }
             try {
                 const initData = messageData.data?.content || messageData.data?.initData || null;
                 if (targetThreadId && initData && typeof initData === 'object') {
@@ -2938,6 +3534,24 @@ function handleWebSocketMessage(message) {
                 });
                 
                 if (content) {
+                    const redoTarget = resolvePendingRedoTarget(targetThreadId, topic);
+                    if (redoTarget) {
+                        const applied = applyRedoContentToTarget(targetThreadId, redoTarget.message, redoTarget.messageId, content);
+                        if (applied) {
+                            const ctx = redoThreadContextMap.get(targetThreadId);
+                            if (ctx) {
+                                ctx.pending = false;
+                                redoThreadContextMap.set(targetThreadId, ctx);
+                            }
+                        }
+                        return;
+                    }
+
+                    if (redoThreadContextMap.has(targetThreadId)) {
+                        console.warn('[handleWebSocketMessage] redo 锁定中，拦截新增 assistant 词条');
+                        return;
+                    }
+
                     const assistantMessage = {
                         role: 'assistant',
                         content: content,
@@ -2976,10 +3590,23 @@ function handleWebSocketMessage(message) {
                 hideThinkingState();
             }
 
-            void emitLatestMarkdownContentToChat(targetThreadId, { force: true })
+            const pendingRedoTarget = resolvePendingRedoTarget(targetThreadId, topic);
+            const redoThreadCtx = pendingRedoTarget
+                ? { messageId: pendingRedoTarget.messageId, topic: topic || null, pending: hasPendingRedoInThread(targetThreadId) }
+                : (redoThreadContextMap.get(targetThreadId) || null);
+            void emitLatestMarkdownContentToChat(targetThreadId, { force: true, redoContext: redoThreadCtx })
                 .finally(() => {
                     void setThreadExecutingState(targetThreadId, false);
                     unbindTopic(topic);
+                    const ctx = redoThreadContextMap.get(targetThreadId);
+                    if (ctx && !hasPendingRedoInThread(targetThreadId)) {
+                        ctx.locked = false;
+                        redoThreadContextMap.set(targetThreadId, ctx);
+                    }
+                    if (!hasPendingRedoInThread(targetThreadId)) {
+                        if (topic) redoTopicContextMap.delete(topic);
+                        redoThreadContextMap.delete(targetThreadId);
+                    }
                     console.info('[handleWebSocketMessage] 结束流程完成:', { targetThreadId, topic });
                 });
         }
@@ -3022,6 +3649,7 @@ async function emitLatestMarkdownContentToChat(targetThreadId, options = {}) {
     if (!targetThreadId) return false;
 
     const force = options.force === true;
+    const redoContext = options.redoContext || null;
     const thread = getThreadById(targetThreadId);
     if (!thread) return false;
 
@@ -3053,6 +3681,20 @@ async function emitLatestMarkdownContentToChat(targetThreadId, options = {}) {
             lastAssistant.meta &&
             lastAssistant.meta.finalReportSignature === signature
         );
+
+        if (redoContext && redoContext.messageId) {
+            const targetMessages = Array.isArray(thread.messages) ? thread.messages : [];
+            const targetMessage = targetMessages.find((m) => m && m._messageId === redoContext.messageId);
+            if (targetMessage) {
+                applyRedoContentToTarget(targetThreadId, targetMessage, redoContext.messageId, content);
+
+                finalConclusionContentSignatureByThread.set(targetThreadId, signature);
+                console.info('[emitLatestMarkdownContentToChat] 重做结果回填成功:', { targetThreadId, filePath });
+                return true;
+            }
+            console.warn('[emitLatestMarkdownContentToChat] 重做上下文存在但目标消息缺失，跳过新增:', { targetThreadId, redoContext });
+            return false;
+        }
 
         if (!alreadySame) {
             const reportMessage = {
@@ -3609,6 +4251,78 @@ function formatTime(timestamp) {
 
 function getTimeAgo(timestamp) {
     return formatTime(timestamp);
+}
+
+function openDeleteMessageConfirmModal() {
+    const modal = document.getElementById('delete-message-confirm-modal-overlay');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeDeleteMessageConfirmModal() {
+    const modal = document.getElementById('delete-message-confirm-modal-overlay');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function confirmDeleteMessageAction() {
+    const ctx = pendingDeleteMessageActionContext;
+    pendingDeleteMessageActionContext = null;
+    closeDeleteMessageConfirmModal();
+    if (!ctx) return;
+
+    queueMetaMessageEvent('delete', ctx.message);
+
+    const thread = getCurrentThread();
+    if (thread && Array.isArray(thread.messages)) {
+        const idx = thread.messages.indexOf(ctx.message);
+        if (idx >= 0) {
+            thread.messages.splice(idx, 1);
+            thread.messageCount = thread.messages.length;
+            thread.updatedAt = Date.now();
+            syncThreadMessagesToBackend(thread);
+            saveState();
+        }
+    }
+
+    if (ctx.messageItem && ctx.messageItem.parentNode) {
+        ctx.messageItem.remove();
+    }
+}
+
+function initDeleteMessageConfirmModal() {
+    const closeBtn = document.getElementById('close-delete-message-confirm-modal');
+    const cancelBtn = document.getElementById('cancel-delete-message-confirm-btn');
+    const confirmBtn = document.getElementById('confirm-delete-message-confirm-btn');
+    const modal = document.getElementById('delete-message-confirm-modal-overlay');
+
+    if (!modal || !closeBtn || !cancelBtn || !confirmBtn) return;
+
+    closeBtn.addEventListener('click', closeDeleteMessageConfirmModal);
+    cancelBtn.addEventListener('click', closeDeleteMessageConfirmModal);
+    confirmBtn.addEventListener('click', confirmDeleteMessageAction);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeDeleteMessageConfirmModal();
+        }
+    });
+}
+
+function refreshMessageTimeLabels() {
+    const timeEls = document.querySelectorAll('.message-time[data-timestamp]');
+    timeEls.forEach((el) => {
+        const ts = Number(el.dataset.timestamp);
+        if (!ts) return;
+        el.textContent = formatTime(ts);
+    });
+}
+
+function startMessageTimeRefresh() {
+    if (messageTimeRefreshTimer) return;
+    refreshMessageTimeLabels();
+    messageTimeRefreshTimer = setInterval(refreshMessageTimeLabels, 60000);
 }
 
 function toggleThreadStar(threadId) {
@@ -4168,6 +4882,7 @@ function initThreeColumnLayout() {
     initDeleteConfirmModal();
     initDeleteFolderConfirmModal();
     initClearChatConfirmModal();
+    initDeleteMessageConfirmModal();
     initFileDuplicateModal();
     initSettingsModal();
     initFolderDragDrop();
@@ -4278,6 +4993,7 @@ function loadExampleData() {
 }
 
 document.addEventListener('DOMContentLoaded', initThreeColumnLayout);
+document.addEventListener('DOMContentLoaded', startMessageTimeRefresh);
 
 // ==================== 测试命令处理 ====================
 // 缓存测试文档内容

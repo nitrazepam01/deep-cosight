@@ -326,6 +326,24 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="delete-message-confirm-modal-overlay" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>删除消息确认</h3>
+                <button class="btn-close-modal" id="close-delete-message-confirm-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-message">确定要删除这条消息吗？此操作不可恢复。</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal-secondary" id="cancel-delete-message-confirm-btn">取消</button>
+                <button class="btn-modal-primary btn-delete-confirm" id="confirm-delete-message-confirm-btn">删除</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="file-duplicate-confirm-modal-overlay" style="display: none;">
         <div class="modal">
             <div class="modal-header">

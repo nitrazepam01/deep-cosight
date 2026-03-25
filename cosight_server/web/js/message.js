@@ -711,12 +711,16 @@
         // 生成并复用稳定的 planId 作为 messageSerialNumber
         const planId = this.ensurePlanIdForTopic(topic);
 
+        const normalizedContent = (typeof content === 'object' && content !== null)
+            ? JSON.stringify(content)
+            : String(content ?? '');
+
         const message = {
             uuid: WebSocketService.generateUUID(),
             type: "multi-modal",
             from: "human",
             timestamp: Date.now(),
-            initData: [{type: "text", value: content}],
+            initData: [{type: "text", value: normalizedContent}],
             roleInfo: {name: "admin"},
             mentions: [],
             extra: {
