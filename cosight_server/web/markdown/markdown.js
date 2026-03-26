@@ -30,7 +30,8 @@
 
     const md = createMarkdownRenderer();
     const html = md.render(markdownText);
-    container.innerHTML = html;
+    const safeHtml = sanitizeRenderedHtml(html);
+    container.innerHTML = safeHtml;
     container.classList.add('markdown-body');
 
     // 绑定复制按钮
@@ -42,7 +43,53 @@
     // 渲染 MathJax 公式
     await renderMathInContainer(container);
 
-    return html;
+    return safeHtml;
+  }
+
+  function sanitizeRenderedHtml(rawHtml) {
+    if (typeof rawHtml !== 'string' || !rawHtml) return '';
+    if (typeof window === 'undefined' || typeof window.DOMParser !== 'function') {
+      return rawHtml;
+    }
+
+    const parser = new window.DOMParser();
+    const doc = parser.parseFromString(rawHtml, 'text/html');
+    const forbiddenTags = new Set([
+      'script', 'style', 'iframe', 'object', 'embed', 'link', 'meta', 'base'
+    ]);
+    const unwrapTags = new Set(['html', 'head', 'body']);
+
+    const all = Array.from(doc.body.querySelectorAll('*'));
+    all.forEach((el) => {
+      const tag = String(el.tagName || '').toLowerCase();
+      if (forbiddenTags.has(tag)) {
+        el.remove();
+        return;
+      }
+      if (unwrapTags.has(tag)) {
+        const parent = el.parentNode;
+        if (!parent) return;
+        while (el.firstChild) {
+          parent.insertBefore(el.firstChild, el);
+        }
+        el.remove();
+        return;
+      }
+
+      Array.from(el.attributes).forEach((attr) => {
+        const name = String(attr.name || '').toLowerCase();
+        const value = String(attr.value || '');
+        if (name.startsWith('on') || name === 'style') {
+          el.removeAttribute(attr.name);
+          return;
+        }
+        if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(value)) {
+          el.removeAttribute(attr.name);
+        }
+      });
+    });
+
+    return doc.body.innerHTML;
   }
 
   /**
@@ -499,8 +546,8 @@
 
   function createMarkdownRenderer() {
     const md = window.markdownit({
-      // 禁止渲染原始 HTML，避免消息中的 <style>/<script> 污染主页面布局
-      html: false,
+      // 允许 details/summary 等原始 HTML，但渲染后会做安全过滤
+      html: true,
       linkify: true,
       breaks: false,
       typographer: true,
@@ -621,7 +668,7 @@
     try {
       const markdownText = await loadMarkdownText();
       const md = createMarkdownRenderer();
-      outputEl.innerHTML = md.render(markdownText);
+      outputEl.innerHTML = sanitizeRenderedHtml(md.render(markdownText));
 
       bindCopyButtons();
       await renderMermaid();

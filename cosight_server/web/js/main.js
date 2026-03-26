@@ -27,6 +27,8 @@ let pendingDeleteMessageActionContext = null;
 let lastNormalSendPayload = null;
 const redoTopicContextMap = new Map();
 const redoThreadContextMap = new Map();
+const thinkingTitleRotationStateByThread = new Map();
+let thinkingIndicatorRefreshTimer = null;
 
 // ==================== 工具函数 ====================
 
@@ -2094,7 +2096,7 @@ function createMessageElement(message) {
             <div class="message-bubble message-redo-placeholder" style="display: none;">
                 <div class="thinking-indicator">
                     <i class="fas fa-cog loading-spinner"></i>
-                    <span>正在思考...</span>
+                    <span class="thinking-label">正在制定问题解决方案</span>
                 </div>
             </div>
             <div class="message-bubble message-redo-result" style="display: none;"></div>
@@ -2231,10 +2233,12 @@ function renderMessageBubbleContent(message, bubbleEl) {
     if (!message || !bubbleEl) return;
     const metadata = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
     if (message.role === 'assistant' && metadata.pendingPlaceholder === true) {
+        const startedAt = Number(message.timestamp) || Date.now();
+        const threadId = AppState.currentThreadId || '';
         bubbleEl.innerHTML = `
-            <div class="thinking-indicator">
+            <div class="thinking-indicator" data-thinking-kind="normal" data-thread-id="${threadId}" data-start-ts="${startedAt}">
                 <i class="fas fa-cog loading-spinner"></i>
-                <span>正在思考...</span>
+                <span class="thinking-label">正在制定问题解决方案...</span>
             </div>
         `;
         return;
@@ -2425,6 +2429,15 @@ function applyRedoViewState(messageItem, message) {
     }
     if (placeholderEl) {
         placeholderEl.style.display = isPendingPage ? 'block' : 'none';
+        if (isPendingPage) {
+            const indicatorEl = placeholderEl.querySelector('.thinking-indicator');
+            if (indicatorEl) {
+                const startTs = Number(currentVersion?.timestamp) || Date.now();
+                indicatorEl.dataset.threadId = String(AppState.currentThreadId || '');
+                indicatorEl.dataset.startTs = String(startTs);
+                indicatorEl.dataset.thinkingKind = 'redo';
+            }
+        }
     }
     if (redoResultEl) {
         redoResultEl.style.display = (!isOriginalPage && !isPendingPage) ? 'block' : 'none';
@@ -2436,8 +2449,8 @@ function applyRedoViewState(messageItem, message) {
         actionsEl.style.display = isPendingPage ? 'none' : 'flex';
     }
     if (timeEl) {
-        timeEl.style.display = isPendingPage ? 'none' : 'inline';
-        if (!isPendingPage && currentVersion && currentVersion.timestamp) {
+        timeEl.style.display = 'inline';
+        if (currentVersion && currentVersion.timestamp) {
             const ts = Number(currentVersion.timestamp) || Date.now();
             timeEl.dataset.timestamp = String(ts);
             timeEl.title = new Date(ts).toLocaleString('zh-CN');
@@ -2450,6 +2463,7 @@ function applyRedoViewState(messageItem, message) {
     if (nextBtnEl) {
         nextBtnEl.disabled = !hasRedoState || currentIndex >= maxIndex;
     }
+    refreshThinkingIndicators();
 }
 
 function ensureRedoState(message) {
@@ -2901,6 +2915,7 @@ function appendMessageNow(message) {
     messageList.appendChild(messageItem);
 
     scrollToBottom();
+    refreshThinkingIndicators();
 }
 
 function addMessageToThreadStorage(thread, message, options = {}) {
@@ -3470,6 +3485,86 @@ function syncThinkingStateWithCurrentThread() {
     }
 }
 
+function getInProgressStepTitlesForThread(threadId) {
+    if (!threadId) return [];
+
+    if (threadId === AppState.currentThreadId && dagData && Array.isArray(dagData.nodes) && dagData.nodes.length > 0) {
+        return dagData.nodes
+            .filter((node) => node && node.status === 'in_progress')
+            .sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0))
+            .map((node) => String(node.fullName || node.title || node.name || `Step ${node.id || ''}`).trim())
+            .filter(Boolean);
+    }
+
+    const thread = getThreadById(threadId);
+    const content = thread?.rightPanelState?.dagInitData;
+    const steps = Array.isArray(content?.steps) ? content.steps : [];
+    const statuses = content?.step_statuses && typeof content.step_statuses === 'object' ? content.step_statuses : {};
+    const titles = [];
+    for (let i = 0; i < steps.length; i += 1) {
+        const stepNo = i + 1;
+        const statusRec = statuses[`step_${stepNo}`] ?? statuses[stepNo] ?? statuses[String(stepNo)];
+        const status = typeof statusRec === 'string' ? statusRec : (statusRec?.status || '');
+        if (status !== 'in_progress') continue;
+        const step = steps[i];
+        const label = typeof step === 'string'
+            ? step
+            : (step?.title || step?.name || step?.fullName || `Step ${stepNo}`);
+        titles.push(String(label || '').trim());
+    }
+    return titles.filter(Boolean);
+}
+
+function getThinkingStatusTextForThread(threadId) {
+    const titles = getInProgressStepTitlesForThread(threadId);
+    const now = Date.now();
+    const signature = titles.join('|');
+    const state = thinkingTitleRotationStateByThread.get(threadId) || {
+        signature: '',
+        index: 0,
+        lastSwitchAt: now,
+        lastText: ''
+    };
+
+    if (signature !== state.signature) {
+        state.signature = signature;
+        state.index = 0;
+        state.lastSwitchAt = now;
+    } else if (titles.length > 1 && (now - state.lastSwitchAt) >= 15000) {
+        state.index = (state.index + 1) % titles.length;
+        state.lastSwitchAt = now;
+    }
+
+    const nextText = titles.length > 0
+        ? `${titles[state.index] || titles[0]}...`
+        : '正在制定问题解决方案';
+    const changed = nextText !== state.lastText;
+    state.lastText = nextText;
+    thinkingTitleRotationStateByThread.set(threadId, state);
+    return { text: nextText, changed };
+}
+
+function refreshThinkingIndicators(forceBlink = false) {
+    const indicators = document.querySelectorAll('.thinking-indicator[data-thread-id][data-start-ts]');
+    indicators.forEach((indicatorEl) => {
+        const threadId = String(indicatorEl.dataset.threadId || AppState.currentThreadId || '');
+        const startTs = Number(indicatorEl.dataset.startTs) || Date.now();
+        const labelEl = indicatorEl.querySelector('.thinking-label');
+        const { text, changed } = getThinkingStatusTextForThread(threadId);
+
+        if (labelEl) {
+            if (labelEl.textContent !== text) {
+                labelEl.textContent = text;
+            }
+            if (forceBlink || changed) {
+                labelEl.classList.remove('thinking-label-blink');
+                void labelEl.offsetWidth;
+                labelEl.classList.add('thinking-label-blink');
+            }
+        }
+    });
+}
+
 async function sendMessage() {
     const chatInput = document.getElementById('chat-input');
     const message = chatInput.value.trim();
@@ -3975,9 +4070,9 @@ function showThinkingState() {
         </div>
         <div class="message-content">
             <div class="message-bubble">
-                <div class="thinking-indicator">
+                <div class="thinking-indicator" data-thinking-kind="legacy" data-thread-id="${AppState.currentThreadId || ''}" data-start-ts="${Date.now()}">
                     <i class="fas fa-cog loading-spinner"></i>
-                    <span>正在思考...</span>
+                    <span class="thinking-label">正在制定问题解决方案</span>
                 </div>
             </div>
         </div>
@@ -3985,6 +4080,7 @@ function showThinkingState() {
     
     messageList.appendChild(thinkingDiv);
     scrollToBottom();
+    refreshThinkingIndicators(true);
 }
 
 function hideThinkingState() {
@@ -4563,12 +4659,18 @@ function refreshMessageTimeLabels() {
         if (!ts) return;
         el.textContent = formatTime(ts);
     });
+    refreshThinkingIndicators();
 }
 
 function startMessageTimeRefresh() {
     if (messageTimeRefreshTimer) return;
     refreshMessageTimeLabels();
     messageTimeRefreshTimer = setInterval(refreshMessageTimeLabels, 60000);
+    if (!thinkingIndicatorRefreshTimer) {
+        thinkingIndicatorRefreshTimer = setInterval(() => {
+            refreshThinkingIndicators();
+        }, 1000);
+    }
 }
 
 function toggleThreadStar(threadId) {
