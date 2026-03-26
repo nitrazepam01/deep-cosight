@@ -87,7 +87,9 @@
             const currentThreadId = window?.AppState?.currentThreadId;
             if (!topic || !currentThreadId) return true;
             if (typeof window.getThreadIdByTopic !== 'function') return true;
-            const targetThreadId = window.getThreadIdByTopic(topic) || currentThreadId;
+            const mapped = window.getThreadIdByTopic(topic);
+            if (!mapped) return false;
+            const targetThreadId = mapped;
             return targetThreadId === currentThreadId;
         } catch (_) {
             return true;
@@ -99,7 +101,7 @@
             const topic = messageData?.topic;
             if (!topic) return window?.AppState?.currentThreadId || null;
             if (typeof window.getThreadIdByTopic === 'function') {
-                return window.getThreadIdByTopic(topic) || window?.AppState?.currentThreadId || null;
+                return window.getThreadIdByTopic(topic) || null;
             }
             return window?.AppState?.currentThreadId || null;
         } catch (_) {

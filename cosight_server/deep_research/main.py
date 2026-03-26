@@ -224,7 +224,7 @@ async def global_exception_handler(request: Request, call_next):
 
 
 if __name__ == '__main__':
-    logger.info("\n【提示】请在浏览器访问: http://localhost:7788/cosight/index-new.html\n")
+    logger.info("\n【提示】请在浏览器访问: http://localhost:7788/cosight/index.html\n")
     import argparse
     import uvicorn
 

@@ -8,7 +8,7 @@
     "/cosight/markdown-response.txt",
   ];
   
-  // 检查是否在 index-new.html 页面（使用 markdown-content 容器）
+  // 检查是否在主聊天页面（使用 markdown-content 容器）
   const isNewPage = !!document.getElementById("markdown-content");
   const mermaidAdaptiveRegistry = new WeakMap();
   const MERMAID_MIN_CONTENT_HEIGHT = 288;
@@ -499,7 +499,8 @@
 
   function createMarkdownRenderer() {
     const md = window.markdownit({
-      html: true,
+      // 禁止渲染原始 HTML，避免消息中的 <style>/<script> 污染主页面布局
+      html: false,
       linkify: true,
       breaks: false,
       typographer: true,
@@ -605,7 +606,7 @@
   }
 
   async function renderMarkdownFile() {
-    // 如果在 index-new.html 页面，outputEl 为 null，直接返回
+    // 如果在主聊天页面，outputEl 为 null，直接返回
     if (!outputEl && !isNewPage) {
       console.log('markdown.js: 未找到输出容器，跳过自动渲染');
       return;
@@ -613,7 +614,7 @@
     
     // 如果是新页面，不自动加载 markdown-response.txt
     if (isNewPage) {
-      console.log('markdown.js: 检测到 index-new.html 页面，由 main-new.js 控制渲染');
+      console.log('markdown.js: 检测到主聊天页面，由 main.js 控制渲染');
       return;
     }
     

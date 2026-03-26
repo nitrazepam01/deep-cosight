@@ -338,6 +338,33 @@ async def create_thread(body: dict = Body(...)):
         
         data = load_sessions()
         
+        root_id = f"root-{int(datetime.now().timestamp() * 1000)}"
+        initial_tree = {
+            "rootId": root_id,
+            "nodes": {
+                root_id: {
+                    "id": root_id,
+                    "parentId": None,
+                    "role": "system",
+                    "content": "ROOT",
+                    "timestamp": int(datetime.now().timestamp() * 1000),
+                    "deleted": False,
+                    "children": [],
+                    "branchId": "main",
+                    "version": 1,
+                    "metadata": {}
+                }
+            },
+            "branches": {
+                "main": {
+                    "rootId": root_id,
+                    "active": True,
+                    "name": "主分支"
+                }
+            },
+            "activeBranch": "main"
+        }
+
         new_thread = {
             "id": f"thread-{int(datetime.now().timestamp() * 1000)}",
             "title": title,
@@ -345,8 +372,9 @@ async def create_thread(body: dict = Body(...)):
             "createdAt": int(datetime.now().timestamp() * 1000),
             "updatedAt": int(datetime.now().timestamp() * 1000),
             "messageCount": 0,
+            "activeMessageCount": 0,
             "starred": False,
-            "messages": [],
+            "messageTree": initial_tree,
             "userRenamedTitle": False,
             "autoRenamedByTask": False
         }
@@ -409,12 +437,15 @@ async def update_thread(thread_id: str, body: dict = Body(...)):
                         thread["starred"] = body["starred"]
                     if "folderId" in body:
                         thread["folderId"] = body["folderId"]
-                    if "messages" in body and isinstance(body["messages"], list):
-                        thread["messages"] = body["messages"]
+                    if "messageTree" in body and isinstance(body["messageTree"], dict):
+                        thread["messageTree"] = body["messageTree"]
                     if "messageCount" in body:
                         thread["messageCount"] = body["messageCount"]
-                    elif "messages" in body and isinstance(body["messages"], list):
-                        thread["messageCount"] = len(body["messages"])
+                    elif "messageTree" in body and isinstance(body["messageTree"], dict):
+                        node_count = len((body["messageTree"].get("nodes") or {}).keys())
+                        thread["messageCount"] = max(0, node_count - 1)
+                    if "activeMessageCount" in body:
+                        thread["activeMessageCount"] = body["activeMessageCount"]
                     if "rightPanelState" in body and isinstance(body["rightPanelState"], dict):
                         current_state = thread.get("rightPanelState")
                         if not isinstance(current_state, dict):
@@ -505,7 +536,7 @@ async def move_thread(thread_id: str, body: dict = Body(...)):
         
         save_sessions(data)
         logger.info(f"移动会话：{thread_id} -> {target_folder_id}")
-        return json_result(0, 'success', {"threadId": thread_id, "targetFolderId": targetFolderId})
+        return json_result(0, 'success', {"threadId": thread_id, "targetFolderId": target_folder_id})
     except Exception as e:
         logger.error(f"移动会话失败：{e}")
         return json_result(500, str(e), None)
