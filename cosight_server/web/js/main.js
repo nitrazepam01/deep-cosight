@@ -29,6 +29,7 @@ const redoTopicContextMap = new Map();
 const redoThreadContextMap = new Map();
 const thinkingTitleRotationStateByThread = new Map();
 let thinkingIndicatorRefreshTimer = null;
+const finalReportRetryStateByThread = new Map();
 
 // ==================== 工具函数 ====================
 
@@ -2238,7 +2239,7 @@ function renderMessageBubbleContent(message, bubbleEl) {
         bubbleEl.innerHTML = `
             <div class="thinking-indicator" data-thinking-kind="normal" data-thread-id="${threadId}" data-start-ts="${startedAt}">
                 <i class="fas fa-cog loading-spinner"></i>
-                <span class="thinking-label">正在制定问题解决方案...</span>
+                <span class="thinking-label">正在制定问题解决方案</span>
             </div>
         `;
         return;
@@ -3515,6 +3516,41 @@ function getInProgressStepTitlesForThread(threadId) {
     return titles.filter(Boolean);
 }
 
+function isThreadDagAllCompleted(threadId) {
+    if (!threadId) return false;
+
+    if (threadId === AppState.currentThreadId && dagData && Array.isArray(dagData.nodes) && dagData.nodes.length > 0) {
+        const nodes = dagData.nodes.filter((node) => node && node.status);
+        return nodes.length > 0 && nodes.every((node) => node.status === 'completed');
+    }
+
+    const thread = getThreadById(threadId);
+    const content = thread?.rightPanelState?.dagInitData;
+    if (!content || typeof content !== 'object') return false;
+
+    const progress = content.progress && typeof content.progress === 'object' ? content.progress : null;
+    if (progress) {
+        const completed = Number(progress.completed) || 0;
+        const inProgress = Number(progress.in_progress) || 0;
+        const blocked = Number(progress.blocked) || 0;
+        const notStarted = Number(progress.not_started) || 0;
+        const total = Number(progress.total) || (completed + inProgress + blocked + notStarted);
+        return total > 0 && completed === total;
+    }
+
+    const steps = Array.isArray(content.steps) ? content.steps : [];
+    const statuses = content.step_statuses && typeof content.step_statuses === 'object' ? content.step_statuses : {};
+    if (steps.length === 0) return false;
+    let completedCount = 0;
+    for (let i = 0; i < steps.length; i += 1) {
+        const stepNo = i + 1;
+        const statusRec = statuses[`step_${stepNo}`] ?? statuses[stepNo] ?? statuses[String(stepNo)];
+        const status = typeof statusRec === 'string' ? statusRec : (statusRec?.status || '');
+        if (status === 'completed') completedCount += 1;
+    }
+    return completedCount === steps.length;
+}
+
 function getThinkingStatusTextForThread(threadId) {
     const titles = getInProgressStepTitlesForThread(threadId);
     const now = Date.now();
@@ -3536,8 +3572,8 @@ function getThinkingStatusTextForThread(threadId) {
     }
 
     const nextText = titles.length > 0
-        ? `${titles[state.index] || titles[0]}...`
-        : '正在制定问题解决方案';
+        ? `${titles[state.index] || titles[0]}`
+        : (isThreadDagAllCompleted(threadId) ? '正在整理问题最终报告' : '正在制定问题解决方案');
     const changed = nextText !== state.lastText;
     state.lastText = nextText;
     thinkingTitleRotationStateByThread.set(threadId, state);
@@ -3879,6 +3915,13 @@ function handleWebSocketMessage(message) {
                 ? { messageId: pendingRedoTarget.messageId, topic: topic || null, pending: hasPendingRedoInThread(targetThreadId) }
                 : (redoThreadContextMap.get(targetThreadId) || null);
             void emitLatestMarkdownContentToChat(targetThreadId, { force: true, redoContext: redoThreadCtx })
+                .then((sent) => {
+                    if (!sent) {
+                        scheduleFinalReportBackfill(targetThreadId, redoThreadCtx);
+                    } else {
+                        finalReportRetryStateByThread.delete(targetThreadId);
+                    }
+                })
                 .finally(() => {
                     void setThreadExecutingState(targetThreadId, false);
                     unbindTopic(topic);
@@ -3929,6 +3972,52 @@ async function fetchFinalReportByThreadId(targetThreadId) {
     }
 }
 
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchFinalReportByThreadIdWithRetry(targetThreadId, options = {}) {
+    const maxAttempts = Number.isFinite(Number(options.maxAttempts)) ? Number(options.maxAttempts) : 8;
+    const intervalMs = Number.isFinite(Number(options.intervalMs)) ? Number(options.intervalMs) : 1200;
+    for (let i = 0; i < maxAttempts; i += 1) {
+        const report = await fetchFinalReportByThreadId(targetThreadId);
+        if (report && report.content && report.filePath) {
+            return report;
+        }
+        if (i < maxAttempts - 1) {
+            await sleep(intervalMs);
+        }
+    }
+    return null;
+}
+
+function scheduleFinalReportBackfill(targetThreadId, redoContext = null) {
+    if (!targetThreadId) return;
+    const state = finalReportRetryStateByThread.get(targetThreadId) || { attempts: 0, timer: null };
+    if (state.timer) return;
+    if (state.attempts >= 20) return;
+
+    state.attempts += 1;
+    state.timer = setTimeout(async () => {
+        const current = finalReportRetryStateByThread.get(targetThreadId) || state;
+        current.timer = null;
+        finalReportRetryStateByThread.set(targetThreadId, current);
+
+        const sent = await emitLatestMarkdownContentToChat(targetThreadId, {
+            force: true,
+            redoContext,
+            retryConfig: { maxAttempts: 4, intervalMs: 1500 }
+        });
+        if (sent) {
+            finalReportRetryStateByThread.delete(targetThreadId);
+        } else {
+            scheduleFinalReportBackfill(targetThreadId, redoContext);
+        }
+    }, 3000);
+
+    finalReportRetryStateByThread.set(targetThreadId, state);
+}
+
 async function emitLatestMarkdownContentToChat(targetThreadId, options = {}) {
     if (!targetThreadId) return false;
 
@@ -3938,7 +4027,9 @@ async function emitLatestMarkdownContentToChat(targetThreadId, options = {}) {
     if (!thread) return false;
 
     try {
-        const report = await fetchFinalReportByThreadId(targetThreadId);
+        const report = options.retryConfig
+            ? await fetchFinalReportByThreadIdWithRetry(targetThreadId, options.retryConfig)
+            : await fetchFinalReportByThreadIdWithRetry(targetThreadId, { maxAttempts: 8, intervalMs: 1200 });
         if (!report) {
             console.warn('[emitLatestMarkdownContentToChat] 未获取到最终文件:', { targetThreadId });
             return false;
@@ -3963,8 +4054,8 @@ async function emitLatestMarkdownContentToChat(targetThreadId, options = {}) {
         const alreadySame = !!(
             lastAssistant &&
             lastAssistant.role === 'assistant' &&
-            lastAssistant.meta &&
-            lastAssistant.meta.finalReportSignature === signature
+            ((lastAssistant.metadata && lastAssistant.metadata.finalReportSignature === signature)
+                || (lastAssistant.meta && lastAssistant.meta.finalReportSignature === signature))
         );
 
         if (redoContext && redoContext.messageId) {
