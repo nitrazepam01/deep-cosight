@@ -20,7 +20,6 @@ let runtimeLogCounter = 0;
 let runtimeLogSignatures = new Set();
 const ENABLE_FLOATING_TOOL_PANELS = false;
 const DEFAULT_THREAD_TITLES = new Set(["新对话", "新会话"]);
-const finalConclusionContentSignatureByThread = new Map();
 let messageTimeRefreshTimer = null;
 let pendingMetaMessageEvents = [];
 let pendingDeleteMessageActionContext = null;
@@ -677,7 +676,9 @@ const AppState = {
     runtimeLogActiveTaskId: null,
     selectedTaskNodeId: null,
     initialRuntimeLogsCleared: false,
-    initialized: false
+    initialized: false,
+    // 任务节点查看记忆：taskId -> nodeId 映射
+    taskNodeViewMemory: new Map()
 };
 
 const DEFAULT_FOLDER_ID = 'default';
@@ -1685,6 +1686,13 @@ function handleTaskNodeSelection(nodeOrId) {
     if (!selectedNode) return;
 
     AppState.selectedTaskNodeId = Number(selectedNode.id);
+    
+    // 记住当前任务的最后查看节点
+    const currentTaskId = AppState.runtimeLogActiveTaskId;
+    if (currentTaskId) {
+        AppState.taskNodeViewMemory.set(currentTaskId, AppState.selectedTaskNodeId);
+    }
+    
     rerenderTaskInfoBySelection();
 }
 window.handleTaskNodeSelection = handleTaskNodeSelection;
@@ -1845,6 +1853,8 @@ function ensureRuntimeTaskForThread(threadId, options = {}) {
     rightPanelState.runtimeLogBook = book;
     if (threadId === AppState.currentThreadId) {
         AppState.runtimeLogActiveTaskId = book.activeTaskId || null;
+        // 新任务默认清除节点选择（显示任务概览）
+        AppState.selectedTaskNodeId = null;
     }
     return { thread, book, task };
 }
@@ -1965,6 +1975,19 @@ async function restoreRightPanelByThread(threadId) {
         .filter(Boolean)
         .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
         .forEach((log) => addToolCallToChain(log));
+
+    // 恢复该任务最后查看的节点
+    const activeTaskId = AppState.runtimeLogActiveTaskId;
+    if (activeTaskId) {
+        const lastViewedNodeId = AppState.taskNodeViewMemory.get(activeTaskId);
+        if (lastViewedNodeId && dagData.nodes.some(n => n.id === lastViewedNodeId)) {
+            AppState.selectedTaskNodeId = lastViewedNodeId;
+        } else {
+            AppState.selectedTaskNodeId = null;
+        }
+    } else {
+        AppState.selectedTaskNodeId = null;
+    }
 
     rerenderTaskInfoBySelection();
 }
@@ -2329,6 +2352,22 @@ function defaultExportMessage(message) {
 
 async function defaultRedoMessage(message, messageItem) {
     console.info('[REDO_FLOW] 点击重做', { threadId: AppState.currentThreadId, targetMessageId: ensureMessageId(message) });
+
+    // 重试之前清空右侧面板状态，避免旧完成状态误导 "正在整理问题最终报告"
+    if (typeof window.clearDagViewState === 'function') {
+        window.clearDagViewState();
+    }
+    if (typeof window.clearRuntimeLogs === 'function') {
+        window.clearRuntimeLogs();
+    }
+    if (typeof window.clearRuntimeLogFilter === 'function') {
+        window.clearRuntimeLogFilter();
+    }
+    AppState.selectedTaskNodeId = null;
+
+    // 重试也设为执行态，锁定发送按钮
+    await setThreadExecutingState(AppState.currentThreadId, true);
+
     queueMetaMessageEvent('redo', message);
     markMessageAsRedoPending(message, messageItem);
     const resent = await resendLastNormalPayloadByRedo(message);
@@ -2339,6 +2378,7 @@ async function defaultRedoMessage(message, messageItem) {
             state.currentIndex = 0;
             applyRedoViewState(messageItem, message);
         }
+        await setThreadExecutingState(AppState.currentThreadId, false);
         return;
     }
     console.info('[REDO_FLOW] 重做请求已发送，目标消息切到思考态');
@@ -2350,7 +2390,34 @@ function defaultDeleteMessage(message, messageItem) {
 }
 
 function defaultLocateMessage(message) {
-    console.info('[message-action] 默认定位函数，后续可接入业务逻辑', message);
+    if (!message) return;
+    
+    // 获取气泡关联的任务ID
+    const associatedTaskId = message.associatedTaskId || AppState.runtimeLogActiveTaskId;
+    if (!associatedTaskId) {
+        console.warn('[message-action] 无法定位：找不到关联的任务ID', message);
+        return;
+    }
+    
+    // 切换到该任务
+    AppState.runtimeLogActiveTaskId = associatedTaskId;
+    
+    // 恢复该任务最后查看的节点
+    const lastViewedNodeId = AppState.taskNodeViewMemory.get(associatedTaskId);
+    if (lastViewedNodeId) {
+        AppState.selectedTaskNodeId = lastViewedNodeId;
+    } else {
+        // 如果没有记录过，默认选择第一个节点
+        AppState.selectedTaskNodeId = null;
+    }
+    
+    // 重新渲染右侧栏和任务过滤
+    rerenderTaskInfoBySelection();
+    
+    console.info('[message-action] 定位到任务', {
+        taskId: associatedTaskId,
+        nodeId: AppState.selectedTaskNodeId || '未选择'
+    });
 }
 
 function markMessageAsRedoPending(message, messageItem) {
@@ -2922,6 +2989,11 @@ function appendMessageNow(message) {
 function addMessageToThreadStorage(thread, message, options = {}) {
     if (!thread) return null;
     const { parentId = null, branchId = null, isRedo = false } = options;
+
+    // 关联当前任务
+    if (AppState.runtimeLogActiveTaskId) {
+        message.associatedTaskId = AppState.runtimeLogActiveTaskId;
+    }
 
     if (window.TreeMessageService && thread.messageTree) {
         const result = window.TreeMessageService.addMessage(
@@ -3800,6 +3872,13 @@ function handleWebSocketMessage(message) {
                             : [];
                     }
                     schedulePersistRightPanelState(targetThreadId, { dagInitData: initData });
+                    if (isDagInitDataAllCompleted(initData)) {
+                        const pendingRedoTarget = resolvePendingRedoTarget(targetThreadId, topic);
+                        const redoThreadCtx = pendingRedoTarget
+                            ? { messageId: pendingRedoTarget.messageId, topic: topic || null, pending: hasPendingRedoInThread(targetThreadId) }
+                            : (redoThreadContextMap.get(targetThreadId) || null);
+                        startFinalReportPolling(targetThreadId, { topic, redoContext: redoThreadCtx });
+                    }
                     // 首次任务标题到达时，触发会话自动改名策略（仅当前激活会话会更新主标题）
                     if (typeof initData.title === 'string' && initData.title.trim()) {
                         if (targetThreadId === AppState.currentThreadId) {
@@ -3902,40 +3981,12 @@ function handleWebSocketMessage(message) {
         // 检查是否是控制类结束信号
         if (messageData.data && ((messageData.data.type === 'control-status-message') || messageType === 'control-status-message')) {
             console.info('[handleWebSocketMessage] 收到结束信号:', { targetThreadId, topic });
-            // 结束时序：
-            // 1) 先清理“正在思考...”
-            // 2) 发送最终文件内容
-            // 3) 最后解除执行态并解禁发送按钮
-            if (targetThreadId === AppState.currentThreadId) {
-                hideThinkingState();
-            }
-
             const pendingRedoTarget = resolvePendingRedoTarget(targetThreadId, topic);
             const redoThreadCtx = pendingRedoTarget
                 ? { messageId: pendingRedoTarget.messageId, topic: topic || null, pending: hasPendingRedoInThread(targetThreadId) }
                 : (redoThreadContextMap.get(targetThreadId) || null);
-            void emitLatestMarkdownContentToChat(targetThreadId, { force: true, redoContext: redoThreadCtx })
-                .then((sent) => {
-                    if (!sent) {
-                        scheduleFinalReportBackfill(targetThreadId, redoThreadCtx);
-                    } else {
-                        finalReportRetryStateByThread.delete(targetThreadId);
-                    }
-                })
-                .finally(() => {
-                    void setThreadExecutingState(targetThreadId, false);
-                    unbindTopic(topic);
-                    const ctx = redoThreadContextMap.get(targetThreadId);
-                    if (ctx && !hasPendingRedoInThread(targetThreadId)) {
-                        ctx.locked = false;
-                        redoThreadContextMap.set(targetThreadId, ctx);
-                    }
-                    if (!hasPendingRedoInThread(targetThreadId)) {
-                        if (topic) redoTopicContextMap.delete(topic);
-                        redoThreadContextMap.delete(targetThreadId);
-                    }
-                    console.info('[handleWebSocketMessage] 结束流程完成:', { targetThreadId, topic });
-                });
+            startFinalReportPolling(targetThreadId, { topic, redoContext: redoThreadCtx });
+            console.info('[handleWebSocketMessage] 已进入最终报告轮询流程:', { targetThreadId, topic });
         }
     } catch (error) {
         console.error('处理 WebSocket 消息失败:', error);
@@ -3956,7 +4007,7 @@ async function fetchFinalReportByThreadId(targetThreadId) {
         }
         const payload = await response.json();
         const data = payload && payload.data ? payload.data : null;
-        if (!data || !data.content || !data.filePath) {
+        if (!data || !data.filePath) {
             console.warn('[fetchFinalReportByThreadId] 返回数据不完整:', { targetThreadId, payload });
             return null;
         }
@@ -3972,99 +4023,115 @@ async function fetchFinalReportByThreadId(targetThreadId) {
     }
 }
 
-function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function fetchFinalReportByThreadIdWithRetry(targetThreadId, options = {}) {
-    const maxAttempts = Number.isFinite(Number(options.maxAttempts)) ? Number(options.maxAttempts) : 8;
-    const intervalMs = Number.isFinite(Number(options.intervalMs)) ? Number(options.intervalMs) : 1200;
-    for (let i = 0; i < maxAttempts; i += 1) {
-        const report = await fetchFinalReportByThreadId(targetThreadId);
-        if (report && report.content && report.filePath) {
-            return report;
-        }
-        if (i < maxAttempts - 1) {
-            await sleep(intervalMs);
-        }
+function clearRedoContextForThread(threadId, topic = null) {
+    const ctx = redoThreadContextMap.get(threadId);
+    if (ctx && !hasPendingRedoInThread(threadId)) {
+        ctx.locked = false;
+        redoThreadContextMap.set(threadId, ctx);
     }
-    return null;
+    if (!hasPendingRedoInThread(threadId)) {
+        if (topic) redoTopicContextMap.delete(topic);
+        redoThreadContextMap.delete(threadId);
+    }
 }
 
-function scheduleFinalReportBackfill(targetThreadId, redoContext = null) {
-    if (!targetThreadId) return;
-    const state = finalReportRetryStateByThread.get(targetThreadId) || { attempts: 0, timer: null };
-    if (state.timer) return;
-    if (state.attempts >= 20) return;
+function isDagInitDataAllCompleted(initData) {
+    if (!initData || typeof initData !== 'object') return false;
+    const progress = initData.progress && typeof initData.progress === 'object' ? initData.progress : null;
+    if (progress) {
+        const completed = Number(progress.completed) || 0;
+        const inProgress = Number(progress.in_progress) || 0;
+        const blocked = Number(progress.blocked) || 0;
+        const notStarted = Number(progress.not_started) || 0;
+        const total = Number(progress.total) || (completed + inProgress + blocked + notStarted);
+        return total > 0 && completed === total;
+    }
+    const steps = Array.isArray(initData.steps) ? initData.steps : [];
+    const statuses = initData.step_statuses && typeof initData.step_statuses === 'object' ? initData.step_statuses : {};
+    if (steps.length === 0) return false;
+    let completedCount = 0;
+    for (let i = 0; i < steps.length; i += 1) {
+        const stepNo = i + 1;
+        const statusRec = statuses[`step_${stepNo}`] ?? statuses[stepNo] ?? statuses[String(stepNo)];
+        const status = typeof statusRec === 'string' ? statusRec : (statusRec?.status || '');
+        if (status === 'completed') completedCount += 1;
+    }
+    return completedCount === steps.length;
+}
 
-    state.attempts += 1;
-    state.timer = setTimeout(async () => {
-        const current = finalReportRetryStateByThread.get(targetThreadId) || state;
-        current.timer = null;
-        finalReportRetryStateByThread.set(targetThreadId, current);
+function startFinalReportPolling(threadId, options = {}) {
+    if (!threadId) return;
+    const existing = finalReportRetryStateByThread.get(threadId);
+    if (existing) {
+        existing.topic = options.topic || existing.topic || null;
+        existing.redoContext = options.redoContext || existing.redoContext || null;
+        finalReportRetryStateByThread.set(threadId, existing);
+        return;
+    }
 
-        const sent = await emitLatestMarkdownContentToChat(targetThreadId, {
+    const state = {
+        timer: null,
+        topic: options.topic || null,
+        redoContext: options.redoContext || null
+    };
+    finalReportRetryStateByThread.set(threadId, state);
+
+    const tick = async () => {
+        const current = finalReportRetryStateByThread.get(threadId);
+        if (!current) return;
+
+        if (!isThreadDagAllCompleted(threadId)) {
+            current.timer = setTimeout(tick, 3000);
+            finalReportRetryStateByThread.set(threadId, current);
+            return;
+        }
+
+        const sent = await emitLatestMarkdownContentToChat(threadId, {
             force: true,
-            redoContext,
-            retryConfig: { maxAttempts: 4, intervalMs: 1500 }
+            redoContext: current.redoContext
         });
         if (sent) {
-            finalReportRetryStateByThread.delete(targetThreadId);
-        } else {
-            scheduleFinalReportBackfill(targetThreadId, redoContext);
+            finalReportRetryStateByThread.delete(threadId);
+            if (current.topic) unbindTopic(current.topic);
+            clearRedoContextForThread(threadId, current.topic);
+            void setThreadExecutingState(threadId, false);
+            return;
         }
-    }, 3000);
 
-    finalReportRetryStateByThread.set(targetThreadId, state);
+        current.timer = setTimeout(tick, 3000);
+        finalReportRetryStateByThread.set(threadId, current);
+    };
+
+    state.timer = setTimeout(tick, 3000);
+    finalReportRetryStateByThread.set(threadId, state);
 }
 
 async function emitLatestMarkdownContentToChat(targetThreadId, options = {}) {
     if (!targetThreadId) return false;
 
-    const force = options.force === true;
     const redoContext = options.redoContext || null;
     const thread = getThreadById(targetThreadId);
     if (!thread) return false;
 
     try {
-        const report = options.retryConfig
-            ? await fetchFinalReportByThreadIdWithRetry(targetThreadId, options.retryConfig)
-            : await fetchFinalReportByThreadIdWithRetry(targetThreadId, { maxAttempts: 8, intervalMs: 1200 });
+        const report = await fetchFinalReportByThreadId(targetThreadId);
         if (!report) {
             console.warn('[emitLatestMarkdownContentToChat] 未获取到最终文件:', { targetThreadId });
             return false;
         }
 
         const filePath = report.filePath;
-        const content = String(report.content || '').trim();
-        if (!filePath || !content) return false;
-
-        const signature = `${report.workspaceId || ''}|${report.fileName || ''}|${filePath}`;
-        if (!force && finalConclusionContentSignatureByThread.get(targetThreadId) === signature) {
-            console.log('[emitLatestMarkdownContentToChat] 重复签名，跳过发送:', { targetThreadId, signature });
-            return true;
-        }
+        const content = String(report.content ?? '');
+        if (!filePath) return false;
 
         showMarkdownFileInRightPanel(filePath, report.fileName);
-
         const currentMessages = getRenderableMessagesFromThread(thread);
-        const lastAssistant = currentMessages.length
-            ? currentMessages[currentMessages.length - 1]
-            : null;
-        const alreadySame = !!(
-            lastAssistant &&
-            lastAssistant.role === 'assistant' &&
-            ((lastAssistant.metadata && lastAssistant.metadata.finalReportSignature === signature)
-                || (lastAssistant.meta && lastAssistant.meta.finalReportSignature === signature))
-        );
 
         if (redoContext && redoContext.messageId) {
             const targetMessages = currentMessages;
             const targetMessage = targetMessages.find((m) => m && ensureMessageId(m) === redoContext.messageId);
             if (targetMessage) {
                 applyRedoContentToTarget(targetThreadId, targetMessage, redoContext.messageId, content);
-
-                finalConclusionContentSignatureByThread.set(targetThreadId, signature);
                 console.info('[emitLatestMarkdownContentToChat] 重做结果回填成功:', { targetThreadId, filePath });
                 return true;
             }
@@ -4074,36 +4141,29 @@ async function emitLatestMarkdownContentToChat(targetThreadId, options = {}) {
 
         const replacedPending = resolvePendingAssistantPlaceholder(targetThreadId, content, {
             type: 'final_markdown_content',
-            finalMarkdownPath: filePath,
-            finalReportSignature: signature
+            finalMarkdownPath: filePath
         });
         if (replacedPending) {
-            finalConclusionContentSignatureByThread.set(targetThreadId, signature);
             console.info('[emitLatestMarkdownContentToChat] 正常占位消息已替换为最终内容:', { targetThreadId, filePath });
             return true;
         }
 
-        if (!alreadySame) {
-            const reportMessage = {
-                role: 'assistant',
-                content: content,
-                timestamp: Date.now(),
-                meta: {
-                    type: 'final_markdown_content',
-                    finalMarkdownPath: filePath,
-                    finalReportSignature: signature
-                }
-            };
-
-            if (targetThreadId === AppState.currentThreadId) {
-                addMessage(reportMessage);
-            } else {
-                addMessageToThreadStorage(thread, reportMessage);
-                renderFolderList();
+        const reportMessage = {
+            role: 'assistant',
+            content: content,
+            timestamp: Date.now(),
+            metadata: {
+                type: 'final_markdown_content',
+                finalMarkdownPath: filePath
             }
-        }
+        };
 
-        finalConclusionContentSignatureByThread.set(targetThreadId, signature);
+        if (targetThreadId === AppState.currentThreadId) {
+            addMessage(reportMessage);
+        } else {
+            addMessageToThreadStorage(thread, reportMessage);
+            renderFolderList();
+        }
         console.info('[emitLatestMarkdownContentToChat] 最终文件发送成功:', { targetThreadId, filePath });
         return true;
     } catch (error) {

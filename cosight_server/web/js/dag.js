@@ -806,6 +806,13 @@ function createDag(messageData) {
             }
             dagData.nodes = [];
             dagData.edges = [];
+            
+            // DAG 被清空时，同步清空任务详情
+            AppState.selectedTaskNodeId = null;
+            if (typeof window.rerenderTaskInfoBySelection === 'function') {
+                window.rerenderTaskInfoBySelection();
+            }
+            
             console.warn('[createDag] steps 为空，已清空 DAG');
             return true;
         }
@@ -927,6 +934,12 @@ function createDag(messageData) {
         const allGreen = doneStatuses.length > 0 && doneStatuses.every(v => v === 'completed');
         const p = initData.progress || {};
         const progressDone = Number(p.total || 0) > 0 && Number(p.completed || 0) >= Number(p.total || 0);
+        
+        // 自动重新渲染当前选中节点的详情（内容会自动更新）
+        if (typeof window.rerenderTaskInfoBySelection === 'function') {
+            window.rerenderTaskInfoBySelection();
+        }
+        
         console.info('[createDag] DAG 已更新:', {
             nodes: dagData.nodes.length,
             edges: dagData.edges.length,

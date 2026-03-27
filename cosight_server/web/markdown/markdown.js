@@ -176,8 +176,13 @@
           </div>
         `;
         
-        // 替换原元素
-        element.parentNode.replaceChild(wrapper, element);
+        // 替换原元素（容错处理 parentNode 可能为 null 的情况）
+        const parentEl = element.parentNode;
+        if (!parentEl) {
+          console.warn('Mermaid Node has no parent, skip replacement');
+          continue;
+        }
+        parentEl.replaceChild(wrapper, element);
         
         // 渲染 SVG
         const svgContainer = wrapper.querySelector('.mermaid-svg-container');

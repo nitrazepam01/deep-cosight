@@ -259,34 +259,31 @@ async def get_thread_final_report(thread_id: str):
         if (not os.path.isdir(workspace_dir)) or (not _is_safe_workspace_dir(workspace_root, workspace_dir)):
             return json_result(404, 'Workspace directory not found', None)
 
-        text_exts = {".md", ".html", ".txt", ".json", ".csv", ".xml"}
-        preferred_candidates = []
-        fallback_candidates = []
+        file_candidates = []
         for name in os.listdir(workspace_dir):
             abs_path = os.path.join(workspace_dir, name)
             if not os.path.isfile(abs_path):
+                continue
+            if os.path.splitext(name)[1].lower() != ".md":
                 continue
             try:
                 mtime = os.path.getmtime(abs_path)
             except Exception:
                 continue
-            ext = os.path.splitext(name)[1].lower()
-            item = (name, abs_path, mtime)
-            if ext in text_exts:
-                preferred_candidates.append(item)
-            else:
-                fallback_candidates.append(item)
-
-        file_candidates = preferred_candidates if preferred_candidates else fallback_candidates
+            file_candidates.append((name, abs_path, mtime))
         if not file_candidates:
-            return json_result(404, 'No file found in workspace', None)
+            return json_result(404, 'No markdown file found in workspace', None)
 
         # 直接取最后保存（修改时间最新）的文件
         file_candidates.sort(key=lambda item: item[2])
         target_name, target_abs_path, _ = file_candidates[-1]
 
-        with open(target_abs_path, "r", encoding="utf-8") as f:
-            content = f.read()
+        try:
+            with open(target_abs_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except UnicodeDecodeError:
+            with open(target_abs_path, "rb") as f:
+                content = f.read().decode("utf-8", errors="replace")
 
         rel_path = f"work_space/{workspace_id}/{target_name}"
         return json_result(0, 'success', {

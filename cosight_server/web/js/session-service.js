@@ -144,6 +144,7 @@ class SessionService {
             return window.TreeMessageService.createTree();
         }
         const rootId = threadId ? `root-${threadId}` : `root-${Date.now()}`;
+        const now = Date.now();
         return {
             rootId,
             nodes: {
@@ -152,16 +153,22 @@ class SessionService {
                     parentId: null,
                     role: 'system',
                     content: 'ROOT',
-                    timestamp: Date.now(),
+                    timestamp: now,
                     deleted: false,
                     children: [],
+                    isActive: true,
                     branchId: 'main',
                     version: 1,
                     metadata: {}
                 }
             },
             branches: { main: { rootId, active: true, name: '主分支' } },
-            activeBranch: 'main'
+            activeBranch: 'main',
+            activePath: [{ nodeId: rootId, role: 'system', timestamp: now }],
+            metadata: {
+                lastActiveMessageId: rootId,
+                lastSwitchTime: now
+            }
         };
     }
 
@@ -217,6 +224,8 @@ class SessionService {
 
         messageTree = this.repairMessageTreeShape(messageTree, threadId);
 
+        // 仅支持新版本树结构。旧数据清空后可直接使用。
+        // 不再自动进行历史兼容修复（用户已声明会手动处理旧数据）。
         let linearMessages = [];
         if (window.TreeMessageService && typeof window.TreeMessageService.convertToLinear === 'function') {
             linearMessages = window.TreeMessageService.convertToLinear(messageTree);
@@ -269,8 +278,12 @@ class SessionService {
             if (node.id === tree.rootId) {
                 node.parentId = null;
                 node.role = node.role || 'system';
+                node.isActive = true;
             } else if (!node.parentId || !tree.nodes[node.parentId]) {
                 node.parentId = tree.rootId;
+            }
+            if (node.isActive === undefined) {
+                node.isActive = false;
             }
         });
 
@@ -282,6 +295,36 @@ class SessionService {
                 parent.children.push(nodeId);
             }
         });
+
+        // 修复 activePath
+        if (!Array.isArray(tree.activePath) || tree.activePath.length === 0) {
+            if (window.TreeMessageService && typeof window.TreeMessageService.buildActivePathFromTree === 'function') {
+                tree.activePath = window.TreeMessageService.buildActivePathFromTree(tree);
+            } else {
+                tree.activePath = [{ nodeId: tree.rootId, role: 'system', timestamp: Date.now() }];
+            }
+        }
+
+        // 同步 isActive 标记与 activePath
+        const activePathSet = new Set((tree.activePath || []).map(item => item.nodeId));
+        Object.keys(tree.nodes).forEach((nodeId) => {
+            const node = tree.nodes[nodeId];
+            if (!node || typeof node !== 'object') return;
+            node.isActive = activePathSet.has(nodeId);
+            if (!node.isActive) {
+                node.children = [];
+            }
+        });
+
+        if (!tree.metadata || typeof tree.metadata !== 'object') {
+            tree.metadata = {};
+        }
+        if (!tree.metadata.lastActiveMessageId && tree.activePath && tree.activePath.length > 0) {
+            tree.metadata.lastActiveMessageId = tree.activePath[tree.activePath.length - 1].nodeId;
+        }
+        if (!tree.metadata.lastSwitchTime) {
+            tree.metadata.lastSwitchTime = Date.now();
+        }
 
         return tree;
     }
