@@ -254,7 +254,7 @@ class WebsocketService {
             return;
         }
         const type = respData?.data?.contentType || respData?.data?.type || 'unknown';
-        console.log('[WebsocketService] 收到消息:', { type, topic: respData.topic });
+        console.debug('[WebsocketService] 收到消息:', { type, topic: respData.topic });
 
         // 触发自定义事件
         this._receiveMessage.dispatchEvent(new CustomEvent('message', {

@@ -813,7 +813,6 @@ function createDag(messageData) {
                 window.rerenderTaskInfoBySelection();
             }
             
-            console.warn('[createDag] steps 为空，已清空 DAG');
             return true;
         }
         if (!initData.dependencies || typeof initData.dependencies !== 'object') {
@@ -939,15 +938,9 @@ function createDag(messageData) {
         if (typeof window.rerenderTaskInfoBySelection === 'function') {
             window.rerenderTaskInfoBySelection();
         }
-        
-        console.info('[createDag] DAG 已更新:', {
-            nodes: dagData.nodes.length,
-            edges: dagData.edges.length,
-            progressDone,
-            allGreen
-        });
 
         return true
+
     } catch (error) {
         console.error('创建DAG图时发生错误:', error);
         return false;
