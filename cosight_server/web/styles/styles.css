@@ -1407,6 +1407,11 @@ select.settings-input option:checked {
     max-width: 100%;
 }
 
+.message-bubble.markdown-body {
+    margin: 0 !important;
+    max-width: 100% !important;
+}
+
 .message-item.assistant .message-bubble {
     background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
     color: #333;
