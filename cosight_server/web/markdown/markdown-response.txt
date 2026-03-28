@@ -85,7 +85,7 @@ import React, { useState } from 'react';
 
 function Counter({ initialValue = 0 }) {
     const [count, setCount] = useState(initialValue);
-    
+
     return (
         <div className="counter">
             <h1>计数：{count}</h1>
@@ -208,7 +208,7 @@ sequenceDiagram
     participant F as 前端
     participant A as API
     participant D as 数据库
-    
+
     U->>F: 输入查询
     F->>A: 发送请求
     A->>D: 查询数据
@@ -267,7 +267,7 @@ pie
 ### 块引用
 
 > "足球是圆的，什么结果都可能出现。"
-> 
+>
 > —— 著名足球教练 希斯菲尔德
 
 > **注意**：本文档中的所有数据均为示例数据。
