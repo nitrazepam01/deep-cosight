@@ -116,9 +116,7 @@ class TreeMessageService {
                 branchId: branchId,
                 version: (tree.nodes[redoTargetId].version || 1) + 1,
                 metadata: {
-                    ...(message.metadata || {}),
-                    redoOf: redoTargetId,
-                    redoVersion: (tree.nodes[redoTargetId].version || 1) + 1
+                    ...(message.metadata || {})
                 }
             };
 
@@ -296,10 +294,20 @@ class TreeMessageService {
             return tree;
         }
 
+        // 先把同父节点的所有版本都设为非活跃
+        const siblingIds = Array.isArray(tree.nodes[currentNode.parentId]?.children)
+            ? tree.nodes[currentNode.parentId].children
+            : [];
+        siblingIds.forEach((siblingId) => {
+            const siblingNode = tree.nodes[siblingId];
+            if (siblingNode && siblingNode.role === 'assistant') {
+                siblingNode.isActive = false;
+            }
+        });
+
         // 转移子节点
         const childrenToTransfer = Array.isArray(currentNode.children) ? [...currentNode.children] : [];
         currentNode.children = [];
-        currentNode.isActive = false;
 
         targetNode.children = childrenToTransfer;
         targetNode.isActive = true;
@@ -456,10 +464,46 @@ class TreeMessageService {
             if (!node) return;
 
             if (!node.deleted && node.role !== 'system' && activePathIds.has(nodeId)) {
-                result.push({ ...node, depth });
+                const clonedNode = { ...node, depth };
+
+                if (node.role === 'assistant' && node.parentId && tree.nodes[node.parentId]) {
+                    const parent = tree.nodes[node.parentId];
+                    const siblingIds = Array.isArray(parent.children) ? parent.children : [];
+                    const versions = siblingIds
+                        .map(id => tree.nodes[id])
+                        .filter(item => item && item.role === 'assistant' && !item.deleted)
+                        .sort((a, b) => (Number(a.version) || 0) - (Number(b.version) || 0));
+
+                    if (versions.length > 1) {
+                        const existingRedoState = (node._redoState && typeof node._redoState === 'object') ? node._redoState : {};
+                        const redoHistory = versions.map((version) => ({
+                            id: version.id || this.generateId('redo'),
+                            timestamp: Number(version.timestamp) || Date.now(),
+                            content: String(version.content || ''),
+                            pending: !!(version.metadata && version.metadata.pendingPlaceholder === true),
+                            deleted: !!version.deleted
+                        }));
+                        let currentIndex = Math.max(0, versions.findIndex(v => v.id === nodeId));
+                        if (Number.isFinite(Number(existingRedoState.currentIndex))) {
+                            const index = Number(existingRedoState.currentIndex);
+                            if (index >= 0 && index < redoHistory.length) {
+                                currentIndex = index;
+                            }
+                        }
+                        clonedNode._redoState = {
+                            enabled: true,
+                            pending: !!existingRedoState.pending,
+                            history: redoHistory,
+                            currentIndex,
+                            updatedAt: existingRedoState.updatedAt || Date.now(),
+                            redoThreads: Array.isArray(existingRedoState.redoThreads) ? existingRedoState.redoThreads : []
+                        };
+                    }
+                }
+
+                result.push(clonedNode);
             }
 
-            // 仅遍历活跃节点的子节点
             if (node.isActive && Array.isArray(node.children)) {
                 node.children.forEach(childId => traverse(childId, depth + 1));
             }

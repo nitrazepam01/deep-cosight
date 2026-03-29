@@ -1152,6 +1152,19 @@ select.settings-input option:checked {
     left: 50%;
     transform: translate(-50%);
     flex-shrink: 0;
+    max-width: 50%;
+}
+
+.main-title h2 {
+    font-size: 18px;
+    color: #333;
+    font-weight: 600;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: inline-block;
 }
 
 .main-actions {
@@ -2027,6 +2040,19 @@ select.settings-input option:checked {
     gap: 10px;
     font-size: 16px;
     font-weight: 600;
+    width: 80%;
+    max-width: 80%;
+    min-width: 0;
+    flex: 0 0 80%;
+}
+
+.sidebar-right-title span {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .sidebar-right-title i {

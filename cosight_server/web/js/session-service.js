@@ -172,50 +172,6 @@ class SessionService {
         };
     }
 
-    convertNestedTreeMessagesToTree(treeMessages, threadId = null) {
-        const tree = this.createEmptyMessageTree(threadId);
-        const rootId = tree.rootId;
-        if (!Array.isArray(treeMessages) || treeMessages.length === 0) {
-            return tree;
-        }
-
-        const walk = (node, parentId) => {
-            if (!node || typeof node !== 'object') return;
-            const nodeId = node.id || this.generateId('msg');
-            if (tree.nodes[nodeId]) return;
-
-            tree.nodes[nodeId] = {
-                id: nodeId,
-                parentId: parentId || rootId,
-                role: node.role || 'assistant',
-                content: node.content || '',
-                timestamp: node.timestamp || Date.now(),
-                deleted: !!(node.deleted || node.isDeleted),
-                children: [],
-                branchId: node.branchId || 'main',
-                version: Number(node.version) || 1,
-                metadata: node.metadata && typeof node.metadata === 'object' ? node.metadata : {}
-            };
-
-            if (tree.nodes[parentId || rootId]) {
-                const siblings = tree.nodes[parentId || rootId].children;
-                if (!siblings.includes(nodeId)) siblings.push(nodeId);
-            }
-
-            const children = Array.isArray(node.children) ? node.children : [];
-            children.forEach(child => {
-                walk(child, nodeId);
-                const childId = child && (child.id || child._messageId);
-                if (childId && tree.nodes[childId] && !tree.nodes[nodeId].children.includes(childId)) {
-                    tree.nodes[nodeId].children.push(childId);
-                }
-            });
-        };
-
-        treeMessages.forEach(item => walk(item, rootId));
-        return tree;
-    }
-
     normalizeThreadMessageData(thread) {
         const threadId = thread?.id || null;
         let messageTree = (thread && thread.messageTree && typeof thread.messageTree === 'object')
@@ -226,14 +182,7 @@ class SessionService {
 
         // 仅支持新版本树结构。旧数据清空后可直接使用。
         // 不再自动进行历史兼容修复（用户已声明会手动处理旧数据）。
-        let linearMessages = [];
-        if (window.TreeMessageService && typeof window.TreeMessageService.convertToLinear === 'function') {
-            linearMessages = window.TreeMessageService.convertToLinear(messageTree);
-        } else if (Array.isArray(thread?.messages)) {
-            linearMessages = thread.messages;
-        }
-
-        return { messageTree, linearMessages };
+        return { messageTree };
     }
 
     repairMessageTreeShape(messageTree, threadId = null) {
@@ -284,6 +233,13 @@ class SessionService {
             }
             if (node.isActive === undefined) {
                 node.isActive = false;
+            }
+            if (node.metadata && typeof node.metadata === 'object') {
+                ['pendingPlaceholder', 'pendingKind', 'redoOf', 'redoVersion', 'pendingTopic', 'redoState'].forEach((key) => {
+                    if (Object.prototype.hasOwnProperty.call(node.metadata, key)) {
+                        delete node.metadata[key];
+                    }
+                });
             }
         });
 
@@ -409,7 +365,9 @@ class SessionService {
                     folder.threads.forEach(thread => {
                         const normalizedMessageData = this.normalizeThreadMessageData(thread);
                         const messageTree = normalizedMessageData.messageTree;
-                        const linearMessages = normalizedMessageData.linearMessages;
+                        const treeNodes = messageTree.nodes || {};
+                        const defaultMessageCount = Math.max(0, Object.keys(treeNodes).length - 1);
+                        const defaultActiveMessageCount = Object.values(treeNodes).filter(node => node && node.id !== messageTree.rootId && !node.deleted).length;
 
                         normalizedFolder.threads.push({
                             id: thread.id || this.generateId('thread'),
@@ -419,18 +377,16 @@ class SessionService {
                             updatedAt: thread.updatedAt || Date.now(),
                             messageCount: Number.isFinite(Number(thread.messageCount))
                                 ? Number(thread.messageCount)
-                                : linearMessages.length,
+                                : defaultMessageCount,
                             activeMessageCount: Number.isFinite(Number(thread.activeMessageCount))
                                 ? Number(thread.activeMessageCount)
-                                : linearMessages.length,
+                                : defaultActiveMessageCount,
                             starred: thread.starred || false,
                             messageTree: messageTree, // 树形消息结构
-                            messages: linearMessages, // 兼容旧逻辑的线性镜像
+                            messages: [],
                             userRenamedTitle: thread.userRenamedTitle === true,
                             autoRenamedByTask: thread.autoRenamedByTask === true,
-                            rightPanelState: thread.rightPanelState && typeof thread.rightPanelState === 'object'
-                                ? thread.rightPanelState
-                                : {},
+                            rightPanelState: this.normalizeRightPanelState(thread.rightPanelState),
                             isExecuting: !!thread.isExecuting,
                             statusUpdatedAt: thread.statusUpdatedAt || thread.updatedAt || Date.now()
                         });
@@ -456,6 +412,23 @@ class SessionService {
         return normalized;
     }
 
+    normalizeRightPanelState(rawRightPanelState) {
+        if (!rawRightPanelState || typeof rawRightPanelState !== 'object') {
+            return {};
+        }
+        try {
+            return JSON.parse(JSON.stringify(rawRightPanelState));
+        } catch (error) {
+            const normalized = {};
+            Object.entries(rawRightPanelState).forEach(([key, value]) => {
+                if (value !== undefined) {
+                    normalized[key] = value;
+                }
+            });
+            return normalized;
+        }
+    }
+
     /**
      * 从 localStorage 加载数据
      */
@@ -478,7 +451,6 @@ class SessionService {
     saveToLocalStorage() {
         try {
             if (!this.sessionsData) return;
-            
             this.sessionsData.updatedAt = Date.now();
             localStorage.setItem('cosight:sessionsData', JSON.stringify(this.sessionsData));
         } catch (error) {
@@ -647,7 +619,7 @@ class SessionService {
      * 更新会话（调用后端 API）- 标星、重命名等
      */
     async updateThread(threadId, updates) {
-        const normalizedUpdates = { ...updates };
+        const normalizedUpdates = this.filterThreadUpdatePayload({ ...updates });
 
         // 先立即更新本地缓存（不等待后端响应，确保 UI 立即生效）
         if (this.sessionsData) {
@@ -662,6 +634,33 @@ class SessionService {
         // 然后调用后端 API 保存
         const result = await this._put(`/thread/${threadId}`, normalizedUpdates);
         return result;
+    }
+
+    filterThreadUpdatePayload(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return {};
+        }
+        const allowedFields = new Set([
+            'title',
+            'starred',
+            'folderId',
+            'messageTree',
+            'messageCount',
+            'activeMessageCount',
+            'rightPanelState',
+            'userRenamedTitle',
+            'autoRenamedByTask',
+            'isExecuting',
+            'statusUpdatedAt',
+            'updatedAt'
+        ]);
+        const normalized = {};
+        Object.keys(payload).forEach(key => {
+            if (allowedFields.has(key) && payload[key] !== undefined) {
+                normalized[key] = payload[key];
+            }
+        });
+        return normalized;
     }
 
     /**
@@ -751,14 +750,22 @@ class SessionService {
         if (this.sessionsData && normalized) {
             const thread = this.getThread(threadId);
             if (thread) {
-                const localUpdatedAt = Number(thread.updatedAt) || 0;
-                const remoteUpdatedAt = Number(normalized.updatedAt) || 0;
-                if (remoteUpdatedAt >= localUpdatedAt) {
-                    Object.assign(thread, normalized);
+                Object.assign(thread, normalized);
+            } else {
+                const folderId = normalized.folderId || 'default';
+                let folder = this.sessionsData.folders.find(f => f.id === folderId);
+                if (!folder) {
+                    folder = this.getDefaultFolder();
                 }
-                this.saveToLocalStorage();
-                this.syncToAppState();
+                if (folder) {
+                    if (!Array.isArray(folder.threads)) {
+                        folder.threads = [];
+                    }
+                    folder.threads.push(normalized);
+                }
             }
+            this.saveToLocalStorage();
+            this.syncToAppState();
         }
         return normalized;
     }

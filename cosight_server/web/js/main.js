@@ -29,6 +29,9 @@ const redoThreadContextMap = new Map();
 const thinkingTitleRotationStateByThread = new Map();
 let thinkingIndicatorRefreshTimer = null;
 const finalReportRetryStateByThread = new Map();
+const threadCompletionHandled = new Set();
+const RIGHT_PANEL_COMPLETED_STATUS_TEXT = '执行完成';
+let displayThreadId = null; // 当前显示的thread，用于redo切换
 
 // ==================== 工具函数 ====================
 
@@ -678,7 +681,9 @@ const AppState = {
     initialRuntimeLogsCleared: false,
     initialized: false,
     // 任务节点查看记忆：taskId -> nodeId 映射
-    taskNodeViewMemory: new Map()
+    taskNodeViewMemory: new Map(),
+    // 线程任务状态保存：threadId -> {runtimeLogActiveTaskId, selectedTaskNodeId} 映射，用于切换会话时保持任务状态
+    threadTaskStateMemory: new Map()
 };
 
 const DEFAULT_FOLDER_ID = 'default';
@@ -746,6 +751,22 @@ function bindTopicToThread(topic, threadId) {
 function unbindTopic(topic) {
     if (!topic) return;
     delete AppState.topicThreadMap[topic];
+    try {
+        const pendingRaw = localStorage.getItem('cosight:pendingRequests');
+        if (pendingRaw) {
+            const pendings = JSON.parse(pendingRaw);
+            if (pendings && Object.prototype.hasOwnProperty.call(pendings, topic)) {
+                delete pendings[topic];
+                const keys = Object.keys(pendings);
+                if (keys.length === 0) {
+                    localStorage.removeItem('cosight:pendingRequests');
+                } else {
+                    localStorage.setItem('cosight:pendingRequests', JSON.stringify(pendings));
+                }
+            }
+        }
+    } catch (e) {
+    }
 }
 
 function getThreadIdByTopic(topic) {
@@ -1446,6 +1467,21 @@ function getThreadById(threadId) {
     return null;
 }
 
+function findMessageByIdInAllThreads(messageId) {
+    if (!messageId || typeof messageId !== 'string') return null;
+    for (const folder of getAllFolders()) {
+        for (const thread of folder.threads || []) {
+            const messages = getRenderableMessagesFromThread(thread);
+            const found = (messages || []).find((m) => m && ensureMessageId(m) === messageId);
+            if (found) {
+                return { thread, message: found };
+            }
+        }
+    }
+    return null;
+}
+
+
 function createNewThread(title, folderId = DEFAULT_FOLDER_ID) {
     const normalizedFolderId = folderId || DEFAULT_FOLDER_ID;
     const thread = {
@@ -1486,7 +1522,33 @@ function createNewThread(title, folderId = DEFAULT_FOLDER_ID) {
 async function switchThread(threadId) {
     if (threadId === AppState.currentThreadId) return;
 
+    // 保存当前线程的任务执行状态
+    const currentExecuting = isThreadExecuting(AppState.currentThreadId);
+    const targetExecuting = isThreadExecuting(threadId);
+    if (currentExecuting) {
+        console.info('[switchThread] 当前线程正在执行任务，允许切换会话并保存任务状态', {
+            current: AppState.currentThreadId,
+            target: threadId,
+            targetExecuting
+        });
+    }
+
+    if (AppState.currentThreadId) {
+        AppState.threadTaskStateMemory.set(AppState.currentThreadId, {
+            runtimeLogActiveTaskId: AppState.runtimeLogActiveTaskId,
+            selectedTaskNodeId: AppState.selectedTaskNodeId,
+            taskInfoMode: AppState.taskInfoMode
+        });
+        console.debug('[switchThread] 保存线程任务状态', {
+            threadId: AppState.currentThreadId,
+            state: AppState.threadTaskStateMemory.get(AppState.currentThreadId)
+        });
+    }
+
     AppState.currentThreadId = threadId;
+    AppState.runtimeLogActiveTaskId = null;
+    AppState.selectedTaskNodeId = null;
+    AppState.taskInfoMode = 'detail';
 
     // 获取当前会话所在的文件夹 ID
     const thread = getThreadById(threadId);
@@ -1583,8 +1645,8 @@ function clearDagViewState() {
                         dependencies: {},
                         progress: {
                             completed: 0,
-                            in_progress: 0,
                             blocked: 0,
+                            in_progress: 0,
                             not_started: 0,
                             total: 0
                         }
@@ -1597,6 +1659,18 @@ function clearDagViewState() {
     
     // 同时清理 progress-overview 显示
     clearProgressOverview();
+
+    // 重试或重置时，清空当前线程已缓存的 DAG 结构，避免旧完成状态误导状态文案
+    try {
+        const currentThread = getCurrentThread();
+        if (currentThread) {
+            currentThread.rightPanelState = currentThread.rightPanelState || {};
+            currentThread.rightPanelState.dagInitData = null;
+            schedulePersistRightPanelState(currentThread.threadId, { dagInitData: null });
+        }
+    } catch (err) {
+        console.warn('[clearDagViewState] 清理线程 DAG 缓存失败：', err);
+    }
 }
 
 // 清理 progress-overview 显示
@@ -1916,7 +1990,7 @@ function getActiveTaskLogsForThread(threadId) {
     const book = normalizeRuntimeLogBook(rightPanelState.runtimeLogBook);
     rightPanelState.runtimeLogBook = book;
 
-    const activeTaskId = AppState.runtimeLogActiveTaskId || book.activeTaskId;
+    const activeTaskId = book.activeTaskId || AppState.runtimeLogActiveTaskId || (book.tasks.length ? book.tasks[0]?.taskId : null);
     const activeTask = getTaskByIdFromBook(book, activeTaskId) || (book.tasks.length ? book.tasks[0] : null);
     if (!activeTask) return [];
 
@@ -1960,6 +2034,7 @@ async function restoreRightPanelByThread(threadId) {
     migrateLegacyRuntimeLogsToBook(localThread);
     const rightPanelState = ensureThreadRightPanelState(localThread);
     const dagInitData = rightPanelState.dagInitData || null;
+    void maybeHandleRightPanelStateCompletion(threadId, rightPanelState);
     const runtimeLogs = getActiveTaskLogsForThread(threadId);
 
     if (dagInitData && typeof createDag === 'function') {
@@ -1969,7 +2044,8 @@ async function restoreRightPanelByThread(threadId) {
         }
     }
 
-    clearRuntimeLogs();
+    // 这里不清 activeTaskId，否则定位会被覆盖成未知
+    clearRuntimeLogs(true);
     runtimeLogs
         .map(normalizeRuntimeLogItem)
         .filter(Boolean)
@@ -1993,24 +2069,67 @@ async function restoreRightPanelByThread(threadId) {
 }
 
 async function loadThread(threadId) {
-    const thread = getThreadById(threadId);
+    // 切换时优先从后端/文件读取最新线程数据
+    let thread = getThreadById(threadId);
+    if (window.SessionService && typeof window.SessionService.getThreadFromBackend === 'function') {
+        try {
+            const backendThread = await window.SessionService.getThreadFromBackend(threadId);
+            if (backendThread) {
+                thread = backendThread;
+            }
+        } catch (e) {
+            console.warn('[loadThread] 从后端读取线程失败，使用本地缓存', e);
+        }
+    }
 
     if (!thread) return;
 
     syncConversationTitleWithCurrentThread();
-    resetExecutionTitle();
-    clearRuntimeLogs();
-    AppState.selectedTaskNodeId = null;
-    rerenderTaskInfoBySelection();
-    await restoreRightPanelByThread(threadId);
-
-    // 先取历史，再向后端确认状态，最后统一渲染（避免先显示错误思考态）
-    const messages = getRenderableMessagesFromThread(thread);
+    
+    // 先从后端确认线程执行状态，再决定是否恢复保存的任务状态
     const executing = await fetchThreadExecutionStatus(threadId);
     if (threadId !== AppState.currentThreadId) return;
 
+    // 先加载消息
+    const messages = getRenderableMessagesFromThread(thread);
     loadMessages(messages);
+
     isTaskExecuting = isThreadExecuting(threadId);
+    
+    // 如果线程正在执行，先获取保存的任务状态
+    const savedTaskState = AppState.threadTaskStateMemory.get(threadId);
+    const hasExecutingTaskState = savedTaskState && isTaskExecuting;
+    if (hasExecutingTaskState) {
+        AppState.runtimeLogActiveTaskId = savedTaskState.runtimeLogActiveTaskId || null;
+        AppState.selectedTaskNodeId = savedTaskState.selectedTaskNodeId || null;
+        AppState.taskInfoMode = savedTaskState.taskInfoMode || 'detail';
+    }
+    
+    // 根据是否有正在执行的任务，决定是否清空右侧栏
+    if (!hasExecutingTaskState) {
+        // 无执行任务的线程优先使用树最下层 active msg 的 finalJsonPath 渲染右侧栏
+        resetExecutionTitle();
+        clearRuntimeLogs();
+        AppState.selectedTaskNodeId = null;
+        rerenderTaskInfoBySelection();
+        await restoreRightPanelByNonExecutingThread(thread);
+    } else {
+        // 线程正在执行，保留之前的右侧栏状态，只更新 DAG
+        resetExecutionTitle();
+        await restoreRightPanelByThread(threadId);
+        
+        // 恢复执行中的线程的视图选择状态（不覆盖当前任务 activeTaskId）
+        AppState.selectedTaskNodeId = savedTaskState.selectedTaskNodeId;
+        AppState.taskInfoMode = savedTaskState.taskInfoMode || 'detail';
+        console.info('[loadThread] 恢复执行中的线程任务显示状态', {
+            threadId,
+            state: savedTaskState,
+            isExecuting: true
+        });
+        
+        rerenderTaskInfoBySelection();
+    }
+    
     updateSendButtonState();
     syncThinkingStateWithCurrentThread();
 }
@@ -2073,6 +2192,7 @@ function createMessageElement(message) {
     div.className = `message-item ${message.role}`;
     const messageId = ensureMessageId(message);
     div.dataset.messageId = messageId;
+    div.dataset.originalMessageId = messageId;
 
     // 为用户消息应用气泡颜色主题
     if (message.role === 'user') {
@@ -2160,6 +2280,12 @@ function ensureMessageId(message) {
     return message._messageId;
 }
 
+function findMessageElementByMessageId(messageId) {
+    if (!messageId) return null;
+    const selector = `.message-item[data-message-id="${messageId}"], .message-item[data-original-message-id="${messageId}"]`;
+    return document.querySelector(selector);
+}
+
 function hasPendingRequestForThread(threadId) {
     if (!threadId) return false;
     try {
@@ -2213,6 +2339,58 @@ function hydrateMessageRuntimeFromMetadata(message) {
     return message;
 }
 
+function mergeRedoMessageIntoOriginal(originalMessage, redoMessage) {
+    if (!originalMessage || !redoMessage) return;
+    const originalState = ensureRedoState(originalMessage);
+    originalState.enabled = true;
+    const redoContent = String(redoMessage.content || '');
+    const redoTimestamp = Number(redoMessage.timestamp) || Date.now();
+    const pendingIndex = originalState.history.findIndex((item) => item && item.pending === true && item.deleted !== true);
+    if (pendingIndex >= 0) {
+        originalState.history[pendingIndex] = {
+            ...normalizeRedoHistoryEntry(originalState.history[pendingIndex], originalMessage, pendingIndex),
+            content: redoContent,
+            timestamp: redoTimestamp,
+            pending: false
+        };
+    } else {
+        originalState.history.push(createRedoHistoryEntry(redoContent, redoTimestamp));
+    }
+    const visibleHistory = getVisibleRedoHistory(originalState);
+    originalState.currentIndex = Math.max(0, visibleHistory.length - 1);
+    originalState.pending = false;
+    originalState.updatedAt = Date.now();
+    if (!originalMessage.metadata || typeof originalMessage.metadata !== 'object') {
+        originalMessage.metadata = {};
+    }
+    // Keep redo state only in runtime _redoState; do not persist it into metadata.
+}
+
+function filterAndMergeRedoOfMessages(messages) {
+    if (!Array.isArray(messages)) return messages;
+    const messageById = new Map();
+    messages.forEach((msg) => {
+        if (!msg || typeof msg !== 'object') return;
+        const messageId = ensureMessageId(msg);
+        if (messageId) {
+            messageById.set(messageId, msg);
+        }
+    });
+
+    messages.forEach((msg) => {
+        if (!msg || msg.role !== 'assistant') return;
+        const metadata = (msg.metadata && typeof msg.metadata === 'object') ? msg.metadata : {};
+        const redoOfId = String(metadata.redoOf || metadata.redo_of || '').trim();
+        if (!redoOfId) return;
+        const originalMessage = messageById.get(redoOfId);
+        if (!originalMessage || originalMessage === msg) return;
+        mergeRedoMessageIntoOriginal(originalMessage, msg);
+        msg._skipRender = true;
+    });
+
+    return messages.filter((msg) => !msg || !msg._skipRender);
+}
+
 function persistMessageStateToThread(thread, message, options = {}) {
     if (!thread || !message) return;
     const messageId = ensureMessageId(message);
@@ -2230,22 +2408,36 @@ function persistMessageStateToThread(thread, message, options = {}) {
         const baseMeta = (node.metadata && typeof node.metadata === 'object') ? node.metadata : {};
         const msgMeta = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
         const mergedMeta = { ...baseMeta, ...msgMeta };
-        const serializedRedoState = sanitizeRedoStateForStorage(message._redoState);
-        if (serializedRedoState) {
-            mergedMeta.redoState = serializedRedoState;
-        } else if (Object.prototype.hasOwnProperty.call(mergedMeta, 'redoState')) {
-            delete mergedMeta.redoState;
+        const shouldPreservePlaceholderMeta = msgMeta.pendingPlaceholder === true;
+        const blacklistedMetaKeys = ['redoOf', 'redoVersion', 'redoState'];
+        if (!shouldPreservePlaceholderMeta) {
+            blacklistedMetaKeys.push('pendingPlaceholder', 'pendingKind', 'pendingTopic');
+        }
+        blacklistedMetaKeys.forEach((key) => {
+            if (Object.prototype.hasOwnProperty.call(mergedMeta, key)) {
+                delete mergedMeta[key];
+            }
+        });
+        if (msgMeta && typeof msgMeta === 'object') {
+            Object.keys(msgMeta).forEach((metaKey) => {
+                if (msgMeta[metaKey] === null) {
+                    delete mergedMeta[metaKey];
+                }
+            });
         }
         node.metadata = mergedMeta;
         message.metadata = mergedMeta;
-    } else if (message._redoState) {
-        message.metadata = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
-        message.metadata.redoState = sanitizeRedoStateForStorage(message._redoState);
     }
 }
 
 function renderAssistantContentToBubble(bubbleEl, content) {
     if (!bubbleEl) return;
+    const trimmed = String(content || '').trim();
+    if (trimmed === '') {
+        renderPendingPlaceholderToBubble(bubbleEl, AppState.currentThreadId || '');
+        return;
+    }
+    bubbleEl.innerHTML = '';
     if (window.MarkdownRenderer && typeof window.MarkdownRenderer.render === 'function') {
         window.MarkdownRenderer.render(content, bubbleEl);
     } else {
@@ -2253,10 +2445,24 @@ function renderAssistantContentToBubble(bubbleEl, content) {
     }
 }
 
+function renderPendingPlaceholderToBubble(bubbleEl, threadId) {
+    if (!bubbleEl) return;
+    const startedAt = Date.now();
+    const threadIdAttr = String(threadId || '');
+    bubbleEl.innerHTML = `
+        <div class="thinking-indicator" data-thinking-kind="normal" data-thread-id="${threadIdAttr}" data-start-ts="${startedAt}">
+            <i class="fas fa-cog loading-spinner"></i>
+            <span class="thinking-label">正在制定问题解决方案</span>
+        </div>
+    `;
+}
+
 function renderMessageBubbleContent(message, bubbleEl) {
     if (!message || !bubbleEl) return;
     const metadata = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
-    if (message.role === 'assistant' && metadata.pendingPlaceholder === true) {
+    const isPendingPlaceholder = message.role === 'assistant' && metadata.pendingPlaceholder === true;
+    const isEmptyAssistantMessage = message.role === 'assistant' && String(message.content || '').trim() === '';
+    if (isPendingPlaceholder || isEmptyAssistantMessage) {
         const startedAt = Number(message.timestamp) || Date.now();
         const threadId = AppState.currentThreadId || '';
         bubbleEl.innerHTML = `
@@ -2274,6 +2480,68 @@ function renderMessageBubbleContent(message, bubbleEl) {
     }
 }
 
+function getCurrentRenderedMessageText(messageItem) {
+    if (!messageItem) return '';
+    const redoResultEl = messageItem.querySelector('.message-redo-result');
+    if (redoResultEl && redoResultEl.style.display !== 'none') {
+        return String(redoResultEl.innerText || redoResultEl.textContent || '').trim();
+    }
+    const bubbleEl = messageItem.querySelector('.message-bubble');
+    if (bubbleEl && bubbleEl.style.display !== 'none') {
+        return String(bubbleEl.innerText || bubbleEl.textContent || '').trim();
+    }
+    return '';
+}
+
+function reconstructRenderedMessage(messageItem, fallbackMessage) {
+    if (!messageItem) return null;
+    const currentMessageId = String(messageItem.dataset.messageId || '');
+    if (!currentMessageId) return null;
+
+    const content = getCurrentRenderedMessageText(messageItem);
+    const timeEl = messageItem.querySelector('.message-time');
+    const timestamp = Number(timeEl?.dataset.timestamp) || Number(fallbackMessage?.timestamp) || Date.now();
+    return {
+        ...fallbackMessage,
+        id: currentMessageId,
+        _messageId: currentMessageId,
+        content: content,
+        timestamp: timestamp,
+        metadata: fallbackMessage?.metadata ? { ...fallbackMessage.metadata } : {},
+        role: fallbackMessage?.role || 'assistant'
+    };
+}
+
+function resolveActionMessage(messageItem, fallbackMessage) {
+    if (!messageItem) return fallbackMessage;
+    const currentMessageId = String(messageItem.dataset.messageId || '');
+    const result = (currentMessageId && findMessageByIdInAllThreads(currentMessageId)) || null;
+    if (result && result.message) {
+        console.debug('[REDO_ACTION] resolveActionMessage found current message', {
+            actionMessageId: currentMessageId,
+            foundMessageId: ensureMessageId(result.message),
+            fallbackMessageId: ensureMessageId(fallbackMessage)
+        });
+        return result.message;
+    }
+
+    const reconstructed = reconstructRenderedMessage(messageItem, fallbackMessage);
+    if (reconstructed) {
+        console.debug('[REDO_ACTION] resolveActionMessage fallback reconstructed current visible message', {
+            actionMessageId: currentMessageId,
+            reconstructedMessageId: reconstructed.id,
+            fallbackMessageId: ensureMessageId(fallbackMessage)
+        });
+        return reconstructed;
+    }
+
+    console.debug('[REDO_ACTION] resolveActionMessage no current message found, using fallback', {
+        actionMessageId: currentMessageId,
+        fallbackMessageId: ensureMessageId(fallbackMessage)
+    });
+    return fallbackMessage;
+}
+
 function bindMessageMetaActions(messageItem, message) {
     const actionButtons = messageItem.querySelectorAll('.message-action-btn');
 
@@ -2283,21 +2551,28 @@ function bindMessageMetaActions(messageItem, message) {
             event.stopPropagation();
 
             const action = btn.dataset.action;
+            const currentMessage = resolveActionMessage(messageItem, message);
+            console.debug('[REDO_ACTION] button click', {
+                action,
+                messageItemId: messageItem.dataset.messageId,
+                originalMessageId: messageItem.dataset.originalMessageId,
+                resolvedMessageId: ensureMessageId(currentMessage)
+            });
             switch (action) {
                 case 'copy':
-                    await defaultCopyMessage(message, btn);
+                    await defaultCopyMessage(currentMessage, btn);
                     break;
                 case 'export':
-                    defaultExportMessage(message);
+                    defaultExportMessage(currentMessage);
                     break;
                 case 'redo':
-                    await defaultRedoMessage(message, messageItem);
+                    await defaultRedoMessage(currentMessage, messageItem);
                     break;
                 case 'delete':
-                    defaultDeleteMessage(message, messageItem);
+                    defaultDeleteMessage(currentMessage, messageItem);
                     break;
                 case 'locate':
-                    defaultLocateMessage(message);
+                    defaultLocateMessage(currentMessage);
                     break;
                 default:
                     break;
@@ -2308,17 +2583,17 @@ function bindMessageMetaActions(messageItem, message) {
     const prevBtn = messageItem.querySelector('[data-action="redo-prev"]');
     const nextBtn = messageItem.querySelector('[data-action="redo-next"]');
     if (prevBtn) {
-        prevBtn.addEventListener('click', (event) => {
+        prevBtn.addEventListener('click', async (event) => {
             event.preventDefault();
             event.stopPropagation();
-            setRedoView(message, messageItem, -1);
+            await setRedoView(message, messageItem, -1);
         });
     }
     if (nextBtn) {
-        nextBtn.addEventListener('click', (event) => {
+        nextBtn.addEventListener('click', async (event) => {
             event.preventDefault();
             event.stopPropagation();
-            setRedoView(message, messageItem, 1);
+            await setRedoView(message, messageItem, 1);
         });
     }
 }
@@ -2358,18 +2633,23 @@ async function defaultRedoMessage(message, messageItem) {
         window.clearDagViewState();
     }
     if (typeof window.clearRuntimeLogs === 'function') {
-        window.clearRuntimeLogs();
+        // 保留当前任务 ID，避免点击定位出现 未知 taskId
+        window.clearRuntimeLogs(true);
     }
     if (typeof window.clearRuntimeLogFilter === 'function') {
         window.clearRuntimeLogFilter();
     }
     AppState.selectedTaskNodeId = null;
 
-    // 重试也设为执行态，锁定发送按钮
-    await setThreadExecutingState(AppState.currentThreadId, true);
+    const state = ensureRedoState(message);
+    state.enabled = true;
 
     queueMetaMessageEvent('redo', message);
     markMessageAsRedoPending(message, messageItem);
+
+    // 保持当前会话线程，不创建新线程，右侧状态仍然绑定当前窗口
+    await setThreadExecutingState(AppState.currentThreadId, true);
+
     const resent = await resendLastNormalPayloadByRedo(message);
     if (!resent) {
         if (message) {
@@ -2391,31 +2671,175 @@ function defaultDeleteMessage(message, messageItem) {
 
 function defaultLocateMessage(message) {
     if (!message) return;
+
+    // 任务进行中不切换右侧栏状态，只保持显示当前任务的信息
+    const isCurrentTaskExecuting = isThreadExecuting(AppState.currentThreadId);
     
-    // 获取气泡关联的任务ID
-    const associatedTaskId = message.associatedTaskId || AppState.runtimeLogActiveTaskId;
-    if (!associatedTaskId) {
-        console.warn('[message-action] 无法定位：找不到关联的任务ID', message);
+    console.info('[message-action] 执行 defaultLocateMessage', {
+        messageId: message.id || message._messageId,
+        metadata: message.metadata,
+        associatedTaskId: message.associatedTaskId,
+        runtimeLogActiveTaskId: AppState.runtimeLogActiveTaskId,
+        displayThreadId,
+        isCurrentTaskExecuting
+    });
+
+    // 任务进行中时，防止定位按钮切换线程和右侧栏状态
+    if (isCurrentTaskExecuting) {
+        console.info('[message-action] 任务进行中，不切换右侧栏状态');
         return;
     }
-    
-    // 切换到该任务
-    AppState.runtimeLogActiveTaskId = associatedTaskId;
-    
-    // 恢复该任务最后查看的节点
-    const lastViewedNodeId = AppState.taskNodeViewMemory.get(associatedTaskId);
-    if (lastViewedNodeId) {
-        AppState.selectedTaskNodeId = lastViewedNodeId;
-    } else {
-        // 如果没有记录过，默认选择第一个节点
-        AppState.selectedTaskNodeId = null;
+
+    // 如果有displayThreadId，切换到显示的thread
+    if (displayThreadId && displayThreadId !== AppState.currentThreadId) {
+        void switchThread(displayThreadId);
+        return;
     }
-    
-    // 重新渲染右侧栏和任务过滤
-    rerenderTaskInfoBySelection();
-    
+
+    let associatedTaskId = message.associatedTaskId || (message.metadata && message.metadata.taskId) || AppState.runtimeLogActiveTaskId;
+
+    // fallback: 从当前线程已加载的 rightPanelState/runtimeLogBook 里获取 activeTaskId
+    if (!associatedTaskId) {
+        const currentThread = getCurrentThread();
+        const fallbackTaskId = currentThread?.rightPanelState?.runtimeLogBook?.activeTaskId;
+        if (fallbackTaskId) {
+            associatedTaskId = fallbackTaskId;
+            console.info('[message-action] defaultLocateMessage fallback to activeTaskId from runtimeLogBook', { associatedTaskId });
+        }
+    }
+
+    // 再fallback到任务列表中第一个taskId（防止没有 activeTaskId 但有任务记录）
+    if (!associatedTaskId) {
+        const currentThread = getCurrentThread();
+        const taskList = currentThread?.rightPanelState?.runtimeLogBook?.tasks;
+        if (Array.isArray(taskList) && taskList.length > 0) {
+            associatedTaskId = taskList[0].taskId || null;
+            if (associatedTaskId) {
+                console.debug('[message-action] defaultLocateMessage fallback to first taskId from runtimeLogBook', { associatedTaskId });
+            }
+        }
+    }
+
+    if (!associatedTaskId) {
+        if (!(message.metadata && (message.metadata.finalJsonPath || message.metadata.finalMarkdownPath))) {
+            console.warn('[message-action] 关联任务ID缺失，仍尝试根据消息路径定位', message);
+        } else {
+            console.debug('[message-action] final report message no associatedTaskId, will restore from finalJsonPath/metadata', {
+                messageId: message.id || message._messageId,
+                metadata: message.metadata
+            });
+        }
+    } else {
+        AppState.runtimeLogActiveTaskId = associatedTaskId;
+
+        const thread = getCurrentThread();
+        if (thread) {
+            thread.rightPanelState = thread.rightPanelState || {};
+            thread.rightPanelState.runtimeLogBook = thread.rightPanelState.runtimeLogBook || normalizeRuntimeLogBook(null);
+            thread.rightPanelState.runtimeLogBook.activeTaskId = associatedTaskId;
+            schedulePersistRightPanelState(thread.id, { runtimeLogBook: thread.rightPanelState.runtimeLogBook });
+        }
+
+        const lastViewedNodeId = AppState.taskNodeViewMemory.get(associatedTaskId);
+        AppState.selectedTaskNodeId = lastViewedNodeId || null;
+
+        // 强制刷新当前任务数据，切换右侧日志内容
+        const runtimeLogs = getActiveTaskLogsForThread(AppState.currentThreadId);
+        if (Array.isArray(runtimeLogs)) {
+            runtimeLogs
+                .map(normalizeRuntimeLogItem)
+                .filter(Boolean)
+                .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+                .forEach((log) => addToolCallToChain(log));
+        }
+
+        rerenderTaskInfoBySelection();
+    }
+
+    // 更新右侧面板显示对应版本的文件（优先使用消息元数据）
+    const workspaceIdFromMsg = message.metadata && message.metadata.workspaceId;
+    const finalPathFromMsg = message.metadata && message.metadata.finalMarkdownPath;
+
+    // 恢复右侧栏状态（DAG图、任务详情、日志等）
+    if (message.metadata && message.metadata.finalJsonPath) {
+        const thread = getCurrentThread();
+        const workspaceIdFallback = message.metadata.workspaceId || thread?.rightPanelState?.workspaceId || null;
+        if (thread) {
+            void loadThreadRightPanelStateFromFinalJson(thread, message.metadata.finalJsonPath, workspaceIdFallback)
+                .catch(err => console.warn('[message-action] 恢复 finalJsonData 失败:', err));
+        }
+    }
+
+    if (finalPathFromMsg) {
+        const thread = getCurrentThread();
+        if (thread) {
+            thread.rightPanelState = thread.rightPanelState || {};
+            if (workspaceIdFromMsg) {
+                thread.rightPanelState.workspaceId = workspaceIdFromMsg;
+            }
+        }
+        showMarkdownFileInRightPanel(finalPathFromMsg);
+    } else if (workspaceIdFromMsg) {
+        // 即便没有路径，也可能有workspaceId，尝试从后端重新拉取该workspace的最新报告
+        const thread = getCurrentThread();
+        if (thread) {
+            thread.rightPanelState = thread.rightPanelState || {};
+            thread.rightPanelState.workspaceId = workspaceIdFromMsg;
+        }
+        void fetchFinalJsonPath(workspaceIdFromMsg).then((finalJsonData) => {
+            if (finalJsonData && finalJsonData.path) {
+                const currentThread = getCurrentThread();
+                if (currentThread) {
+                    void loadThreadRightPanelStateFromFinalJson(currentThread, finalJsonData.path, workspaceIdFromMsg);
+                }
+            }
+        }).catch(err => console.warn('[message-action] 查找 finalJsonPath 失败:', err));
+        console.info('[message-action] defaultLocateMessage: workspaceIdFromMsg 有值，尝试 fetchFinalReportByThreadId', {
+            workspaceIdFromMsg,
+            messageId: message.id || message._messageId,
+            messageMeta: message.metadata
+        });
+        void fetchFinalReportByThreadId(AppState.currentThreadId, workspaceIdFromMsg).then((report) => {
+            if (report && report.filePath) {
+                console.info('[message-action] defaultLocateMessage: fetchFinalReportByThreadId 返回', report);
+                showMarkdownFileInRightPanel(report.filePath, report.fileName);
+                return;
+            }
+            console.warn('[message-action] defaultLocateMessage: fetchFinalReportByThreadId 无可用文件，fallback 直接内容渲染', report);
+            // fallback: 直接显示消息内容
+            if (message && message.content) {
+                const markdownContent = document.getElementById('markdown-content');
+                const iframe = document.getElementById('content-iframe');
+                if (iframe) iframe.style.display = 'none';
+                if (markdownContent) {
+                    markdownContent.style.display = 'block';
+                    if (window.MarkdownRenderer && typeof window.MarkdownRenderer.render === 'function') {
+                        window.MarkdownRenderer.render(message.content, markdownContent);
+                    } else {
+                        markdownContent.textContent = message.content;
+                    }
+                }
+            }
+        });
+    } else {
+        // 没有路径没有workspaceId，则直接展示当前气泡内容（确保版本展示能见）
+        if (message && message.content) {
+            const markdownContent = document.getElementById('markdown-content');
+            const iframe = document.getElementById('content-iframe');
+            if (iframe) iframe.style.display = 'none';
+            if (markdownContent) {
+                markdownContent.style.display = 'block';
+                if (window.MarkdownRenderer && typeof window.MarkdownRenderer.render === 'function') {
+                    window.MarkdownRenderer.render(message.content, markdownContent);
+                } else {
+                    markdownContent.textContent = message.content;
+                }
+            }
+        }
+    }
+
     console.info('[message-action] 定位到任务', {
-        taskId: associatedTaskId,
+        taskId: associatedTaskId || '未知',
         nodeId: AppState.selectedTaskNodeId || '未选择'
     });
 }
@@ -2428,13 +2852,22 @@ function markMessageAsRedoPending(message, messageItem) {
         .filter((item) => !(item && item.pending === true && item.deleted !== true));
     state.enabled = true;
     state.pending = true;
-    // 将“正在思考...”作为真实版本占位写入 history，后续直接替换该占位
-    state.history.push({
-        ...createRedoHistoryEntry('', Date.now()),
-        pending: true
-    });
+
     const visibleHistory = getVisibleRedoHistory(state);
-    state.currentIndex = Math.max(0, visibleHistory.length - 1);
+    const redoThreads = state.redoThreads || [];
+    if (redoThreads.length > 0) {
+        // 已创建 redo 线程，直接切到最新的 redo 版本线程，不额外添加历史占位
+        state.currentIndex = Math.max(0, visibleHistory.length + redoThreads.length - 1);
+    } else {
+        // 将“正在思考...”作为真实版本占位写入 history，后续直接替换该占位
+        state.history.push({
+            ...createRedoHistoryEntry('', Date.now()),
+            pending: true
+        });
+        const finalVisibleHistory = getVisibleRedoHistory(state);
+        state.currentIndex = Math.max(0, finalVisibleHistory.length - 1);
+    }
+
     state.updatedAt = Date.now();
     const thread = getCurrentThread();
     if (thread) {
@@ -2446,11 +2879,36 @@ function markMessageAsRedoPending(message, messageItem) {
     scrollToBottom();
 }
 
-function setRedoView(message, messageItem, direction) {
+async function setRedoView(message, messageItem, direction) {
     const state = ensureRedoState(message);
     if (!state.enabled) return;
-    const maxIndex = getRedoMaxIndex(state);
+    const visibleHistory = getVisibleRedoHistory(state);
+    const visibleCount = visibleHistory.length;
+    const redoThreads = state.redoThreads || [];
+    const totalCount = visibleCount + redoThreads.length;
+    const maxIndex = Math.max(0, totalCount - 1);
     const nextIndex = Math.max(0, Math.min(maxIndex, (Number(state.currentIndex) || 0) + direction));
+    const isThreadMode = nextIndex >= visibleCount;
+    const threadIndex = isThreadMode ? nextIndex - visibleCount : -1;
+    if (isThreadMode && threadIndex >= 0 && threadIndex < redoThreads.length) {
+        displayThreadId = redoThreads[threadIndex];
+    } else {
+        displayThreadId = null;
+    }
+
+    const shouldSwitchVersion = !isThreadMode && nextIndex !== Number(state.currentIndex);
+    if (shouldSwitchVersion) {
+        const switched = await switchMessageVersionForRedo(message, nextIndex);
+        state.currentIndex = nextIndex;
+        if (switched) {
+            const thread = getCurrentThread();
+            if (thread) {
+                loadMessages(getRenderableMessagesFromThread(thread));
+            }
+            return;
+        }
+    }
+
     state.currentIndex = nextIndex;
     const thread = getCurrentThread();
     if (thread) {
@@ -2460,6 +2918,27 @@ function setRedoView(message, messageItem, direction) {
     }
     applyRedoViewState(messageItem, message);
     scrollToBottom();
+}
+
+async function switchMessageVersionForRedo(message, targetIndex) {
+    if (!message || typeof targetIndex !== 'number') return false;
+    const state = ensureRedoState(message);
+    const targetVersion = getRedoHistoryItem(state, targetIndex);
+    if (!targetVersion || !targetVersion.id) return false;
+
+    const currentMessageId = ensureMessageId(message);
+    const targetMessageId = String(targetVersion.id);
+    if (targetMessageId === String(currentMessageId)) return false;
+
+    const thread = getCurrentThread();
+    if (!thread || !thread.messageTree || !window.TreeMessageService || typeof window.TreeMessageService.switchMessageVersion !== 'function') {
+        return false;
+    }
+
+    window.TreeMessageService.switchMessageVersion(thread.messageTree, currentMessageId, targetMessageId);
+    thread.updatedAt = Date.now();
+    await syncThreadMessagesToBackend(thread);
+    return true;
 }
 
 function applyRedoViewState(messageItem, message) {
@@ -2477,15 +2956,60 @@ function applyRedoViewState(messageItem, message) {
     const timeEl = messageItem.querySelector('.message-time');
     const visibleHistory = getVisibleRedoHistory(state);
     const visibleCount = visibleHistory.length;
+    const redoThreads = state.redoThreads || [];
+    const totalCount = visibleCount + redoThreads.length;
     const currentIndex = Math.max(0, Number(state.currentIndex) || 0);
-    const maxIndex = getRedoMaxIndex(state);
-    const currentVersion = getRedoHistoryItem(state, currentIndex);
+    const maxIndex = Math.max(0, totalCount - 1);
+    const isHistoryMode = currentIndex < visibleCount;
+    const isThreadMode = currentIndex >= visibleCount;
+    const threadIndex = isThreadMode ? currentIndex - visibleCount : -1;
+    const currentThreadId = isThreadMode && threadIndex >= 0 && threadIndex < redoThreads.length ? redoThreads[threadIndex] : null;
+    const currentVersion = isHistoryMode ? getRedoHistoryItem(state, currentIndex) : null;
     const isPendingPage = !!(currentVersion && currentVersion.pending === true);
-    const hasRedoState = !!state.enabled && visibleCount > 1;
-    const isOriginalPage = currentIndex === 0;
-    const currentVersionContent = currentVersion ? String(currentVersion.content || '') : '';
-    if (redoResultEl && currentVersionContent) {
-        renderAssistantContentToBubble(redoResultEl, currentVersionContent);
+    const hasRedoState = !!state.enabled && totalCount > 1;
+    const isOriginalPage = isHistoryMode && currentVersion && String(currentVersion.id) === String(ensureMessageId(message));
+    let currentVersionContent = '';
+    if (isHistoryMode) {
+        currentVersionContent = currentVersion ? String(currentVersion.content || '') : '';
+        if (redoResultEl) {
+            if (isPendingPage || String(currentVersionContent || '').trim() === '') {
+                renderPendingPlaceholderToBubble(redoResultEl, currentThreadId);
+            } else {
+                renderAssistantContentToBubble(redoResultEl, currentVersionContent);
+            }
+        }
+    } else if (isThreadMode && currentThreadId) {
+        // 获取对应thread的最后一个assistant消息内容
+        const thread = getThreadById(currentThreadId);
+        let threadContent = '';
+        let threadPending = false;
+        if (thread) {
+            const messages = getRenderableMessagesFromThread(thread);
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const msg = messages[i];
+                if (msg && msg.role === 'assistant') {
+                    const metadata = (msg.metadata && typeof msg.metadata === 'object') ? msg.metadata : {};
+                    if (metadata.pendingPlaceholder === true) {
+                        threadPending = true;
+                    } else {
+                        threadContent = String(msg.content || '');
+                    }
+                    break;
+                }
+            }
+        }
+        if (redoResultEl) {
+            if (threadPending || String(threadContent || '').trim() === '') {
+                renderPendingPlaceholderToBubble(redoResultEl, currentThreadId);
+            } else {
+                renderAssistantContentToBubble(redoResultEl, threadContent);
+            }
+        }
+    } else {
+        // 无有效版本，显示占位气泡而不是空白内容
+        if (redoResultEl) {
+            renderPendingPlaceholderToBubble(redoResultEl, currentThreadId);
+        }
     }
 
     messageItem.classList.toggle('has-redo-switch', hasRedoState);
@@ -2513,17 +3037,55 @@ function applyRedoViewState(messageItem, message) {
     if (switchTextEl) {
         switchTextEl.textContent = `${currentIndex + 1}/${maxIndex + 1}`;
     }
+    if (messageItem) {
+        let currentRenderedId = ensureMessageId(message);
+        if (isHistoryMode && currentVersion && currentVersion.id) {
+            currentRenderedId = String(currentVersion.id);
+        } else if (isThreadMode && currentThreadId) {
+            const thread = getThreadById(currentThreadId);
+            if (thread) {
+                const threadMessages = getRenderableMessagesFromThread(thread);
+                for (let i = threadMessages.length - 1; i >= 0; i -= 1) {
+                    const msg = threadMessages[i];
+                    if (msg && msg.role === 'assistant') {
+                        currentRenderedId = ensureMessageId(msg);
+                        break;
+                    }
+                }
+            }
+        }
+        console.debug('[REDO_VIEW] applyRedoViewState set messageItem.dataset.messageId', currentRenderedId, {
+            messageId: ensureMessageId(message),
+            currentIndex,
+            visibleCount,
+            totalCount,
+            isHistoryMode,
+            isThreadMode,
+            currentThreadId,
+            currentVersionId: currentVersion?.id,
+            isOriginalPage
+        });
+        messageItem.dataset.messageId = currentRenderedId;
+    }
     if (actionsEl) {
         actionsEl.style.display = isPendingPage ? 'none' : 'flex';
     }
     if (timeEl) {
         timeEl.style.display = 'inline';
-        if (currentVersion && currentVersion.timestamp) {
-            const ts = Number(currentVersion.timestamp) || Date.now();
-            timeEl.dataset.timestamp = String(ts);
-            timeEl.title = new Date(ts).toLocaleString('zh-CN');
-            timeEl.textContent = formatTime(ts);
+        let ts = Date.now();
+        if (isHistoryMode && currentVersion && currentVersion.timestamp) {
+            ts = Number(currentVersion.timestamp);
+        } else if (isThreadMode && currentThreadId) {
+            const thread = getThreadById(currentThreadId);
+            if (thread && thread.updatedAt) {
+                ts = Number(thread.updatedAt);
+            }
+        } else if (message.timestamp) {
+            ts = Number(message.timestamp);
         }
+        timeEl.dataset.timestamp = String(ts);
+        timeEl.title = new Date(ts).toLocaleString('zh-CN');
+        timeEl.textContent = formatTime(ts);
     }
     if (prevBtnEl) {
         prevBtnEl.disabled = !hasRedoState || currentIndex <= 0;
@@ -2535,7 +3097,7 @@ function applyRedoViewState(messageItem, message) {
 }
 
 function ensureRedoState(message) {
-    if (!message) return { enabled: false, pending: false, history: [createRedoHistoryEntry('')], currentIndex: 0, updatedAt: Date.now() };
+    if (!message) return { enabled: false, pending: false, history: [createRedoHistoryEntry('')], currentIndex: 0, updatedAt: Date.now(), redoThreads: [] };
     const original = String(message.content || '');
     const legacy = message._redoState || {};
     let history = Array.isArray(legacy.history) ? legacy.history.map((item, idx) => normalizeRedoHistoryEntry(item, message, idx)) : null;
@@ -2553,23 +3115,34 @@ function ensureRedoState(message) {
             pending: true
         });
     }
+    const currentIndex = Number.isFinite(Number(legacy.currentIndex)) ? Number(legacy.currentIndex) : 0;
     message._redoState = {
         enabled: !!legacy.enabled,
         pending: !!legacy.pending,
         history: normalizedHistory,
-        currentIndex: Number.isFinite(legacy.currentIndex) ? legacy.currentIndex : 0,
-        updatedAt: legacy.updatedAt || Date.now()
+        currentIndex,
+        updatedAt: legacy.updatedAt || Date.now(),
+        redoThreads: Array.isArray(legacy.redoThreads) ? legacy.redoThreads : []
     };
-    if (!legacy.enabled && visibleCount > 1) {
+    if (!legacy.enabled && (visibleCount > 1 || message._redoState.redoThreads.length > 0)) {
         message._redoState.enabled = true;
     }
-    if (message._redoState.currentIndex < 0) message._redoState.currentIndex = 0;
+    if (!Array.isArray(message._redoState.history)) message._redoState.history = [];
+    const visibleHistory = getVisibleRedoHistory(message._redoState);
+    const maxIndex = Math.max(0, visibleHistory.length - 1);
+    if (message._redoState.currentIndex < 0) {
+        message._redoState.currentIndex = 0;
+    } else if (message._redoState.currentIndex > maxIndex) {
+        message._redoState.currentIndex = maxIndex;
+    }
     return message._redoState;
 }
 
-function getRedoMaxIndex(state) {
+function queueMetaMessageEvent(action, message) {
     if (!state) return 0;
-    return Math.max(0, getVisibleRedoHistory(state).length - 1);
+    const historyCount = getVisibleRedoHistory(state).length;
+    const threadCount = (state.redoThreads || []).length;
+    return Math.max(0, historyCount + threadCount - 1);
 }
 
 function createRedoHistoryEntry(content, timestamp = Date.now(), id = null, deleted = false) {
@@ -2634,17 +3207,17 @@ function clonePayload(payload) {
     return JSON.parse(JSON.stringify(payload || {}));
 }
 
-async function resendLastNormalPayloadByRedo(redoTargetMessage) {
-    const sourceThreadId = AppState.currentThreadId;
+async function resendLastNormalPayloadByRedo(redoTargetMessage, targetThreadId = null) {
+    const sourceThreadId = targetThreadId || AppState.currentThreadId;
 
     await syncSendButtonStateWithCurrentThread(sourceThreadId);
     if (isThreadExecuting(sourceThreadId)) {
         console.warn('[REDO_FLOW] 当前线程仍在执行中，继续尝试重做发送', { threadId: sourceThreadId });
     }
 
-    const payloadSource = resolveLastNormalPayload(sourceThreadId);
+    const payloadSource = resolveLastNormalPayload(AppState.currentThreadId); // 始终从原thread获取payload
     if (!payloadSource) {
-        console.error('[REDO_FLOW] 找不到可重做的 payloadSource', { threadId: sourceThreadId });
+        console.error('[REDO_FLOW] 找不到可重做的 payloadSource', { threadId: AppState.currentThreadId });
         return false;
     }
     const payload = clonePayload(payloadSource);
@@ -2659,13 +3232,26 @@ async function resendLastNormalPayloadByRedo(redoTargetMessage) {
         return false;
     }
 
+    // 为重试添加时间戳后缀，确保后端生成不同内容
+    payload.user = userContent + " (重试 " + Date.now() + ")";
+
     // 特殊约定：测试消息始终走前端本地逻辑，不走后端
     if (userContent === '测试') {
         const localContent = await getTestMarkdownContentForRedo();
         if (!localContent) {
             console.error('[REDO_FLOW] 本地测试内容为空，重做失败');
+            await setThreadExecutingState(sourceThreadId, false);
             return false;
         }
+
+        const replacedPending = resolvePendingAssistantPlaceholder(sourceThreadId, localContent);
+        if (replacedPending) {
+            pendingMetaMessageEvents = [];
+            console.info('[REDO_FLOW] 测试消息本地重做完成（替换占位符）', { threadId: sourceThreadId, replacedPending });
+            await setThreadExecutingState(sourceThreadId, false);
+            return true;
+        }
+
         const targetMessage = redoTargetMessage;
         const targetMessageId = ensureMessageId(targetMessage);
         const applied = applyRedoContentToTarget(sourceThreadId, targetMessage, targetMessageId, localContent);
@@ -2673,10 +3259,36 @@ async function resendLastNormalPayloadByRedo(redoTargetMessage) {
             pendingMetaMessageEvents = [];
         }
         console.info('[REDO_FLOW] 测试消息本地重做完成', { threadId: sourceThreadId, applied });
+        await setThreadExecutingState(sourceThreadId, false);
         return !!applied;
     }
 
-    const topic = await sendToBackend(userContent, sourceThreadId, payload, { isRedo: true, redoTargetMessage });
+    // 在当前线程中创建重试占位符消息，作为原消息的兄弟节点
+    const redoTargetMessageId = ensureMessageId(redoTargetMessage);
+    const pendingAssistantPlaceholder = {
+        role: 'assistant',
+        content: '',
+        timestamp: Date.now(),
+        metadata: {
+            pendingPlaceholder: true,
+            pendingKind: 'redo'
+        }
+    };
+    pendingAssistantPlaceholder._messageId = pendingAssistantPlaceholder._messageId || generateUniqueId('msg');
+    
+    const sourceThread = getThreadById(sourceThreadId);
+    if (sourceThread) {
+        addMessageToThreadStorage(sourceThread, pendingAssistantPlaceholder, {
+            isRedo: true,
+            redoTargetId: redoTargetMessageId
+        });
+    }
+
+    const topic = await sendToBackend(userContent, sourceThreadId, payload, { 
+        isRedo: true, 
+        redoTargetMessage,
+        pendingPlaceholderMessage: pendingAssistantPlaceholder
+    });
     console.info('[REDO_FLOW] resendLastNormalPayloadByRedo 发送结果', { threadId: sourceThreadId, topic });
     return !!topic;
 }
@@ -2718,14 +3330,28 @@ function resolvePendingRedoTarget(threadId, topic = null) {
 
     const byContext = (ctx) => {
         if (!ctx || !ctx.messageId) return null;
-        const msg = messages.find((m) => m && ensureMessageId(m) === ctx.messageId);
+
+        // 优先从当前线程中查找
+        let msg = (messages || []).find((m) => m && ensureMessageId(m) === ctx.messageId);
+        let targetThread = thread;
+
+        // 如果当前线程没有，在整个会话中查一次（原始消息可能在旧线程）
+        if (!msg) {
+            const foundGlobal = findMessageByIdInAllThreads(ctx.messageId);
+            if (foundGlobal && foundGlobal.message) {
+                msg = foundGlobal.message;
+                targetThread = foundGlobal.thread;
+            }
+        }
+
         if (!msg) return null;
-        return { thread, message: msg, messageId: ctx.messageId };
+
+        return { thread: targetThread, message: msg, messageId: ctx.messageId };
     };
 
     if (topic) {
         const topicCtx = redoTopicContextMap.get(topic);
-        if (topicCtx && topicCtx.threadId === threadId) {
+        if (topicCtx) {
             const found = byContext(topicCtx);
             if (found) return found;
         }
@@ -2803,7 +3429,7 @@ function applyRedoContentToTarget(threadId, targetMessage, messageId, content) {
     }
 
     if (threadId === AppState.currentThreadId) {
-        const messageEl = document.querySelector(`.message-item[data-message-id="${messageId}"]`);
+        const messageEl = findMessageElementByMessageId(messageId);
         if (messageEl) {
             const redoResultEl = messageEl.querySelector('.message-redo-result');
             if (redoResultEl) {
@@ -2828,15 +3454,34 @@ function findPendingAssistantPlaceholder(threadId, topic = null) {
     const thread = getThreadById(threadId);
     if (!thread) return null;
     const messages = getRenderableMessagesFromThread(thread);
+    let fallback = null;
     for (let i = messages.length - 1; i >= 0; i -= 1) {
         const msg = messages[i];
         if (!msg || msg.role !== 'assistant') continue;
         const meta = (msg.metadata && typeof msg.metadata === 'object') ? msg.metadata : {};
         if (meta.pendingPlaceholder !== true) continue;
-        if (topic && meta.pendingTopic && meta.pendingTopic !== topic) continue;
+        if (topic && meta.pendingTopic && meta.pendingTopic !== topic) {
+            if (!fallback) {
+                fallback = { thread, message: msg, messageId: ensureMessageId(msg) };
+            }
+            continue;
+        }
         return { thread, message: msg, messageId: ensureMessageId(msg) };
     }
-    return null;
+
+    // Fallback: some pending placeholders may lose their metadata during persistence or thread reload,
+    // but remain as empty assistant messages in the active thread. Match those last so we can still
+    // convert them into final report messages instead of leaving a blank bubble behind.
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+        const msg = messages[i];
+        if (!msg || msg.role !== 'assistant' || msg.deleted) continue;
+        const meta = (msg.metadata && typeof msg.metadata === 'object') ? msg.metadata : {};
+        if (Object.keys(meta).length > 0) continue;
+        if (String(msg.content || '').trim() !== '') continue;
+        return { thread, message: msg, messageId: ensureMessageId(msg) };
+    }
+
+    return fallback;
 }
 
 function hasPendingAssistantPlaceholder(threadId) {
@@ -2862,14 +3507,24 @@ function resolvePendingAssistantPlaceholder(threadId, content, metadataPatch = {
     const found = findPendingAssistantPlaceholder(threadId);
     if (!found || !found.message) return false;
     const { thread, message, messageId } = found;
+    const baseMeta = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
+    const previousPendingTopic = baseMeta.pendingTopic;
     const mergedMeta = {
-        ...((message.metadata && typeof message.metadata === 'object') ? message.metadata : {}),
+        ...baseMeta,
         ...metadataPatch,
         pendingPlaceholder: false
     };
     delete mergedMeta.pendingTopic;
     delete mergedMeta.pendingKind;
+    delete mergedMeta.rightPanelState;
     message.metadata = mergedMeta;
+    if (message._redoState && message._redoState.pending === true) {
+        message._redoState.pending = false;
+        message._redoState.updatedAt = Date.now();
+    }
+    if (previousPendingTopic) {
+        unbindTopic(previousPendingTopic);
+    }
     message.content = String(content || '');
     message.timestamp = Date.now();
     persistMessageStateToThread(thread, message, { syncContent: true, syncTimestamp: true });
@@ -2877,10 +3532,11 @@ function resolvePendingAssistantPlaceholder(threadId, content, metadataPatch = {
     void syncThreadMessagesToBackend(thread);
 
     if (threadId === AppState.currentThreadId) {
-        const messageEl = document.querySelector(`.message-item[data-message-id="${messageId}"]`);
+        const messageEl = findMessageElementByMessageId(messageId);
         if (messageEl) {
             const bubbleEl = messageEl.querySelector('.message-bubble');
             if (bubbleEl) renderMessageBubbleContent(message, bubbleEl);
+            applyRedoViewState(messageEl, message);
             const actionsEl = messageEl.querySelector('.message-actions');
             if (!actionsEl) {
                 loadMessages(getRenderableMessagesFromThread(thread));
@@ -2896,16 +3552,21 @@ function resolvePendingAssistantPlaceholder(threadId, content, metadataPatch = {
 }
 
 async function getTestMarkdownContentForRedo() {
-    if (testMarkdownContent) {
-        return testMarkdownContent;
-    }
     try {
-        const response = await fetch('markdown/markdown-response.txt');
+        const response = await fetch(`markdown/markdown-response.txt?t=${Date.now()}`, {
+            cache: 'no-store',
+            credentials: 'same-origin',
+            headers: {
+                'Cache-Control': 'no-cache, no-store',
+                Pragma: 'no-cache'
+            }
+        });
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }
-        testMarkdownContent = await response.text();
-        return testMarkdownContent;
+        const content = await response.text();
+        testMarkdownContent = content;
+        return content;
     } catch (error) {
         console.error('[REDO_FLOW] 加载本地测试内容失败:', error);
         return null;
@@ -2913,25 +3574,8 @@ async function getTestMarkdownContentForRedo() {
 }
 
 function tryConsumeRedoByAssistantMessage(message, threadId = AppState.currentThreadId) {
-    if (!message || message.role !== 'assistant' || !threadId) return false;
-    const ctx = redoThreadContextMap.get(threadId);
-    if (!ctx || !ctx.locked) return false;
-
-    const redoTarget = resolvePendingRedoTarget(threadId, ctx.topic || null);
-    if (!redoTarget || !redoTarget.message) {
-        console.warn('[REDO_FLOW] 锁定存在但未找到目标消息，拦截 assistant 追加');
-        return true;
-    }
-
-    const content = String(message.content || '').trim();
-    if (!content) return true;
-
-    applyRedoContentToTarget(threadId, redoTarget.message, redoTarget.messageId, content);
-    ctx.pending = false;
-    ctx.locked = false;
-    redoThreadContextMap.set(threadId, ctx);
-    console.info('[REDO_FLOW] assistant 已回填到 2/2，阻止新增词条', { threadId, messageId: redoTarget.messageId });
-    return true;
+    // 新的redo逻辑不拦截消息，直接返回false
+    return false;
 }
 
 const pendingAssistantMessages = [];
@@ -2988,11 +3632,20 @@ function appendMessageNow(message) {
 
 function addMessageToThreadStorage(thread, message, options = {}) {
     if (!thread) return null;
-    const { parentId = null, branchId = null, isRedo = false } = options;
+    const { parentId = null, branchId = null, isRedo = false, redoTargetId = null } = options;
 
-    // 关联当前任务
-    if (AppState.runtimeLogActiveTaskId) {
-        message.associatedTaskId = AppState.runtimeLogActiveTaskId;
+    // 关联当前任务，优先保证每条消息持久化 taskId
+    if (!message.associatedTaskId) {
+        if (AppState.runtimeLogActiveTaskId) {
+            message.associatedTaskId = AppState.runtimeLogActiveTaskId;
+        } else {
+            const rightPanelState = thread.rightPanelState || {};
+            const activeTaskId = rightPanelState.runtimeLogBook?.activeTaskId ||
+                (Array.isArray(rightPanelState.runtimeLogBook?.tasks) && rightPanelState.runtimeLogBook.tasks[0]?.taskId);
+            if (activeTaskId) {
+                message.associatedTaskId = activeTaskId;
+            }
+        }
     }
 
     if (window.TreeMessageService && thread.messageTree) {
@@ -3008,7 +3661,8 @@ function addMessageToThreadStorage(thread, message, options = {}) {
             {
                 parentId: parentId,
                 branchId: branchId || thread.messageTree.activeBranch,
-                isRedo: isRedo
+                isRedo: isRedo,
+                redoTargetId: redoTargetId
             }
         );
 
@@ -3034,17 +3688,34 @@ function addMessageToThreadStorage(thread, message, options = {}) {
 }
 
 function addMessage(message, options = {}) {
-    const { parentId = null, branchId = null, isRedo = false } = options;
+    const { parentId = null, branchId = null, isRedo = false, redoTargetId = null } = options;
     
-    if (message.role === 'assistant' && tryConsumeRedoByAssistantMessage(message, AppState.currentThreadId)) {
-        return;
-    }
-
     // 获取当前线程
     const thread = getCurrentThread();
     if (!thread) return;
 
-    addMessageToThreadStorage(thread, message, { parentId, branchId, isRedo });
+    addMessageToThreadStorage(thread, message, { parentId, branchId, isRedo, redoTargetId });
+
+    // 如果是assistant消息且是redo thread，更新原message的redo state
+    if (message.role === 'assistant') {
+        const ctx = redoThreadContextMap.get(thread.id);
+        if (ctx && ctx.locked) {
+            const redoTarget = resolvePendingRedoTarget(thread.id, ctx.topic || null);
+            if (redoTarget && redoTarget.message) {
+                const state = ensureRedoState(redoTarget.message);
+                state.pending = false;
+                // 重新应用view state
+                const messageItem = findMessageElementByMessageId(redoTarget.messageId);
+                if (messageItem) {
+                    applyRedoViewState(messageItem, redoTarget.message);
+                }
+                ctx.pending = false;
+                ctx.locked = false;
+                redoThreadContextMap.set(thread.id, ctx);
+                console.info('[REDO_FLOW] redo thread完成，更新原message状态', { threadId: thread.id, messageId: redoTarget.messageId });
+            }
+        }
+    }
 
     // Always defer assistant rendering to async flush, and block it during reordering.
     if (message.role === 'assistant') {
@@ -3117,11 +3788,54 @@ function getRenderableMessagesFromThread(thread) {
     if (window.TreeMessageService && thread.messageTree && typeof window.TreeMessageService.getMessagesForRender === 'function') {
         const messages = window.TreeMessageService.getMessagesForRender(thread.messageTree);
         messages.forEach(hydrateMessageRuntimeFromMetadata);
-        return messages;
+        return filterAndMergeRedoOfMessages(messages);
     }
     const messages = Array.isArray(thread.messages) ? thread.messages : [];
     messages.forEach(hydrateMessageRuntimeFromMetadata);
-    return messages;
+    return filterAndMergeRedoOfMessages(messages);
+}
+
+function getLowestActiveRenderableMessage(thread) {
+    if (!thread) return null;
+    const messages = getRenderableMessagesFromThread(thread);
+    if (Array.isArray(messages) && messages.length > 0) {
+        return messages[messages.length - 1];
+    }
+    return null;
+}
+
+async function restoreRightPanelByNonExecutingThread(thread) {
+    if (!thread) return;
+    if (isThreadExecuting(thread.id)) {
+        // 对于正在执行的线程，优先恢复线程自身保存的 rightPanelState，不使用 finalJsonPath 进行恢复。
+        await restoreRightPanelByThread(thread.id);
+        return;
+    }
+
+    const activeMessage = getLowestActiveRenderableMessage(thread);
+    const workspaceIdFallback = activeMessage?.metadata?.workspaceId || thread?.rightPanelState?.workspaceId || null;
+
+    if (activeMessage && activeMessage.metadata) {
+        const finalJsonPath = activeMessage.metadata.finalJsonPath || null;
+        if (finalJsonPath) {
+            const loaded = await loadThreadRightPanelStateFromFinalJson(thread, finalJsonPath, workspaceIdFallback);
+            if (loaded) return;
+        }
+
+        if (workspaceIdFallback) {
+            try {
+                const finalJsonData = await fetchFinalJsonPath(workspaceIdFallback);
+                if (finalJsonData && finalJsonData.path) {
+                    const loaded = await loadThreadRightPanelStateFromFinalJson(thread, finalJsonData.path, workspaceIdFallback);
+                    if (loaded) return;
+                }
+            } catch (error) {
+                console.warn('[restoreRightPanelByNonExecutingThread] fetch finalJsonPath failed:', error);
+            }
+        }
+    }
+
+    await restoreRightPanelByThread(thread.id);
 }
 
 async function syncThreadMessagesToBackend(thread) {
@@ -3456,33 +4170,55 @@ function initInputArea() {
 // 任务执行中状态
 let isTaskExecuting = false;
 
+function hasThreadExecutionEvidence(threadId) {
+    if (!threadId) return false;
+    const thread = getThreadById(threadId);
+    if (!thread) return false;
+    if (hasPendingAssistantPlaceholder(threadId) || hasPendingRedoInThread(threadId)) {
+        return true;
+    }
+    const rightPanelState = thread.rightPanelState || null;
+    if (!rightPanelState) return false;
+    const hasProgressState = Boolean(
+        rightPanelState.dagInitData || String(rightPanelState.statusText || '').trim()
+    );
+    return hasProgressState && !isRightPanelStatusTextCompleted(rightPanelState);
+}
+
 function isThreadExecuting(threadId) {
     if (!threadId) return false;
-    return AppState.threadExecutionState[threadId] === true || hasPendingRequestForThread(threadId);
+    if (AppState.threadExecutionState[threadId] === true) {
+        return true;
+    }
+    if (AppState.threadExecutionState[threadId] === false) {
+        return false;
+    }
+    return hasThreadExecutionEvidence(threadId);
 }
 
 async function setThreadExecutingState(threadId, executing) {
     if (!threadId) return;
 
+    let backendUpdated = false;
     if (window.SessionService && typeof window.SessionService.updateThreadStatus === 'function') {
         try {
             const status = await window.SessionService.updateThreadStatus(threadId, !!executing);
             const backendExecuting = !!status?.isExecuting;
-            if (backendExecuting) {
-                AppState.threadExecutionState[threadId] = true;
-            } else {
-                delete AppState.threadExecutionState[threadId];
-            }
+            AppState.threadExecutionState[threadId] = backendExecuting;
+            backendUpdated = true;
         } catch (err) {
             console.warn('[setThreadExecutingState] 后端状态同步失败:', { threadId, executing, err });
         }
+    }
+
+    if (!backendUpdated) {
+        AppState.threadExecutionState[threadId] = !!executing;
     }
 
     if (threadId === AppState.currentThreadId) {
         isTaskExecuting = isThreadExecuting(AppState.currentThreadId);
         updateSendButtonState();
         syncThinkingStateWithCurrentThread();
-        console.info('[setThreadExecutingState] 当前会话执行态:', { threadId, isTaskExecuting });
     }
 }
 
@@ -3494,11 +4230,7 @@ async function fetchThreadExecutionStatus(threadId) {
         try {
             const status = await window.SessionService.getThreadStatus(threadId);
             const executing = !!status?.isExecuting;
-            if (executing) {
-                AppState.threadExecutionState[threadId] = true;
-            } else {
-                delete AppState.threadExecutionState[threadId];
-            }
+            AppState.threadExecutionState[threadId] = executing;
             return executing;
         } catch (e) {
             console.warn('[fetchThreadExecutionStatus] 查询失败:', { threadId, e });
@@ -3591,6 +4323,13 @@ function getInProgressStepTitlesForThread(threadId) {
 function isThreadDagAllCompleted(threadId) {
     if (!threadId) return false;
 
+    // 当前会话正在执行时，不使用旧状态表明已完成，优先显示「正在制定问题解决方案」
+    if (threadId === AppState.currentThreadId && isThreadExecuting(threadId)) {
+        if (!dagData || !Array.isArray(dagData.nodes) || dagData.nodes.length === 0) {
+            return false;
+        }
+    }
+
     if (threadId === AppState.currentThreadId && dagData && Array.isArray(dagData.nodes) && dagData.nodes.length > 0) {
         const nodes = dagData.nodes.filter((node) => node && node.status);
         return nodes.length > 0 && nodes.every((node) => node.status === 'completed');
@@ -3603,24 +4342,24 @@ function isThreadDagAllCompleted(threadId) {
     const progress = content.progress && typeof content.progress === 'object' ? content.progress : null;
     if (progress) {
         const completed = Number(progress.completed) || 0;
-        const inProgress = Number(progress.in_progress) || 0;
         const blocked = Number(progress.blocked) || 0;
+        const inProgress = Number(progress.in_progress) || 0;
         const notStarted = Number(progress.not_started) || 0;
-        const total = Number(progress.total) || (completed + inProgress + blocked + notStarted);
-        return total > 0 && completed === total;
+        const total = Number(progress.total) || (completed + blocked + inProgress + notStarted);
+        return total > 0 && (completed + blocked) === total;
     }
 
     const steps = Array.isArray(content.steps) ? content.steps : [];
     const statuses = content.step_statuses && typeof content.step_statuses === 'object' ? content.step_statuses : {};
     if (steps.length === 0) return false;
-    let completedCount = 0;
+    let doneCount = 0;
     for (let i = 0; i < steps.length; i += 1) {
         const stepNo = i + 1;
         const statusRec = statuses[`step_${stepNo}`] ?? statuses[stepNo] ?? statuses[String(stepNo)];
         const status = typeof statusRec === 'string' ? statusRec : (statusRec?.status || '');
-        if (status === 'completed') completedCount += 1;
+        if (status === 'completed' || status === 'blocked') doneCount += 1;
     }
-    return completedCount === steps.length;
+    return doneCount === steps.length;
 }
 
 function getThinkingStatusTextForThread(threadId) {
@@ -3643,9 +4382,10 @@ function getThinkingStatusTextForThread(threadId) {
         state.lastSwitchAt = now;
     }
 
+    const hasFinalReportPending = finalReportRetryStateByThread.has(threadId);
     const nextText = titles.length > 0
         ? `${titles[state.index] || titles[0]}`
-        : (isThreadDagAllCompleted(threadId) ? '正在整理问题最终报告' : '正在制定问题解决方案');
+        : (isThreadDagAllCompleted(threadId) || hasFinalReportPending ? '正在整理问题最终报告' : '正在制定问题解决方案');
     const changed = nextText !== state.lastText;
     state.lastText = nextText;
     thinkingTitleRotationStateByThread.set(threadId, state);
@@ -3700,6 +4440,9 @@ async function sendMessage() {
             }
         }
         : null;
+    if (pendingAssistantPlaceholder) {
+        pendingAssistantPlaceholder._messageId = pendingAssistantPlaceholder._messageId || generateUniqueId('msg');
+    }
     const outboundPayload = {
         user: message,
         'meta-message': pendingMetaMessageEvents.slice(),
@@ -3812,26 +4555,33 @@ async function sendToBackend(message, sourceThreadId = AppState.currentThreadId,
 
 // 初始化 WebSocket 消息监听
 function initWebSocketMessageHandler() {
-    if (!window.messageService) {
+    if (!window.messageService || typeof window.messageService.receiveMessage !== 'function') {
         return;
     }
-    
+
+    const currentReceiveMessage = window.messageService.receiveMessage;
+    if (currentReceiveMessage && currentReceiveMessage.__cosightWrapped) {
+        return;
+    }
+
     // 保存原始的 receiveMessage 方法
-    const originalReceiveMessage = window.messageService.receiveMessage.bind(window.messageService);
-    
+    const originalReceiveMessage = currentReceiveMessage.bind(window.messageService);
+
     // 包装 receiveMessage 方法，添加我们的处理逻辑
-    window.messageService.receiveMessage = function(message) {
+    const wrappedReceiveMessage = function(message) {
         // 先调用原始方法处理 DAG 和工具面板
         originalReceiveMessage(message);
-        
+
         // 添加我们的聊天消息处理
         handleWebSocketMessage(message);
     };
-    
+    wrappedReceiveMessage.__cosightWrapped = true;
+
+    window.messageService.receiveMessage = wrappedReceiveMessage;
 }
 
 // 处理 WebSocket 消息
-function handleWebSocketMessage(message) {
+async function handleWebSocketMessage(message) {
     try {
         const messageData = typeof message === 'string' ? JSON.parse(message) : message;
         const topic = messageData.topic;
@@ -3842,14 +4592,46 @@ function handleWebSocketMessage(message) {
             return;
         }
         const targetThread = getThreadById(targetThreadId);
-        console.info('[REDO_FLOW] 收到回包', {
+        console.debug('[REDO_FLOW] 收到回包', {
             topic,
             targetThreadId,
             hasRedoLock: !!redoThreadContextMap.get(targetThreadId)?.locked
         });
         
-        // 检查是否是 lui-message-manus-step 类型的消息（DAG 步骤消息）
+        // 检查是否是 lui-message-manus-step-completed 类型的完成消息
         const messageType = messageData.data?.contentType || messageData.data?.type;
+        
+        if (messageType === 'lui-message-manus-step-completed') {
+            // 任务已完成，触发最终报告发送
+            console.debug('[handleWebSocketMessage] 收到任务完成信号', { topic, targetThreadId });
+            const current = finalReportRetryStateByThread.get(targetThreadId);
+            const pendingRedoTarget = resolvePendingRedoTarget(targetThreadId, topic);
+            const redoThreadCtx = pendingRedoTarget
+                ? { messageId: pendingRedoTarget.messageId, topic: topic || null, pending: hasPendingRedoInThread(targetThreadId) }
+                : (redoThreadContextMap.get(targetThreadId) || null);
+            await clearThreadRightPanelState(targetThreadId);
+            const stateWorkspaceId = current ? current.workspaceId : null;
+            const stateTopic = current ? current.topic : topic;
+            const stateRedoContext = current ? current.redoContext : redoThreadCtx;
+            const sent = await trySendPendingFinalMarkdownContent(targetThreadId, {
+                workspaceId: stateWorkspaceId,
+                topic: stateTopic,
+                redoContext: stateRedoContext
+            });
+            if (sent) {
+                finalReportRetryStateByThread.delete(targetThreadId);
+                if (stateTopic) unbindTopic(stateTopic);
+                clearRedoContextForThread(targetThreadId, stateTopic);
+                await setThreadExecutingState(targetThreadId, false);
+            } else {
+                startFinalReportPolling(targetThreadId, {
+                    topic: stateTopic,
+                    redoContext: stateRedoContext,
+                    workspaceId: stateWorkspaceId
+                });
+            }
+            return;
+        }
         
         if (messageType === 'lui-message-manus-step') {
             // DAG 步骤消息，任务开始执行
@@ -3939,7 +4721,8 @@ function handleWebSocketMessage(message) {
                 if (content) {
                     const redoTarget = resolvePendingRedoTarget(targetThreadId, topic);
                     if (redoTarget) {
-                        const applied = applyRedoContentToTarget(targetThreadId, redoTarget.message, redoTarget.messageId, content);
+                        const persistThreadId = redoTarget.thread && redoTarget.thread.id ? redoTarget.thread.id : targetThreadId;
+                        const applied = applyRedoContentToTarget(persistThreadId, redoTarget.message, redoTarget.messageId, content);
                         if (applied) {
                             const ctx = redoThreadContextMap.get(targetThreadId);
                             if (ctx) {
@@ -3951,8 +4734,13 @@ function handleWebSocketMessage(message) {
                     }
 
                     if (redoThreadContextMap.has(targetThreadId)) {
-                        console.warn('[handleWebSocketMessage] redo 锁定中，拦截新增 assistant 词条');
-                        return;
+                        // redo流程中的新thread，直接使用resolvePendingAssistantPlaceholder替换
+                        const replacedPending = resolvePendingAssistantPlaceholder(targetThreadId, content);
+                        if (replacedPending) {
+                            console.info('[handleWebSocketMessage] redo新thread中的占位符消息已替换', { targetThreadId, topic });
+                            return;
+                        }
+                        console.warn('[handleWebSocketMessage] redo 锁定中，但找不到占位符消息，将作为新消息添加', { targetThreadId });
                     }
 
                     const replacedPending = resolvePendingAssistantPlaceholder(targetThreadId, content);
@@ -3993,28 +4781,32 @@ function handleWebSocketMessage(message) {
     }
 }
 
-async function fetchFinalReportByThreadId(targetThreadId) {
+async function fetchFinalReportByThreadId(targetThreadId, workspaceId = null) {
     if (!targetThreadId) return null;
     try {
         const apiBase = (window.SessionService && window.SessionService.apiBaseUrl)
             ? window.SessionService.apiBaseUrl
             : (window.location.origin + '/api/nae-deep-research/v1');
-        const url = `${apiBase}/workspace/final-report/${encodeURIComponent(targetThreadId)}`;
+        let url = `${apiBase}/workspace/final-report/${encodeURIComponent(targetThreadId)}`;
+        if (workspaceId) {
+            url += `?workspaceId=${encodeURIComponent(workspaceId)}`;
+        }
         const response = await fetch(url);
         if (!response.ok) {
             console.warn('[fetchFinalReportByThreadId] 请求失败:', { status: response.status, url, targetThreadId });
             return null;
         }
         const payload = await response.json();
-        const data = payload && payload.data ? payload.data : null;
+        const data = payload && (payload.data || payload.payload || payload) ? (payload.data || payload.payload || payload) : null;
         if (!data || !data.filePath) {
             console.warn('[fetchFinalReportByThreadId] 返回数据不完整:', { targetThreadId, payload });
             return null;
         }
-        console.info('[fetchFinalReportByThreadId] 获取成功:', {
+        console.debug('[fetchFinalReportByThreadId] 获取成功:', {
             targetThreadId,
             workspaceId: data.workspaceId,
-            fileName: data.fileName
+            fileName: data.fileName,
+            filePath: data.filePath
         });
         return data;
     } catch (error) {
@@ -4040,70 +4832,604 @@ function isDagInitDataAllCompleted(initData) {
     const progress = initData.progress && typeof initData.progress === 'object' ? initData.progress : null;
     if (progress) {
         const completed = Number(progress.completed) || 0;
-        const inProgress = Number(progress.in_progress) || 0;
         const blocked = Number(progress.blocked) || 0;
+        const inProgress = Number(progress.in_progress) || 0;
         const notStarted = Number(progress.not_started) || 0;
-        const total = Number(progress.total) || (completed + inProgress + blocked + notStarted);
-        return total > 0 && completed === total;
+        const total = Number(progress.total) || (completed + blocked + inProgress + notStarted);
+        return total > 0 && (completed + blocked) === total;
     }
     const steps = Array.isArray(initData.steps) ? initData.steps : [];
     const statuses = initData.step_statuses && typeof initData.step_statuses === 'object' ? initData.step_statuses : {};
     if (steps.length === 0) return false;
-    let completedCount = 0;
+    let doneCount = 0;
     for (let i = 0; i < steps.length; i += 1) {
         const stepNo = i + 1;
         const statusRec = statuses[`step_${stepNo}`] ?? statuses[stepNo] ?? statuses[String(stepNo)];
         const status = typeof statusRec === 'string' ? statusRec : (statusRec?.status || '');
-        if (status === 'completed') completedCount += 1;
+        if (status === 'completed' || status === 'blocked') doneCount += 1;
     }
-    return completedCount === steps.length;
+    return doneCount === steps.length;
 }
 
-function startFinalReportPolling(threadId, options = {}) {
+async function startFinalReportPolling(threadId, options = {}) {
     if (!threadId) return;
     const existing = finalReportRetryStateByThread.get(threadId);
     if (existing) {
         existing.topic = options.topic || existing.topic || null;
         existing.redoContext = options.redoContext || existing.redoContext || null;
+        existing.workspaceId = options.workspaceId || existing.workspaceId || existing.workspaceId || null;
         finalReportRetryStateByThread.set(threadId, existing);
         return;
     }
 
+    const thread = getThreadById(threadId);
+    const initialWorkspaceId = thread?.rightPanelState?.workspaceId || null;
+
     const state = {
         timer: null,
         topic: options.topic || null,
-        redoContext: options.redoContext || null
+        redoContext: options.redoContext || null,
+        workspaceId: options.workspaceId || initialWorkspaceId || null
     };
     finalReportRetryStateByThread.set(threadId, state);
+
+    console.info('[startFinalReportPolling] 初始化状态', {
+        threadId,
+        state
+    });
+
+    const finalizeSuccess = async () => {
+        const current = finalReportRetryStateByThread.get(threadId);
+        if (current) {
+            if (current.topic) unbindTopic(current.topic);
+            clearRedoContextForThread(threadId, current.topic);
+            finalReportRetryStateByThread.delete(threadId);
+        }
+        await setThreadExecutingState(threadId, false);
+    };
+
+    const trySend = async () => {
+        const current = finalReportRetryStateByThread.get(threadId);
+        if (!current) return false;
+        const sent = await trySendPendingFinalMarkdownContent(threadId, {
+            workspaceId: current.workspaceId,
+            topic: current.topic,
+            redoContext: current.redoContext
+        });
+        if (sent) {
+            await finalizeSuccess();
+            return true;
+        }
+        return false;
+    };
 
     const tick = async () => {
         const current = finalReportRetryStateByThread.get(threadId);
         if (!current) return;
 
-        if (!isThreadDagAllCompleted(threadId)) {
-            current.timer = setTimeout(tick, 3000);
-            finalReportRetryStateByThread.set(threadId, current);
-            return;
-        }
-
-        const sent = await emitLatestMarkdownContentToChat(threadId, {
-            force: true,
-            redoContext: current.redoContext
-        });
-        if (sent) {
-            finalReportRetryStateByThread.delete(threadId);
-            if (current.topic) unbindTopic(current.topic);
-            clearRedoContextForThread(threadId, current.topic);
-            void setThreadExecutingState(threadId, false);
-            return;
-        }
+        const sent = await trySend();
+        if (sent) return;
 
         current.timer = setTimeout(tick, 3000);
         finalReportRetryStateByThread.set(threadId, current);
     };
 
-    state.timer = setTimeout(tick, 3000);
-    finalReportRetryStateByThread.set(threadId, state);
+    const sent = await trySend();
+    if (!sent) {
+        state.timer = setTimeout(tick, 3000);
+        finalReportRetryStateByThread.set(threadId, state);
+    }
+}
+
+async function fetchFinalJsonPath(workspaceId) {
+    const apiBase = (window.SessionService && window.SessionService.apiBaseUrl) ? window.SessionService.apiBaseUrl : (window.location.origin + '/api/nae-deep-research/v1');
+    const url = `${apiBase}/workspace/final-json-path/${workspaceId}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const result = await response.json();
+    return result.code === 0 ? result.data : null;
+}
+
+async function fetchFinalJsonData(finalJsonPath) {
+    if (!finalJsonPath || typeof finalJsonPath !== 'string') return null;
+
+    const apiBase = (window.SessionService && window.SessionService.apiBaseUrl)
+        ? window.SessionService.apiBaseUrl
+        : (window.location.origin + '/api/nae-deep-research/v1');
+
+    const normalizedPath = String(finalJsonPath || '').replace(/^\/+/, '');
+    const candidateUrls = [];
+    const apiPrefix = 'api/nae-deep-research/v1/';
+
+    if (/^https?:\/\//.test(finalJsonPath)) {
+        candidateUrls.push(finalJsonPath);
+    } else if (normalizedPath.startsWith(apiPrefix)) {
+        candidateUrls.push(`${window.location.origin}/${normalizedPath}`);
+        const suffix = normalizedPath.slice(apiPrefix.length);
+        if (suffix) {
+            candidateUrls.push(`${apiBase}/${suffix}`);
+        }
+    } else {
+        candidateUrls.push(`${apiBase}/${normalizedPath}`);
+        candidateUrls.push(`${window.location.origin}/${normalizedPath}`);
+    }
+
+    for (const url of candidateUrls) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.warn('[fetchFinalJsonData] 请求失败', { status: response.status, url, finalJsonPath });
+                continue;
+            }
+            return await response.json();
+        } catch (error) {
+            console.warn('[fetchFinalJsonData] 请求异常', { finalJsonPath, url, error });
+            continue;
+        }
+    }
+
+    return null;
+}
+
+async function getThreadSnapshotForPolling(threadId) {
+    if (!threadId) return null;
+    if (window.SessionService && typeof window.SessionService.getThreadFromBackend === 'function') {
+        try {
+            const backendThread = await window.SessionService.getThreadFromBackend(threadId);
+            if (backendThread) return backendThread;
+        } catch (error) {
+            console.warn('[getThreadSnapshotForPolling] 从后端获取线程失败，使用本地缓存', { threadId, error });
+        }
+    }
+    return getThreadById(threadId);
+}
+
+function findFinalMarkdownMetadataInThread(thread) {
+    if (!thread) return null;
+    const seen = new Set();
+
+    const searchMessageArray = (messages) => {
+        if (!Array.isArray(messages)) return null;
+        for (let i = messages.length - 1; i >= 0; i -= 1) {
+            const msg = messages[i];
+            if (!msg || !msg.metadata || typeof msg.metadata !== 'object') continue;
+            const messageId = String(msg.id || msg._messageId || '').trim();
+            if (messageId) seen.add(messageId);
+            const finalMarkdownPath = String(msg.metadata.finalMarkdownPath || '').trim();
+            if (!finalMarkdownPath) continue;
+
+            return {
+                finalMarkdownPath,
+                workspaceId: String(msg.metadata.workspaceId || '').trim() || null,
+                finalJsonPath: String(msg.metadata.finalJsonPath || '').trim() || null
+            };
+        }
+        return null;
+    };
+
+    let result = searchMessageArray(getRenderableMessagesFromThread(thread));
+    if (result) return result;
+
+    if (Array.isArray(thread.messages)) {
+        result = searchMessageArray(thread.messages);
+        if (result) return result;
+    }
+
+    const nodeMap = thread.messageTree?.nodes || null;
+    if (nodeMap && typeof nodeMap === 'object') {
+        const nodes = Object.values(nodeMap)
+            .filter((node) => node && typeof node === 'object')
+            .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+        for (const node of nodes) {
+            const messageId = String(node.id || node._messageId || '').trim();
+            if (messageId && seen.has(messageId)) continue;
+            if (!node.metadata || typeof node.metadata !== 'object') continue;
+            const finalMarkdownPath = String(node.metadata.finalMarkdownPath || '').trim();
+            if (!finalMarkdownPath) continue;
+            return {
+                finalMarkdownPath,
+                workspaceId: String(node.metadata.workspaceId || '').trim() || null,
+                finalJsonPath: String(node.metadata.finalJsonPath || '').trim() || null
+            };
+        }
+    }
+
+    return null;
+}
+
+async function fetchMarkdownFileContent(finalMarkdownPath) {
+    if (!finalMarkdownPath || typeof finalMarkdownPath !== 'string') return null;
+
+    const apiBase = (window.SessionService && window.SessionService.apiBaseUrl)
+        ? window.SessionService.apiBaseUrl
+        : (window.location.origin + '/api/nae-deep-research/v1');
+
+    const normalizedPath = String(finalMarkdownPath || '').replace(/^\/+/, '');
+    const candidateUrls = [];
+    const apiPrefix = 'api/nae-deep-research/v1/';
+
+    if (/^https?:\/\//.test(finalMarkdownPath)) {
+        candidateUrls.push(finalMarkdownPath);
+    } else if (normalizedPath.startsWith(apiPrefix)) {
+        candidateUrls.push(`${window.location.origin}/${normalizedPath}`);
+        const suffix = normalizedPath.slice(apiPrefix.length);
+        if (suffix) {
+            candidateUrls.push(`${apiBase}/${suffix}`);
+        }
+    } else {
+        candidateUrls.push(`${apiBase}/${normalizedPath}`);
+        candidateUrls.push(`${window.location.origin}/${normalizedPath}`);
+    }
+
+    for (const url of candidateUrls) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.warn('[fetchMarkdownFileContent] 请求失败', { status: response.status, url, finalMarkdownPath });
+                continue;
+            }
+            return await response.text();
+        } catch (error) {
+            console.warn('[fetchMarkdownFileContent] 请求异常', { finalMarkdownPath, url, error });
+            continue;
+        }
+    }
+
+    return null;
+}
+
+async function sendPendingFinalMarkdownPathToChat(threadId, finalMarkdownPath, workspaceId = null, finalJsonPath = null) {
+    if (!threadId || !finalMarkdownPath) return false;
+
+    const markdownContent = await fetchMarkdownFileContent(finalMarkdownPath);
+    if (!markdownContent) return false;
+
+    const thread = getThreadById(threadId);
+    const metadataPatch = {
+        type: 'final_markdown_content',
+        finalMarkdownPath: finalMarkdownPath
+    };
+    if (workspaceId) metadataPatch.workspaceId = workspaceId;
+    if (finalJsonPath) metadataPatch.finalJsonPath = finalJsonPath;
+
+    const replaced = resolvePendingAssistantPlaceholder(threadId, markdownContent, metadataPatch);
+    if (!replaced) {
+        const assistantMessage = {
+            role: 'assistant',
+            content: markdownContent,
+            timestamp: Date.now(),
+            metadata: metadataPatch
+        };
+        if (threadId === AppState.currentThreadId) {
+            addMessage(assistantMessage);
+        } else if (thread) {
+            addMessageToThreadStorage(thread, assistantMessage);
+        }
+    }
+
+    if (thread) {
+        thread.rightPanelState = thread.rightPanelState || {};
+        thread.rightPanelState.workspaceId = workspaceId || thread.rightPanelState.workspaceId || null;
+        thread.rightPanelState.finalMarkdownPath = finalMarkdownPath;
+        if (finalJsonPath) {
+            thread.rightPanelState.finalJsonPath = finalJsonPath;
+        }
+        schedulePersistRightPanelState(threadId, thread.rightPanelState);
+    }
+    return true;
+}
+
+async function trySendPendingFinalMarkdownContent(threadId, options = {}) {
+    if (!threadId) return false;
+    const thread = await getThreadSnapshotForPolling(threadId);
+    if (!thread) return false;
+
+    const metadata = findFinalMarkdownMetadataInThread(thread);
+    if (metadata && metadata.finalMarkdownPath) {
+        return await sendPendingFinalMarkdownPathToChat(
+            threadId,
+            metadata.finalMarkdownPath,
+            metadata.workspaceId,
+            metadata.finalJsonPath
+        );
+    }
+
+    return await emitLatestMarkdownContentToChat(threadId, {
+        workspaceId: options.workspaceId || thread.rightPanelState?.workspaceId || null,
+        topic: options.topic,
+        redoContext: options.redoContext
+    });
+}
+
+function normalizeFinalJsonToRightPanelState(rawFinalJson, workspaceIdFallback = null) {
+    if (!rawFinalJson || typeof rawFinalJson !== 'object') return null;
+
+    const payload = rawFinalJson.rightPanelState
+        || rawFinalJson.data?.rightPanelState
+        || rawFinalJson.data
+        || rawFinalJson;
+    if (!payload || typeof payload !== 'object') return null;
+
+    // If payload already contains a ready-made rightPanelState, use it directly.
+    if (payload.dagInitData || payload.runtimeLogBook || payload.finalMarkdownPath) {
+        const readyState = cloneSerializable(payload, null);
+        if (!readyState || typeof readyState !== 'object') return null;
+        if (workspaceIdFallback) {
+            if (!readyState.workspaceId) {
+                readyState.workspaceId = workspaceIdFallback;
+            }
+            if (!readyState.workspacePath) {
+                readyState.workspacePath = `work_space/${workspaceIdFallback}`;
+            }
+        }
+        return readyState;
+    }
+
+    const finalJson = payload;
+    const finalJsonTitle = finalJson.title || finalJson.data?.title || '';
+    const dagInitData = {
+        title: finalJsonTitle,
+        steps: Array.isArray(finalJson.steps) ? finalJson.steps : [],
+        dependencies: (finalJson.dependencies && typeof finalJson.dependencies === 'object') ? finalJson.dependencies : {},
+        progress: (finalJson.progress && typeof finalJson.progress === 'object') ? finalJson.progress : {},
+        step_statuses: (finalJson.step_statuses && typeof finalJson.step_statuses === 'object') ? finalJson.step_statuses : {},
+        step_notes: (finalJson.step_notes && typeof finalJson.step_notes === 'object') ? finalJson.step_notes : {},
+        step_details: (finalJson.step_details && typeof finalJson.step_details === 'object') ? finalJson.step_details : {},
+        step_agents: (finalJson.step_agents && typeof finalJson.step_agents === 'object') ? finalJson.step_agents : {},
+        step_execution_agents: (finalJson.step_execution_agents && typeof finalJson.step_execution_agents === 'object') ? finalJson.step_execution_agents : {},
+        statusText: finalJson.statusText || finalJson.status_text || ''
+    };
+
+    if (!dagInitData.title && finalJson.title) {
+        dagInitData.title = finalJson.title;
+    }
+    if (!dagInitData.title && finalJson.data && typeof finalJson.data.title === 'string') {
+        dagInitData.title = finalJson.data.title;
+    }
+
+    if (!dagInitData.step_statuses && finalJson.step_statuses) {
+        dagInitData.step_statuses = finalJson.step_statuses;
+    }
+    if (!dagInitData.step_notes && finalJson.step_notes) {
+        dagInitData.step_notes = finalJson.step_notes;
+    }
+    if (!dagInitData.step_details && finalJson.step_details) {
+        dagInitData.step_details = finalJson.step_details;
+    }
+
+    if (!dagInitData.statusText && dagInitData.progress && Number(dagInitData.progress.total || 0) > 0) {
+        const completed = Number(dagInitData.progress.completed || 0);
+        const blocked = Number(dagInitData.progress.blocked || 0);
+        const total = Number(dagInitData.progress.total || 0);
+        if ((completed + blocked) >= total) {
+            dagInitData.statusText = RIGHT_PANEL_COMPLETED_STATUS_TEXT;
+        }
+    }
+
+    const rightPanelState = {
+        dagInitData: cloneSerializable(dagInitData, {}),
+        runtimeLogBook: normalizeRuntimeLogBook(null)
+    };
+
+    const rawLogs = finalJson['任务日志'] || finalJson.task_logs || finalJson.runtimeLogs || finalJson.runtimeLogBook || null;
+    if (Array.isArray(rawLogs) && rawLogs.length > 0) {
+        const taskId = `task_restore_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const orderedTaskList = rawLogs
+            .map((entry, idx) => {
+                const logItem = typeof entry === 'object'
+                    ? entry
+                    : { result: String(entry) };
+                return {
+                    seq: Number.isFinite(Number(entry?.seq)) ? Number(entry.seq) : idx + 1,
+                    stepId: Number.isFinite(Number(entry?.stepId)) ? Number(entry.stepId) : (Number.isFinite(Number(entry?.nodeId)) ? Number(entry.nodeId) : null),
+                    log: logItem
+                };
+            })
+            .filter(Boolean);
+
+        rightPanelState.runtimeLogBook = normalizeRuntimeLogBook({
+            version: 2,
+            activeTaskId: taskId,
+            tasks: [{
+                taskId,
+                externalTaskKey: null,
+                title: '任务日志',
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                sequenceCounter: orderedTaskList.length,
+                stepOrder: orderedTaskList
+                    .map(item => Number.isFinite(Number(item.stepId)) ? Number(item.stepId) : null)
+                    .filter(Number.isFinite),
+                stepLogs: {},
+                orderedTaskList
+            }]
+        });
+    } else if (rawLogs && typeof rawLogs === 'object' && Array.isArray(rawLogs.tasks)) {
+        rightPanelState.runtimeLogBook = normalizeRuntimeLogBook(rawLogs);
+    }
+
+    if (workspaceIdFallback) {
+        rightPanelState.workspaceId = workspaceIdFallback;
+        rightPanelState.workspacePath = `work_space/${workspaceIdFallback}`;
+    }
+
+    if (finalJsonTitle) {
+        rightPanelState.executionTitle = finalJsonTitle;
+    }
+
+    return rightPanelState;
+}
+
+
+async function loadThreadRightPanelStateFromFinalJson(thread, finalJsonPath, workspaceIdFallback = null) {
+    if (!finalJsonPath) return false;
+
+    const data = await fetchFinalJsonData(finalJsonPath);
+    if (!data || typeof data !== 'object') return false;
+
+    const normalizedState = normalizeFinalJsonToRightPanelState(data, workspaceIdFallback);
+    if (!normalizedState) {
+        const resultContent = typeof data.result === 'string'
+            ? data.result
+            : (typeof data.data?.result === 'string' ? data.data.result : null);
+        if (resultContent && thread.id) {
+            const title = data.title || data.data?.title || '最终报告';
+            thread.rightPanelState = {
+                executionTitle: title
+            };
+            if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
+                void schedulePersistRightPanelState(thread.id, thread.rightPanelState);
+            }
+            if (thread.id === AppState.currentThreadId) {
+                showMarkdownContentInRightPanel(resultContent, title);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    if (thread.id) {
+        thread.rightPanelState = normalizedState;
+        if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
+            void schedulePersistRightPanelState(thread.id, normalizedState);
+        }
+    }
+
+    if (thread.id && thread.id === AppState.currentThreadId) {
+        await restoreRightPanelStateFromData(normalizedState, thread.id);
+    }
+    return true;
+}
+
+function showMarkdownContentInRightPanel(content, title = '最终报告') {
+    const iframe = document.getElementById('content-iframe');
+    const markdownContent = document.getElementById('markdown-content');
+    const rightStatus = document.getElementById('right-container-status');
+
+    if (!markdownContent) return;
+    if (iframe) {
+        iframe.style.display = 'none';
+    }
+
+    if (rightStatus) {
+        rightStatus.textContent = `正在查看：${title}`;
+    }
+    if (typeof updateExecutionTitle === 'function' && title) {
+        updateExecutionTitle(title);
+    }
+
+    markdownContent.style.display = 'block';
+    if (window.MarkdownRenderer && typeof window.MarkdownRenderer.render === 'function') {
+        window.MarkdownRenderer.render(content, markdownContent);
+    } else {
+        markdownContent.textContent = content;
+    }
+}
+
+function getActiveTaskLogsFromRightPanelState(rightPanelState) {
+    if (!rightPanelState || typeof rightPanelState !== 'object') return [];
+
+    const book = normalizeRuntimeLogBook(rightPanelState.runtimeLogBook);
+    rightPanelState.runtimeLogBook = book;
+
+    const activeTaskId = book.activeTaskId || AppState.runtimeLogActiveTaskId || (book.tasks.length ? book.tasks[0]?.taskId : null);
+    const activeTask = getTaskByIdFromBook(book, activeTaskId) || (book.tasks.length ? book.tasks[0] : null);
+    if (!activeTask) return [];
+
+    AppState.runtimeLogActiveTaskId = activeTask.taskId;
+    book.activeTaskId = activeTask.taskId;
+    rightPanelState.runtimeLogBook = book;
+
+    return (activeTask.orderedTaskList || [])
+        .map((entry) => normalizeRuntimeLogItem(entry?.log || entry))
+        .filter(Boolean)
+        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+}
+
+async function restoreRightPanelStateFromData(rightPanelState, threadId) {
+    if (!rightPanelState || typeof rightPanelState !== 'object') return false;
+    if (!threadId) {
+        threadId = AppState.currentThreadId;
+    }
+    if (!threadId) return false;
+
+    resetExecutionTitle();
+    clearDagViewState();
+    clearRuntimeLogs();
+    clearRuntimeLogFilter();
+    AppState.selectedTaskNodeId = null;
+
+    const normalizedState = cloneSerializable(rightPanelState, null);
+    if (!normalizedState || typeof normalizedState !== 'object') return false;
+    normalizedState.runtimeLogBook = normalizeRuntimeLogBook(normalizedState.runtimeLogBook);
+
+    void maybeHandleRightPanelStateCompletion(threadId, normalizedState);
+
+    const dagInitData = normalizedState.dagInitData || null;
+    const uiTitle = normalizedState.executionTitle || (dagInitData && dagInitData.title) || null;
+    if (uiTitle) {
+        updateExecutionTitle(uiTitle);
+    }
+    if (dagInitData && typeof createDag === 'function') {
+        createDag({ data: { content: dagInitData } });
+    }
+
+    const runtimeLogs = getActiveTaskLogsFromRightPanelState(normalizedState);
+    clearRuntimeLogs(true);
+    runtimeLogs.forEach((log) => addToolCallToChain(log));
+
+    const activeTaskId = AppState.runtimeLogActiveTaskId;
+    if (activeTaskId) {
+        const lastViewedNodeId = AppState.taskNodeViewMemory.get(activeTaskId);
+        if (lastViewedNodeId) {
+            AppState.selectedTaskNodeId = lastViewedNodeId;
+        }
+    }
+
+    rerenderTaskInfoBySelection();
+    return true;
+}
+
+async function fetchUpdateFinalJson(finalJsonPath, rightPanelState) {
+    const apiBase = (window.SessionService && window.SessionService.apiBaseUrl) ? window.SessionService.apiBaseUrl : (window.location.origin + '/api/nae-deep-research/v1');
+    const url = `${apiBase}/workspace/update-final-json`;
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: finalJsonPath, rightPanelState })
+    });
+    return response.ok;
+}
+
+async function fetchUpdateThreadRightPanelState(threadId, rightPanelState) {
+    const apiBase = (window.SessionService && window.SessionService.apiBaseUrl) ? window.SessionService.apiBaseUrl : (window.location.origin + '/api/nae-deep-research/v1');
+    const url = `${apiBase}/thread/${threadId}`;
+    try {
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rightPanelState })
+        });
+        if (!response.ok) {
+            console.warn('[fetchUpdateThreadRightPanelState] 更新失败:', response.status);
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.warn('[fetchUpdateThreadRightPanelState] 网络错误:', error);
+        return false;
+    }
+}
+
+function hasExistingFinalMarkdownMessage(thread, finalMarkdownPath, workspaceId) {
+    if (!thread) return false;
+    const messages = getRenderableMessagesFromThread(thread);
+    return messages.some((msg) => {
+        if (!msg || msg.role !== 'assistant' || !msg.metadata || msg.metadata.type !== 'final_markdown_content') return false;
+        if (finalMarkdownPath && msg.metadata.finalMarkdownPath === finalMarkdownPath) return true;
+        if (workspaceId && msg.metadata.workspaceId === workspaceId) return true;
+        return false;
+    });
 }
 
 async function emitLatestMarkdownContentToChat(targetThreadId, options = {}) {
@@ -4114,62 +5440,158 @@ async function emitLatestMarkdownContentToChat(targetThreadId, options = {}) {
     if (!thread) return false;
 
     try {
-        const report = await fetchFinalReportByThreadId(targetThreadId);
-        if (!report) {
-            console.warn('[emitLatestMarkdownContentToChat] 未获取到最终文件:', { targetThreadId });
-            return false;
-        }
+        const targetWorkspaceId = options.workspaceId || thread.rightPanelState?.workspaceId || null;
+        const metadata = findFinalMarkdownMetadataInThread(thread);
+        let filePath = null;
+        let content = null;
+        let workspaceId = targetWorkspaceId;
+        let finalJsonPath = metadata?.finalJsonPath || null;
 
-        const filePath = report.filePath;
-        const content = String(report.content ?? '');
-        if (!filePath) return false;
-
-        showMarkdownFileInRightPanel(filePath, report.fileName);
-        const currentMessages = getRenderableMessagesFromThread(thread);
-
-        if (redoContext && redoContext.messageId) {
-            const targetMessages = currentMessages;
-            const targetMessage = targetMessages.find((m) => m && ensureMessageId(m) === redoContext.messageId);
-            if (targetMessage) {
-                applyRedoContentToTarget(targetThreadId, targetMessage, redoContext.messageId, content);
-                console.info('[emitLatestMarkdownContentToChat] 重做结果回填成功:', { targetThreadId, filePath });
-                return true;
+        if (metadata?.finalMarkdownPath) {
+            filePath = metadata.finalMarkdownPath;
+            workspaceId = metadata.workspaceId || workspaceId;
+            content = await fetchMarkdownFileContent(filePath);
+            if (content === null) {
+                console.warn('[emitLatestMarkdownContentToChat] metadata.finalMarkdownPath 指向的文件不存在或无法读取', {
+                    targetThreadId,
+                    filePath,
+                    workspaceId
+                });
+                return false;
             }
-            console.warn('[emitLatestMarkdownContentToChat] 重做上下文存在但目标消息缺失，跳过新增:', { targetThreadId, redoContext });
-            return false;
+        } else {
+            const report = await fetchFinalReportByThreadId(targetThreadId, targetWorkspaceId);
+            if (!report) {
+                return false;
+            }
+
+            const finalJsonData = await fetchFinalJsonPath(report.workspaceId);
+            finalJsonPath = finalJsonData ? finalJsonData.path : null;
+
+            filePath = report.filePath;
+            content = String(report.content ?? '');
+            workspaceId = report.workspaceId;
+            if (!filePath) return false;
         }
 
-        const replacedPending = resolvePendingAssistantPlaceholder(targetThreadId, content, {
-            type: 'final_markdown_content',
+        const finalReportRightPanelState = {
+            workspaceId: workspaceId,
             finalMarkdownPath: filePath
-        });
-        if (replacedPending) {
-            console.info('[emitLatestMarkdownContentToChat] 正常占位消息已替换为最终内容:', { targetThreadId, filePath });
+        };
+
+        if (hasExistingFinalMarkdownMessage(thread, filePath, workspaceId)) {
+            if (finalJsonPath) {
+                await fetchUpdateFinalJson(finalJsonPath, finalReportRightPanelState);
+            }
+            await clearThreadRightPanelState(targetThreadId);
             return true;
         }
 
-        const reportMessage = {
-            role: 'assistant',
-            content: content,
-            timestamp: Date.now(),
-            metadata: {
-                type: 'final_markdown_content',
-                finalMarkdownPath: filePath
-            }
+        const pendingPlaceholderExists = !!findPendingAssistantPlaceholder(targetThreadId);
+        const metadataPatch = {
+            type: 'final_markdown_content',
+            finalMarkdownPath: filePath,
+            workspaceId: workspaceId,
+            finalJsonPath: finalJsonPath
         };
 
-        if (targetThreadId === AppState.currentThreadId) {
-            addMessage(reportMessage);
-        } else {
-            addMessageToThreadStorage(thread, reportMessage);
-            renderFolderList();
+        // 当前线程/版本来源Workspace固定为该report的workspace，避免后续redo覆盖导致历史版本错乱
+        thread.rightPanelState = thread.rightPanelState || {};
+        thread.rightPanelState.workspaceId = workspaceId;
+        thread.rightPanelState.finalMarkdownPath = filePath;
+
+        if (pendingPlaceholderExists) {
+            const replacedPending = resolvePendingAssistantPlaceholder(targetThreadId, content, metadataPatch);
+            if (replacedPending) {
+                if (finalJsonPath) {
+                    await fetchUpdateFinalJson(finalJsonPath, finalReportRightPanelState);
+                }
+                await clearThreadRightPanelState(targetThreadId);
+                showMarkdownFileInRightPanel(filePath, filePath.split('/').pop() || '最终报告');
+                console.info('[emitLatestMarkdownContentToChat] 正常占位消息已替换为最终内容:', { targetThreadId, filePath });
+                return true;
+            }
         }
-        console.info('[emitLatestMarkdownContentToChat] 最终文件发送成功:', { targetThreadId, filePath });
+
+        console.warn('[emitLatestMarkdownContentToChat] 无 pending placeholder，已忽略新增 final report 消息', {
+            targetThreadId,
+            filePath,
+            workspaceId,
+            redoContext
+        });
+        if (finalJsonPath) {
+            await fetchUpdateFinalJson(finalJsonPath, finalReportRightPanelState);
+        }
+        await clearThreadRightPanelState(targetThreadId);
         return true;
     } catch (error) {
         console.warn('[emitLatestMarkdownContentToChat] 发送异常:', { targetThreadId, error });
         return false;
     }
+}
+
+function getRightPanelStateStatusText(rightPanelState) {
+    if (!rightPanelState || typeof rightPanelState !== 'object') return '';
+
+    const dagInitStatus = String(rightPanelState.dagInitData?.statusText || '').trim();
+    if (dagInitStatus) return dagInitStatus;
+
+    return String(rightPanelState.statusText || '').trim();
+}
+
+function isRightPanelStatusTextCompleted(rightPanelState) {
+    return getRightPanelStateStatusText(rightPanelState) === RIGHT_PANEL_COMPLETED_STATUS_TEXT;
+}
+
+async function clearThreadRightPanelState(threadId) {
+    if (!threadId) return false;
+    const thread = getThreadById(threadId);
+    if (thread) {
+        delete thread.workspaceId;
+        delete thread.workspacePath;
+        delete thread.planLogPath;
+        delete thread.rightPanelState;
+    }
+    try {
+        if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
+            const updates = { rightPanelState: null };
+            await window.SessionService.updateThread(threadId, updates);
+            return true;
+        }
+        return await fetchUpdateThreadRightPanelState(threadId, null);
+    } catch (error) {
+        console.warn('[clearThreadRightPanelState] 清理失败:', { threadId, error });
+        return false;
+    }
+}
+
+async function maybeHandleRightPanelStateCompletion(threadId, rightPanelState) {
+    if (!threadId || !isRightPanelStatusTextCompleted(rightPanelState)) return;
+    if (threadCompletionHandled.has(threadId)) return;
+    threadCompletionHandled.add(threadId);
+
+    const thread = getThreadById(threadId);
+    if (!thread) return;
+    if (thread.rightPanelState && thread.rightPanelState.finalMarkdownPath) return;
+
+    console.info('[RightPanelCompletion] 检测到任务完成信号', { threadId, statusText: rightPanelState.statusText });
+    await clearThreadRightPanelState(threadId);
+
+    const sent = await trySendPendingFinalMarkdownContent(threadId, {
+        workspaceId: rightPanelState.workspaceId || null
+    });
+
+    if (sent) {
+        await setThreadExecutingState(threadId, false);
+        if (threadId === AppState.currentThreadId && typeof hideThinkingState === 'function') {
+            hideThinkingState();
+        }
+        return;
+    }
+
+    startFinalReportPolling(threadId, {
+        workspaceId: rightPanelState.workspaceId || null
+    });
 }
 
 // 在右侧面板显示 markdown 文件
@@ -4293,6 +5715,16 @@ function exportCurrentChat() {
 
 // ==================== 工具链展示 ====================
 
+function getPersistableRightPanelState(rightPanelState) {
+    if (!rightPanelState || typeof rightPanelState !== 'object') return null;
+    return JSON.parse(JSON.stringify(rightPanelState));
+}
+
+function buildPersistableThreadMetadata(rightPanelState) {
+    if (!rightPanelState || typeof rightPanelState !== 'object') return null;
+    return { rightPanelState: JSON.parse(JSON.stringify(rightPanelState)) };
+}
+
 const rightPanelPersistTimers = new Map();
 
 function schedulePersistRightPanelState(threadId, partialState) {
@@ -4307,6 +5739,8 @@ function schedulePersistRightPanelState(threadId, partialState) {
     };
     thread.rightPanelState = nextState;
 
+    void maybeHandleRightPanelStateCompletion(threadId, nextState);
+
     const existingTimer = rightPanelPersistTimers.get(threadId);
     if (existingTimer) {
         clearTimeout(existingTimer);
@@ -4316,13 +5750,49 @@ function schedulePersistRightPanelState(threadId, partialState) {
         rightPanelPersistTimers.delete(threadId);
         try {
             if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
-                await window.SessionService.updateThread(threadId, { rightPanelState: nextState });
+                const persistState = buildPersistableThreadMetadata(nextState);
+                if (persistState) {
+                    await window.SessionService.updateThread(threadId, persistState);
+                }
             }
         } catch (e) {
+            // ignore persistence errors
         }
     }, 250);
 
     rightPanelPersistTimers.set(threadId, timer);
+}
+
+async function flushPersistedRightPanelState(threadId) {
+    if (!threadId) return;
+    const timer = rightPanelPersistTimers.get(threadId);
+    if (timer) {
+        clearTimeout(timer);
+        rightPanelPersistTimers.delete(threadId);
+    }
+
+    const thread = getThreadById(threadId);
+    if (!thread || !window.SessionService || typeof window.SessionService.updateThread !== 'function') {
+        return;
+    }
+
+    const persistState = buildPersistableThreadMetadata(thread.rightPanelState);
+    if (!persistState) return;
+
+    try {
+        await window.SessionService.updateThread(threadId, persistState);
+    } catch (e) {
+        // ignore persistence errors
+    }
+}
+
+async function flushCurrentThreadPersistence(threadId) {
+    if (!threadId) return;
+    const thread = getThreadById(threadId);
+    if (!thread) return;
+
+    await flushPersistedRightPanelState(threadId);
+    await syncThreadMessagesToBackend(thread);
 }
 
 function appendRuntimeLogFromToolCall(nodeId, toolCall, options = {}) {
@@ -4331,13 +5801,20 @@ function appendRuntimeLogFromToolCall(nodeId, toolCall, options = {}) {
     const externalTaskKey = options.externalTaskKey || toolCall.externalTaskKey || null;
     if (!targetThreadId) return;
 
-    const stepLabel = `Step ${nodeId}`;
-    const status = toolCall.status || 'completed';
-    const description = toolCall.description || '';
-    const resultText = toolCall.result
-        ? (typeof toolCall.result === 'string' ? toolCall.result : JSON.stringify(toolCall.result))
-        : '';
+    const status = String(toolCall.status || toolCall.state || 'unknown');
+    const description = String(toolCall.description || toolCall.name || toolCall.tool || '').trim();
+    let resultText = '';
+    if (typeof toolCall.result === 'string') {
+        resultText = toolCall.result;
+    } else if (toolCall.result !== undefined && toolCall.result !== null) {
+        try {
+            resultText = JSON.stringify(toolCall.result);
+        } catch (err) {
+            resultText = String(toolCall.result);
+        }
+    }
 
+    const stepLabel = `Step ${nodeId}`;
     const sourceCallId = toolCall.id
         ? String(toolCall.id)
         : `${toolCall.tool || 'tool_event'}|${description}|${resultText.slice(0, 120)}`;
@@ -4419,12 +5896,14 @@ function appendRuntimeLogFromToolCall(nodeId, toolCall, options = {}) {
     }
 }
 
-function clearRuntimeLogs() {
+function clearRuntimeLogs(preserveActiveTaskId = false) {
     AppState.toolCalls = [];
     runtimeLogCounter = 0;
     runtimeLogSignatures.clear();
     AppState.runtimeLogFilterNodeId = null;
-    AppState.runtimeLogActiveTaskId = null;
+    if (!preserveActiveTaskId) {
+        AppState.runtimeLogActiveTaskId = null;
+    }
     applyRuntimeLogFilter();
 }
 
@@ -4538,8 +6017,12 @@ function updateProgressStats(stats) {
     if (blockedCount) blockedCount.textContent = stats.blocked || 0;
     if (notStartedCount) notStartedCount.textContent = stats.not_started || 0;
     
-    const total = (stats.completed || 0) + (stats.in_progress || 0) + (stats.blocked || 0) + (stats.not_started || 0);
-    const percentage = total > 0 ? Math.round((stats.completed || 0) / total * 100) : 0;
+    const completed = Number(stats.completed) || 0;
+    const blocked = Number(stats.blocked) || 0;
+    const inProgress = Number(stats.in_progress) || 0;
+    const notStarted = Number(stats.not_started) || 0;
+    const total = completed + blocked + inProgress + notStarted;
+    const percentage = total > 0 ? Math.round((completed + blocked) / total * 100) : 0;
     
     if (progressFill) progressFill.style.width = percentage + '%';
     if (progressText) progressText.textContent = percentage + '%';
@@ -5506,15 +6989,16 @@ async function handleTestCommand() {
     // 隐藏思考状态
     hideThinkingState();
 
-    // 如果已缓存，直接使用
-    if (testMarkdownContent) {
-        showTestContentAsAIReply(testMarkdownContent);
-        return;
-    }
-
     try {
-        // 加载测试文档
-        const response = await fetch('markdown/markdown-response.txt');
+        // 加载测试文档（禁止缓存）
+        const response = await fetch(`markdown/markdown-response.txt?t=${Date.now()}`, {
+            cache: 'no-store',
+            credentials: 'same-origin',
+            headers: {
+                'Cache-Control': 'no-cache, no-store',
+                Pragma: 'no-cache'
+            }
+        });
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }

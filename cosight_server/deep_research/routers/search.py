@@ -122,6 +122,9 @@ def _bind_thread_workspace(thread_id: str, workspace_path_value: str):
             right_panel_state["workspaceId"] = workspace_name
             right_panel_state["workspacePath"] = f"work_space/{workspace_name}"
             thread["rightPanelState"] = right_panel_state
+            thread.pop("workspaceId", None)
+            thread.pop("workspacePath", None)
+            thread.pop("planLogPath", None)
             thread["updatedAt"] = now_ms
             updated = True
             break
@@ -376,16 +379,19 @@ def _serialize_plan_data(plan_obj: Plan) -> dict:
     }
 
 
-async def append_create_plan(data: Any):
+async def append_create_plan(data: Any, plan_log_path: str = None, plan_final_path: str = None):
     """
-    将数据追加写入LOGS_PATH下的plan.log文件，并将数据放入队列以发送给客户端
+    将数据追加写入指定路径的plan.log文件，并将数据放入队列以发送给客户端
 
     Args:
         data: 要写入的数据（支持字典、列表等可JSON序列化的类型）
+        plan_log_path: 日志文件路径，如果为None则使用默认路径
+        plan_final_path: 最终结果文件路径，如果为None则使用默认路径
     """
     try:
-        # 使用LOGS_PATH构建文件路径
-        file_path = Path(LOGS_PATH) / "plan.log"
+        # 使用传入的路径或默认路径
+        log_path = plan_log_path or (Path(LOGS_PATH) / "plan.log")
+        final_path = plan_final_path or (Path(LOGS_PATH) / "plan.final.json")
 
         # 处理Plan对象转换为可序列化的dict
         if isinstance(data, Plan):
@@ -421,7 +427,7 @@ async def append_create_plan(data: Any):
         # logger.info(f"序列化后的Plan数据: {content.strip()}")
 
         # 追加写入文件（自动创建文件）
-        with open(file_path, mode='a', encoding='utf-8') as f:
+        with open(log_path, mode='a', encoding='utf-8') as f:
             f.write(content)
 
         # 将数据放入队列以便流式发送 - 使用run_coroutine_threadsafe
@@ -566,23 +572,24 @@ async def search(request: Request, params: Any = Body(None)):
         except Exception as e:
             logger.warning(f"Failed to query knowledge bases: {e}")
 
-    # 规划每个 plan 的持久化文件
-    plan_log_path = os.path.join(LOGS_PATH, f"{plan_id}.log")
-    plan_final_path = os.path.join(LOGS_PATH, f"{plan_id}.final.json")
-
-    # 构造路径：/xxx/xxx/work_space/work_space_时间戳
-    # 在函数外部生成，确保RecordGenerator和generator_func使用相同路径
-    # 注意：回放请求不应创建新的工作区目录，否则会让 workspace 变得很冗余
+    # 确定 workspace_id
     if not is_replay_request:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-        work_space_path_time = os.path.join(work_space_path, f'work_space_{timestamp}')
+        workspace_id = f'work_space_{timestamp}'
+        work_space_path_time = os.path.join(work_space_path, workspace_id)
         print(f"work_space_path_time:{work_space_path_time}")
         os.makedirs(work_space_path_time, exist_ok=True)
         # 将工作空间路径存储到环境变量，供 RecordGenerator 和 CoSight 使用
         os.environ['WORKSPACE_PATH'] = work_space_path_time
     else:
-        # 回放场景下不需要新的工作区目录，这里仅占位，RecordGenerator 会使用 replayWorkspace
+        # 回放请求，从 replayWorkspace 提取 workspace_id
+        replay_workspace = params.get("replayWorkspace", "")
+        workspace_id = os.path.basename(replay_workspace) if replay_workspace else plan_id  # 降级使用 plan_id
         work_space_path_time = None
+
+    # 规划每个 plan 的持久化文件，使用 workspace_id 命名
+    plan_log_path = os.path.join(LOGS_PATH, f"{workspace_id}.log")
+    plan_final_path = os.path.join(LOGS_PATH, f"{workspace_id}.final.json")
 
     # 会话与 workspace 绑定：后续按会话直接定位文件夹读取最终报告
     try:
@@ -626,7 +633,7 @@ async def search(request: Request, params: Any = Body(None)):
 
         def append_create_plan_local(data: Any):
             """
-            将数据追加写入LOGS_PATH下按 plan_id 的文件，并将数据放入队列以发送给客户端
+            将数据追加写入LOGS_PATH下按 workspace_id 的文件，并将数据放入队列以发送给客户端
 
             Args:
                 data: 要写入的数据（支持字典、列表等可JSON序列化的类型）
@@ -634,6 +641,9 @@ async def search(request: Request, params: Any = Body(None)):
             try:
                 # 针对当前 plan 的日志文件
                 file_path = Path(plan_log_path)
+                
+                # 确保父目录存在
+                file_path.parent.mkdir(parents=True, exist_ok=True)
 
                 # 处理Plan对象转换为可序列化的dict
                 if isinstance(data, Plan):
@@ -1033,6 +1043,24 @@ async def search(request: Request, params: Any = Body(None)):
 
                 yield json.dumps(response_json, ensure_ascii=False).encode('utf-8') + b'\n'
                 await asyncio.sleep(0)
+
+            # 任务完成后发送完成信号
+            logger.info(f"任务完成，发送完成信号 plan_id={plan_id}")
+            completion_response = json.dumps({
+                "contentType": "lui-message-manus-step-completed",
+                "sessionInfo": params.get("sessionInfo", {}),
+                "code": 0,
+                "message": "ok",
+                "task": "chat",
+                "changeType": "replace",
+                "content": {
+                    "status": "completed",
+                    "title": "任务已完成",
+                    "steps": [],
+                    "statusText": "任务执行完成"
+                }
+            }, ensure_ascii=False).encode('utf-8') + b'\n'
+            yield completion_response
 
         except Exception as exc:
             error_msg = "生成回复时发生错误。"
