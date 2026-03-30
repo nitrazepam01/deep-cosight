@@ -179,9 +179,6 @@ class SessionService {
             : this.createEmptyMessageTree(threadId);
 
         messageTree = this.repairMessageTreeShape(messageTree, threadId);
-
-        // 仅支持新版本树结构。旧数据清空后可直接使用。
-        // 不再自动进行历史兼容修复（用户已声明会手动处理旧数据）。
         return { messageTree };
     }
 
