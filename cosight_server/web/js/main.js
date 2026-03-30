@@ -3791,18 +3791,6 @@ async function restoreRightPanelByNonExecutingThread(thread) {
             const loaded = await loadThreadRightPanelStateFromFinalJson(thread, finalJsonPath, workspaceIdFallback);
             if (loaded) return;
         }
-
-        if (workspaceIdFallback) {
-            try {
-                const finalJsonData = await fetchFinalJsonPath(workspaceIdFallback);
-                if (finalJsonData && finalJsonData.path) {
-                    const loaded = await loadThreadRightPanelStateFromFinalJson(thread, finalJsonData.path, workspaceIdFallback);
-                    if (loaded) return;
-                }
-            } catch (error) {
-                console.warn('[restoreRightPanelByNonExecutingThread] fetch finalJsonPath failed:', error);
-            }
-        }
     }
 
     await restoreRightPanelByThread(thread.id);
