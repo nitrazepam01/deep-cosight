@@ -28,7 +28,7 @@ class FileToolkit:
     def __init__(self, work_space_path: str = None):
         self.work_space_path = work_space_path if work_space_path else os.environ.get("WORKSPACE_PATH") or os.getcwd()
 
-    def file_saver(self, content: str | bytes, file_path: str, mode: str = "a", binary: bool = False) -> str:
+    def file_saver(self, content: str | bytes = None, file_path: str = None, mode: str = "a", binary: bool = False) -> str:
         r"""Save content to a file at the specified path. Supports both text and binary files. Default mode is append to preserve existing content.
 
         Args:
@@ -41,9 +41,13 @@ class FileToolkit:
             str: A message indicating the result of the operation.
         """
         try:
-            # Explicit validation for content parameter
+            # Explicit validation for required parameters
             if content is None or (isinstance(content, str) and content.strip() == ''):
                 error_msg = "ERROR: Missing required 'content' parameter. You must provide the actual text content to save to the file."
+                logger.error(error_msg)
+                return error_msg
+            if not file_path or (isinstance(file_path, str) and file_path.strip() == ''):
+                error_msg = "ERROR: Missing required 'file_path' parameter. You must provide the target file path."
                 logger.error(error_msg)
                 return error_msg
 
@@ -103,15 +107,30 @@ class FileToolkit:
         """
         try:
             logger.info(f"reading content to file: {file}")
-            # Use the input path if it exists, otherwise use workspace path
-            if os.path.exists(file):
-                absolute_path = file
+            
+            # Handle API path format (e.g., /api/nae-deep-research/v1/work_space/...)
+            if file.startswith('/api/nae-deep-research/v1/'):
+                # Extract relative path after the API prefix
+                relative_path = file[len('/api/nae-deep-research/v1/'):]
+                absolute_path = os.path.join(self.work_space_path, relative_path)
             else:
-                absolute_path = os.path.join(self.work_space_path, os.path.basename(file))
+                # Use the input path if it exists, otherwise use workspace path
+                if os.path.exists(file):
+                    absolute_path = file
+                else:
+                    absolute_path = os.path.join(self.work_space_path, os.path.basename(file))
 
             # Verify file exists
             if not os.path.exists(absolute_path):
                 return f"Error: File not found at {absolute_path}"
+
+            # Handle directory reading
+            if os.path.isdir(absolute_path):
+                try:
+                    items = os.listdir(absolute_path)
+                    return f"Directory contents of {absolute_path}:\n" + "\n".join(items)
+                except PermissionError:
+                    return f"Error: Permission denied accessing directory {absolute_path}"
 
             # Read file content
             with open(absolute_path, 'rb' if binary else 'r', encoding=None if binary else 'utf-8') as f:

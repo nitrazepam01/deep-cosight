@@ -139,6 +139,164 @@ class SessionService {
         };
     }
 
+    createEmptyMessageTree(threadId = null) {
+        if (window.TreeMessageService && typeof window.TreeMessageService.createTree === 'function') {
+            return window.TreeMessageService.createTree();
+        }
+        const rootId = threadId ? `root-${threadId}` : `root-${Date.now()}`;
+        const now = Date.now();
+        return {
+            rootId,
+            nodes: {
+                [rootId]: {
+                    id: rootId,
+                    parentId: null,
+                    role: 'system',
+                    content: 'ROOT',
+                    timestamp: now,
+                    deleted: false,
+                    children: [],
+                    isActive: true,
+                    branchId: 'main',
+                    version: 1,
+                    metadata: {}
+                }
+            },
+            branches: { main: { rootId, active: true, name: '主分支' } },
+            activeBranch: 'main',
+            activePath: [{ nodeId: rootId, role: 'system', timestamp: now }],
+            metadata: {
+                lastActiveMessageId: rootId,
+                lastSwitchTime: now
+            }
+        };
+    }
+
+    normalizeThreadMessageData(thread) {
+        const threadId = thread?.id || null;
+        let messageTree = (thread && thread.messageTree && typeof thread.messageTree === 'object')
+            ? thread.messageTree
+            : this.createEmptyMessageTree(threadId);
+
+        messageTree = this.repairMessageTreeShape(messageTree, threadId);
+        return { messageTree };
+    }
+
+    repairMessageTreeShape(messageTree, threadId = null) {
+        let tree = messageTree && typeof messageTree === 'object' ? messageTree : this.createEmptyMessageTree(threadId);
+        if (!tree.nodes || typeof tree.nodes !== 'object') tree.nodes = {};
+        if (!tree.branches || typeof tree.branches !== 'object') tree.branches = {};
+
+        if (!tree.rootId || typeof tree.rootId !== 'string') {
+            tree.rootId = threadId ? `root-${threadId}` : `root-${Date.now()}`;
+        }
+
+        if (!tree.nodes[tree.rootId] || typeof tree.nodes[tree.rootId] !== 'object') {
+            tree.nodes[tree.rootId] = {
+                id: tree.rootId,
+                parentId: null,
+                role: 'system',
+                content: 'ROOT',
+                timestamp: Date.now(),
+                deleted: false,
+                children: [],
+                branchId: 'main',
+                version: 1,
+                metadata: {}
+            };
+        }
+
+        if (!tree.branches.main || typeof tree.branches.main !== 'object') {
+            tree.branches.main = { rootId: tree.rootId, active: true, name: '主分支' };
+        }
+        if (!tree.branches.main.rootId) {
+            tree.branches.main.rootId = tree.rootId;
+        }
+        if (!tree.activeBranch || !tree.branches[tree.activeBranch]) {
+            tree.activeBranch = 'main';
+        }
+
+        Object.keys(tree.nodes).forEach((nodeId) => {
+            const node = tree.nodes[nodeId];
+            if (!node || typeof node !== 'object') return;
+            if (!Array.isArray(node.children)) node.children = [];
+            if (!node.id) node.id = nodeId;
+            if (node.id === tree.rootId) {
+                node.parentId = null;
+                node.role = node.role || 'system';
+                node.isActive = true;
+            } else if (!node.parentId || !tree.nodes[node.parentId]) {
+                node.parentId = tree.rootId;
+            }
+            if (node.isActive === undefined) {
+                node.isActive = false;
+            }
+            if (node.metadata && typeof node.metadata === 'object') {
+                ['pendingPlaceholder', 'pendingKind', 'redoOf', 'redoVersion', 'pendingTopic', 'redoState'].forEach((key) => {
+                    if (Object.prototype.hasOwnProperty.call(node.metadata, key)) {
+                        delete node.metadata[key];
+                    }
+                });
+            }
+        });
+
+        Object.keys(tree.nodes).forEach((nodeId) => {
+            const node = tree.nodes[nodeId];
+            if (!node || !node.parentId) return;
+            const parent = tree.nodes[node.parentId];
+            if (parent && Array.isArray(parent.children) && !parent.children.includes(nodeId)) {
+                parent.children.push(nodeId);
+            }
+        });
+
+        // 修复 activePath
+        if (!Array.isArray(tree.activePath) || tree.activePath.length === 0) {
+            if (window.TreeMessageService && typeof window.TreeMessageService.buildActivePathFromTree === 'function') {
+                tree.activePath = window.TreeMessageService.buildActivePathFromTree(tree);
+            } else {
+                tree.activePath = [{ nodeId: tree.rootId, role: 'system', timestamp: Date.now() }];
+            }
+        }
+
+        // 同步 isActive 标记与 activePath
+        const activePathSet = new Set((tree.activePath || []).map(item => item.nodeId));
+        Object.keys(tree.nodes).forEach((nodeId) => {
+            const node = tree.nodes[nodeId];
+            if (!node || typeof node !== 'object') return;
+            node.isActive = activePathSet.has(nodeId);
+            if (!node.isActive) {
+                node.children = [];
+            }
+        });
+
+        if (!tree.metadata || typeof tree.metadata !== 'object') {
+            tree.metadata = {};
+        }
+        if (!tree.metadata.lastActiveMessageId && tree.activePath && tree.activePath.length > 0) {
+            tree.metadata.lastActiveMessageId = tree.activePath[tree.activePath.length - 1].nodeId;
+        }
+        if (!tree.metadata.lastSwitchTime) {
+            tree.metadata.lastSwitchTime = Date.now();
+        }
+
+        return tree;
+    }
+
+    normalizeSingleThread(rawThread, folderId = null) {
+        const targetFolderId = folderId || rawThread?.folderId || 'default';
+        const pseudo = this.normalizeData({
+            folders: [
+                {
+                    id: targetFolderId,
+                    isDefault: targetFolderId === 'default',
+                    threads: [rawThread]
+                }
+            ]
+        });
+        const allThreads = (pseudo.folders || []).flatMap(f => f.threads || []);
+        return allThreads.find(t => t.id === (rawThread?.id || '')) || null;
+    }
+
     /**
      * 从 JSON 文件加载数据
      */
@@ -202,20 +360,30 @@ class SessionService {
                 // 处理文件夹内的会话
                 if (Array.isArray(folder.threads)) {
                     folder.threads.forEach(thread => {
+                        const normalizedMessageData = this.normalizeThreadMessageData(thread);
+                        const messageTree = normalizedMessageData.messageTree;
+                        const treeNodes = messageTree.nodes || {};
+                        const defaultMessageCount = Math.max(0, Object.keys(treeNodes).length - 1);
+                        const defaultActiveMessageCount = Object.values(treeNodes).filter(node => node && node.id !== messageTree.rootId && !node.deleted).length;
+
                         normalizedFolder.threads.push({
                             id: thread.id || this.generateId('thread'),
                             title: thread.title || '新对话',
                             folderId: normalizedFolder.id,
                             createdAt: thread.createdAt || Date.now(),
                             updatedAt: thread.updatedAt || Date.now(),
-                            messageCount: thread.messageCount || 0,
+                            messageCount: Number.isFinite(Number(thread.messageCount))
+                                ? Number(thread.messageCount)
+                                : defaultMessageCount,
+                            activeMessageCount: Number.isFinite(Number(thread.activeMessageCount))
+                                ? Number(thread.activeMessageCount)
+                                : defaultActiveMessageCount,
                             starred: thread.starred || false,
-                            messages: Array.isArray(thread.messages) ? thread.messages : [],
+                            messageTree: messageTree, // 树形消息结构
+                            messages: [],
                             userRenamedTitle: thread.userRenamedTitle === true,
                             autoRenamedByTask: thread.autoRenamedByTask === true,
-                            rightPanelState: thread.rightPanelState && typeof thread.rightPanelState === 'object'
-                                ? thread.rightPanelState
-                                : {},
+                            rightPanelState: this.normalizeRightPanelState(thread.rightPanelState),
                             isExecuting: !!thread.isExecuting,
                             statusUpdatedAt: thread.statusUpdatedAt || thread.updatedAt || Date.now()
                         });
@@ -241,6 +409,23 @@ class SessionService {
         return normalized;
     }
 
+    normalizeRightPanelState(rawRightPanelState) {
+        if (!rawRightPanelState || typeof rawRightPanelState !== 'object') {
+            return {};
+        }
+        try {
+            return JSON.parse(JSON.stringify(rawRightPanelState));
+        } catch (error) {
+            const normalized = {};
+            Object.entries(rawRightPanelState).forEach(([key, value]) => {
+                if (value !== undefined) {
+                    normalized[key] = value;
+                }
+            });
+            return normalized;
+        }
+    }
+
     /**
      * 从 localStorage 加载数据
      */
@@ -263,7 +448,6 @@ class SessionService {
     saveToLocalStorage() {
         try {
             if (!this.sessionsData) return;
-            
             this.sessionsData.updatedAt = Date.now();
             localStorage.setItem('cosight:sessionsData', JSON.stringify(this.sessionsData));
         } catch (error) {
@@ -395,19 +579,20 @@ class SessionService {
      * 创建新会话（调用后端 API）
      */
     async createThread(title, folderId = 'default') {
-        const newThread = await this._post('/thread', { title, folderId });
+        const rawThread = await this._post('/thread', { title, folderId });
+        const normalizedThread = this.normalizeSingleThread(rawThread, folderId) || rawThread;
         // 更新本地缓存
         if (this.sessionsData) {
             const folder = this.sessionsData.folders.find(f => f.id === folderId);
             if (folder) {
                 if (!folder.threads) folder.threads = [];
-                folder.threads.push(newThread);
+                folder.threads.push(normalizedThread);
                 folder.expanded = true;
                 this.saveToLocalStorage();
                 this.syncToAppState();
             }
         }
-        return newThread;
+        return normalizedThread;
     }
 
     /**
@@ -431,19 +616,48 @@ class SessionService {
      * 更新会话（调用后端 API）- 标星、重命名等
      */
     async updateThread(threadId, updates) {
+        const normalizedUpdates = this.filterThreadUpdatePayload({ ...updates });
+
         // 先立即更新本地缓存（不等待后端响应，确保 UI 立即生效）
         if (this.sessionsData) {
             const thread = this.getThread(threadId);
             if (thread) {
-                Object.assign(thread, updates);
+                Object.assign(thread, normalizedUpdates);
                 thread.updatedAt = Date.now();
                 this.saveToLocalStorage();
                 this.syncToAppState();
             }
         }
         // 然后调用后端 API 保存
-        const result = await this._put(`/thread/${threadId}`, updates);
+        const result = await this._put(`/thread/${threadId}`, normalizedUpdates);
         return result;
+    }
+
+    filterThreadUpdatePayload(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return {};
+        }
+        const allowedFields = new Set([
+            'title',
+            'starred',
+            'folderId',
+            'messageTree',
+            'messageCount',
+            'activeMessageCount',
+            'rightPanelState',
+            'userRenamedTitle',
+            'autoRenamedByTask',
+            'isExecuting',
+            'statusUpdatedAt',
+            'updatedAt'
+        ]);
+        const normalized = {};
+        Object.keys(payload).forEach(key => {
+            if (allowedFields.has(key) && payload[key] !== undefined) {
+                normalized[key] = payload[key];
+            }
+        });
+        return normalized;
     }
 
     /**
@@ -527,16 +741,30 @@ class SessionService {
      * 从后端获取线程完整信息（用于会话切换时恢复右侧状态）
      */
     async getThreadFromBackend(threadId) {
-        const result = await this._get(`/sessions/thread/${threadId}`);
-        if (this.sessionsData && result) {
+        const rawResult = await this._get(`/sessions/thread/${threadId}`);
+        if (!rawResult) return rawResult;
+        const normalized = this.normalizeSingleThread(rawResult, rawResult.folderId || 'default') || rawResult;
+        if (this.sessionsData && normalized) {
             const thread = this.getThread(threadId);
             if (thread) {
-                Object.assign(thread, result);
-                this.saveToLocalStorage();
-                this.syncToAppState();
+                Object.assign(thread, normalized);
+            } else {
+                const folderId = normalized.folderId || 'default';
+                let folder = this.sessionsData.folders.find(f => f.id === folderId);
+                if (!folder) {
+                    folder = this.getDefaultFolder();
+                }
+                if (folder) {
+                    if (!Array.isArray(folder.threads)) {
+                        folder.threads = [];
+                    }
+                    folder.threads.push(normalized);
+                }
             }
+            this.saveToLocalStorage();
+            this.syncToAppState();
         }
-        return result;
+        return normalized;
     }
 
     /**

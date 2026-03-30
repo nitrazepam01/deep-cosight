@@ -18,7 +18,7 @@ import json
 import threading
 from datetime import datetime
 from typing import Dict, Optional
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.params import Body
 
 from cosight_server.sdk.common.api_result import json_result
@@ -162,6 +162,14 @@ def set_thread_execution_status(thread_id: str, is_executing: bool) -> Optional[
     return None
 
 
+def sanitize_right_panel_state(incoming_state: dict, current_state: Optional[Dict] = None) -> Optional[Dict]:
+    if not isinstance(incoming_state, dict):
+        return None
+    current_state = current_state if isinstance(current_state, dict) else {}
+    merged_state = {**current_state, **incoming_state}
+    return merged_state
+
+
 def _get_workspace_root_dir() -> str:
     workspace_env = os.getenv("WORKSPACE_PATH_ENV")
     if workspace_env:
@@ -239,8 +247,9 @@ async def get_thread_status(thread_id: str):
 
 
 @commonRouter.get("/workspace/final-report/{thread_id}")
-async def get_thread_final_report(thread_id: str):
-    """按会话绑定的 workspaceId 直接在文件夹中查找最后保存的文件。"""
+async def get_thread_final_report(thread_id: str, workspaceId: Optional[str] = Query(None)):
+    """按会话绑定的 workspaceId 直接在文件夹中查找最后保存的文件。
+    支持可选 query 参数 workspaceId，用于读取历史版本所在目录。"""
     try:
         thread = get_thread_by_id(thread_id)
         if not thread:
@@ -250,7 +259,14 @@ async def get_thread_final_report(thread_id: str):
         if not isinstance(right_panel_state, dict):
             right_panel_state = {}
 
-        workspace_id = right_panel_state.get("workspaceId")
+        workspace_id = None
+        if workspaceId and isinstance(workspaceId, str) and workspaceId.strip():
+            workspace_id = workspaceId.strip()
+        else:
+            workspace_id = right_panel_state.get("workspaceId")
+
+        if not workspace_id or not isinstance(workspace_id, str):
+            workspace_id = thread.get("workspaceId")
         if not workspace_id or not isinstance(workspace_id, str):
             return json_result(404, 'Workspace binding not found for thread', None)
 
@@ -259,34 +275,31 @@ async def get_thread_final_report(thread_id: str):
         if (not os.path.isdir(workspace_dir)) or (not _is_safe_workspace_dir(workspace_root, workspace_dir)):
             return json_result(404, 'Workspace directory not found', None)
 
-        text_exts = {".md", ".html", ".txt", ".json", ".csv", ".xml"}
-        preferred_candidates = []
-        fallback_candidates = []
+        file_candidates = []
         for name in os.listdir(workspace_dir):
             abs_path = os.path.join(workspace_dir, name)
             if not os.path.isfile(abs_path):
+                continue
+            if os.path.splitext(name)[1].lower() != ".md":
                 continue
             try:
                 mtime = os.path.getmtime(abs_path)
             except Exception:
                 continue
-            ext = os.path.splitext(name)[1].lower()
-            item = (name, abs_path, mtime)
-            if ext in text_exts:
-                preferred_candidates.append(item)
-            else:
-                fallback_candidates.append(item)
-
-        file_candidates = preferred_candidates if preferred_candidates else fallback_candidates
+            file_candidates.append((name, abs_path, mtime))
         if not file_candidates:
-            return json_result(404, 'No file found in workspace', None)
+            return json_result(404, 'No markdown file found in workspace', None)
 
         # 直接取最后保存（修改时间最新）的文件
         file_candidates.sort(key=lambda item: item[2])
         target_name, target_abs_path, _ = file_candidates[-1]
 
-        with open(target_abs_path, "r", encoding="utf-8") as f:
-            content = f.read()
+        try:
+            with open(target_abs_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except UnicodeDecodeError:
+            with open(target_abs_path, "rb") as f:
+                content = f.read().decode("utf-8", errors="replace")
 
         rel_path = f"work_space/{workspace_id}/{target_name}"
         return json_result(0, 'success', {
@@ -298,6 +311,50 @@ async def get_thread_final_report(thread_id: str):
         })
     except Exception as e:
         logger.error(f"按会话读取最终报告失败：{e}", exc_info=True)
+        return json_result(500, str(e), None)
+
+
+@commonRouter.get("/workspace/final-json-path/{workspace_id}")
+async def get_final_json_path(workspace_id: str):
+    """根据 workspaceId 查找对应的 .final.json 文件路径"""
+    try:
+        plans_dir = os.path.join(_get_workspace_root_dir(), "plans")
+        if not os.path.isdir(plans_dir):
+            return json_result(404, 'Plans directory not found', None)
+
+        # 直接推导 workspaceId.final.json 的标准路径，允许文件暂时不存在
+        rel_path = f"work_space/plans/{workspace_id}.final.json"
+        full_path = os.path.join(_get_workspace_root_dir(), rel_path)
+        if not _is_safe_workspace_dir(_get_workspace_root_dir(), full_path):
+            return json_result(404, 'Unsafe final JSON path', None)
+        return json_result(0, 'success', {"path": rel_path})
+    except Exception as e:
+        logger.error(f"查找 final JSON 路径失败：{e}", exc_info=True)
+        return json_result(500, str(e), None)
+
+
+@commonRouter.post("/workspace/update-final-json")
+async def update_final_json(body: dict = Body(...)):
+    """更新 .final.json 文件，添加 rightPanelState"""
+    try:
+        path = body.get("path")
+        rightPanelState = body.get("rightPanelState")
+        if not path or not rightPanelState:
+            return json_result(400, 'Invalid parameters', None)
+
+        full_path = os.path.join(_get_workspace_root_dir(), path)
+        if not os.path.isfile(full_path) or not _is_safe_workspace_dir(_get_workspace_root_dir(), full_path):
+            return json_result(404, 'File not found', None)
+
+        with open(full_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        data['rightPanelState'] = rightPanelState
+        with open(full_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        return json_result(0, 'success', None)
+    except Exception as e:
+        logger.error(f"更新 final JSON 失败：{e}", exc_info=True)
         return json_result(500, str(e), None)
 
 
@@ -338,6 +395,33 @@ async def create_thread(body: dict = Body(...)):
         
         data = load_sessions()
         
+        root_id = f"root-{int(datetime.now().timestamp() * 1000)}"
+        initial_tree = {
+            "rootId": root_id,
+            "nodes": {
+                root_id: {
+                    "id": root_id,
+                    "parentId": None,
+                    "role": "system",
+                    "content": "ROOT",
+                    "timestamp": int(datetime.now().timestamp() * 1000),
+                    "deleted": False,
+                    "children": [],
+                    "branchId": "main",
+                    "version": 1,
+                    "metadata": {}
+                }
+            },
+            "branches": {
+                "main": {
+                    "rootId": root_id,
+                    "active": True,
+                    "name": "主分支"
+                }
+            },
+            "activeBranch": "main"
+        }
+
         new_thread = {
             "id": f"thread-{int(datetime.now().timestamp() * 1000)}",
             "title": title,
@@ -345,8 +429,9 @@ async def create_thread(body: dict = Body(...)):
             "createdAt": int(datetime.now().timestamp() * 1000),
             "updatedAt": int(datetime.now().timestamp() * 1000),
             "messageCount": 0,
+            "activeMessageCount": 0,
             "starred": False,
-            "messages": [],
+            "messageTree": initial_tree,
             "userRenamedTitle": False,
             "autoRenamedByTask": False
         }
@@ -409,25 +494,26 @@ async def update_thread(thread_id: str, body: dict = Body(...)):
                         thread["starred"] = body["starred"]
                     if "folderId" in body:
                         thread["folderId"] = body["folderId"]
-                    if "messages" in body and isinstance(body["messages"], list):
-                        thread["messages"] = body["messages"]
+                    if "messageTree" in body and isinstance(body["messageTree"], dict):
+                        thread["messageTree"] = body["messageTree"]
                     if "messageCount" in body:
                         thread["messageCount"] = body["messageCount"]
-                    elif "messages" in body and isinstance(body["messages"], list):
-                        thread["messageCount"] = len(body["messages"])
-                    if "rightPanelState" in body and isinstance(body["rightPanelState"], dict):
+                    elif "messageTree" in body and isinstance(body["messageTree"], dict):
+                        node_count = len((body["messageTree"].get("nodes") or {}).keys())
+                        thread["messageCount"] = max(0, node_count - 1)
+                    if "activeMessageCount" in body:
+                        thread["activeMessageCount"] = body["activeMessageCount"]
+                    if "rightPanelState" in body:
+                        incoming_state = body["rightPanelState"]
                         current_state = thread.get("rightPanelState")
                         if not isinstance(current_state, dict):
                             current_state = {}
-                        incoming_state = body["rightPanelState"]
-                        merged_state = dict(current_state)
-                        merged_state.update(incoming_state)
-                        # 保护关键绑定字段，避免被前端局部更新覆盖丢失
-                        if "workspaceId" in current_state and "workspaceId" not in incoming_state:
-                            merged_state["workspaceId"] = current_state.get("workspaceId")
-                        if "workspacePath" in current_state and "workspacePath" not in incoming_state:
-                            merged_state["workspacePath"] = current_state.get("workspacePath")
-                        thread["rightPanelState"] = merged_state
+                        if incoming_state is None:
+                            thread["rightPanelState"] = None
+                        elif isinstance(incoming_state, dict):
+                            thread["rightPanelState"] = sanitize_right_panel_state(incoming_state, current_state)
+                        else:
+                            thread["rightPanelState"] = incoming_state
                     if "userRenamedTitle" in body:
                         thread["userRenamedTitle"] = bool(body["userRenamedTitle"])
                     if "autoRenamedByTask" in body:
@@ -505,7 +591,7 @@ async def move_thread(thread_id: str, body: dict = Body(...)):
         
         save_sessions(data)
         logger.info(f"移动会话：{thread_id} -> {target_folder_id}")
-        return json_result(0, 'success', {"threadId": thread_id, "targetFolderId": targetFolderId})
+        return json_result(0, 'success', {"threadId": thread_id, "targetFolderId": target_folder_id})
     except Exception as e:
         logger.error(f"移动会话失败：{e}")
         return json_result(500, str(e), None)

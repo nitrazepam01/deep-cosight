@@ -149,7 +149,12 @@ class BaseAgent:
             required = mapping_cfg.get('required', [])
             missing = [r for r in required if r in valid_param_names and r not in produced]
             if missing:
-                logger.warning(f"Missing required args for {function_name}: {missing}")
+                err_msg = (
+                    f"Missing required args for tool '{function_name}': {missing}. "
+                    f"Please provide {', '.join(missing)}."
+                )
+                logger.warning(err_msg)
+                raise ValueError(err_msg)
 
             # 记录被移除的参数（用于调试）
             removed_keys = set(normalized_args.keys()) - used_keys

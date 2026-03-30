@@ -8,8 +8,12 @@
     "/cosight/markdown-response.txt",
   ];
   
-  // 检查是否在 index-new.html 页面（使用 markdown-content 容器）
+  // 检查是否在主聊天页面（使用 markdown-content 容器）
   const isNewPage = !!document.getElementById("markdown-content");
+  const mermaidAdaptiveRegistry = new WeakMap();
+  const MERMAID_MIN_CONTENT_HEIGHT = 288;
+  const MERMAID_VIEWPORT_HEIGHT_RATIO = 0.6;
+  const MERMAID_MAX_CONTENT_HEIGHT = 720;
 
   // ==================== 导出供外部使用的函数 ====================
   
@@ -26,7 +30,8 @@
 
     const md = createMarkdownRenderer();
     const html = md.render(markdownText);
-    container.innerHTML = html;
+    const safeHtml = sanitizeRenderedHtml(html);
+    container.innerHTML = safeHtml;
     container.classList.add('markdown-body');
 
     // 绑定复制按钮
@@ -38,7 +43,53 @@
     // 渲染 MathJax 公式
     await renderMathInContainer(container);
 
-    return html;
+    return safeHtml;
+  }
+
+  function sanitizeRenderedHtml(rawHtml) {
+    if (typeof rawHtml !== 'string' || !rawHtml) return '';
+    if (typeof window === 'undefined' || typeof window.DOMParser !== 'function') {
+      return rawHtml;
+    }
+
+    const parser = new window.DOMParser();
+    const doc = parser.parseFromString(rawHtml, 'text/html');
+    const forbiddenTags = new Set([
+      'script', 'style', 'iframe', 'object', 'embed', 'link', 'meta', 'base'
+    ]);
+    const unwrapTags = new Set(['html', 'head', 'body']);
+
+    const all = Array.from(doc.body.querySelectorAll('*'));
+    all.forEach((el) => {
+      const tag = String(el.tagName || '').toLowerCase();
+      if (forbiddenTags.has(tag)) {
+        el.remove();
+        return;
+      }
+      if (unwrapTags.has(tag)) {
+        const parent = el.parentNode;
+        if (!parent) return;
+        while (el.firstChild) {
+          parent.insertBefore(el.firstChild, el);
+        }
+        el.remove();
+        return;
+      }
+
+      Array.from(el.attributes).forEach((attr) => {
+        const name = String(attr.name || '').toLowerCase();
+        const value = String(attr.value || '');
+        if (name.startsWith('on') || name === 'style') {
+          el.removeAttribute(attr.name);
+          return;
+        }
+        if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(value)) {
+          el.removeAttribute(attr.name);
+        }
+      });
+    });
+
+    return doc.body.innerHTML;
   }
 
   /**
@@ -125,8 +176,13 @@
           </div>
         `;
         
-        // 替换原元素
-        element.parentNode.replaceChild(wrapper, element);
+        // 替换原元素（容错处理 parentNode 可能为 null 的情况）
+        const parentEl = element.parentNode;
+        if (!parentEl) {
+          console.warn('Mermaid Node has no parent, skip replacement');
+          continue;
+        }
+        parentEl.replaceChild(wrapper, element);
         
         // 渲染 SVG
         const svgContainer = wrapper.querySelector('.mermaid-svg-container');
@@ -134,6 +190,7 @@
         try {
           const { svg } = await mermaid.render(uniqueId, graphDefinition);
           svgContainer.innerHTML = svg;
+          normalizeMermaidSvgEnvelope(svgContainer);
         } catch (renderError) {
           console.error('Mermaid 渲染失败:', renderError);
           svgContainer.innerHTML = `<div style="color: #f44336; padding: 16px; background: #ffebee;">
@@ -237,6 +294,129 @@
           URL.revokeObjectURL(url);
         }
       });
+    });
+  }
+
+  /**
+   * 修正 Mermaid SVG 包络，避免部分图表因 viewBox 计算偏差被裁切
+   */
+  function normalizeMermaidSvgEnvelope(svgContainer) {
+    const svgEl = svgContainer.querySelector('svg');
+    if (!svgEl || typeof svgEl.getBBox !== 'function') return;
+
+    // 由 JS 按容器尺寸做等比自适应，避免出现横竖滚动条
+    svgEl.style.maxWidth = 'none';
+    svgEl.style.width = 'auto';
+    svgEl.style.height = 'auto';
+    svgEl.style.display = 'block';
+
+    const applyBBoxEnvelope = () => {
+      let bbox = null;
+      try {
+        bbox = svgEl.getBBox();
+      } catch (error) {
+        console.warn('Mermaid getBBox 失败，跳过包络修正:', error);
+        return;
+      }
+
+      if (!bbox || bbox.width <= 0 || bbox.height <= 0) return;
+
+      const padding = 24;
+      const viewX = Math.floor(bbox.x - padding);
+      const viewY = Math.floor(bbox.y - padding);
+      const viewWidth = Math.ceil(bbox.width + padding * 2);
+      const viewHeight = Math.ceil(bbox.height + padding * 2);
+
+      svgEl.setAttribute('viewBox', `${viewX} ${viewY} ${viewWidth} ${viewHeight}`);
+      svgEl.setAttribute('preserveAspectRatio', 'xMinYMin meet');
+
+      fitMermaidSvgToContainer(svgContainer, svgEl, viewWidth, viewHeight);
+    };
+
+    // 首帧做一次，字体就绪后再做一次，覆盖异步字体导致的 bbox 偏差
+    requestAnimationFrame(applyBBoxEnvelope);
+    if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
+      document.fonts.ready.then(() => requestAnimationFrame(applyBBoxEnvelope));
+    }
+    setupMermaidAdaptiveResize(svgContainer, applyBBoxEnvelope);
+  }
+
+  function fitMermaidSvgToContainer(svgContainer, svgEl, rawWidth, rawHeight) {
+    const contentEl = svgContainer.closest('.mermaid-content');
+    const contentRect = contentEl ? contentEl.getBoundingClientRect() : null;
+
+    // 缩放阈值：50% ~ 150%
+    const MIN_SCALE = 0.5;
+    const MAX_SCALE = 1.5;
+    const horizontalPadding = 40; // 与 .mermaid-svg-container 左右 padding 对齐
+    const verticalPadding = 40; // 与 .mermaid-svg-container 上下 padding 对齐
+    const availableWidth = Math.max(120, (contentRect ? contentRect.width : rawWidth) - horizontalPadding);
+    const widthScale = availableWidth / rawWidth;
+
+    // 优先按宽度填充；超过阈值时改为滚动策略
+    let scale = widthScale;
+    let useHorizontalScroll = false;
+    if (widthScale < MIN_SCALE) {
+      scale = MIN_SCALE;
+      useHorizontalScroll = true;
+    } else if (widthScale > MAX_SCALE) {
+      scale = MAX_SCALE;
+    }
+
+    const fittedWidth = Math.max(1, Math.round(rawWidth * scale));
+    const fittedHeight = Math.max(1, Math.round(rawHeight * scale));
+
+    svgEl.setAttribute('width', String(fittedWidth));
+    svgEl.setAttribute('height', String(fittedHeight));
+
+    if (contentEl) {
+      contentEl.classList.toggle('mermaid-scroll-x', useHorizontalScroll);
+      // 高图允许纵向滚动：按视口给一个上限高度
+      const maxContentHeight = Math.round(
+        Math.max(
+          MERMAID_MIN_CONTENT_HEIGHT,
+          Math.min(window.innerHeight * MERMAID_VIEWPORT_HEIGHT_RATIO, MERMAID_MAX_CONTENT_HEIGHT)
+        )
+      );
+      contentEl.style.maxHeight = `${maxContentHeight}px`;
+    }
+  }
+
+  function setupMermaidAdaptiveResize(svgContainer, recompute) {
+    const previous = mermaidAdaptiveRegistry.get(svgContainer);
+    if (previous && typeof previous.cleanup === 'function') {
+      previous.cleanup();
+    }
+
+    let rafId = 0;
+    const schedule = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        recompute();
+      });
+    };
+
+    const onWindowResize = () => schedule();
+    window.addEventListener('resize', onWindowResize, { passive: true });
+
+    const contentEl = svgContainer.closest('.mermaid-content');
+    let observer = null;
+    if (typeof ResizeObserver === 'function') {
+      observer = new ResizeObserver(() => schedule());
+      observer.observe(svgContainer);
+      if (contentEl) observer.observe(contentEl);
+    }
+
+    mermaidAdaptiveRegistry.set(svgContainer, {
+      cleanup: () => {
+        window.removeEventListener('resize', onWindowResize);
+        if (observer) observer.disconnect();
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+      }
     });
   }
   
@@ -371,6 +551,7 @@
 
   function createMarkdownRenderer() {
     const md = window.markdownit({
+      // 允许 details/summary 等原始 HTML，但渲染后会做安全过滤
       html: true,
       linkify: true,
       breaks: false,
@@ -477,7 +658,7 @@
   }
 
   async function renderMarkdownFile() {
-    // 如果在 index-new.html 页面，outputEl 为 null，直接返回
+    // 如果在主聊天页面，outputEl 为 null，直接返回
     if (!outputEl && !isNewPage) {
       console.log('markdown.js: 未找到输出容器，跳过自动渲染');
       return;
@@ -485,14 +666,14 @@
     
     // 如果是新页面，不自动加载 markdown-response.txt
     if (isNewPage) {
-      console.log('markdown.js: 检测到 index-new.html 页面，由 main-new.js 控制渲染');
+      console.log('markdown.js: 检测到主聊天页面，由 main.js 控制渲染');
       return;
     }
     
     try {
       const markdownText = await loadMarkdownText();
       const md = createMarkdownRenderer();
-      outputEl.innerHTML = md.render(markdownText);
+      outputEl.innerHTML = sanitizeRenderedHtml(md.render(markdownText));
 
       bindCopyButtons();
       await renderMermaid();

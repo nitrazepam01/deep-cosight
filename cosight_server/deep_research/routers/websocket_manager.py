@@ -320,33 +320,38 @@ async def _stream_handler(params, url, headers, topic, websocket):
                                 }
                             }, websocket)
 
-                            # 结束唯一判定：进度100% 且 DAG 全部节点 completed
+                            # 结束唯一判定：进度100% 且 DAG 全部节点 completed 或 blocked
                             try:
                                 if (not control_sent) and msg_type == "lui-message-manus-step" and isinstance(init_data, dict):
                                     progress = init_data.get("progress") or {}
                                     total = int(progress.get("total") or 0)
                                     completed = int(progress.get("completed") or 0)
+                                    blocked = int(progress.get("blocked") or 0)
 
                                     all_green = False
                                     step_statuses = init_data.get("step_statuses")
                                     if isinstance(step_statuses, dict) and len(step_statuses) > 0:
-                                        values = [str(v) for v in step_statuses.values()]
-                                        all_green = all(v == "completed" for v in values)
+                                        values = [str(v).lower() for v in step_statuses.values()]
+                                        valid_final_status = {"completed", "blocked"}
+                                        all_green = all(v in valid_final_status for v in values)
                                         # progress 缺失时，按 step_statuses 反推
                                         if total <= 0:
                                             total = len(values)
                                             completed = sum(1 for v in values if v == "completed")
+                                            blocked = sum(1 for v in values if v == "blocked")
                                     else:
                                         nodes = init_data.get("nodes")
                                         if isinstance(nodes, list) and len(nodes) > 0:
-                                            statuses = [str((n or {}).get("status", "")) for n in nodes if isinstance(n, dict)]
+                                            statuses = [str((n or {}).get("status", "")).lower() for n in nodes if isinstance(n, dict)]
                                             if len(statuses) > 0:
-                                                all_green = all(s == "completed" for s in statuses)
+                                                valid_final_status = {"completed", "blocked"}
+                                                all_green = all(s in valid_final_status for s in statuses)
                                                 if total <= 0:
                                                     total = len(statuses)
                                                     completed = sum(1 for s in statuses if s == "completed")
+                                                    blocked = sum(1 for s in statuses if s == "blocked")
 
-                                    progress_done = bool(total > 0 and completed >= total)
+                                    progress_done = bool(total > 0 and (completed + blocked) >= total)
 
                                     if progress_done and all_green:
                                         # 先让出事件循环，确保上面的最终PLAN更新已被前端渲染

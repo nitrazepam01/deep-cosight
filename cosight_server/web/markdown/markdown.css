@@ -211,8 +211,20 @@ main {
   position: relative;
   background: var(--mermaid-bg);
   min-height: 100px;
-  max-height: 400px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.mermaid-svg-container {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  width: 100%;
+  padding: 20px;
+}
+
+.mermaid-content.mermaid-scroll-x {
+  overflow-x: auto;
 }
 
 .mermaid-content.code-view {
@@ -232,8 +244,8 @@ main {
 
 .mermaid-content svg {
   display: block;
-  padding: 20px;
-  max-width: 100%;
+  max-width: none;
+  width: auto;
   height: auto;
 }
 
