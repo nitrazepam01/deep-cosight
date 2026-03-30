@@ -2646,7 +2646,7 @@ async function defaultRedoMessage(message, messageItem) {
 }
 
 function defaultDeleteMessage(message, messageItem) {
-    pendingDeleteMessageActionContext = { message, messageItem };
+    pendingDeleteMessageActionContext = { messageId: ensureMessageId(message) };
     openDeleteMessageConfirmModal();
 }
 
@@ -3020,9 +3020,9 @@ function applyRedoViewState(messageItem, message) {
     }
     if (messageItem) {
         let currentRenderedId = ensureMessageId(message);
-        if (isHistoryMode && currentVersion && currentVersion.id) {
+        if (hasRedoState && isHistoryMode && currentVersion && currentVersion.id) {
             currentRenderedId = String(currentVersion.id);
-        } else if (isThreadMode && currentThreadId) {
+        } else if (hasRedoState && isThreadMode && currentThreadId) {
             const thread = getThreadById(currentThreadId);
             if (thread) {
                 const threadMessages = getRenderableMessagesFromThread(thread);
@@ -6160,73 +6160,85 @@ function closeDeleteMessageConfirmModal() {
     }
 }
 
-function confirmDeleteMessageAction() {
+async function deleteThreadMessageById(threadId, messageId) {
+    if (!messageId || !window.SessionService || typeof window.SessionService.updateThread !== 'function') {
+        return false;
+    }
+
+    let thread = getThreadById(threadId);
+    if (!thread || !thread.messageTree) {
+        const found = findMessageByIdInAllThreads(messageId);
+        if (found) {
+            thread = found.thread;
+        }
+    }
+    if (!thread || !thread.messageTree) {
+        return false;
+    }
+
+    let tree = thread.messageTree;
+    let node = tree.nodes && tree.nodes[messageId] ? tree.nodes[messageId] : null;
+    if (!node) {
+        const found = findMessageByIdInAllThreads(messageId);
+        if (found && found.thread && found.thread.messageTree) {
+            thread = found.thread;
+            tree = thread.messageTree;
+            node = tree.nodes && tree.nodes[messageId] ? tree.nodes[messageId] : null;
+        }
+    }
+    if (!node) {
+        return false;
+    }
+
+    if (window.TreeMessageService && typeof window.TreeMessageService.deleteMessage === 'function') {
+        window.TreeMessageService.deleteMessage(tree, messageId);
+        node = tree.nodes && tree.nodes[messageId] ? tree.nodes[messageId] : null;
+        if (node) {
+            node.isActive = false;
+        }
+    } else {
+        return false;
+    }
+
+    if (window.TreeMessageService && typeof window.TreeMessageService.buildActivePathFromTree === 'function') {
+        tree.activePath = window.TreeMessageService.buildActivePathFromTree(tree);
+    }
+    if (!tree.metadata || typeof tree.metadata !== 'object') {
+        tree.metadata = {};
+    }
+    if (Array.isArray(tree.activePath) && tree.activePath.length > 0) {
+        tree.metadata.lastActiveMessageId = tree.activePath[tree.activePath.length - 1].nodeId;
+    } else {
+        tree.metadata.lastActiveMessageId = null;
+    }
+    tree.metadata.lastSwitchTime = Date.now();
+
+    try {
+        await window.SessionService.updateThread(thread.id, {
+            messageTree: tree
+        });
+        syncFromSessionService();
+        if (thread.id === AppState.currentThreadId) {
+            loadMessages(getRenderableMessagesFromThread(getCurrentThread()));
+            renderFolderList();
+        }
+        return true;
+    } catch (error) {
+        console.error('[deleteThreadMessageById] 删除消息失败', { threadId, messageId, error });
+        return false;
+    }
+}
+
+async function confirmDeleteMessageAction() {
     const ctx = pendingDeleteMessageActionContext;
     pendingDeleteMessageActionContext = null;
     closeDeleteMessageConfirmModal();
-    if (!ctx) return;
-
-    queueMetaMessageEvent('delete', ctx.message);
+    if (!ctx || !ctx.messageId) return;
 
     const thread = getCurrentThread();
-    if (thread && ctx.message && ctx.message.role === 'assistant') {
-        const state = ensureRedoState(ctx.message);
-        const visibleHistory = getVisibleRedoHistory(state);
-        const currentIndex = Math.max(0, Math.min(visibleHistory.length - 1, Number(state.currentIndex) || 0));
+    if (!thread) return;
 
-        if (!state.pending && visibleHistory.length > 1) {
-            const targetVersion = visibleHistory[currentIndex];
-            if (targetVersion) {
-                const originVersion = state.history.find(item => item && item.id === targetVersion.id);
-                if (originVersion) {
-                    originVersion.deleted = true;
-                }
-            }
-            const remaining = getVisibleRedoHistory(state);
-            state.pending = false;
-            state.enabled = remaining.length > 1;
-            state.currentIndex = Math.max(0, Math.min(currentIndex, remaining.length - 1));
-            state.updatedAt = Date.now();
-
-            if (remaining.length > 0 && state.currentIndex === 0) {
-                const head = remaining[0];
-                ctx.message.content = String(head.content || '');
-                ctx.message.timestamp = Number(head.timestamp) || ctx.message.timestamp;
-            }
-
-            persistMessageStateToThread(thread, ctx.message, { syncContent: false, syncTimestamp: false });
-            thread.messages = getRenderableMessagesFromThread(thread);
-            thread.messageCount = thread.messages.length;
-            thread.activeMessageCount = thread.messages.filter(m => !m.deleted).length;
-            thread.updatedAt = Date.now();
-            syncThreadMessagesToBackend(thread);
-            saveState();
-
-            if (ctx.messageItem && ctx.messageItem.parentNode) {
-                applyRedoViewState(ctx.messageItem, ctx.message);
-            }
-            return;
-        }
-    }
-
-    if (thread) {
-        const messageId = ensureMessageId(ctx.message);
-        if (window.TreeMessageService && thread.messageTree && typeof window.TreeMessageService.deleteMessage === 'function') {
-            thread.messageTree = window.TreeMessageService.deleteMessage(thread.messageTree, messageId);
-            thread.messages = getRenderableMessagesFromThread(thread);
-        }
-
-        thread.messageCount = (thread.messages || []).length;
-        thread.activeMessageCount = (thread.messages || []).filter(m => !m.deleted).length;
-        thread.updatedAt = Date.now();
-        syncThreadMessagesToBackend(thread);
-        saveState();
-    }
-
-    if (ctx.messageItem && ctx.messageItem.parentNode) {
-        ctx.messageItem.remove();
-    }
-    loadMessages(getRenderableMessagesFromThread(getCurrentThread()));
+    await deleteThreadMessageById(thread.id, ctx.messageId);
 }
 
 function initDeleteMessageConfirmModal() {
