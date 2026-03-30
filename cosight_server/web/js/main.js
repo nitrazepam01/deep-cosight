@@ -2150,39 +2150,20 @@ function loadMessages(messages) {
         return;
     }
 
-    // 统一通过 getRenderableMessagesFromThread 渲染，确保 metadata -> _redoState 恢复生效
-    if (window.TreeMessageService && thread.messageTree) {
-        const messagesForRender = getRenderableMessagesFromThread(thread);
-        
-        if (messagesForRender.length === 0) {
-            welcomeScreen.style.display = 'flex';
-            messageList.style.display = 'none';
-            return;
-        }
-
-        welcomeScreen.style.display = 'none';
-        messageList.style.display = 'flex';
-
-        messagesForRender.forEach(msg => {
-            const messageItem = createMessageElement(msg);
-            messageList.appendChild(messageItem);
-        });
-    } else {
-        // 降级方案：使用线性数组
-        if (messages.length === 0) {
-            welcomeScreen.style.display = 'flex';
-            messageList.style.display = 'none';
-            return;
-        }
-
-        welcomeScreen.style.display = 'none';
-        messageList.style.display = 'flex';
-
-        messages.forEach(msg => {
-            const messageItem = createMessageElement(msg);
-            messageList.appendChild(messageItem);
-        });
+    const messagesForRender = getRenderableMessagesFromThread(thread);
+    if (messagesForRender.length === 0) {
+        welcomeScreen.style.display = 'flex';
+        messageList.style.display = 'none';
+        return;
     }
+
+    welcomeScreen.style.display = 'none';
+    messageList.style.display = 'flex';
+
+    messagesForRender.forEach(msg => {
+        const messageItem = createMessageElement(msg);
+        messageList.appendChild(messageItem);
+    });
 
     scrollToBottom();
 }
@@ -3648,39 +3629,31 @@ function addMessageToThreadStorage(thread, message, options = {}) {
         }
     }
 
-    if (window.TreeMessageService && thread.messageTree) {
-        const result = window.TreeMessageService.addMessage(
-            thread.messageTree,
-            {
-                id: message.id || message._messageId || null,
-                role: message.role,
-                content: message.content,
-                timestamp: message.timestamp || Date.now(),
-                metadata: message.metadata || {}
-            },
-            {
-                parentId: parentId,
-                branchId: branchId || thread.messageTree.activeBranch,
-                isRedo: isRedo,
-                redoTargetId: redoTargetId
-            }
-        );
+    const result = window.TreeMessageService.addMessage(
+        thread.messageTree,
+        {
+            id: message.id || message._messageId || null,
+            role: message.role,
+            content: message.content,
+            timestamp: message.timestamp || Date.now(),
+            metadata: message.metadata || {}
+        },
+        {
+            parentId: parentId,
+            branchId: branchId || thread.messageTree.activeBranch,
+            isRedo: isRedo,
+            redoTargetId: redoTargetId
+        }
+    );
 
-        thread.messageTree = result.tree;
-        message.id = result.messageId;
-        message._messageId = result.messageId;
+    thread.messageTree = result.tree;
+    message.id = result.messageId;
+    message._messageId = result.messageId;
 
-        const allMessages = window.TreeMessageService.getMessagesForRender(thread.messageTree);
-        thread.messageCount = allMessages.length;
-        thread.activeMessageCount = allMessages.filter(m => !m.deleted).length;
-        thread.messages = allMessages;
-    } else {
-        if (!thread.messages) thread.messages = [];
-        thread.messages.push(message);
-        thread.messageCount = thread.messages.length;
-        thread.activeMessageCount = thread.messages.length;
-        ensureMessageId(message);
-    }
+    const allMessages = window.TreeMessageService.getMessagesForRender(thread.messageTree);
+    thread.messageCount = allMessages.length;
+    thread.activeMessageCount = allMessages.filter(m => !m.deleted).length;
+    thread.messages = allMessages;
 
     thread.updatedAt = Date.now();
     void syncThreadMessagesToBackend(thread);
@@ -3784,13 +3757,10 @@ function getCurrentThread() {
 }
 
 function getRenderableMessagesFromThread(thread) {
-    if (!thread) return [];
-    if (window.TreeMessageService && thread.messageTree && typeof window.TreeMessageService.getMessagesForRender === 'function') {
-        const messages = window.TreeMessageService.getMessagesForRender(thread.messageTree);
-        messages.forEach(hydrateMessageRuntimeFromMetadata);
-        return filterAndMergeRedoOfMessages(messages);
+    if (!thread || !window.TreeMessageService || !thread.messageTree || typeof window.TreeMessageService.getMessagesForRender !== 'function') {
+        return [];
     }
-    const messages = Array.isArray(thread.messages) ? thread.messages : [];
+    const messages = window.TreeMessageService.getMessagesForRender(thread.messageTree);
     messages.forEach(hydrateMessageRuntimeFromMetadata);
     return filterAndMergeRedoOfMessages(messages);
 }
@@ -4740,7 +4710,8 @@ async function handleWebSocketMessage(message) {
                             console.info('[handleWebSocketMessage] redo新thread中的占位符消息已替换', { targetThreadId, topic });
                             return;
                         }
-                        console.warn('[handleWebSocketMessage] redo 锁定中，但找不到占位符消息，将作为新消息添加', { targetThreadId });
+                        console.warn('[handleWebSocketMessage] redo 锁定中，但找不到占位符消息，已忽略重复 assistant 消息', { targetThreadId });
+                        return;
                     }
 
                     const replacedPending = resolvePendingAssistantPlaceholder(targetThreadId, content);
@@ -4748,19 +4719,12 @@ async function handleWebSocketMessage(message) {
                         return;
                     }
 
-                    const assistantMessage = {
-                        role: 'assistant',
-                        content: content,
-                        timestamp: Date.now()
-                    };
-                    
-                    // 仅当目标线程就是当前线程时，才实时追加到 UI
-                    if (targetThreadId === AppState.currentThreadId) {
-                        addMessage(assistantMessage);
-                    } else {
-                        addMessageToThreadStorage(targetThread, assistantMessage);
-                        renderFolderList();
-                    }
+                    console.warn('[handleWebSocketMessage] 未找到 pending placeholder，已忽略重复 assistant 消息', {
+                        targetThreadId,
+                        topic,
+                        contentSnippet: String(content || '').slice(0, 100)
+                    });
+                    return;
 
                 }
             }
@@ -6250,9 +6214,6 @@ function confirmDeleteMessageAction() {
         if (window.TreeMessageService && thread.messageTree && typeof window.TreeMessageService.deleteMessage === 'function') {
             thread.messageTree = window.TreeMessageService.deleteMessage(thread.messageTree, messageId);
             thread.messages = getRenderableMessagesFromThread(thread);
-        } else if (Array.isArray(thread.messages)) {
-            const idx = thread.messages.findIndex(m => ensureMessageId(m) === messageId);
-            if (idx >= 0) thread.messages.splice(idx, 1);
         }
 
         thread.messageCount = (thread.messages || []).length;

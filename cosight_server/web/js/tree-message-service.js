@@ -512,45 +512,6 @@ class TreeMessageService {
         traverse(tree.rootId, 0);
         return result;
     }
-
-    /**
-     * 从线性消息数组转换为树形结构
-     * @param {Array} messages - 线性消息数组
-     * @returns {Object} 树形结构
-     */
-    convertFromLinear(messages) {
-        const tree = this.createTree();
-        
-        messages.forEach((msg, index) => {
-            this.addMessage(tree, {
-                id: msg.id || msg._messageId || null,
-                role: msg.role,
-                content: msg.content,
-                timestamp: msg.timestamp || Date.now(),
-                deleted: !!(msg.deleted || msg.isDeleted),
-                metadata: msg.metadata || {}
-            }, {
-                parentId: index === 0 ? tree.rootId : null // 第一条消息连接到根节点
-            });
-        });
-        
-        return tree;
-    }
-
-    /**
-     * 从树形结构转换为线性数组（用于兼容）
-     * @param {Object} tree - 树形结构
-     * @returns {Array} 线性消息数组
-     */
-    convertToLinear(tree) {
-        return this.getMessagesForRender(tree).map(node => ({
-            id: node.id,
-            role: node.role,
-            content: node.content,
-            timestamp: node.timestamp,
-            metadata: node.metadata
-        }));
-    }
 }
 
 // 创建全局实例
