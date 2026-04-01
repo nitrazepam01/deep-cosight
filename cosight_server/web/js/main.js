@@ -1372,6 +1372,8 @@ async function createNewFolder(name) {
 async function deleteFolder(folderId) {
     if (folderId === DEFAULT_FOLDER_ID) return;
 
+    let shouldSwitchToDefault = false;
+
     // 使用 SessionService 删除文件夹
     if (window.SessionService) {
         // 检查是否有线程在当前文件夹中
@@ -1379,6 +1381,7 @@ async function deleteFolder(folderId) {
         if (folder) {
             const threadIdsInFolder = (folder.threads || []).map(t => t.id);
             if (threadIdsInFolder.includes(AppState.currentThreadId)) {
+                shouldSwitchToDefault = true;
                 AppState.currentThreadId = null;
                 loadMessages([]);
                 document.getElementById('conversation-title').textContent = '新对话';
@@ -1389,6 +1392,9 @@ async function deleteFolder(folderId) {
         await window.SessionService.deleteFolder(folderId);
         // syncToAppState 已经在 deleteFolder 中调用，但需要重新渲染 UI
         syncFromSessionService();
+        if (shouldSwitchToDefault) {
+            await createNewThreadAndSwitch();
+        }
         return;
     }
 
@@ -1398,6 +1404,7 @@ async function deleteFolder(folderId) {
         const folder = AppState.folders[index];
         const threadIdsInFolder = (folder.threads || []).map(t => t.id);
         if (threadIdsInFolder.includes(AppState.currentThreadId)) {
+            shouldSwitchToDefault = true;
             AppState.currentThreadId = null;
             loadMessages([]);
             document.getElementById('conversation-title').textContent = '新对话';
@@ -1407,6 +1414,9 @@ async function deleteFolder(folderId) {
         AppState.folders.splice(index, 1);
         renderFolderList();
         await saveState();
+        if (shouldSwitchToDefault) {
+            await createNewThreadAndSwitch();
+        }
     }
 }
 
@@ -1526,7 +1536,7 @@ async function switchThread(threadId) {
     const currentExecuting = isThreadExecuting(AppState.currentThreadId);
     const targetExecuting = isThreadExecuting(threadId);
     if (currentExecuting) {
-        console.info('[switchThread] 当前线程正在执行任务，允许切换会话并保存任务状态', {
+        console.debug('[switchThread] 当前线程正在执行任务，允许切换会话并保存任务状态', {
             current: AppState.currentThreadId,
             target: threadId,
             targetExecuting
@@ -2023,7 +2033,6 @@ async function restoreRightPanelByThread(threadId) {
     if (threadId !== AppState.currentThreadId) return;
 
     const localThread = getThreadById(threadId) || {};
-    const mergedThread = backendThread || localThread;
     if (backendThread && localThread && typeof localThread === 'object') {
         const localUpdatedAt = Number(localThread.updatedAt) || 0;
         const remoteUpdatedAt = Number(backendThread.updatedAt) || 0;
@@ -2034,7 +2043,6 @@ async function restoreRightPanelByThread(threadId) {
     migrateLegacyRuntimeLogsToBook(localThread);
     const rightPanelState = ensureThreadRightPanelState(localThread);
     const dagInitData = rightPanelState.dagInitData || null;
-    void maybeHandleRightPanelStateCompletion(threadId, rightPanelState);
     const runtimeLogs = getActiveTaskLogsForThread(threadId);
 
     if (dagInitData && typeof createDag === 'function') {
@@ -2121,7 +2129,7 @@ async function loadThread(threadId) {
         // 恢复执行中的线程的视图选择状态（不覆盖当前任务 activeTaskId）
         AppState.selectedTaskNodeId = savedTaskState.selectedTaskNodeId;
         AppState.taskInfoMode = savedTaskState.taskInfoMode || 'detail';
-        console.info('[loadThread] 恢复执行中的线程任务显示状态', {
+        console.debug('[loadThread] 恢复执行中的线程任务显示状态', {
             threadId,
             state: savedTaskState,
             isExecuting: true
@@ -2199,7 +2207,7 @@ function createMessageElement(message) {
             </div>
         `
         : '';
-    const actionsHtml = (message.role === 'assistant' && !isPendingPlaceholder)
+    const actionsHtml = (message.role === 'assistant')
         ? `
             <div class="message-actions">
                 <button class="message-action-btn" data-action="copy" title="复制"><i class="fas fa-copy"></i></button>
@@ -2607,6 +2615,11 @@ function defaultExportMessage(message) {
 }
 
 async function defaultRedoMessage(message, messageItem) {
+    if (isThreadExecuting(AppState.currentThreadId)) {
+        console.info('[REDO_FLOW] 忽略重做：当前线程正在执行中', { threadId: AppState.currentThreadId });
+        return false;
+    }
+
     console.info('[REDO_FLOW] 点击重做', { threadId: AppState.currentThreadId, targetMessageId: ensureMessageId(message) });
 
     // 重试之前清空右侧面板状态，避免旧完成状态误导 "正在整理问题最终报告"
@@ -2646,6 +2659,10 @@ async function defaultRedoMessage(message, messageItem) {
 }
 
 function defaultDeleteMessage(message, messageItem) {
+    if (isThreadExecuting(AppState.currentThreadId)) {
+        console.info('[REDO_FLOW] 忽略删除：当前线程正在执行中', { threadId: AppState.currentThreadId });
+        return false;
+    }
     pendingDeleteMessageActionContext = { messageId: ensureMessageId(message) };
     openDeleteMessageConfirmModal();
 }
@@ -3047,9 +3064,6 @@ function applyRedoViewState(messageItem, message) {
             isOriginalPage
         });
         messageItem.dataset.messageId = currentRenderedId;
-    }
-    if (actionsEl) {
-        actionsEl.style.display = isPendingPage ? 'none' : 'flex';
     }
     if (timeEl) {
         timeEl.style.display = 'inline';
@@ -4546,47 +4560,56 @@ async function handleWebSocketMessage(message) {
         const mappedThreadId = getThreadIdByTopic(topic);
         const targetThreadId = mappedThreadId || (!topic ? AppState.currentThreadId : null);
         if (topic && !targetThreadId) {
-            console.warn('[handleWebSocketMessage] topic 未绑定线程，忽略回包避免串会话', { topic });
+            console.debug('[handleWebSocketMessage] topic 未绑定线程，忽略回包避免串会话', { topic });
             return;
         }
         const targetThread = getThreadById(targetThreadId);
-        console.debug('[REDO_FLOW] 收到回包', {
-            topic,
-            targetThreadId,
-            hasRedoLock: !!redoThreadContextMap.get(targetThreadId)?.locked
-        });
         
         // 检查是否是 lui-message-manus-step-completed 类型的完成消息
         const messageType = messageData.data?.contentType || messageData.data?.type;
         
         if (messageType === 'lui-message-manus-step-completed') {
             // 任务已完成，触发最终报告发送
-            console.debug('[handleWebSocketMessage] 收到任务完成信号', { topic, targetThreadId });
+            console.info('[handleWebSocketMessage] 收到任务完成信号', { topic, targetThreadId });
             const current = finalReportRetryStateByThread.get(targetThreadId);
             const pendingRedoTarget = resolvePendingRedoTarget(targetThreadId, topic);
             const redoThreadCtx = pendingRedoTarget
                 ? { messageId: pendingRedoTarget.messageId, topic: topic || null, pending: hasPendingRedoInThread(targetThreadId) }
                 : (redoThreadContextMap.get(targetThreadId) || null);
-            await clearThreadRightPanelState(targetThreadId);
-            const stateWorkspaceId = current ? current.workspaceId : null;
+
+            console.info('[handleWebSocketMessage] 已进入最终报告轮询流程:', { targetThreadId, topic });
+            const metadata = await saveFinalMsgMetadata(targetThreadId);
+            if (!metadata) {
+                console.info('[handleWebSocketMessage] metadata 落盘失败');
+                return;
+            };
+            persistOrderedTaskListIntoFinalJsonPathMetadata(targetThreadId)
+            clearThreadRightPanelState(targetThreadId);
+            
             const stateTopic = current ? current.topic : topic;
             const stateRedoContext = current ? current.redoContext : redoThreadCtx;
-            const sent = await trySendPendingFinalMarkdownContent(targetThreadId, {
-                workspaceId: stateWorkspaceId,
-                topic: stateTopic,
-                redoContext: stateRedoContext
-            });
+
+            const sent = await sendPendingFinalMarkdownPathToChat(
+                targetThreadId,
+                metadata.finalMarkdownPath,
+                metadata.workspaceId,
+                metadata.finalJsonPath
+            );
+
             if (sent) {
                 finalReportRetryStateByThread.delete(targetThreadId);
                 if (stateTopic) unbindTopic(stateTopic);
                 clearRedoContextForThread(targetThreadId, stateTopic);
                 await setThreadExecutingState(targetThreadId, false);
             } else {
-                startFinalReportPolling(targetThreadId, {
-                    topic: stateTopic,
-                    redoContext: stateRedoContext,
-                    workspaceId: stateWorkspaceId
-                });
+                startFinalReportPolling(
+                    targetThreadId,
+                    stateTopic,
+                    stateRedoContext,
+                    metadata.workspaceId,
+                    metadata.finalMarkdownPath,
+                    metadata.finalJsonPath
+                );
             }
             return;
         }
@@ -4595,6 +4618,10 @@ async function handleWebSocketMessage(message) {
             // DAG 步骤消息，任务开始执行
             if (!redoTopicContextMap.has(topic)) {
                 void setThreadExecutingState(targetThreadId, true);
+            }
+            if (finalReportRetryStateByThread.has(targetThreadId)) {
+                console.debug('[handleWebSocketMessage] 清除旧 finalReportRetryState', { targetThreadId });
+                finalReportRetryStateByThread.delete(targetThreadId);
             }
             try {
                 const initData = messageData.data?.content || messageData.data?.initData || null;
@@ -4617,7 +4644,6 @@ async function handleWebSocketMessage(message) {
                         const redoThreadCtx = pendingRedoTarget
                             ? { messageId: pendingRedoTarget.messageId, topic: topic || null, pending: hasPendingRedoInThread(targetThreadId) }
                             : (redoThreadContextMap.get(targetThreadId) || null);
-                        startFinalReportPolling(targetThreadId, { topic, redoContext: redoThreadCtx });
                     }
                     // 首次任务标题到达时，触发会话自动改名策略（仅当前激活会话会更新主标题）
                     if (typeof initData.title === 'string' && initData.title.trim()) {
@@ -4651,13 +4677,12 @@ async function handleWebSocketMessage(message) {
                     }
                 }
             } catch (e) {
+                console.error('[lui-message-manus-step]', e);
             }
-            // 已经在 message.js 中处理
             return;
         }
         
-        if (messageType === 'lui-message-tool-event') {
-            // 工具事件消息，已经在 message.js 中处理
+        if (messageType === 'lui-message-tool-event' || messageType === 'control-status-message') {
             return;
         }
         
@@ -4716,17 +4741,6 @@ async function handleWebSocketMessage(message) {
 
                 }
             }
-        }
-        
-        // 检查是否是控制类结束信号
-        if (messageData.data && ((messageData.data.type === 'control-status-message') || messageType === 'control-status-message')) {
-            console.info('[handleWebSocketMessage] 收到结束信号:', { targetThreadId, topic });
-            const pendingRedoTarget = resolvePendingRedoTarget(targetThreadId, topic);
-            const redoThreadCtx = pendingRedoTarget
-                ? { messageId: pendingRedoTarget.messageId, topic: topic || null, pending: hasPendingRedoInThread(targetThreadId) }
-                : (redoThreadContextMap.get(targetThreadId) || null);
-            startFinalReportPolling(targetThreadId, { topic, redoContext: redoThreadCtx });
-            console.info('[handleWebSocketMessage] 已进入最终报告轮询流程:', { targetThreadId, topic });
         }
     } catch (error) {
         console.error('处理 WebSocket 消息失败:', error);
@@ -4803,32 +4817,30 @@ function isDagInitDataAllCompleted(initData) {
     return doneCount === steps.length;
 }
 
-async function startFinalReportPolling(threadId, options = {}) {
-    if (!threadId) return;
-    const existing = finalReportRetryStateByThread.get(threadId);
-    if (existing) {
-        existing.topic = options.topic || existing.topic || null;
-        existing.redoContext = options.redoContext || existing.redoContext || null;
-        existing.workspaceId = options.workspaceId || existing.workspaceId || existing.workspaceId || null;
-        finalReportRetryStateByThread.set(threadId, existing);
+async function startFinalReportPolling(threadId, topic, redoContext, workspaceId, finalMarkdownPath, finalJsonPath) {
+    sent = await trySendPendingFinalMarkdownContent(threadId, {
+        workspaceId,
+        finalMarkdownPath,
+        finalJsonPath
+    });
+    
+    if (sent) {
+        if (topic) unbindTopic(topic);
+        clearRedoContextForThread(threadId, topic);
+        finalReportRetryStateByThread.delete(threadId);
+        await setThreadExecutingState(threadId, false);
         return;
     }
 
-    const thread = getThreadById(threadId);
-    const initialWorkspaceId = thread?.rightPanelState?.workspaceId || null;
-
     const state = {
         timer: null,
-        topic: options.topic || null,
-        redoContext: options.redoContext || null,
-        workspaceId: options.workspaceId || initialWorkspaceId || null
+        topic: topic,
+        redoContext: redoContext,
+        workspaceId: workspaceId,
+        finalMarkdownPath: finalMarkdownPath,
+        finalJsonPath: finalJsonPath
     };
     finalReportRetryStateByThread.set(threadId, state);
-
-    console.info('[startFinalReportPolling] 初始化状态', {
-        threadId,
-        state
-    });
 
     const finalizeSuccess = async () => {
         const current = finalReportRetryStateByThread.get(threadId);
@@ -4845,8 +4857,8 @@ async function startFinalReportPolling(threadId, options = {}) {
         if (!current) return false;
         const sent = await trySendPendingFinalMarkdownContent(threadId, {
             workspaceId: current.workspaceId,
-            topic: current.topic,
-            redoContext: current.redoContext
+            finalMarkdownPath: current.finalMarkdownPath,
+            finalJsonPath: current.finalJsonPath
         });
         if (sent) {
             await finalizeSuccess();
@@ -4936,59 +4948,6 @@ async function getThreadSnapshotForPolling(threadId) {
     return getThreadById(threadId);
 }
 
-function findFinalMarkdownMetadataInThread(thread) {
-    if (!thread) return null;
-    const seen = new Set();
-
-    const searchMessageArray = (messages) => {
-        if (!Array.isArray(messages)) return null;
-        for (let i = messages.length - 1; i >= 0; i -= 1) {
-            const msg = messages[i];
-            if (!msg || !msg.metadata || typeof msg.metadata !== 'object') continue;
-            const messageId = String(msg.id || msg._messageId || '').trim();
-            if (messageId) seen.add(messageId);
-            const finalMarkdownPath = String(msg.metadata.finalMarkdownPath || '').trim();
-            if (!finalMarkdownPath) continue;
-
-            return {
-                finalMarkdownPath,
-                workspaceId: String(msg.metadata.workspaceId || '').trim() || null,
-                finalJsonPath: String(msg.metadata.finalJsonPath || '').trim() || null
-            };
-        }
-        return null;
-    };
-
-    let result = searchMessageArray(getRenderableMessagesFromThread(thread));
-    if (result) return result;
-
-    if (Array.isArray(thread.messages)) {
-        result = searchMessageArray(thread.messages);
-        if (result) return result;
-    }
-
-    const nodeMap = thread.messageTree?.nodes || null;
-    if (nodeMap && typeof nodeMap === 'object') {
-        const nodes = Object.values(nodeMap)
-            .filter((node) => node && typeof node === 'object')
-            .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
-        for (const node of nodes) {
-            const messageId = String(node.id || node._messageId || '').trim();
-            if (messageId && seen.has(messageId)) continue;
-            if (!node.metadata || typeof node.metadata !== 'object') continue;
-            const finalMarkdownPath = String(node.metadata.finalMarkdownPath || '').trim();
-            if (!finalMarkdownPath) continue;
-            return {
-                finalMarkdownPath,
-                workspaceId: String(node.metadata.workspaceId || '').trim() || null,
-                finalJsonPath: String(node.metadata.finalJsonPath || '').trim() || null
-            };
-        }
-    }
-
-    return null;
-}
-
 async function fetchMarkdownFileContent(finalMarkdownPath) {
     if (!finalMarkdownPath || typeof finalMarkdownPath !== 'string') return null;
 
@@ -5030,7 +4989,7 @@ async function fetchMarkdownFileContent(finalMarkdownPath) {
     return null;
 }
 
-async function sendPendingFinalMarkdownPathToChat(threadId, finalMarkdownPath, workspaceId = null, finalJsonPath = null) {
+async function sendPendingFinalMarkdownPathToChat(threadId, finalMarkdownPath, workspaceId, finalJsonPath) {
     if (!threadId || !finalMarkdownPath) return false;
 
     const markdownContent = await fetchMarkdownFileContent(finalMarkdownPath);
@@ -5039,10 +4998,10 @@ async function sendPendingFinalMarkdownPathToChat(threadId, finalMarkdownPath, w
     const thread = getThreadById(threadId);
     const metadataPatch = {
         type: 'final_markdown_content',
-        finalMarkdownPath: finalMarkdownPath
+        finalMarkdownPath: finalMarkdownPath,
+        workspaceId: workspaceId,
+        finalJsonPath: finalJsonPath
     };
-    if (workspaceId) metadataPatch.workspaceId = workspaceId;
-    if (finalJsonPath) metadataPatch.finalJsonPath = finalJsonPath;
 
     const replaced = resolvePendingAssistantPlaceholder(threadId, markdownContent, metadataPatch);
     if (!replaced) {
@@ -5058,39 +5017,23 @@ async function sendPendingFinalMarkdownPathToChat(threadId, finalMarkdownPath, w
             addMessageToThreadStorage(thread, assistantMessage);
         }
     }
-
-    if (thread) {
-        thread.rightPanelState = thread.rightPanelState || {};
-        thread.rightPanelState.workspaceId = workspaceId || thread.rightPanelState.workspaceId || null;
-        thread.rightPanelState.finalMarkdownPath = finalMarkdownPath;
-        if (finalJsonPath) {
-            thread.rightPanelState.finalJsonPath = finalJsonPath;
-        }
-        schedulePersistRightPanelState(threadId, thread.rightPanelState);
-    }
     return true;
 }
 
 async function trySendPendingFinalMarkdownContent(threadId, options = {}) {
-    if (!threadId) return false;
-    const thread = await getThreadSnapshotForPolling(threadId);
-    if (!thread) return false;
+    const finalMarkdownPath = options.finalMarkdownPath;
+    const finalJsonPath = options.finalJsonPath;
+    const workspaceId = options.workspaceId;
 
-    const metadata = findFinalMarkdownMetadataInThread(thread);
-    if (metadata && metadata.finalMarkdownPath) {
+    if (finalMarkdownPath) {
         return await sendPendingFinalMarkdownPathToChat(
             threadId,
-            metadata.finalMarkdownPath,
-            metadata.workspaceId,
-            metadata.finalJsonPath
+            finalMarkdownPath,
+            workspaceId,
+            finalJsonPath
         );
     }
-
-    return await emitLatestMarkdownContentToChat(threadId, {
-        workspaceId: options.workspaceId || thread.rightPanelState?.workspaceId || null,
-        topic: options.topic,
-        redoContext: options.redoContext
-    });
+    return false;
 }
 
 function normalizeFinalJsonToRightPanelState(rawFinalJson, workspaceIdFallback = null) {
@@ -5315,8 +5258,6 @@ async function restoreRightPanelStateFromData(rightPanelState, threadId) {
     if (!normalizedState || typeof normalizedState !== 'object') return false;
     normalizedState.runtimeLogBook = normalizeRuntimeLogBook(normalizedState.runtimeLogBook);
 
-    void maybeHandleRightPanelStateCompletion(threadId, normalizedState);
-
     const dagInitData = normalizedState.dagInitData || null;
     const uiTitle = normalizedState.executionTitle || (dagInitData && dagInitData.title) || null;
     if (uiTitle) {
@@ -5384,104 +5325,6 @@ function hasExistingFinalMarkdownMessage(thread, finalMarkdownPath, workspaceId)
     });
 }
 
-async function emitLatestMarkdownContentToChat(targetThreadId, options = {}) {
-    if (!targetThreadId) return false;
-
-    const redoContext = options.redoContext || null;
-    const thread = getThreadById(targetThreadId);
-    if (!thread) return false;
-
-    try {
-        const targetWorkspaceId = options.workspaceId || thread.rightPanelState?.workspaceId || null;
-        const metadata = findFinalMarkdownMetadataInThread(thread);
-        let filePath = null;
-        let content = null;
-        let workspaceId = targetWorkspaceId;
-        let finalJsonPath = metadata?.finalJsonPath || null;
-
-        if (metadata?.finalMarkdownPath) {
-            filePath = metadata.finalMarkdownPath;
-            workspaceId = metadata.workspaceId || workspaceId;
-            content = await fetchMarkdownFileContent(filePath);
-            if (content === null) {
-                console.warn('[emitLatestMarkdownContentToChat] metadata.finalMarkdownPath 指向的文件不存在或无法读取', {
-                    targetThreadId,
-                    filePath,
-                    workspaceId
-                });
-                return false;
-            }
-        } else {
-            const report = await fetchFinalReportByThreadId(targetThreadId, targetWorkspaceId);
-            if (!report) {
-                return false;
-            }
-
-            const finalJsonData = await fetchFinalJsonPath(report.workspaceId);
-            finalJsonPath = finalJsonData ? finalJsonData.path : null;
-
-            filePath = report.filePath;
-            content = String(report.content ?? '');
-            workspaceId = report.workspaceId;
-            if (!filePath) return false;
-        }
-
-        const finalReportRightPanelState = {
-            workspaceId: workspaceId,
-            finalMarkdownPath: filePath
-        };
-
-        if (hasExistingFinalMarkdownMessage(thread, filePath, workspaceId)) {
-            if (finalJsonPath) {
-                await fetchUpdateFinalJson(finalJsonPath, finalReportRightPanelState);
-            }
-            await clearThreadRightPanelState(targetThreadId);
-            return true;
-        }
-
-        const pendingPlaceholderExists = !!findPendingAssistantPlaceholder(targetThreadId);
-        const metadataPatch = {
-            type: 'final_markdown_content',
-            finalMarkdownPath: filePath,
-            workspaceId: workspaceId,
-            finalJsonPath: finalJsonPath
-        };
-
-        // 当前线程/版本来源Workspace固定为该report的workspace，避免后续redo覆盖导致历史版本错乱
-        thread.rightPanelState = thread.rightPanelState || {};
-        thread.rightPanelState.workspaceId = workspaceId;
-        thread.rightPanelState.finalMarkdownPath = filePath;
-
-        if (pendingPlaceholderExists) {
-            const replacedPending = resolvePendingAssistantPlaceholder(targetThreadId, content, metadataPatch);
-            if (replacedPending) {
-                if (finalJsonPath) {
-                    await fetchUpdateFinalJson(finalJsonPath, finalReportRightPanelState);
-                }
-                await clearThreadRightPanelState(targetThreadId);
-                showMarkdownFileInRightPanel(filePath, filePath.split('/').pop() || '最终报告');
-                console.info('[emitLatestMarkdownContentToChat] 正常占位消息已替换为最终内容:', { targetThreadId, filePath });
-                return true;
-            }
-        }
-
-        console.warn('[emitLatestMarkdownContentToChat] 无 pending placeholder，已忽略新增 final report 消息', {
-            targetThreadId,
-            filePath,
-            workspaceId,
-            redoContext
-        });
-        if (finalJsonPath) {
-            await fetchUpdateFinalJson(finalJsonPath, finalReportRightPanelState);
-        }
-        await clearThreadRightPanelState(targetThreadId);
-        return true;
-    } catch (error) {
-        console.warn('[emitLatestMarkdownContentToChat] 发送异常:', { targetThreadId, error });
-        return false;
-    }
-}
-
 function getRightPanelStateStatusText(rightPanelState) {
     if (!rightPanelState || typeof rightPanelState !== 'object') return '';
 
@@ -5493,6 +5336,101 @@ function getRightPanelStateStatusText(rightPanelState) {
 
 function isRightPanelStatusTextCompleted(rightPanelState) {
     return getRightPanelStateStatusText(rightPanelState) === RIGHT_PANEL_COMPLETED_STATUS_TEXT;
+}
+
+async function saveFinalMsgMetadata(threadId, workspaceId = null) {
+    if (!threadId) return false;
+    const thread = getThreadById(threadId);
+    if (!thread) return false;
+
+    workspaceId = thread.rightPanelState?.workspaceId || workspaceId;
+    console.info("[saveFinalMsgMetadata]: workspaceId", workspaceId);
+
+    const report = await fetchFinalReportByThreadId(threadId, workspaceId);
+    const finalJsonData = await fetchFinalJsonPath(workspaceId);
+    console.info("[saveFinalMsgMetadata]: finalJsonData", finalJsonData);
+
+    if (!report) return false;
+    const finalReportMetadata = {
+        finalMarkdownPath: report.filePath,
+        finalJsonPath: finalJsonData?.path || null,
+        workspaceId: workspaceId
+    };
+
+    let target = findPendingAssistantPlaceholder(threadId);
+    if (!target || !target.message) {
+        const messages = getRenderableMessagesFromThread(thread);
+        for (let i = messages.length - 1; i >= 0; i -= 1) {
+            const msg = messages[i];
+            if (msg && msg.role === 'assistant') {
+                target = { thread, message: msg, messageId: ensureMessageId(msg) };
+                break;
+            }
+        }
+    }
+
+    if (!target || !target.message) {
+        return false;
+    }
+
+    target.message.metadata = {
+        ...(target.message.metadata && typeof target.message.metadata === 'object' ? target.message.metadata : {}),
+        ...finalReportMetadata
+    };
+    persistMessageStateToThread(thread, target.message, { syncContent: false, syncTimestamp: false });
+    thread.updatedAt = Date.now();
+
+    try {
+        await syncThreadMessagesToBackend(thread);
+        return finalReportMetadata;
+    } catch (error) {
+        console.warn('[saveFinalMsgMetadata] 添加失败:', { threadId, error });
+        return false;
+    }
+}
+
+async function persistOrderedTaskListIntoFinalJsonPathMetadata(threadId) {
+    if (!threadId) return false;
+
+    const thread = getThreadById(threadId);
+    if (!thread) return false;
+
+    const orderedTaskList = thread?.rightPanelState?.runtimeLogBook?.tasks?.[0]?.orderedTaskList;
+    if (!Array.isArray(orderedTaskList) || orderedTaskList.length === 0) return false;
+
+    const messages = getRenderableMessagesFromThread(thread);
+    let targetMessage = null;
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+        const message = messages[i];
+        if (message && message.metadata && typeof message.metadata.finalJsonPath !== 'undefined') {
+            targetMessage = message;
+            break;
+        }
+    }
+
+    if (!targetMessage) return false;
+
+    const existingFinalJsonPath = targetMessage.metadata.finalJsonPath;
+    const newFinalJsonPath = (existingFinalJsonPath && typeof existingFinalJsonPath === 'object')
+        ? { ...existingFinalJsonPath }
+        : { path: existingFinalJsonPath || null };
+
+    newFinalJsonPath.orderedTaskList = orderedTaskList;
+    targetMessage.metadata = {
+        ...(targetMessage.metadata && typeof targetMessage.metadata === 'object' ? targetMessage.metadata : {}),
+        finalJsonPath: newFinalJsonPath
+    };
+
+    persistMessageStateToThread(thread, targetMessage, { syncContent: false, syncTimestamp: false });
+    thread.updatedAt = Date.now();
+
+    try {
+        await syncThreadMessagesToBackend(thread);
+        return true;
+    } catch (error) {
+        console.warn('[persistOrderedTaskListIntoFinalJsonPathMetadata] 保存失败:', { threadId, error });
+        return false;
+    }
 }
 
 async function clearThreadRightPanelState(threadId) {
@@ -5515,35 +5453,6 @@ async function clearThreadRightPanelState(threadId) {
         console.warn('[clearThreadRightPanelState] 清理失败:', { threadId, error });
         return false;
     }
-}
-
-async function maybeHandleRightPanelStateCompletion(threadId, rightPanelState) {
-    if (!threadId || !isRightPanelStatusTextCompleted(rightPanelState)) return;
-    if (threadCompletionHandled.has(threadId)) return;
-    threadCompletionHandled.add(threadId);
-
-    const thread = getThreadById(threadId);
-    if (!thread) return;
-    if (thread.rightPanelState && thread.rightPanelState.finalMarkdownPath) return;
-
-    console.info('[RightPanelCompletion] 检测到任务完成信号', { threadId, statusText: rightPanelState.statusText });
-    await clearThreadRightPanelState(threadId);
-
-    const sent = await trySendPendingFinalMarkdownContent(threadId, {
-        workspaceId: rightPanelState.workspaceId || null
-    });
-
-    if (sent) {
-        await setThreadExecutingState(threadId, false);
-        if (threadId === AppState.currentThreadId && typeof hideThinkingState === 'function') {
-            hideThinkingState();
-        }
-        return;
-    }
-
-    startFinalReportPolling(threadId, {
-        workspaceId: rightPanelState.workspaceId || null
-    });
 }
 
 // 在右侧面板显示 markdown 文件
@@ -5690,8 +5599,6 @@ function schedulePersistRightPanelState(threadId, partialState) {
         ...partialState
     };
     thread.rightPanelState = nextState;
-
-    void maybeHandleRightPanelStateCompletion(threadId, nextState);
 
     const existingTimer = rightPanelPersistTimers.get(threadId);
     if (existingTimer) {
@@ -7311,4 +7218,3 @@ window.createThread = createNewThread;
 window.getThreadById = getThreadById;
 window.handleTestCommand = handleTestCommand;
 window.toggleThinkingMode = toggleThinkingMode;
-
