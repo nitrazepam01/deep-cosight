@@ -80,7 +80,7 @@ class TreeMessageService {
         } = options;
 
         // 生成消息ID
-        let messageId = message.id || message._messageId || this.generateId('msg');
+        let messageId = message.id || this.generateId('msg');
         if (tree.nodes[messageId]) {
             messageId = this.generateId('msg');
         }
@@ -120,9 +120,7 @@ class TreeMessageService {
                 branchId: branchId,
                 version: redoVersion,
                 metadata: {
-                    ...baseMetadata,
-                    redoOf: String(redoTargetId),
-                    redoVersion
+                    ...baseMetadata
                 }
             };
 
@@ -218,7 +216,7 @@ class TreeMessageService {
      * 获取消息的所有兄弟节点（同一个父节点下的所有子节点）
      * @param {Object} tree - 消息树
      * @param {string} messageId - 消息ID
-     * @returns {Array} 兄弟节点数组，按时间戳排序
+    * @returns {Array} 兄弟节点数组，按版本号排序
      */
     getSiblingMessages(tree, messageId) {
         if (!tree.nodes[messageId]) {
@@ -235,7 +233,11 @@ class TreeMessageService {
         const siblings = siblingIds
             .map(id => tree.nodes[id])
             .filter(node => node && !node.deleted && node.role === 'assistant') // 只关注未删除的assistant消息
-            .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)); // 按时间戳排序
+            .sort((a, b) => {
+                const versionDiff = (Number(a.version) || 0) - (Number(b.version) || 0);
+                if (versionDiff !== 0) return versionDiff;
+                return (a.timestamp || 0) - (b.timestamp || 0);
+            }); // 按版本号排序，时间戳兜底
         
         return siblings;
     }
@@ -244,7 +246,7 @@ class TreeMessageService {
      * 获取消息的所有版本（同一个父节点下的所有兄弟节点）
      * @param {Object} tree - 消息树
      * @param {string} messageId - 消息ID
-     * @returns {Array} 版本数组，按时间戳排序
+    * @returns {Array} 版本数组，按版本号排序
      */
     getMessageVersions(tree, messageId) {
         if (!tree.nodes[messageId]) {
@@ -264,7 +266,11 @@ class TreeMessageService {
         const versions = siblingIds
             .map(id => tree.nodes[id])
             .filter(node => node && !node.deleted && node.role === 'assistant')
-            .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)); // 按时间戳排序
+            .sort((a, b) => {
+                const versionDiff = (Number(a.version) || 0) - (Number(b.version) || 0);
+                if (versionDiff !== 0) return versionDiff;
+                return (a.timestamp || 0) - (b.timestamp || 0);
+            }); // 按版本号排序，时间戳兜底
         
         return versions;
     }
@@ -480,31 +486,7 @@ class TreeMessageService {
                         .filter(item => item && item.role === 'assistant' && !item.deleted)
                         .sort((a, b) => (Number(a.version) || 0) - (Number(b.version) || 0));
 
-                    if (versions.length > 1) {
-                        const existingRedoState = (node._redoState && typeof node._redoState === 'object') ? node._redoState : {};
-                        const redoHistory = versions.map((version) => ({
-                            id: version.id || this.generateId('redo'),
-                            timestamp: Number(version.timestamp) || Date.now(),
-                            content: String(version.content || ''),
-                            pending: !!(version.metadata && version.metadata.pendingPlaceholder === true),
-                            deleted: !!version.deleted
-                        }));
-                        let currentIndex = Math.max(0, versions.findIndex(v => v.id === nodeId));
-                        if (Number.isFinite(Number(existingRedoState.currentIndex))) {
-                            const index = Number(existingRedoState.currentIndex);
-                            if (index >= 0 && index < redoHistory.length) {
-                                currentIndex = index;
-                            }
-                        }
-                        clonedNode._redoState = {
-                            enabled: true,
-                            pending: !!existingRedoState.pending,
-                            history: redoHistory,
-                            currentIndex,
-                            updatedAt: existingRedoState.updatedAt || Date.now(),
-                            redoThreads: Array.isArray(existingRedoState.redoThreads) ? existingRedoState.redoThreads : []
-                        };
-                    }
+                    // redo 切换状态完全依赖 messageTree 节点(version/isActive/activePath)。
                 }
 
                 result.push(clonedNode);
