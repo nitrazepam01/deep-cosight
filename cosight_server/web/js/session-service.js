@@ -232,11 +232,9 @@ class SessionService {
                 node.isActive = false;
             }
             if (node.metadata && typeof node.metadata === 'object') {
-                ['pendingPlaceholder', 'pendingKind', 'redoOf', 'redoVersion', 'pendingTopic', 'redoState'].forEach((key) => {
-                    if (Object.prototype.hasOwnProperty.call(node.metadata, key)) {
-                        delete node.metadata[key];
-                    }
-                });
+                if (Object.prototype.hasOwnProperty.call(node.metadata, 'redoState')) {
+                    delete node.metadata.redoState;
+                }
             }
         });
 

@@ -35,7 +35,7 @@ from app.common.logger_util import logger
 from app.cosight.task.plan_report_manager import plan_report_event_manager
 from app.cosight.task.todolist import Plan
 from CoSight import CoSight
-from cosight_server.deep_research.routers.common import set_thread_execution_status, load_sessions, save_sessions
+from cosight_server.deep_research.routers.common import set_thread_execution_status, load_sessions, save_sessions, pop_ordered_task_list_backup
 
 searchRouter = APIRouter()
 
@@ -709,8 +709,18 @@ async def search(request: Request, params: Any = Body(None)):
                 # 如果包含最终结果，单独落盘 final 文件
                 try:
                     if isinstance(data, dict) and data.get("result"):
+                        payload_to_save = dict(data)
+
+                        # 将前端清理前备份在后端的 orderedTaskList 合并到最终 .final.json
+                        try:
+                            backup = pop_ordered_task_list_backup(workspace_id)
+                            if isinstance(backup, dict) and isinstance(backup.get("orderedTaskList"), list) and len(backup.get("orderedTaskList")) > 0:
+                                payload_to_save["orderedTaskList"] = backup.get("orderedTaskList")
+                        except Exception as merge_err:
+                            logger.warning(f"合并 orderedTaskList 备份失败: {merge_err}")
+
                         with open(plan_final_path, mode='w', encoding='utf-8') as ff:
-                            ff.write(json.dumps(data, ensure_ascii=False, indent=2))
+                            ff.write(json.dumps(payload_to_save, ensure_ascii=False, indent=2))
                 except Exception as _:
                     pass
 

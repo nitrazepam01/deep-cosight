@@ -2191,10 +2191,11 @@ function createMessageElement(message) {
     const avatarIcon = message.role === 'user' ? 'fa-user' : 'fa-robot';
     const messageMetadata = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
     const isPendingPlaceholder = message.role === 'assistant' && messageMetadata.pendingPlaceholder === true;
+    const hasRedoLineage = message.role === 'assistant' && !!(messageMetadata.redoOf || messageMetadata.redo_of);
     const safeTimestamp = Number(message.timestamp) || Date.now();
     const timeStr = formatTime(safeTimestamp);
     const timeTitle = new Date(safeTimestamp).toLocaleString('zh-CN');
-    const redoSwitcherHtml = (message.role === 'assistant' && !isPendingPlaceholder)
+    const redoSwitcherHtml = (message.role === 'assistant')
         ? `
             <div class="message-redo-switch" data-redo-switch>
                 <button class="message-redo-switch-btn" data-action="redo-prev" title="上一条">
@@ -2224,14 +2225,8 @@ function createMessageElement(message) {
             <i class="fas ${avatarIcon}"></i>
         </div>
         <div class="message-content">
-            <div class="message-bubble">
-            </div>
-            <div class="message-bubble message-redo-placeholder" style="display: none;">
-                <div class="thinking-indicator">
-                    <i class="fas fa-cog loading-spinner"></i>
-                    <span class="thinking-label">正在制定问题解决方案</span>
-                </div>
-            </div>
+            <div class="message-bubble"></div>
+            <div class="message-bubble message-redo-placeholder" style="display: none;"></div>
             <div class="message-bubble message-redo-result" style="display: none;"></div>
             <div class="message-meta">
                 ${actionsHtml}
@@ -2397,8 +2392,12 @@ function persistMessageStateToThread(thread, message, options = {}) {
         const baseMeta = (node.metadata && typeof node.metadata === 'object') ? node.metadata : {};
         const msgMeta = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
         const mergedMeta = { ...baseMeta, ...msgMeta };
-        const shouldPreservePlaceholderMeta = msgMeta.pendingPlaceholder === true;
-        const blacklistedMetaKeys = ['redoOf', 'redoVersion', 'redoState'];
+        
+        const hasExplicitPendingFlag = Object.prototype.hasOwnProperty.call(msgMeta, 'pendingPlaceholder');
+        const shouldPreservePlaceholderMeta = hasExplicitPendingFlag
+            ? (msgMeta.pendingPlaceholder === true)
+            : (baseMeta.pendingPlaceholder === true);
+        const blacklistedMetaKeys = ['redoState'];
         if (!shouldPreservePlaceholderMeta) {
             blacklistedMetaKeys.push('pendingPlaceholder', 'pendingKind', 'pendingTopic');
         }
@@ -2417,6 +2416,42 @@ function persistMessageStateToThread(thread, message, options = {}) {
         node.metadata = mergedMeta;
         message.metadata = mergedMeta;
     }
+}
+
+function applyLocalRedoAsTreeVersion(threadId, redoTargetMessage, content) {
+    const thread = getThreadById(threadId);
+    if (!thread || !redoTargetMessage) return false;
+
+    const redoTargetMessageId = ensureMessageId(redoTargetMessage);
+    const redoMessage = {
+        role: 'assistant',
+        content: String(content || ''),
+        timestamp: Date.now(),
+        metadata: {
+            redoOf: redoTargetMessageId
+        }
+    };
+
+    addMessageToThreadStorage(thread, redoMessage, {
+        isRedo: true,
+        redoTargetId: redoTargetMessageId
+    });
+
+    const targetState = ensureRedoState(redoTargetMessage);
+    targetState.pending = false;
+    targetState.enabled = true;
+    targetState.updatedAt = Date.now();
+    persistMessageStateToThread(thread, redoTargetMessage, { syncContent: false, syncTimestamp: false });
+    thread.updatedAt = Date.now();
+    void syncThreadMessagesToBackend(thread);
+
+    if (threadId === AppState.currentThreadId) {
+        loadMessages(getRenderableMessagesFromThread(thread));
+        scrollToBottom();
+    } else {
+        renderFolderList();
+    }
+    return true;
 }
 
 function renderAssistantContentToBubble(bubbleEl, content) {
@@ -3015,11 +3050,12 @@ function applyRedoViewState(messageItem, message) {
         switchRootEl.style.display = hasRedoState ? 'inline-flex' : 'none';
     }
     if (bubbleEl) {
-        bubbleEl.style.display = isOriginalPage ? '' : 'none';
+        bubbleEl.style.display = (isOriginalPage && !isPendingPage) ? '' : 'none';
     }
     if (placeholderEl) {
         placeholderEl.style.display = isPendingPage ? 'block' : 'none';
         if (isPendingPage) {
+            renderPendingPlaceholderToBubble(placeholderEl, currentThreadId);
             const indicatorEl = placeholderEl.querySelector('.thinking-indicator');
             if (indicatorEl) {
                 const startTs = Number(currentVersion?.timestamp) || Date.now();
@@ -3030,8 +3066,10 @@ function applyRedoViewState(messageItem, message) {
         }
     }
     if (redoResultEl) {
-        redoResultEl.style.display = (!isOriginalPage && !isPendingPage) ? 'block' : 'none';
+        const shouldShowRedoResult = !isOriginalPage && (!isPendingPage || !placeholderEl);
+        redoResultEl.style.display = shouldShowRedoResult ? 'block' : 'none';
     }
+    messageItem.classList.toggle('redo-pending', isPendingPage);
     if (switchTextEl) {
         switchTextEl.textContent = `${currentIndex + 1}/${maxIndex + 1}`;
     }
@@ -3052,17 +3090,6 @@ function applyRedoViewState(messageItem, message) {
                 }
             }
         }
-        console.debug('[REDO_VIEW] applyRedoViewState set messageItem.dataset.messageId', currentRenderedId, {
-            messageId: ensureMessageId(message),
-            currentIndex,
-            visibleCount,
-            totalCount,
-            isHistoryMode,
-            isThreadMode,
-            currentThreadId,
-            currentVersionId: currentVersion?.id,
-            isOriginalPage
-        });
         messageItem.dataset.messageId = currentRenderedId;
     }
     if (timeEl) {
@@ -3207,7 +3234,7 @@ async function resendLastNormalPayloadByRedo(redoTargetMessage, targetThreadId =
 
     await syncSendButtonStateWithCurrentThread(sourceThreadId);
     if (isThreadExecuting(sourceThreadId)) {
-        console.warn('[REDO_FLOW] 当前线程仍在执行中，继续尝试重做发送', { threadId: sourceThreadId });
+        console.info('[REDO_FLOW] 当前线程已进入执行态（redo触发），继续发送', { threadId: sourceThreadId });
     }
 
     const payloadSource = resolveLastNormalPayload(AppState.currentThreadId); // 始终从原thread获取payload
@@ -3248,8 +3275,7 @@ async function resendLastNormalPayloadByRedo(redoTargetMessage, targetThreadId =
         }
 
         const targetMessage = redoTargetMessage;
-        const targetMessageId = ensureMessageId(targetMessage);
-        const applied = applyRedoContentToTarget(sourceThreadId, targetMessage, targetMessageId, localContent);
+        const applied = applyLocalRedoAsTreeVersion(sourceThreadId, targetMessage, localContent);
         if (applied) {
             pendingMetaMessageEvents = [];
         }
@@ -3449,34 +3475,23 @@ function findPendingAssistantPlaceholder(threadId, topic = null) {
     const thread = getThreadById(threadId);
     if (!thread) return null;
     const messages = getRenderableMessagesFromThread(thread);
-    let fallback = null;
+    let fallbackAny = null;
     for (let i = messages.length - 1; i >= 0; i -= 1) {
         const msg = messages[i];
         if (!msg || msg.role !== 'assistant') continue;
         const meta = (msg.metadata && typeof msg.metadata === 'object') ? msg.metadata : {};
         if (meta.pendingPlaceholder !== true) continue;
-        if (topic && meta.pendingTopic && meta.pendingTopic !== topic) {
-            if (!fallback) {
-                fallback = { thread, message: msg, messageId: ensureMessageId(msg) };
+        if (topic) {
+            if (meta.pendingTopic === topic) {
+                return { thread, message: msg, messageId: ensureMessageId(msg) };
             }
             continue;
         }
-        return { thread, message: msg, messageId: ensureMessageId(msg) };
+        if (!fallbackAny) {
+            fallbackAny = { thread, message: msg, messageId: ensureMessageId(msg) };
+        }
     }
-
-    // Fallback: some pending placeholders may lose their metadata during persistence or thread reload,
-    // but remain as empty assistant messages in the active thread. Match those last so we can still
-    // convert them into final report messages instead of leaving a blank bubble behind.
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-        const msg = messages[i];
-        if (!msg || msg.role !== 'assistant' || msg.deleted) continue;
-        const meta = (msg.metadata && typeof msg.metadata === 'object') ? msg.metadata : {};
-        if (Object.keys(meta).length > 0) continue;
-        if (String(msg.content || '').trim() !== '') continue;
-        return { thread, message: msg, messageId: ensureMessageId(msg) };
-    }
-
-    return fallback;
+    return topic ? null : fallbackAny;
 }
 
 function hasPendingAssistantPlaceholder(threadId) {
@@ -3498,12 +3513,14 @@ function assignPendingPlaceholderTopic(threadId, placeholderMessage, topic) {
     void syncThreadMessagesToBackend(thread);
 }
 
-function resolvePendingAssistantPlaceholder(threadId, content, metadataPatch = {}) {
-    const found = findPendingAssistantPlaceholder(threadId);
+function resolvePendingAssistantPlaceholder(threadId, content, metadataPatch = {}, options = {}) {
+    const topic = options && typeof options === 'object' ? (options.topic || null) : null;
+    const found = findPendingAssistantPlaceholder(threadId, topic);
     if (!found || !found.message) return false;
     const { thread, message, messageId } = found;
     const baseMeta = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
     const previousPendingTopic = baseMeta.pendingTopic;
+
     const mergedMeta = {
         ...baseMeta,
         ...metadataPatch,
@@ -3524,6 +3541,16 @@ function resolvePendingAssistantPlaceholder(threadId, content, metadataPatch = {
     message.timestamp = Date.now();
     persistMessageStateToThread(thread, message, { syncContent: true, syncTimestamp: true });
     thread.updatedAt = Date.now();
+
+    const redoOfId = String(message.metadata?.redoOf || message.metadata?.redo_of || '').trim();
+    if (redoOfId) {
+        const messages = getRenderableMessagesFromThread(thread);
+        const originalMessage = messages.find((msg) => msg && ensureMessageId(msg) === redoOfId);
+        if (originalMessage && originalMessage.role === 'assistant') {
+            applyRedoContentToTarget(threadId, originalMessage, redoOfId, message.content);
+        }
+    }
+
     void syncThreadMessagesToBackend(thread);
 
     if (threadId === AppState.currentThreadId) {
@@ -3819,12 +3846,13 @@ async function syncThreadMessagesToBackend(thread) {
         thread.messageCount = totalCount;
         thread.activeMessageCount = activeCount;
         thread.messages = messagesForRender;
-        await window.SessionService.updateThread(thread.id, {
+        const updatePayload = {
             messageTree: thread.messageTree || null,
             messageCount: totalCount,
             activeMessageCount: activeCount,
             updatedAt: thread.updatedAt || Date.now()
-        });
+        };
+        await window.SessionService.updateThread(thread.id, updatePayload);
     } catch (error) {
     }
 }
@@ -4250,8 +4278,9 @@ function updateSendButtonState() {
 
 function syncThinkingStateWithCurrentThread() {
     const currentThreadId = AppState.currentThreadId;
+    const hasDomPendingRedo = !!document.querySelector('.message-item.assistant.redo-pending');
     // 重做 pending 使用消息气泡内部占位，不再额外渲染全局“正在思考”气泡
-    if (hasPendingRedoInThread(currentThreadId) || hasPendingAssistantPlaceholder(currentThreadId)) {
+    if (hasDomPendingRedo || hasPendingRedoInThread(currentThreadId) || hasPendingAssistantPlaceholder(currentThreadId)) {
         hideThinkingState();
         return;
     }
@@ -4540,12 +4569,23 @@ function initWebSocketMessageHandler() {
     const originalReceiveMessage = currentReceiveMessage.bind(window.messageService);
 
     // 包装 receiveMessage 方法，添加我们的处理逻辑
-    const wrappedReceiveMessage = function(message) {
-        // 先调用原始方法处理 DAG 和工具面板
+    const wrappedReceiveMessage = async function(message) {
+        // 先让我们的处理器尝试消费消息，若已处理则不再调用原始接收器以避免重复
+        try {
+            const consumed = await handleWebSocketMessage(message);
+            if (consumed) return;
+        } catch (e) {
+            // 处理器内部错误，回退到原始接收器
+        }
+
+        // 原始接收器处理（保留原行为）
         originalReceiveMessage(message);
 
-        // 添加我们的聊天消息处理
-        handleWebSocketMessage(message);
+        // 再次运行我们的处理器以执行需要在消息加入后执行的逻辑
+        try {
+            await handleWebSocketMessage(message);
+        } catch (e) {
+        }
     };
     wrappedReceiveMessage.__cosightWrapped = true;
 
@@ -4563,12 +4603,9 @@ async function handleWebSocketMessage(message) {
             console.debug('[handleWebSocketMessage] topic 未绑定线程，忽略回包避免串会话', { topic });
             return;
         }
-        const targetThread = getThreadById(targetThreadId);
-        
-        // 检查是否是 lui-message-manus-step-completed 类型的完成消息
         const messageType = messageData.data?.contentType || messageData.data?.type;
         
-        if (messageType === 'lui-message-manus-step-completed') {
+        if (messageType === 'control-status-message') {
             // 任务已完成，触发最终报告发送
             console.info('[handleWebSocketMessage] 收到任务完成信号', { topic, targetThreadId });
             const current = finalReportRetryStateByThread.get(targetThreadId);
@@ -4578,13 +4615,12 @@ async function handleWebSocketMessage(message) {
                 : (redoThreadContextMap.get(targetThreadId) || null);
 
             console.info('[handleWebSocketMessage] 已进入最终报告轮询流程:', { targetThreadId, topic });
-            const metadata = await saveFinalMsgMetadata(targetThreadId);
+            const metadata = await saveFinalMsgMetadata(targetThreadId, null, topic);
             if (!metadata) {
                 console.info('[handleWebSocketMessage] metadata 落盘失败');
                 return;
             };
-            persistOrderedTaskListIntoFinalJsonPathMetadata(targetThreadId)
-            clearThreadRightPanelState(targetThreadId);
+            await backupOrderedTaskListForThread(targetThreadId, metadata.workspaceId);
             
             const stateTopic = current ? current.topic : topic;
             const stateRedoContext = current ? current.redoContext : redoThreadCtx;
@@ -4593,15 +4629,19 @@ async function handleWebSocketMessage(message) {
                 targetThreadId,
                 metadata.finalMarkdownPath,
                 metadata.workspaceId,
-                metadata.finalJsonPath
+                metadata.finalJsonPath,
+                topic
             );
 
             if (sent) {
+                await clearThreadRightPanelState(targetThreadId);
                 finalReportRetryStateByThread.delete(targetThreadId);
                 if (stateTopic) unbindTopic(stateTopic);
                 clearRedoContextForThread(targetThreadId, stateTopic);
                 await setThreadExecutingState(targetThreadId, false);
+                return true;
             } else {
+                console.info('[handleWebSocketMessage] sendPendingFinalMarkdownPathToChat 失败');
                 startFinalReportPolling(
                     targetThreadId,
                     stateTopic,
@@ -4611,7 +4651,7 @@ async function handleWebSocketMessage(message) {
                     metadata.finalJsonPath
                 );
             }
-            return;
+            return true;
         }
         
         if (messageType === 'lui-message-manus-step') {
@@ -4682,7 +4722,7 @@ async function handleWebSocketMessage(message) {
             return;
         }
         
-        if (messageType === 'lui-message-tool-event' || messageType === 'control-status-message') {
+        if (messageType === 'lui-message-tool-event') {
             return;
         }
         
@@ -4712,24 +4752,23 @@ async function handleWebSocketMessage(message) {
                                 ctx.pending = false;
                                 redoThreadContextMap.set(targetThreadId, ctx);
                             }
+                            return true;
                         }
-                        return;
                     }
 
                     if (redoThreadContextMap.has(targetThreadId)) {
-                        // redo流程中的新thread，直接使用resolvePendingAssistantPlaceholder替换
-                        const replacedPending = resolvePendingAssistantPlaceholder(targetThreadId, content);
+                        const replacedPending = resolvePendingAssistantPlaceholder(targetThreadId, content, {}, { topic });
                         if (replacedPending) {
                             console.info('[handleWebSocketMessage] redo新thread中的占位符消息已替换', { targetThreadId, topic });
-                            return;
+                            return true;
                         }
                         console.warn('[handleWebSocketMessage] redo 锁定中，但找不到占位符消息，已忽略重复 assistant 消息', { targetThreadId });
-                        return;
+                        return true;
                     }
 
-                    const replacedPending = resolvePendingAssistantPlaceholder(targetThreadId, content);
+                    const replacedPending = resolvePendingAssistantPlaceholder(targetThreadId, content, {}, { topic });
                     if (replacedPending) {
-                        return;
+                        return true;
                     }
 
                     console.warn('[handleWebSocketMessage] 未找到 pending placeholder，已忽略重复 assistant 消息', {
@@ -4737,7 +4776,7 @@ async function handleWebSocketMessage(message) {
                         topic,
                         contentSnippet: String(content || '').slice(0, 100)
                     });
-                    return;
+                    return true;
 
                 }
             }
@@ -4818,7 +4857,8 @@ function isDagInitDataAllCompleted(initData) {
 }
 
 async function startFinalReportPolling(threadId, topic, redoContext, workspaceId, finalMarkdownPath, finalJsonPath) {
-    sent = await trySendPendingFinalMarkdownContent(threadId, {
+    let sent = await trySendPendingFinalMarkdownContent(threadId, {
+        topic,
         workspaceId,
         finalMarkdownPath,
         finalJsonPath
@@ -4856,6 +4896,7 @@ async function startFinalReportPolling(threadId, topic, redoContext, workspaceId
         const current = finalReportRetryStateByThread.get(threadId);
         if (!current) return false;
         const sent = await trySendPendingFinalMarkdownContent(threadId, {
+            topic: current.topic,
             workspaceId: current.workspaceId,
             finalMarkdownPath: current.finalMarkdownPath,
             finalJsonPath: current.finalJsonPath
@@ -4878,7 +4919,7 @@ async function startFinalReportPolling(threadId, topic, redoContext, workspaceId
         finalReportRetryStateByThread.set(threadId, current);
     };
 
-    const sent = await trySend();
+    sent = await trySend();
     if (!sent) {
         state.timer = setTimeout(tick, 3000);
         finalReportRetryStateByThread.set(threadId, state);
@@ -4913,6 +4954,11 @@ async function fetchFinalJsonData(finalJsonPath) {
         if (suffix) {
             candidateUrls.push(`${apiBase}/${suffix}`);
         }
+    } else if (normalizedPath.startsWith('plans/')) {
+        candidateUrls.push(`${apiBase}/work_space/${normalizedPath}`);
+        candidateUrls.push(`${window.location.origin}/work_space/${normalizedPath}`);
+        candidateUrls.push(`${apiBase}/${normalizedPath}`);
+        candidateUrls.push(`${window.location.origin}/${normalizedPath}`);
     } else {
         candidateUrls.push(`${apiBase}/${normalizedPath}`);
         candidateUrls.push(`${window.location.origin}/${normalizedPath}`);
@@ -4946,6 +4992,50 @@ async function getThreadSnapshotForPolling(threadId) {
         }
     }
     return getThreadById(threadId);
+}
+
+async function fetchWorkspaceIdByThreadId(threadId) {
+    if (!threadId) return null;
+    try {
+        if (window.SessionService && typeof window.SessionService.getThreadFromBackend === 'function') {
+            try {
+                const backendThread = await window.SessionService.getThreadFromBackend(threadId);
+                if (backendThread) {
+                    const candidate = backendThread.workspaceId ?? (backendThread.rightPanelState && backendThread.rightPanelState.workspaceId);
+                    if (typeof candidate === 'string' || typeof candidate === 'number') return String(candidate);
+                    if (candidate && typeof candidate === 'object') {
+                        if (candidate.id) return String(candidate.id);
+                        if (candidate.workspaceId) return String(candidate.workspaceId);
+                        if (candidate._id) return String(candidate._id);
+                    }
+                }
+            } catch (e) {
+                console.warn('[fetchWorkspaceIdByThreadId] getThreadFromBackend 异常', { threadId, e });
+            }
+        }
+
+        const apiBase = (window.SessionService && window.SessionService.apiBaseUrl)
+            ? window.SessionService.apiBaseUrl
+            : (window.location.origin + '/api/nae-deep-research/v1');
+        const url = `${apiBase}/workspace/final-report/${encodeURIComponent(threadId)}`;
+        const resp = await fetch(url);
+        if (!resp.ok) return null;
+        const payload = await resp.json();
+        const data = payload && (payload.data || payload.payload || payload) ? (payload.data || payload.payload || payload) : null;
+        if (data && typeof data.workspaceId !== 'undefined') {
+            const candidate = data.workspaceId;
+            if (typeof candidate === 'string' || typeof candidate === 'number') return String(candidate);
+            if (candidate && typeof candidate === 'object') {
+                if (candidate.id) return String(candidate.id);
+                if (candidate.workspaceId) return String(candidate.workspaceId);
+                if (candidate._id) return String(candidate._id);
+            }
+        }
+        return null;
+    } catch (err) {
+        console.warn('[fetchWorkspaceIdByThreadId] 异常', { threadId, err });
+        return null;
+    }
 }
 
 async function fetchMarkdownFileContent(finalMarkdownPath) {
@@ -4989,11 +5079,14 @@ async function fetchMarkdownFileContent(finalMarkdownPath) {
     return null;
 }
 
-async function sendPendingFinalMarkdownPathToChat(threadId, finalMarkdownPath, workspaceId, finalJsonPath) {
+async function sendPendingFinalMarkdownPathToChat(threadId, finalMarkdownPath, workspaceId, finalJsonPath, topic = null) {
     if (!threadId || !finalMarkdownPath) return false;
 
     const markdownContent = await fetchMarkdownFileContent(finalMarkdownPath);
-    if (!markdownContent) return false;
+    if (!markdownContent) {
+        console.warn('[sendPendingFinalMarkdownPathToChat] 未获取到最终 markdown 内容', { threadId, finalMarkdownPath, topic });
+        return false;
+    }
 
     const thread = getThreadById(threadId);
     const metadataPatch = {
@@ -5003,24 +5096,16 @@ async function sendPendingFinalMarkdownPathToChat(threadId, finalMarkdownPath, w
         finalJsonPath: finalJsonPath
     };
 
-    const replaced = resolvePendingAssistantPlaceholder(threadId, markdownContent, metadataPatch);
+    const replaced = resolvePendingAssistantPlaceholder(threadId, markdownContent, metadataPatch, { topic });
     if (!replaced) {
-        const assistantMessage = {
-            role: 'assistant',
-            content: markdownContent,
-            timestamp: Date.now(),
-            metadata: metadataPatch
-        };
-        if (threadId === AppState.currentThreadId) {
-            addMessage(assistantMessage);
-        } else if (thread) {
-            addMessageToThreadStorage(thread, assistantMessage);
-        }
+        console.warn('[sendPendingFinalMarkdownPathToChat] 未找到 pending placeholder，放弃创建新消息', { threadId, finalMarkdownPath });
+        return false;
     }
     return true;
 }
 
 async function trySendPendingFinalMarkdownContent(threadId, options = {}) {
+    const topic = options.topic || null;
     const finalMarkdownPath = options.finalMarkdownPath;
     const finalJsonPath = options.finalJsonPath;
     const workspaceId = options.workspaceId;
@@ -5030,10 +5115,57 @@ async function trySendPendingFinalMarkdownContent(threadId, options = {}) {
             threadId,
             finalMarkdownPath,
             workspaceId,
-            finalJsonPath
+            finalJsonPath,
+            topic
         );
     }
     return false;
+}
+
+function buildRuntimeLogBookFromOrderedTaskList(rawLogs, existingBook = null) {
+    const baseBook = normalizeRuntimeLogBook(existingBook);
+    const orderedTaskList = (Array.isArray(rawLogs) ? rawLogs : [])
+        .map((entry, idx) => {
+            const rawEntry = (entry && typeof entry === 'object') ? entry : { result: String(entry) };
+            const normalizedLog = normalizeRuntimeLogItem(rawEntry?.log || rawEntry);
+            if (!normalizedLog) return null;
+            const seq = Number.isFinite(Number(rawEntry?.seq)) ? Number(rawEntry.seq) : idx + 1;
+            const stepId = Number.isFinite(Number(rawEntry?.stepId))
+                ? Number(rawEntry.stepId)
+                : (Number.isFinite(Number(normalizedLog.nodeId)) ? Number(normalizedLog.nodeId) : null);
+            return {
+                seq,
+                stepId,
+                log: normalizedLog
+            };
+        })
+        .filter(Boolean);
+
+    if (!orderedTaskList.length) {
+        return baseBook;
+    }
+
+    const taskId = baseBook.activeTaskId || (baseBook.tasks[0] && baseBook.tasks[0].taskId) || `task_restore_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const existingTask = getTaskByIdFromBook(baseBook, taskId) || (baseBook.tasks[0] || null);
+    const stepOrder = orderedTaskList
+        .map(item => Number.isFinite(Number(item.stepId)) ? Number(item.stepId) : null)
+        .filter(v => Number.isFinite(v));
+
+    const normalizedTask = {
+        taskId: existingTask?.taskId || taskId,
+        externalTaskKey: existingTask?.externalTaskKey || null,
+        title: existingTask?.title || '任务日志',
+        createdAt: existingTask?.createdAt || Date.now(),
+        updatedAt: Date.now(),
+        sequenceCounter: orderedTaskList.length,
+        stepOrder,
+        stepLogs: existingTask?.stepLogs || {},
+        orderedTaskList
+    };
+
+    baseBook.tasks = [normalizedTask];
+    baseBook.activeTaskId = normalizedTask.taskId;
+    return normalizeRuntimeLogBook(baseBook);
 }
 
 function normalizeFinalJsonToRightPanelState(rawFinalJson, workspaceIdFallback = null) {
@@ -5045,10 +5177,15 @@ function normalizeFinalJsonToRightPanelState(rawFinalJson, workspaceIdFallback =
         || rawFinalJson;
     if (!payload || typeof payload !== 'object') return null;
 
-    // If payload already contains a ready-made rightPanelState, use it directly.
     if (payload.dagInitData || payload.runtimeLogBook || payload.finalMarkdownPath) {
         const readyState = cloneSerializable(payload, null);
         if (!readyState || typeof readyState !== 'object') return null;
+        const topLevelLogs = Array.isArray(rawFinalJson.orderedTaskList)
+            ? rawFinalJson.orderedTaskList
+            : (Array.isArray(payload.orderedTaskList) ? payload.orderedTaskList : null);
+        if (Array.isArray(topLevelLogs) && topLevelLogs.length > 0) {
+            readyState.runtimeLogBook = buildRuntimeLogBookFromOrderedTaskList(topLevelLogs, readyState.runtimeLogBook);
+        }
         if (workspaceIdFallback) {
             if (!readyState.workspaceId) {
                 readyState.workspaceId = workspaceIdFallback;
@@ -5106,39 +5243,9 @@ function normalizeFinalJsonToRightPanelState(rawFinalJson, workspaceIdFallback =
         runtimeLogBook: normalizeRuntimeLogBook(null)
     };
 
-    const rawLogs = finalJson['任务日志'] || finalJson.task_logs || finalJson.runtimeLogs || finalJson.runtimeLogBook || null;
+    const rawLogs = Array.isArray(finalJson.orderedTaskList) ? finalJson.orderedTaskList : null;
     if (Array.isArray(rawLogs) && rawLogs.length > 0) {
-        const taskId = `task_restore_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const orderedTaskList = rawLogs
-            .map((entry, idx) => {
-                const logItem = typeof entry === 'object'
-                    ? entry
-                    : { result: String(entry) };
-                return {
-                    seq: Number.isFinite(Number(entry?.seq)) ? Number(entry.seq) : idx + 1,
-                    stepId: Number.isFinite(Number(entry?.stepId)) ? Number(entry.stepId) : (Number.isFinite(Number(entry?.nodeId)) ? Number(entry.nodeId) : null),
-                    log: logItem
-                };
-            })
-            .filter(Boolean);
-
-        rightPanelState.runtimeLogBook = normalizeRuntimeLogBook({
-            version: 2,
-            activeTaskId: taskId,
-            tasks: [{
-                taskId,
-                externalTaskKey: null,
-                title: '任务日志',
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-                sequenceCounter: orderedTaskList.length,
-                stepOrder: orderedTaskList
-                    .map(item => Number.isFinite(Number(item.stepId)) ? Number(item.stepId) : null)
-                    .filter(Number.isFinite),
-                stepLogs: {},
-                orderedTaskList
-            }]
-        });
+        rightPanelState.runtimeLogBook = buildRuntimeLogBookFromOrderedTaskList(rawLogs, rightPanelState.runtimeLogBook);
     } else if (rawLogs && typeof rawLogs === 'object' && Array.isArray(rawLogs.tasks)) {
         rightPanelState.runtimeLogBook = normalizeRuntimeLogBook(rawLogs);
     }
@@ -5283,17 +5390,6 @@ async function restoreRightPanelStateFromData(rightPanelState, threadId) {
     return true;
 }
 
-async function fetchUpdateFinalJson(finalJsonPath, rightPanelState) {
-    const apiBase = (window.SessionService && window.SessionService.apiBaseUrl) ? window.SessionService.apiBaseUrl : (window.location.origin + '/api/nae-deep-research/v1');
-    const url = `${apiBase}/workspace/update-final-json`;
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: finalJsonPath, rightPanelState })
-    });
-    return response.ok;
-}
-
 async function fetchUpdateThreadRightPanelState(threadId, rightPanelState) {
     const apiBase = (window.SessionService && window.SessionService.apiBaseUrl) ? window.SessionService.apiBaseUrl : (window.location.origin + '/api/nae-deep-research/v1');
     const url = `${apiBase}/thread/${threadId}`;
@@ -5310,6 +5406,39 @@ async function fetchUpdateThreadRightPanelState(threadId, rightPanelState) {
         return true;
     } catch (error) {
         console.warn('[fetchUpdateThreadRightPanelState] 网络错误:', error);
+        return false;
+    }
+}
+
+async function backupOrderedTaskListForThread(threadId, workspaceId = null) {
+    if (!threadId) return false;
+    const apiBase = (window.SessionService && window.SessionService.apiBaseUrl)
+        ? window.SessionService.apiBaseUrl
+        : (window.location.origin + '/api/nae-deep-research/v1');
+    const url = `${apiBase}/workspace/backup-ordered-task-list`;
+    const payload = {
+        threadId,
+        workspaceId: workspaceId || null
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+            console.warn('[backupOrderedTaskListForThread] HTTP失败', { threadId, workspaceId, status: response.status });
+            return false;
+        }
+        const result = await response.json().catch(() => null);
+        if (!result || result.code !== 0) {
+            console.warn('[backupOrderedTaskListForThread] 业务失败', { threadId, workspaceId, result });
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.warn('[backupOrderedTaskListForThread] 请求异常', { threadId, workspaceId, error });
         return false;
     }
 }
@@ -5338,27 +5467,32 @@ function isRightPanelStatusTextCompleted(rightPanelState) {
     return getRightPanelStateStatusText(rightPanelState) === RIGHT_PANEL_COMPLETED_STATUS_TEXT;
 }
 
-async function saveFinalMsgMetadata(threadId, workspaceId = null) {
+async function saveFinalMsgMetadata(threadId, workspaceId, topic = null) {
     if (!threadId) return false;
     const thread = getThreadById(threadId);
     if (!thread) return false;
 
-    workspaceId = thread.rightPanelState?.workspaceId || workspaceId;
-    console.info("[saveFinalMsgMetadata]: workspaceId", workspaceId);
-
     const report = await fetchFinalReportByThreadId(threadId, workspaceId);
-    const finalJsonData = await fetchFinalJsonPath(workspaceId);
-    console.info("[saveFinalMsgMetadata]: finalJsonData", finalJsonData);
-
     if (!report) return false;
+    const resolvedWorkspaceId = report.workspaceId || workspaceId || thread.workspaceId || thread.rightPanelState?.workspaceId || null;
+    if (!resolvedWorkspaceId) {
+        console.warn('[saveFinalMsgMetadata] 无法解析 workspaceId', { threadId, topic });
+        return false;
+    }
+
+    const finalJsonData = await fetchFinalJsonPath(resolvedWorkspaceId);
     const finalReportMetadata = {
         finalMarkdownPath: report.filePath,
         finalJsonPath: finalJsonData?.path || null,
-        workspaceId: workspaceId
+        workspaceId: resolvedWorkspaceId
     };
 
-    let target = findPendingAssistantPlaceholder(threadId);
+    let target = findPendingAssistantPlaceholder(threadId, topic);
     if (!target || !target.message) {
+        if (topic) {
+            console.warn('[saveFinalMsgMetadata] 未找到匹配 topic 的 pending 占位符', { threadId, topic });
+            return false;
+        }
         const messages = getRenderableMessagesFromThread(thread);
         for (let i = messages.length - 1; i >= 0; i -= 1) {
             const msg = messages[i];
@@ -5373,10 +5507,19 @@ async function saveFinalMsgMetadata(threadId, workspaceId = null) {
         return false;
     }
 
-    target.message.metadata = {
-        ...(target.message.metadata && typeof target.message.metadata === 'object' ? target.message.metadata : {}),
+    const baseMeta = (target.message.metadata && typeof target.message.metadata === 'object') ? target.message.metadata : {};
+    const preservePending = baseMeta.pendingPlaceholder === true;
+    const finalMeta = {
+        ...baseMeta,
         ...finalReportMetadata
     };
+    // 保证在写入最终报告元数据时保留占位符相关字段，避免后续查找不到占位符
+    if (preservePending) {
+        finalMeta.pendingPlaceholder = true;
+        if (typeof baseMeta.pendingKind !== 'undefined') finalMeta.pendingKind = baseMeta.pendingKind;
+        if (typeof baseMeta.pendingTopic !== 'undefined') finalMeta.pendingTopic = baseMeta.pendingTopic;
+    }
+    target.message.metadata = finalMeta;
     persistMessageStateToThread(thread, target.message, { syncContent: false, syncTimestamp: false });
     thread.updatedAt = Date.now();
 
@@ -5384,51 +5527,7 @@ async function saveFinalMsgMetadata(threadId, workspaceId = null) {
         await syncThreadMessagesToBackend(thread);
         return finalReportMetadata;
     } catch (error) {
-        console.warn('[saveFinalMsgMetadata] 添加失败:', { threadId, error });
-        return false;
-    }
-}
-
-async function persistOrderedTaskListIntoFinalJsonPathMetadata(threadId) {
-    if (!threadId) return false;
-
-    const thread = getThreadById(threadId);
-    if (!thread) return false;
-
-    const orderedTaskList = thread?.rightPanelState?.runtimeLogBook?.tasks?.[0]?.orderedTaskList;
-    if (!Array.isArray(orderedTaskList) || orderedTaskList.length === 0) return false;
-
-    const messages = getRenderableMessagesFromThread(thread);
-    let targetMessage = null;
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-        const message = messages[i];
-        if (message && message.metadata && typeof message.metadata.finalJsonPath !== 'undefined') {
-            targetMessage = message;
-            break;
-        }
-    }
-
-    if (!targetMessage) return false;
-
-    const existingFinalJsonPath = targetMessage.metadata.finalJsonPath;
-    const newFinalJsonPath = (existingFinalJsonPath && typeof existingFinalJsonPath === 'object')
-        ? { ...existingFinalJsonPath }
-        : { path: existingFinalJsonPath || null };
-
-    newFinalJsonPath.orderedTaskList = orderedTaskList;
-    targetMessage.metadata = {
-        ...(targetMessage.metadata && typeof targetMessage.metadata === 'object' ? targetMessage.metadata : {}),
-        finalJsonPath: newFinalJsonPath
-    };
-
-    persistMessageStateToThread(thread, targetMessage, { syncContent: false, syncTimestamp: false });
-    thread.updatedAt = Date.now();
-
-    try {
-        await syncThreadMessagesToBackend(thread);
-        return true;
-    } catch (error) {
-        console.warn('[persistOrderedTaskListIntoFinalJsonPathMetadata] 保存失败:', { threadId, error });
+        console.warn('[saveFinalMsgMetadata] 添加失败:', { threadId, topic, error });
         return false;
     }
 }
@@ -5735,9 +5834,6 @@ function appendRuntimeLogFromToolCall(nodeId, toolCall, options = {}) {
                 stepId,
                 log: nextLog
             });
-            if (task.orderedTaskList.length > 300) {
-                task.orderedTaskList = task.orderedTaskList.slice(0, 300);
-            }
             task.updatedAt = Date.now();
 
             thread.rightPanelState.runtimeLogBook = book;
@@ -6083,6 +6179,36 @@ async function deleteThreadMessageById(threadId, messageId) {
     }
     if (!node) {
         return false;
+    }
+
+    // 删除当前版本前，优先切到相邻版本：先下一个，再上一个。
+    // 避免删除后总是回退到第一个版本，符合 redo 左右切换语义。
+    let preferredVersionId = null;
+    if (node.role === 'assistant' && node.parentId && tree.nodes[node.parentId]) {
+        const parent = tree.nodes[node.parentId];
+        const siblings = (Array.isArray(parent.children) ? parent.children : [])
+            .map((id) => tree.nodes[id])
+            .filter((item) => item && item.role === 'assistant' && !item.deleted)
+            .sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
+        const currentIndex = siblings.findIndex((item) => item.id === messageId);
+        if (currentIndex >= 0 && siblings.length > 1) {
+            const nextVersion = siblings[currentIndex + 1] || null;
+            const prevVersion = siblings[currentIndex - 1] || null;
+            preferredVersionId = (nextVersion && nextVersion.id) || (prevVersion && prevVersion.id) || null;
+        }
+    }
+
+    if (preferredVersionId && window.TreeMessageService && typeof window.TreeMessageService.switchMessageVersion === 'function') {
+        try {
+            window.TreeMessageService.switchMessageVersion(tree, messageId, preferredVersionId);
+        } catch (e) {
+            console.warn('[deleteThreadMessageById] 切换到相邻版本失败，继续删除', {
+                threadId,
+                messageId,
+                preferredVersionId,
+                e
+            });
+        }
     }
 
     if (window.TreeMessageService && typeof window.TreeMessageService.deleteMessage === 'function') {

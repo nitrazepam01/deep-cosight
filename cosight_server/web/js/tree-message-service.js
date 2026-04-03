@@ -102,6 +102,10 @@ class TreeMessageService {
         if (isRedo && redoTargetId && tree.nodes[redoTargetId]) {
             // 重试消息应该和原消息共享同一个父节点
             actualParentId = tree.nodes[redoTargetId].parentId;
+            const redoVersion = (tree.nodes[redoTargetId].version || 1) + 1;
+            const baseMetadata = (message.metadata && typeof message.metadata === 'object')
+                ? message.metadata
+                : {};
             
             // 创建重试消息节点
             const messageNode = {
@@ -114,9 +118,11 @@ class TreeMessageService {
                 children: [],
                 isActive: true,
                 branchId: branchId,
-                version: (tree.nodes[redoTargetId].version || 1) + 1,
+                version: redoVersion,
                 metadata: {
-                    ...(message.metadata || {})
+                    ...baseMetadata,
+                    redoOf: String(redoTargetId),
+                    redoVersion
                 }
             };
 
