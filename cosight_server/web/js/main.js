@@ -2098,8 +2098,13 @@ async function loadThread(threadId) {
     const executing = await fetchThreadExecutionStatus(threadId);
     if (threadId !== AppState.currentThreadId) return;
 
+    const renderThread = getThreadById(threadId) || thread;
+    if (executing && renderThread) {
+        alignExecutingThreadActivePathToPendingPlaceholder(renderThread);
+    }
+
     // 先加载消息
-    const messages = getRenderableMessagesFromThread(thread);
+    const messages = getRenderableMessagesFromThread(renderThread || thread);
     loadMessages(messages);
 
     isTaskExecuting = isThreadExecuting(threadId);
@@ -2610,14 +2615,32 @@ function bindMessageMetaActions(messageItem, message) {
         prevBtn.addEventListener('click', async (event) => {
             event.preventDefault();
             event.stopPropagation();
-            await setRedoView(message, messageItem, -1);
+            const originalMessageId = String(messageItem.dataset.originalMessageId || '');
+            let targetMessage = message;
+            if (originalMessageId) {
+                const found = findMessageByIdInAllThreads(originalMessageId);
+                if (found && found.message) {
+                    targetMessage = found.message;
+                }
+            }
+            if (!targetMessage || targetMessage.role !== 'assistant') return;
+            await setRedoView(targetMessage, messageItem, -1);
         });
     }
     if (nextBtn) {
         nextBtn.addEventListener('click', async (event) => {
             event.preventDefault();
             event.stopPropagation();
-            await setRedoView(message, messageItem, 1);
+            const originalMessageId = String(messageItem.dataset.originalMessageId || '');
+            let targetMessage = message;
+            if (originalMessageId) {
+                const found = findMessageByIdInAllThreads(originalMessageId);
+                if (found && found.message) {
+                    targetMessage = found.message;
+                }
+            }
+            if (!targetMessage || targetMessage.role !== 'assistant') return;
+            await setRedoView(targetMessage, messageItem, 1);
         });
     }
 }
@@ -2651,11 +2674,11 @@ function defaultExportMessage(message) {
 
 async function defaultRedoMessage(message, messageItem) {
     if (isThreadExecuting(AppState.currentThreadId)) {
-        console.info('[REDO_FLOW] 忽略重做：当前线程正在执行中', { threadId: AppState.currentThreadId });
+        console.debug('[REDO_FLOW] 忽略重做：当前线程正在执行中', { threadId: AppState.currentThreadId });
         return false;
     }
 
-    console.info('[REDO_FLOW] 点击重做', { threadId: AppState.currentThreadId, targetMessageId: ensureMessageId(message) });
+    console.debug('[REDO_FLOW] 点击重做', { threadId: AppState.currentThreadId, targetMessageId: ensureMessageId(message) });
 
     // 重试之前清空右侧面板状态，避免旧完成状态误导 "正在整理问题最终报告"
     if (typeof window.clearDagViewState === 'function') {
@@ -2690,12 +2713,12 @@ async function defaultRedoMessage(message, messageItem) {
         await setThreadExecutingState(AppState.currentThreadId, false);
         return;
     }
-    console.info('[REDO_FLOW] 重做请求已发送，目标消息切到思考态');
+    console.debug('[REDO_FLOW] 重做请求已发送，目标消息切到思考态');
 }
 
 function defaultDeleteMessage(message, messageItem) {
     if (isThreadExecuting(AppState.currentThreadId)) {
-        console.info('[REDO_FLOW] 忽略删除：当前线程正在执行中', { threadId: AppState.currentThreadId });
+        console.debug('[REDO_FLOW] 忽略删除：当前线程正在执行中', { threadId: AppState.currentThreadId });
         return false;
     }
     pendingDeleteMessageActionContext = { messageId: ensureMessageId(message) };
@@ -3234,7 +3257,7 @@ async function resendLastNormalPayloadByRedo(redoTargetMessage, targetThreadId =
 
     await syncSendButtonStateWithCurrentThread(sourceThreadId);
     if (isThreadExecuting(sourceThreadId)) {
-        console.info('[REDO_FLOW] 当前线程已进入执行态（redo触发），继续发送', { threadId: sourceThreadId });
+        console.debug('[REDO_FLOW] 当前线程已进入执行态（redo触发），继续发送', { threadId: sourceThreadId });
     }
 
     const payloadSource = resolveLastNormalPayload(AppState.currentThreadId); // 始终从原thread获取payload
@@ -3269,7 +3292,7 @@ async function resendLastNormalPayloadByRedo(redoTargetMessage, targetThreadId =
         const replacedPending = resolvePendingAssistantPlaceholder(sourceThreadId, localContent);
         if (replacedPending) {
             pendingMetaMessageEvents = [];
-            console.info('[REDO_FLOW] 测试消息本地重做完成（替换占位符）', { threadId: sourceThreadId, replacedPending });
+            console.debug('[REDO_FLOW] 测试消息本地重做完成（替换占位符）', { threadId: sourceThreadId, replacedPending });
             await setThreadExecutingState(sourceThreadId, false);
             return true;
         }
@@ -3279,7 +3302,7 @@ async function resendLastNormalPayloadByRedo(redoTargetMessage, targetThreadId =
         if (applied) {
             pendingMetaMessageEvents = [];
         }
-        console.info('[REDO_FLOW] 测试消息本地重做完成', { threadId: sourceThreadId, applied });
+        console.debug('[REDO_FLOW] 测试消息本地重做完成', { threadId: sourceThreadId, applied });
         await setThreadExecutingState(sourceThreadId, false);
         return !!applied;
     }
@@ -3310,7 +3333,7 @@ async function resendLastNormalPayloadByRedo(redoTargetMessage, targetThreadId =
         redoTargetMessage,
         pendingPlaceholderMessage: pendingAssistantPlaceholder
     });
-    console.info('[REDO_FLOW] resendLastNormalPayloadByRedo 发送结果', { threadId: sourceThreadId, topic });
+    console.debug('[REDO_FLOW] resendLastNormalPayloadByRedo 发送结果', { threadId: sourceThreadId, topic });
     return !!topic;
 }
 
@@ -3726,7 +3749,7 @@ function addMessage(message, options = {}) {
                 ctx.pending = false;
                 ctx.locked = false;
                 redoThreadContextMap.set(thread.id, ctx);
-                console.info('[REDO_FLOW] redo thread完成，更新原message状态', { threadId: thread.id, messageId: redoTarget.messageId });
+                console.debug('[REDO_FLOW] redo thread完成，更新原message状态', { threadId: thread.id, messageId: redoTarget.messageId });
             }
         }
     }
@@ -3804,6 +3827,62 @@ function getRenderableMessagesFromThread(thread) {
     const messages = window.TreeMessageService.getMessagesForRender(thread.messageTree);
     messages.forEach(hydrateMessageRuntimeFromMetadata);
     return filterAndMergeRedoOfMessages(messages);
+}
+
+function alignExecutingThreadActivePathToPendingPlaceholder(thread) {
+    if (!thread || !thread.messageTree || !thread.messageTree.nodes) return false;
+
+    const tree = thread.messageTree;
+    const nodes = tree.nodes;
+    const pendingCandidates = Object.values(nodes)
+        .filter((node) => {
+            if (!node || node.role !== 'assistant' || node.deleted) return false;
+            const meta = (node.metadata && typeof node.metadata === 'object') ? node.metadata : {};
+            return meta.pendingPlaceholder === true;
+        })
+        .sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+
+    if (pendingCandidates.length === 0) return false;
+
+    const targetNode = pendingCandidates[0];
+    const targetId = targetNode.id;
+    if (!targetId || !nodes[targetId]) return false;
+
+    const path = [];
+    const visited = new Set();
+    let currentId = targetId;
+    while (currentId && nodes[currentId] && !visited.has(currentId)) {
+        visited.add(currentId);
+        path.push(currentId);
+        currentId = nodes[currentId].parentId;
+    }
+    if (path.length === 0) return false;
+    path.reverse();
+
+    for (let i = 0; i < path.length; i += 1) {
+        const nodeId = path[i];
+        const node = nodes[nodeId];
+        if (!node) continue;
+        node.isActive = true;
+
+        const nextId = path[i + 1] || null;
+        if (!nextId || !Array.isArray(node.children)) continue;
+        node.children.forEach((childId) => {
+            const child = nodes[childId];
+            if (!child) return;
+            child.isActive = childId === nextId;
+        });
+    }
+
+    if (window.TreeMessageService && typeof window.TreeMessageService.buildActivePathFromTree === 'function') {
+        tree.activePath = window.TreeMessageService.buildActivePathFromTree(tree);
+    }
+    if (!tree.metadata || typeof tree.metadata !== 'object') {
+        tree.metadata = {};
+    }
+    tree.metadata.lastActiveMessageId = targetId;
+    tree.metadata.lastSwitchTime = Date.now();
+    return true;
 }
 
 function getLowestActiveRenderableMessage(thread) {
@@ -4496,7 +4575,7 @@ async function sendToBackend(message, sourceThreadId = AppState.currentThreadId,
             threadId: sourceThreadId
         });
         if (sendOptions && sendOptions.isRedo) {
-            console.info('[REDO_FLOW] sendToBackend 已调用 messageService.sendMessage', {
+            console.debug('[REDO_FLOW] sendToBackend 已调用 messageService.sendMessage', {
                 threadId: sourceThreadId,
                 topic,
                 hasPayload: !!outboundPayload
@@ -5079,6 +5158,17 @@ async function fetchMarkdownFileContent(finalMarkdownPath) {
     return null;
 }
 
+function forceRefreshThreadBubblesAfterFinalSend(threadId) {
+    if (!threadId || threadId !== AppState.currentThreadId) return;
+    const thread = getThreadById(threadId);
+    if (!thread) return;
+    try {
+        loadMessages(getRenderableMessagesFromThread(thread));
+        scrollToBottom();
+    } catch (e) {
+    }
+}
+
 async function sendPendingFinalMarkdownPathToChat(threadId, finalMarkdownPath, workspaceId, finalJsonPath, topic = null) {
     if (!threadId || !finalMarkdownPath) return false;
 
@@ -5101,6 +5191,7 @@ async function sendPendingFinalMarkdownPathToChat(threadId, finalMarkdownPath, w
         console.warn('[sendPendingFinalMarkdownPathToChat] 未找到 pending placeholder，放弃创建新消息', { threadId, finalMarkdownPath });
         return false;
     }
+    forceRefreshThreadBubblesAfterFinalSend(threadId);
     return true;
 }
 
