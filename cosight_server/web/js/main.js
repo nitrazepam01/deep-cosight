@@ -5329,8 +5329,10 @@ function normalizeFinalJsonToRightPanelState(rawFinalJson, workspaceIdFallback =
 }
 
 
-async function loadThreadRightPanelStateFromFinalJson(thread, finalJsonPath, workspaceIdFallback = null) {
+async function loadThreadRightPanelStateFromFinalJson(thread, finalJsonPath, workspaceIdFallback = null, options = {}) {
     if (!finalJsonPath) return false;
+
+    const persistCache = !!(options && typeof options === 'object' && options.persistCache === true);
 
     const data = await fetchFinalJsonData(finalJsonPath);
     if (!data || typeof data !== 'object') return false;
@@ -5345,7 +5347,7 @@ async function loadThreadRightPanelStateFromFinalJson(thread, finalJsonPath, wor
             thread.rightPanelState = {
                 executionTitle: title
             };
-            if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
+            if (persistCache && window.SessionService && typeof window.SessionService.updateThread === 'function') {
                 void schedulePersistRightPanelState(thread.id, thread.rightPanelState);
             }
             if (thread.id === AppState.currentThreadId) {
@@ -5358,7 +5360,7 @@ async function loadThreadRightPanelStateFromFinalJson(thread, finalJsonPath, wor
 
     if (thread.id) {
         thread.rightPanelState = normalizedState;
-        if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
+        if (persistCache && window.SessionService && typeof window.SessionService.updateThread === 'function') {
             void schedulePersistRightPanelState(thread.id, normalizedState);
         }
     }

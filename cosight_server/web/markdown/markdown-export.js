@@ -13,7 +13,6 @@
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
   const DOCX_MAIN_NS =
     "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-  const XML_NS = "http://www.w3.org/XML/1998/namespace";
 
   function ensureMarkdownItFactory(options) {
     if (typeof options?.markdownItFactory === "function") {
@@ -620,6 +619,47 @@
     return escapeLatexPlain(text).replace(/\t/g, "    ");
   }
 
+  function rawInlineText(nodes) {
+    return (nodes || [])
+      .map((node) => {
+        switch (node.type) {
+          case "text":
+            return node.text || "";
+          case "break":
+            return "\n";
+          default:
+            return null;
+        }
+      })
+      .filter((part) => part !== null)
+      .join("");
+  }
+
+  function extractDisplayMath(nodes) {
+    const raw = rawInlineText(nodes);
+    if (!raw) return "";
+
+    const trimmed = raw
+      .trim()
+      .split("\n")
+      .map((line) => {
+        const match = line.match(/(\\+)\s*$/);
+        if (!match) return line;
+        if (match[1].length % 2 === 0) return line;
+        return `${line}\\`;
+      })
+      .join("\n");
+    if (/^\$\$[\s\S]*\$\$$/.test(trimmed)) {
+      return trimmed;
+    }
+
+    if (/^\\\[[\s\S]*\\\]$/.test(trimmed)) {
+      return trimmed;
+    }
+
+    return "";
+  }
+
   function renderLatexInline(nodes, options) {
     return (nodes || [])
       .map((node) => {
@@ -748,7 +788,7 @@
         return `\\${command}{${renderLatexInline(block.content, options)}}`;
       }
       case "paragraph":
-        return renderLatexInline(block.content, options);
+        return extractDisplayMath(block.content) || renderLatexInline(block.content, options);
       case "blockquote":
         return `\\begin{quote}\n${indentBlock(renderLatexBlocks(block.blocks, options), "  ")}\n\\end{quote}`;
       case "code": {
@@ -796,6 +836,7 @@
       "\\documentclass[UTF8]{ctexart}",
       "\\usepackage[margin=2.54cm]{geometry}",
       "\\usepackage{hyperref}",
+      "\\usepackage{amsmath}",
       "\\usepackage{longtable}",
       "\\usepackage{array}",
       "\\usepackage{graphicx}",
@@ -860,7 +901,7 @@
         runs.push(`<w:r>${props}<w:br/></w:r>`);
       }
       runs.push(
-        `<w:r>${props}<w:t ${XML_NS}:space="preserve">${xmlText(part)}</w:t></w:r>`
+        `<w:r>${props}<w:t xml:space="preserve">${xmlText(part)}</w:t></w:r>`
       );
     });
 
