@@ -38,6 +38,8 @@ os.makedirs(SESSIONS_DIR, exist_ok=True)
 
 # 文件锁，防止并发写入
 _file_lock = threading.Lock()
+_ordered_task_list_backup_lock = threading.Lock()
+_ordered_task_list_backup = {}
 
 
 def load_sessions():
@@ -174,6 +176,22 @@ def _get_workspace_root_dir() -> str:
     workspace_env = os.getenv("WORKSPACE_PATH_ENV")
     if workspace_env:
         return os.path.join(workspace_env, "work_space")
+
+    workspace_path = os.getenv("WORKSPACE_PATH")
+    if workspace_path:
+        normalized = os.path.realpath(workspace_path)
+        base_name = os.path.basename(normalized)
+        if base_name == "work_space":
+            return normalized
+        if base_name.startswith("work_space_"):
+            return os.path.dirname(normalized)
+        return os.path.join(normalized, "work_space")
+
+    repo_root_guess = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    guessed_workspace = os.path.join(repo_root_guess, "work_space")
+    if os.path.isdir(guessed_workspace):
+        return guessed_workspace
+
     return os.path.join(os.getcwd(), "work_space")
 
 
@@ -184,6 +202,104 @@ def _is_safe_workspace_dir(workspace_root: str, workspace_dir: str) -> bool:
         common_path = os.path.commonpath([root_real, dir_real])
         return common_path == root_real
     except Exception:
+        return False
+
+
+def _normalize_final_json_rel_path(path: str) -> str:
+    normalized = str(path or '').replace('\\', '/').lstrip('/').strip()
+    if normalized.startswith('work_space/plans/'):
+        return normalized[len('work_space/'):]
+    return normalized
+
+
+def backup_ordered_task_list(thread_id: str, workspace_id: Optional[str] = None, ordered_task_list=None) -> bool:
+    """备份 orderedTaskList，供后端最终写入 .final.json 时合并。"""
+    if not thread_id:
+        return False
+
+    thread = get_thread_by_id(thread_id)
+    if not thread:
+        return False
+
+    right_panel_state = thread.get("rightPanelState") if isinstance(thread, dict) else {}
+    if not isinstance(right_panel_state, dict):
+        right_panel_state = {}
+
+    resolved_workspace_id = workspace_id
+    if not resolved_workspace_id:
+        resolved_workspace_id = right_panel_state.get("workspaceId") or thread.get("workspaceId")
+    if not resolved_workspace_id or not isinstance(resolved_workspace_id, str):
+        return False
+
+    runtime_log_book = right_panel_state.get("runtimeLogBook") if isinstance(right_panel_state, dict) else {}
+    if not isinstance(runtime_log_book, dict):
+        runtime_log_book = {}
+    tasks = runtime_log_book.get("tasks") if isinstance(runtime_log_book.get("tasks"), list) else []
+    active_task_id = runtime_log_book.get("activeTaskId")
+
+    selected_ordered_task_list = ordered_task_list if isinstance(ordered_task_list, list) else None
+    if selected_ordered_task_list is None:
+        active_task = None
+        if active_task_id:
+            for task in tasks:
+                if isinstance(task, dict) and task.get("taskId") == active_task_id:
+                    active_task = task
+                    break
+        if not active_task and tasks:
+            active_task = tasks[0] if isinstance(tasks[0], dict) else None
+
+        if active_task and isinstance(active_task.get("orderedTaskList"), list):
+            selected_ordered_task_list = active_task.get("orderedTaskList")
+
+    if not isinstance(selected_ordered_task_list, list) or len(selected_ordered_task_list) == 0:
+        return False
+
+    backup_record = {
+        "threadId": thread_id,
+        "workspaceId": resolved_workspace_id,
+        "orderedTaskList": selected_ordered_task_list,
+        "savedAt": int(datetime.now().timestamp() * 1000)
+    }
+    with _ordered_task_list_backup_lock:
+        _ordered_task_list_backup[resolved_workspace_id] = backup_record
+    _merge_ordered_task_list_into_final_json_if_exists(resolved_workspace_id, selected_ordered_task_list)
+    return True
+
+
+def pop_ordered_task_list_backup(workspace_id: str):
+    if not workspace_id or not isinstance(workspace_id, str):
+        return None
+    with _ordered_task_list_backup_lock:
+        popped = _ordered_task_list_backup.pop(workspace_id, None)
+    return popped
+
+
+def _merge_ordered_task_list_into_final_json_if_exists(workspace_id: str, ordered_task_list) -> bool:
+    """若 final.json 已存在，则立即合并 orderedTaskList，避免错过 search.py 最终写盘时机。"""
+    if not workspace_id or not isinstance(workspace_id, str):
+        return False
+    if not isinstance(ordered_task_list, list) or len(ordered_task_list) == 0:
+        return False
+
+    rel_path = f"plans/{workspace_id}.final.json"
+    workspace_root = _get_workspace_root_dir()
+    full_path = os.path.join(workspace_root, rel_path)
+    if (not os.path.isfile(full_path)) or (not _is_safe_workspace_dir(workspace_root, full_path)):
+        return False
+
+    try:
+        with open(full_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+
+        data['orderedTaskList'] = ordered_task_list
+
+        with open(full_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        logger.warning(f"immediate orderedTaskList merge failed: {e}")
         return False
 
 
@@ -322,7 +438,7 @@ async def get_final_json_path(workspace_id: str):
         if not os.path.isdir(plans_dir):
             return json_result(404, 'Plans directory not found', None)
 
-        # 直接推导 workspaceId.final.json 的标准路径，允许文件暂时不存在
+        # 对前端返回可直接经 /work_space 静态路由访问的路径
         rel_path = f"work_space/plans/{workspace_id}.final.json"
         full_path = os.path.join(_get_workspace_root_dir(), rel_path)
         if not _is_safe_workspace_dir(_get_workspace_root_dir(), full_path):
@@ -342,12 +458,18 @@ async def update_final_json(body: dict = Body(...)):
         if not path or not rightPanelState:
             return json_result(400, 'Invalid parameters', None)
 
+        path = _normalize_final_json_rel_path(path)
         full_path = os.path.join(_get_workspace_root_dir(), path)
-        if not os.path.isfile(full_path) or not _is_safe_workspace_dir(_get_workspace_root_dir(), full_path):
+        if not _is_safe_workspace_dir(_get_workspace_root_dir(), full_path):
             return json_result(404, 'File not found', None)
 
-        with open(full_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        data = {}
+        if os.path.isfile(full_path):
+            with open(full_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        else:
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+
         data['rightPanelState'] = rightPanelState
         with open(full_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -355,6 +477,22 @@ async def update_final_json(body: dict = Body(...)):
         return json_result(0, 'success', None)
     except Exception as e:
         logger.error(f"更新 final JSON 失败：{e}", exc_info=True)
+        return json_result(500, str(e), None)
+
+
+@commonRouter.post("/workspace/backup-ordered-task-list")
+async def backup_ordered_task_list_api(body: dict = Body(...)):
+    """在前端清理会话前备份 orderedTaskList，后续由后端最终写入 .final.json"""
+    try:
+        thread_id = body.get("threadId")
+        workspace_id = body.get("workspaceId")
+        ordered_task_list = body.get("orderedTaskList")
+        ok = backup_ordered_task_list(thread_id, workspace_id, ordered_task_list)
+        if not ok:
+            return json_result(400, 'Backup failed', None)
+        return json_result(0, 'success', None)
+    except Exception as e:
+        logger.error(f"备份 orderedTaskList 失败：{e}", exc_info=True)
         return json_result(500, str(e), None)
 
 

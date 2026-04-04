@@ -358,6 +358,27 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="message-export-format-modal-overlay" style="display: none;">
+        <div class="modal export-format-modal">
+            <div class="modal-header">
+                <h3>选择导出格式</h3>
+                <button class="btn-close-modal" id="close-message-export-format-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body export-format-modal-body">
+                <button class="export-format-option export-format-option-latex" id="export-format-latex-btn" type="button">
+                    <span class="export-format-icon">∑</span>
+                    <span class="export-format-name">LaTeX</span>
+                </button>
+                <button class="export-format-option export-format-option-word" id="export-format-word-btn" type="button">
+                    <span class="export-format-icon"><i class="fas fa-file-word"></i></span>
+                    <span class="export-format-name">Word</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="settings-modal"></div>
     <!-- 知识库管理弹窗容器 -->
     <div id="knowledge-modal"></div>
@@ -426,6 +447,7 @@
     <script id="MathJax-script" async src="markdown/src/dist/mathjax/tex-mml-chtml.js"></script>
     
     <!-- Markdown 渲染器 -->
+    <script src="markdown/markdown-export.js"></script>
     <script src="markdown/markdown.js"></script>
     
     <script src="js/main.js"></script>

@@ -1,28 +1,56 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Markdown Test Renderer</title>
+  <title>Markdown Render And Export Demo</title>
 
-  <link rel="stylesheet" href="./markdown-test.css" />
-
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/atom-one-dark.min.css" />
+  <link rel="stylesheet" href="./markdown.css" />
+  <link rel="stylesheet" href="./src/dist/styles/atom-one-dark.min.css" />
 </head>
 <body>
   <header class="page-header">
-    <h1>Markdown 渲染测试</h1>
-    <p>数据源：<code>markdown-test-response.txt</code></p>
+    <h1>Markdown 渲染与导出测试</h1>
+    <p>数据源：<code>markdown-response.txt</code> · 导出模块：<code>markdown-export.js</code></p>
   </header>
 
   <main>
+    <section class="export-panel" aria-labelledby="export-panel-title">
+      <div class="export-panel-header">
+        <div class="export-copy">
+          <h2 id="export-panel-title">导出测试</h2>
+          <p>
+            同一份 Markdown 会同时用于页面预览、LaTeX 生成和 DOCX 打包。
+            后续嵌入其他项目时，直接复用 <code>markdown-export.js</code> 即可。
+          </p>
+        </div>
+
+        <div class="export-actions">
+          <button id="refresh-latex-btn" class="export-btn" type="button">刷新 LaTeX</button>
+          <button id="copy-latex-btn" class="export-btn" type="button">复制 LaTeX</button>
+          <button id="download-latex-btn" class="export-btn primary" type="button">下载 .tex</button>
+          <button id="download-docx-btn" class="export-btn primary" type="button">下载 .docx</button>
+        </div>
+      </div>
+
+      <p id="export-status" class="export-status" aria-live="polite"></p>
+
+      <label class="latex-preview-label" for="latex-preview">LaTeX 预览</label>
+      <textarea
+        id="latex-preview"
+        class="latex-preview"
+        readonly
+        spellcheck="false"
+      ></textarea>
+    </section>
+
     <article id="markdown-output" class="markdown-body" aria-live="polite"></article>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2.1.1/dist/markdown-it-task-lists.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.10.1/dist/mermaid.min.js"></script>
+  <script src="./src/dist/markdown-it.min.js"></script>
+  <script src="./src/dist/markdown-it-task-lists.min.js"></script>
+  <script src="./src/dist/highlight.min.js"></script>
+  <script src="./src/dist/mermaid.min.js"></script>
   <script>
     window.MathJax = {
       tex: {
@@ -34,9 +62,10 @@
       }
     };
   </script>
-  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <script id="MathJax-script" async src="./src/dist/mathjax/tex-mml-chtml.js"></script>
 
-  <script src="./markdown-test.js"></script>
+  <script src="./markdown-export.js"></script>
+  <script src="./markdown.js"></script>
+  <script src="./markdown-export-demo.js"></script>
 </body>
 </html>
-

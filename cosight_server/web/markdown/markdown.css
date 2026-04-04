@@ -48,6 +48,100 @@ body {
 
 main {
   padding: 12px 16px 32px;
+  display: grid;
+  gap: 18px;
+}
+
+.export-panel {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(10px);
+}
+
+.export-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.export-copy h2 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+}
+
+.export-copy p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.export-btn {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.export-btn:hover {
+  transform: translateY(-1px);
+  border-color: #94a3b8;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.12);
+}
+
+.export-btn.primary {
+  border-color: #2563eb;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+}
+
+.export-status {
+  min-height: 24px;
+  margin: 14px 0 12px;
+  color: var(--muted);
+}
+
+.export-status[data-state="success"] {
+  color: #047857;
+}
+
+.export-status[data-state="error"] {
+  color: #b91c1c;
+}
+
+.latex-preview-label {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.latex-preview {
+  width: 100%;
+  min-height: 260px;
+  border: 1px solid #d8e0ef;
+  border-radius: 12px;
+  padding: 14px 16px;
+  resize: vertical;
+  background: #f8fafc;
+  color: #0f172a;
+  font: 0.88rem/1.55 Consolas, "Courier New", monospace;
 }
 
 .markdown-body {
@@ -400,6 +494,18 @@ main {
 }
 
 @media (max-width: 768px) {
+  .export-panel {
+    padding: 18px;
+  }
+
+  .export-panel-header {
+    flex-direction: column;
+  }
+
+  .export-actions {
+    justify-content: flex-start;
+  }
+
   .markdown-body {
     padding: 18px;
   }

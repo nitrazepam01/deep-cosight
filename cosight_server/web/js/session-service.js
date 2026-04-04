@@ -232,11 +232,9 @@ class SessionService {
                 node.isActive = false;
             }
             if (node.metadata && typeof node.metadata === 'object') {
-                ['pendingPlaceholder', 'pendingKind', 'redoOf', 'redoVersion', 'pendingTopic', 'redoState'].forEach((key) => {
-                    if (Object.prototype.hasOwnProperty.call(node.metadata, key)) {
-                        delete node.metadata[key];
-                    }
-                });
+                if (Object.prototype.hasOwnProperty.call(node.metadata, 'redoState')) {
+                    delete node.metadata.redoState;
+                }
             }
         });
 
@@ -264,9 +262,6 @@ class SessionService {
             const node = tree.nodes[nodeId];
             if (!node || typeof node !== 'object') return;
             node.isActive = activePathSet.has(nodeId);
-            if (!node.isActive) {
-                node.children = [];
-            }
         });
 
         if (!tree.metadata || typeof tree.metadata !== 'object') {
