@@ -14,6 +14,7 @@
 #    under the License.
 
 import json
+import asyncio
 import uuid
 from typing import List, Optional
 
@@ -219,7 +220,27 @@ async def _send_resp(websocket, cookie, topic, message, lang):
     }
     try:
         if params.get("stream", False):
-            await _stream_handler(params, url, headers, topic, websocket)
+            retry_delay_seconds = float(custom_config.get("blocked_retry_delay_seconds", 2) or 2)
+            max_retry_times = int(custom_config.get("blocked_retry_max_times", 0) or 0)
+            retry_count = 0
+            while True:
+                stream_outcome = await _stream_handler(params, url, headers, topic, websocket)
+                completed = bool(stream_outcome.get("completed"))
+                has_blocked = bool(stream_outcome.get("has_blocked"))
+                if completed or not has_blocked:
+                    break
+
+                retry_count += 1
+                if max_retry_times > 0 and retry_count > max_retry_times:
+                    logger.warning(
+                        f"blocked retry reached max times, stop retry. topic={topic}, retry_count={retry_count}, max={max_retry_times}"
+                    )
+                    break
+
+                logger.info(
+                    f"detected blocked steps, retry stream. topic={topic}, retry_count={retry_count}, delay={retry_delay_seconds}s"
+                )
+                await asyncio.sleep(max(0, retry_delay_seconds))
         else:
             await _no_stream_handler(params, url, headers, topic, websocket)
     except Exception as e:
@@ -250,6 +271,9 @@ async def _stream_handler(params, url, headers, topic, websocket):
     # 保存原始限制并将默认限制调大，避免单行/单块过大错误
     original_limit = getattr(aiohttp.streams, '_DEFAULT_LIMIT', 2**16)  # 64KB
     aiohttp.streams._DEFAULT_LIMIT = 2 * 1024 * 1024 * 1024  # 2GB
+    has_blocked = False
+    has_completed_signal = False
+    has_dag_update = False
     
     try:
         async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
@@ -320,20 +344,22 @@ async def _stream_handler(params, url, headers, topic, websocket):
                                 }
                             }, websocket)
 
-                            # 结束唯一判定：进度100% 且 DAG 全部节点 completed 或 blocked
+                            # 结束唯一判定：仅当 DAG 全部节点 completed 才发送结束信号
                             try:
                                 if (not control_sent) and msg_type == "lui-message-manus-step" and isinstance(init_data, dict):
+                                    has_dag_update = True
                                     progress = init_data.get("progress") or {}
                                     total = int(progress.get("total") or 0)
                                     completed = int(progress.get("completed") or 0)
                                     blocked = int(progress.get("blocked") or 0)
 
-                                    all_green = False
+                                    all_completed = False
+                                    current_has_blocked = False
                                     step_statuses = init_data.get("step_statuses")
                                     if isinstance(step_statuses, dict) and len(step_statuses) > 0:
                                         values = [str(v).lower() for v in step_statuses.values()]
-                                        valid_final_status = {"completed", "blocked"}
-                                        all_green = all(v in valid_final_status for v in values)
+                                        current_has_blocked = any(v == "blocked" for v in values)
+                                        all_completed = all(v == "completed" for v in values)
                                         # progress 缺失时，按 step_statuses 反推
                                         if total <= 0:
                                             total = len(values)
@@ -344,26 +370,30 @@ async def _stream_handler(params, url, headers, topic, websocket):
                                         if isinstance(nodes, list) and len(nodes) > 0:
                                             statuses = [str((n or {}).get("status", "")).lower() for n in nodes if isinstance(n, dict)]
                                             if len(statuses) > 0:
-                                                valid_final_status = {"completed", "blocked"}
-                                                all_green = all(s in valid_final_status for s in statuses)
+                                                current_has_blocked = any(s == "blocked" for s in statuses)
+                                                all_completed = all(s == "completed" for s in statuses)
                                                 if total <= 0:
                                                     total = len(statuses)
                                                     completed = sum(1 for s in statuses if s == "completed")
                                                     blocked = sum(1 for s in statuses if s == "blocked")
 
-                                    progress_done = bool(total > 0 and (completed + blocked) >= total)
+                                    has_blocked = has_blocked or current_has_blocked
+                                    progress_done = bool(total > 0 and completed >= total)
 
-                                    if progress_done and all_green:
+                                    if progress_done and all_completed:
                                         # 先让出事件循环，确保上面的最终PLAN更新已被前端渲染
                                         import asyncio as _asyncio
                                         await _asyncio.sleep(0)
                                         await _send_finish_control_once()
+                                        has_completed_signal = True
                                         # 计划已完成，后续如仍有流数据，继续透传；不强制关闭连接
                             except Exception:
                                 # 解析或字段缺失不阻断主流程
                                 pass
-                    # 流自然结束但未触发过进度完成分支时，兜底发送一次结束控制
-                    await _send_finish_control_once()
+                    # 仅非 DAG 场景保留兜底结束控制；DAG 场景交由 completed-only 判定
+                    if not has_dag_update:
+                        await _send_finish_control_once()
+                        has_completed_signal = True
                 except Exception:
                     # 发生读取异常（包含超时），尝试把缓冲区中已到达的完整行消费掉
                     while True:
@@ -397,10 +427,20 @@ async def _stream_handler(params, url, headers, topic, websocket):
                                 "styles": {"width": "100%"}
                             }
                         }, websocket)
-                    return
+                    return {
+                        "completed": has_completed_signal,
+                        "has_blocked": has_blocked,
+                        "has_dag_update": has_dag_update,
+                    }
     finally:
         # 恢复原始限制
         aiohttp.streams._DEFAULT_LIMIT = original_limit
+
+    return {
+        "completed": has_completed_signal,
+        "has_blocked": has_blocked,
+        "has_dag_update": has_dag_update,
+    }
 
 
 async def _no_stream_handler(params, url, headers, topic, websocket):

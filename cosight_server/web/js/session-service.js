@@ -262,9 +262,6 @@ class SessionService {
             const node = tree.nodes[nodeId];
             if (!node || typeof node !== 'object') return;
             node.isActive = activePathSet.has(nodeId);
-            if (!node.isActive) {
-                node.children = [];
-            }
         });
 
         if (!tree.metadata || typeof tree.metadata !== 'object') {

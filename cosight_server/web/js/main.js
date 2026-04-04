@@ -1824,6 +1824,27 @@ function clearDagViewState() {
     }
 }
 
+function clearRightPanelImmediatelyForNewRun(threadId) {
+    if (!threadId) return;
+
+    // 仅当发送目标线程就是当前激活线程时，才清空可视区域。
+    const activeThreadId = AppState.currentThreadId;
+    const shouldClearVisiblePanel = threadId === activeThreadId;
+
+    if (shouldClearVisiblePanel) {
+        clearDagViewState();
+        resetExecutionTitle();
+        clearRuntimeLogs();
+        clearRuntimeLogFilter();
+        AppState.selectedTaskNodeId = null;
+        if (AppState.currentThreadId === threadId && typeof window.rerenderTaskInfoBySelection === 'function') {
+            window.rerenderTaskInfoBySelection();
+        }
+    }
+
+    void clearThreadRightPanelState(threadId);
+}
+
 // 清理 progress-overview 显示
 function clearProgressOverview() {
     const completedCount = document.getElementById('completed-count');
@@ -3169,6 +3190,9 @@ function clonePayload(payload) {
 async function resendLastNormalPayloadByRedo(redoTargetMessage, targetThreadId = null, redoPlaceholderMessageId = null) {
     const sourceThreadId = targetThreadId || AppState.currentThreadId;
 
+    // 重做发起时立即清空右侧栏，避免等待首包期间显示旧任务结果。
+    clearRightPanelImmediatelyForNewRun(sourceThreadId);
+
     // redo 点击后立即锁定发送按钮，避免等待后端状态同步造成可点击窗口。
     AppState.threadExecutionState[sourceThreadId] = true;
     if (sourceThreadId === AppState.currentThreadId) {
@@ -4249,7 +4273,7 @@ function isThreadDagAllCompleted(threadId) {
         const inProgress = Number(progress.in_progress) || 0;
         const notStarted = Number(progress.not_started) || 0;
         const total = Number(progress.total) || (completed + blocked + inProgress + notStarted);
-        return total > 0 && (completed + blocked) === total;
+        return total > 0 && completed === total;
     }
 
     const steps = Array.isArray(content.steps) ? content.steps : [];
@@ -4260,7 +4284,7 @@ function isThreadDagAllCompleted(threadId) {
         const stepNo = i + 1;
         const statusRec = statuses[`step_${stepNo}`] ?? statuses[stepNo] ?? statuses[String(stepNo)];
         const status = typeof statusRec === 'string' ? statusRec : (statusRec?.status || '');
-        if (status === 'completed' || status === 'blocked') doneCount += 1;
+        if (status === 'completed') doneCount += 1;
     }
     return doneCount === steps.length;
 }
@@ -4324,6 +4348,9 @@ async function sendMessage() {
     // 发送前强制同步一次后端会话状态，前端仅作为镜像
     await syncSendButtonStateWithCurrentThread(sourceThreadId);
     if (!message || isThreadExecuting(sourceThreadId)) return;
+
+    // 普通发送发起时立即清空右侧栏，避免等待首包期间显示旧任务结果。
+    clearRightPanelImmediatelyForNewRun(sourceThreadId);
     
     const sendTimestamp = Date.now();
     const userMessage = {
@@ -4779,7 +4806,7 @@ function isDagInitDataAllCompleted(initData) {
         const inProgress = Number(progress.in_progress) || 0;
         const notStarted = Number(progress.not_started) || 0;
         const total = Number(progress.total) || (completed + blocked + inProgress + notStarted);
-        return total > 0 && (completed + blocked) === total;
+        return total > 0 && completed === total;
     }
     const steps = Array.isArray(initData.steps) ? initData.steps : [];
     const statuses = initData.step_statuses && typeof initData.step_statuses === 'object' ? initData.step_statuses : {};
@@ -4789,7 +4816,7 @@ function isDagInitDataAllCompleted(initData) {
         const stepNo = i + 1;
         const statusRec = statuses[`step_${stepNo}`] ?? statuses[stepNo] ?? statuses[String(stepNo)];
         const status = typeof statusRec === 'string' ? statusRec : (statusRec?.status || '');
-        if (status === 'completed' || status === 'blocked') doneCount += 1;
+        if (status === 'completed') doneCount += 1;
     }
     return doneCount === steps.length;
 }
@@ -5185,7 +5212,7 @@ function normalizeFinalJsonToRightPanelState(rawFinalJson, workspaceIdFallback =
         const completed = Number(dagInitData.progress.completed || 0);
         const blocked = Number(dagInitData.progress.blocked || 0);
         const total = Number(dagInitData.progress.total || 0);
-        if ((completed + blocked) >= total) {
+        if (completed >= total && blocked === 0) {
             dagInitData.statusText = RIGHT_PANEL_COMPLETED_STATUS_TEXT;
         }
     }

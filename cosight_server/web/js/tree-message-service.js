@@ -65,6 +65,65 @@ class TreeMessageService {
     }
 
     /**
+     * 通过 parentId 反向回溯构建从 root 到目标节点的路径
+     */
+    buildPathToNode(tree, targetNodeId) {
+        if (!tree || !tree.nodes || !targetNodeId || !tree.nodes[targetNodeId]) return [];
+
+        const pathIds = [];
+        const visited = new Set();
+        let currentId = targetNodeId;
+
+        while (currentId && tree.nodes[currentId] && !visited.has(currentId)) {
+            visited.add(currentId);
+            pathIds.unshift(currentId);
+            const parentId = tree.nodes[currentId].parentId;
+            if (!parentId) break;
+            currentId = parentId;
+        }
+
+        if (pathIds.length === 0 || pathIds[0] !== tree.rootId) {
+            if (tree.rootId && tree.nodes[tree.rootId]) {
+                return [tree.rootId];
+            }
+            return [];
+        }
+
+        return pathIds;
+    }
+
+    /**
+     * 将 activePath 与 isActive 严格对齐到目标节点
+     */
+    activatePathToNode(tree, targetNodeId) {
+        if (!tree || !tree.nodes || !targetNodeId || !tree.nodes[targetNodeId]) return;
+
+        const pathIds = this.buildPathToNode(tree, targetNodeId);
+        const activeSet = new Set(pathIds);
+
+        Object.keys(tree.nodes).forEach((nodeId) => {
+            const node = tree.nodes[nodeId];
+            if (!node || typeof node !== 'object') return;
+            node.isActive = activeSet.has(nodeId);
+        });
+
+        tree.activePath = pathIds
+            .map((nodeId) => tree.nodes[nodeId])
+            .filter(Boolean)
+            .map((node) => ({
+                nodeId: node.id,
+                role: node.role,
+                timestamp: node.timestamp || Date.now()
+            }));
+
+        if (!tree.metadata || typeof tree.metadata !== 'object') {
+            tree.metadata = {};
+        }
+        tree.metadata.lastActiveMessageId = targetNodeId;
+        tree.metadata.lastSwitchTime = Date.now();
+    }
+
+    /**
      * 添加消息到树中
      * @param {Object} tree - 消息树
      * @param {Object} message - 消息内容 {role, content, timestamp, metadata}
@@ -88,13 +147,22 @@ class TreeMessageService {
         // 确定父节点ID
         let actualParentId = parentId;
         if (!actualParentId) {
-            // 如果没有指定父节点，找到当前分支的最后一个活跃消息
-            const branch = tree.branches[branchId];
-            if (branch) {
-                const lastMessage = this.getLastMessageInBranch(tree, branchId);
-                actualParentId = lastMessage ? lastMessage.id : branch.rootId;
+            // 约束：普通新增必须挂在当前 activePath 的最后节点上。
+            // 先取 activePath 末尾，避免按时间戳选到非活跃版本节点。
+            const activeTailId = Array.isArray(tree.activePath) && tree.activePath.length > 0
+                ? tree.activePath[tree.activePath.length - 1].nodeId
+                : null;
+
+            if (activeTailId && tree.nodes[activeTailId] && !tree.nodes[activeTailId].deleted) {
+                actualParentId = activeTailId;
             } else {
-                actualParentId = tree.rootId;
+                const branch = tree.branches[branchId];
+                if (branch) {
+                    const lastMessage = this.getLastMessageInBranch(tree, branchId);
+                    actualParentId = lastMessage ? lastMessage.id : branch.rootId;
+                } else {
+                    actualParentId = tree.rootId;
+                }
             }
         }
 
@@ -134,26 +202,9 @@ class TreeMessageService {
                 }
             }
 
-            // 切换到重试版本时旧节点失活、activePath 更新
-            if (!tree.nodes[redoTargetId].isActive) {
-                tree.nodes[redoTargetId].isActive = false;
-            } else {
-                tree.nodes[redoTargetId].isActive = false;
-            }
-            if (!Array.isArray(tree.activePath)) tree.activePath = [];
-            const parentIndex = tree.activePath.findIndex(item => item.nodeId === actualParentId);
-            if (parentIndex !== -1) {
-                tree.activePath = tree.activePath.slice(0, parentIndex + 1);
-                tree.activePath.push({
-                    nodeId: messageId,
-                    role: messageNode.role,
-                    timestamp: messageNode.timestamp
-                });
-            }
-
-            if (!tree.metadata || typeof tree.metadata !== 'object') tree.metadata = {};
-            tree.metadata.lastActiveMessageId = messageId;
-            tree.metadata.lastSwitchTime = Date.now();
+            // 重试版本成为新的活跃节点，统一重建 activePath/isActive
+            tree.nodes[redoTargetId].isActive = false;
+            this.activatePathToNode(tree, messageId);
 
             return {
                 tree: tree,
@@ -187,23 +238,8 @@ class TreeMessageService {
             }
         }
 
-        // 更新 activePath：如果父节点在 activePath 的最后，附加这个节点
-        if (!Array.isArray(tree.activePath)) tree.activePath = [];
-        const lastPathNode = tree.activePath[tree.activePath.length - 1];
-        if (lastPathNode && lastPathNode.nodeId === actualParentId) {
-            tree.activePath.push({
-                nodeId: messageId,
-                role: messageNode.role,
-                timestamp: messageNode.timestamp
-            });
-        }
-
-        // 当前节点是活跃节点
-        messageNode.isActive = true;
-
-        if (!tree.metadata || typeof tree.metadata !== 'object') tree.metadata = {};
-        tree.metadata.lastActiveMessageId = messageId;
-        tree.metadata.lastSwitchTime = Date.now();
+        // 普通新增消息也统一重建 activePath/isActive，避免条件追加导致路径漂移。
+        this.activatePathToNode(tree, messageId);
 
         return {
             tree: tree,
@@ -321,22 +357,27 @@ class TreeMessageService {
         const childrenToTransfer = Array.isArray(currentNode.children) ? [...currentNode.children] : [];
         currentNode.children = [];
 
-        targetNode.children = childrenToTransfer;
+        // 先将 children 转移到目标活跃版本节点。
+        const targetChildren = Array.isArray(targetNode.children) ? [...targetNode.children] : [];
+        const mergedChildren = [...targetChildren];
+        childrenToTransfer.forEach((childId) => {
+            if (!mergedChildren.includes(childId)) {
+                mergedChildren.push(childId);
+            }
+        });
+        targetNode.children = mergedChildren;
+
+        // 再基于目标节点 children 列表，统一修正其 parentId。
+        targetNode.children.forEach((childId) => {
+            const childNode = tree.nodes[childId];
+            if (childNode) {
+                childNode.parentId = targetVersionId;
+            }
+        });
         targetNode.isActive = true;
 
-        // 更新 activePath
-        if (!Array.isArray(tree.activePath)) tree.activePath = [];
-        const parentId = currentNode.parentId;
-        for (let i = 0; i < tree.activePath.length - 1; i++) {
-            if (tree.activePath[i].nodeId === parentId && tree.activePath[i + 1] && tree.activePath[i + 1].nodeId === currentVersionId) {
-                tree.activePath[i + 1] = {
-                    nodeId: targetVersionId,
-                    role: targetNode.role,
-                    timestamp: targetNode.timestamp || Date.now()
-                };
-                break;
-            }
-        }
+        // 更新 activePath：基于当前树重建，避免局部替换导致路径失真。
+        tree.activePath = this.buildActivePathFromTree(tree);
 
         if (!tree.metadata || typeof tree.metadata !== 'object') tree.metadata = {};
         tree.metadata.lastActiveMessageId = targetVersionId;
