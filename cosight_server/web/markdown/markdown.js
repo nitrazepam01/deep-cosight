@@ -7,6 +7,7 @@
     "/cosight_server/web/markdown/markdown-response.txt",
     "/cosight/markdown-response.txt",
   ];
+  let currentMarkdownText = "";
   
   // 检查是否在主聊天页面（使用 markdown-content 容器）
   const isNewPage = !!document.getElementById("markdown-content");
@@ -28,6 +29,7 @@
       return '';
     }
 
+    currentMarkdownText = markdownText;
     const md = createMarkdownRenderer();
     const html = md.render(markdownText);
     const safeHtml = sanitizeRenderedHtml(html);
@@ -460,7 +462,11 @@
     render: renderMarkdownContent,
     renderMermaid: renderMermaidInContainer,
     renderMath: renderMathInContainer,
-    createRenderer: createMarkdownRenderer
+    createRenderer: createMarkdownRenderer,
+    loadSource: loadMarkdownText,
+    getLastSource: function () {
+      return currentMarkdownText;
+    }
   };
 
   console.log('MarkdownRenderer 已导出到全局');
@@ -672,6 +678,7 @@
     
     try {
       const markdownText = await loadMarkdownText();
+      currentMarkdownText = markdownText;
       const md = createMarkdownRenderer();
       outputEl.innerHTML = sanitizeRenderedHtml(md.render(markdownText));
 

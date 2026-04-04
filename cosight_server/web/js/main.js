@@ -2730,17 +2730,99 @@ async function defaultCopyMessage(message, btn) {
 }
 
 function defaultExportMessage(message) {
-    const text = String(message?.content ?? '');
-    const ts = Number(message?.timestamp) || Date.now();
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `message_${ts}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    openMessageExportFormatModal(message);
+}
+
+let pendingMessageExportContext = null;
+
+function getMessageExportPayload(payload) {
+    if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'content')) {
+        return payload;
+    }
+    return {
+        content: String(payload || ''),
+        timestamp: Date.now()
+    };
+}
+
+function closeMessageExportFormatModal() {
+    const modal = document.getElementById('message-export-format-modal-overlay');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    pendingMessageExportContext = null;
+}
+
+function openMessageExportFormatModal(message) {
+    const modal = document.getElementById('message-export-format-modal-overlay');
+    if (!modal) return;
+    pendingMessageExportContext = getMessageExportPayload(message);
+    modal.style.display = 'flex';
+}
+
+function exportMessageAsLatex(message) {
+    const payload = getMessageExportPayload(message);
+    const markdownText = String(payload.content || '');
+    if (!markdownText.trim()) return false;
+    if (!window.MarkdownExporter || typeof window.MarkdownExporter.downloadLatex !== 'function') {
+        alert('MarkdownExporter 未加载，无法导出 LaTeX。');
+        return false;
+    }
+
+    const ts = Number(payload.timestamp) || Date.now();
+    const fileName = `message_${ts}.tex`;
+    window.MarkdownExporter.downloadLatex(markdownText, fileName, {
+        title: 'Co-Sight 消息导出',
+        author: 'Co-Sight'
+    });
+    return true;
+}
+
+function exportMessageAsWord(message) {
+    const payload = getMessageExportPayload(message);
+    const markdownText = String(payload.content || '');
+    if (!markdownText.trim()) return false;
+    if (!window.MarkdownExporter || typeof window.MarkdownExporter.downloadDocx !== 'function') {
+        alert('MarkdownExporter 未加载，无法导出 Word。');
+        return false;
+    }
+
+    const ts = Number(payload.timestamp) || Date.now();
+    const fileName = `message_${ts}.docx`;
+    window.MarkdownExporter.downloadDocx(markdownText, fileName, {
+        title: 'Co-Sight 消息导出',
+        author: 'Co-Sight'
+    });
+    return true;
+}
+
+function initMessageExportFormatModal() {
+    const modal = document.getElementById('message-export-format-modal-overlay');
+    const closeBtn = document.getElementById('close-message-export-format-modal');
+    const latexBtn = document.getElementById('export-format-latex-btn');
+    const wordBtn = document.getElementById('export-format-word-btn');
+    if (!modal || !closeBtn || !latexBtn || !wordBtn) return;
+
+    closeBtn.addEventListener('click', closeMessageExportFormatModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeMessageExportFormatModal();
+        }
+    });
+
+    latexBtn.addEventListener('click', () => {
+        if (pendingMessageExportContext) {
+            exportMessageAsLatex(pendingMessageExportContext);
+        }
+        closeMessageExportFormatModal();
+    });
+
+    wordBtn.addEventListener('click', () => {
+        if (pendingMessageExportContext) {
+            exportMessageAsWord(pendingMessageExportContext);
+        }
+        closeMessageExportFormatModal();
+    });
 }
 
 async function defaultRedoMessage(message, messageItem) {
@@ -4399,7 +4481,12 @@ async function sendToBackend(message, sourceThreadId = AppState.currentThreadId,
         
         // 检查是否为测试命令 - 测试命令绕过 WebSocket，直接显示 AI 回复
         if (message === '测试') {
-            await handleTestCommand();
+            await handleTestCommand({
+                threadId: sourceThreadId,
+                pendingPlaceholderMessageId: sendOptions && sendOptions.pendingPlaceholderMessageId
+                    ? String(sendOptions.pendingPlaceholderMessageId)
+                    : null
+            });
             void setThreadExecutingState(sourceThreadId, false);
             return null;
         }
@@ -6850,6 +6937,7 @@ function initThreeColumnLayout() {
     initDeleteFolderConfirmModal();
     initClearChatConfirmModal();
     initDeleteMessageConfirmModal();
+    initMessageExportFormatModal();
     initFileDuplicateModal();
     initSettingsModal();
     initFolderDragDrop();
@@ -6970,7 +7058,12 @@ let testMarkdownContent = null;
  * 处理测试命令
  * 当用户输入"测试"时，直接作为 AI 回复显示 Markdown 测试文档内容
  */
-async function handleTestCommand() {
+async function handleTestCommand(options = {}) {
+    const threadId = options && typeof options === 'object' ? (options.threadId || AppState.currentThreadId) : AppState.currentThreadId;
+    const pendingPlaceholderMessageId = options && typeof options === 'object'
+        ? (options.pendingPlaceholderMessageId ? String(options.pendingPlaceholderMessageId) : null)
+        : null;
+
     // 隐藏思考状态
     hideThinkingState();
 
@@ -6988,28 +7081,76 @@ async function handleTestCommand() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         testMarkdownContent = await response.text();
-        showTestContentAsAIReply(testMarkdownContent);
+        showTestContentAsAIReply(testMarkdownContent, {
+            threadId,
+            pendingPlaceholderMessageId
+        });
     } catch (error) {
-        addMessage({
-            role: 'assistant',
-            content: `加载测试内容失败：${error.message}`,
-            timestamp: Date.now()
+        showTestContentAsAIReply(`加载测试内容失败：${error.message}`, {
+            threadId,
+            pendingPlaceholderMessageId
         });
     }
+}
+
+function resolvePendingAssistantPlaceholderByMessageId(threadId, messageId, content, metadataPatch = {}) {
+    if (!threadId || !messageId) return false;
+    const found = findMessageByIdInAllThreads(String(messageId));
+    if (!found || !found.thread || !found.message) return false;
+    if (found.thread.id !== threadId) return false;
+
+    const message = found.message;
+    if (message.role !== 'assistant') return false;
+
+    const baseMeta = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
+    if (baseMeta.pendingPlaceholder !== true) return false;
+
+    const previousPendingTopic = baseMeta.pendingTopic;
+    const mergedMeta = {
+        ...baseMeta,
+        ...metadataPatch,
+        pendingPlaceholder: false
+    };
+    delete mergedMeta.pendingTopic;
+    delete mergedMeta.pendingKind;
+    delete mergedMeta.pendingWorkspaceId;
+    delete mergedMeta.rightPanelState;
+    message.metadata = mergedMeta;
+
+    if (previousPendingTopic) {
+        unbindTopic(previousPendingTopic);
+    }
+
+    message.content = String(content || '');
+    message.timestamp = Date.now();
+    persistMessageStateToThread(found.thread, message, { syncContent: true, syncTimestamp: true });
+    found.thread.updatedAt = Date.now();
+
+    void syncThreadMessagesToBackend(found.thread);
+
+    if (threadId === AppState.currentThreadId) {
+        loadMessages(getRenderableMessagesFromThread(found.thread));
+        scrollToBottom();
+    } else {
+        renderFolderList();
+    }
+    return true;
 }
 
 /**
  * 将测试内容作为 AI 回复显示
  */
-function showTestContentAsAIReply(content) {
-    const assistantMessage = {
-        role: 'assistant',
-        content: content,
-        timestamp: Date.now()
-    };
-    
-    // 统一通过 addMessage 处理写入与渲染
-    addMessage(assistantMessage);
+function showTestContentAsAIReply(content, options = {}) {
+    const threadId = options && typeof options === 'object' ? (options.threadId || AppState.currentThreadId) : AppState.currentThreadId;
+    const pendingPlaceholderMessageId = options && typeof options === 'object'
+        ? (options.pendingPlaceholderMessageId ? String(options.pendingPlaceholderMessageId) : null)
+        : null;
+
+    if (!threadId || !pendingPlaceholderMessageId) {
+        return;
+    }
+
+    resolvePendingAssistantPlaceholderByMessageId(threadId, pendingPlaceholderMessageId, content);
 }
 
 // ==================== 拖放功能 ====================
@@ -7176,6 +7317,9 @@ function showFileDuplicateModal(message) {
         modal.style.display = 'flex';
     }
 }
+
+window.exportMessageAsLatex = exportMessageAsLatex;
+window.exportMessageAsWord = exportMessageAsWord;
 
 function closeFileDuplicateModal() {
     const modal = document.getElementById('file-duplicate-confirm-modal-overlay');
