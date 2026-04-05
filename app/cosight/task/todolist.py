@@ -53,6 +53,13 @@ class Plan:
             self.dependencies = {i: [i - 1] for i in range(1, len(self.steps))} if len(self.steps) > 1 else {}
         self.result = ""
         self.work_space_path = work_space_path if work_space_path else os.environ.get("WORKSPACE_PATH") or os.getcwd()
+        self.execution_id = ""
+        self.plan_session_id = ""
+        self.approval_state = ""
+        self.plan_version = 0
+        self.latest_revision_prompt = ""
+        self.require_user_approval = False
+        self.status_text = ""
 
     def set_plan_result(self, plan_result):
         self.result = plan_result
@@ -66,6 +73,31 @@ class Plan:
         self.allowed_actor_ids = list(allowed_actor_ids or [])
         self.default_actor_id = default_actor_id or ""
         self.dispatch_mode = dispatch_mode or "single_actor"
+
+    def configure_approval(
+        self,
+        execution_id: Optional[str] = None,
+        plan_session_id: Optional[str] = None,
+        approval_state: Optional[str] = None,
+        plan_version: Optional[int] = None,
+        latest_revision_prompt: Optional[str] = None,
+        require_user_approval: Optional[bool] = None,
+        status_text: Optional[str] = None,
+    ):
+        if execution_id is not None:
+            self.execution_id = execution_id
+        if plan_session_id is not None:
+            self.plan_session_id = plan_session_id
+        if approval_state is not None:
+            self.approval_state = approval_state
+        if plan_version is not None:
+            self.plan_version = int(plan_version)
+        if latest_revision_prompt is not None:
+            self.latest_revision_prompt = latest_revision_prompt
+        if require_user_approval is not None:
+            self.require_user_approval = bool(require_user_approval)
+        if status_text is not None:
+            self.status_text = status_text
 
     def _validate_step_index(self, step_index: int):
         if step_index < 0 or step_index >= len(self.steps):

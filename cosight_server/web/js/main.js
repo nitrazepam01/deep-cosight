@@ -35,6 +35,9 @@ const threadCompletionHandled = new Set();
 const threadMessageSyncQueue = new Map();
 const RIGHT_PANEL_COMPLETED_STATUS_TEXT = '执行完成';
 let displayThreadId = null; // 当前显示的thread，用于redo切换
+const PLAN_APPROVAL_ACTIVE_STATES = new Set(['drafting', 'awaiting_user_approval', 'revising', 'approved', 'executing']);
+const PLAN_APPROVAL_ACTIONABLE_STATES = new Set(['awaiting_user_approval']);
+let pendingPlanRevisionContext = null;
 
 // ==================== 工具函数 ====================
 
@@ -2275,7 +2278,7 @@ async function loadThread(threadId) {
     const messages = getRenderableMessagesFromThread(renderThread || thread);
     loadMessages(messages);
 
-    isTaskExecuting = isThreadExecuting(threadId);
+    isTaskExecuting = isThreadInputLocked(threadId);
     
     // 如果线程正在执行，先获取保存的任务状态
     const savedTaskState = AppState.threadTaskStateMemory.get(threadId);
@@ -2349,6 +2352,32 @@ function loadMessages(messages) {
     scrollToBottom();
 }
 
+function isDraftPlanMessage(message) {
+    const metadata = (message && message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
+    return metadata.type === 'draft_plan';
+}
+
+function buildAssistantActionsHtml(message) {
+    if (!message || message.role !== 'assistant') return '';
+    if (isDraftPlanMessage(message)) {
+        return `
+            <div class="message-actions">
+                <button class="message-action-btn" data-action="copy" title="复制"><i class="fas fa-copy"></i></button>
+                <button class="message-action-btn" data-action="delete" title="删除"><i class="fas fa-trash"></i></button>
+            </div>
+        `;
+    }
+    return `
+        <div class="message-actions">
+            <button class="message-action-btn" data-action="copy" title="复制"><i class="fas fa-copy"></i></button>
+            <button class="message-action-btn" data-action="export" title="导出"><i class="fas fa-download"></i></button>
+            <button class="message-action-btn" data-action="redo" title="重做"><i class="fas fa-rotate-right"></i></button>
+            <button class="message-action-btn" data-action="delete" title="删除"><i class="fas fa-trash"></i></button>
+            <button class="message-action-btn" data-action="locate" title="定位"><i class="fas fa-location-crosshairs"></i></button>
+        </div>
+    `;
+}
+
 function createMessageElement(message) {
     const div = document.createElement('div');
     div.className = `message-item ${message.role}`;
@@ -2380,17 +2409,7 @@ function createMessageElement(message) {
             </div>
         `
         : '';
-    const actionsHtml = (message.role === 'assistant')
-        ? `
-            <div class="message-actions">
-                <button class="message-action-btn" data-action="copy" title="复制"><i class="fas fa-copy"></i></button>
-                <button class="message-action-btn" data-action="export" title="导出"><i class="fas fa-download"></i></button>
-                <button class="message-action-btn" data-action="redo" title="重做"><i class="fas fa-rotate-right"></i></button>
-                <button class="message-action-btn" data-action="delete" title="删除"><i class="fas fa-trash"></i></button>
-                <button class="message-action-btn" data-action="locate" title="定位"><i class="fas fa-location-crosshairs"></i></button>
-            </div>
-        `
-        : '';
+    const actionsHtml = (message.role === 'assistant') ? buildAssistantActionsHtml(message) : '';
 
     div.innerHTML = `
         <div class="message-avatar">
@@ -2450,6 +2469,337 @@ function cloneSerializable(value, fallback = null) {
     } catch (e) {
         return fallback;
     }
+}
+
+function markPendingRequestDeliveryState(topic, options = {}) {
+    if (!topic) return;
+    try {
+        const pendingRaw = localStorage.getItem('cosight:pendingRequests');
+        const pendings = pendingRaw ? JSON.parse(pendingRaw) : {};
+        if (!pendings[topic]) return;
+        if (options && options.remove === true) {
+            delete pendings[topic];
+        } else {
+            pendings[topic].stillPending = false;
+        }
+        localStorage.setItem('cosight:pendingRequests', JSON.stringify(pendings));
+    } catch (e) {
+    }
+}
+
+function normalizePlanApprovalState(value) {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function extractStructuredPayloadFromSocketMessage(messageData) {
+    const data = messageData && messageData.data ? messageData.data : null;
+    if (!data || typeof data !== 'object') return null;
+
+    const candidates = [data.content, data.initData];
+    for (const candidate of candidates) {
+        if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+            return candidate;
+        }
+    }
+    return null;
+}
+
+function resolveDraftPlanQuestion(threadId, draftPlanMessage = null) {
+    const messageMeta = (draftPlanMessage && draftPlanMessage.metadata && typeof draftPlanMessage.metadata === 'object')
+        ? draftPlanMessage.metadata
+        : {};
+    const metadataQuestion = String(messageMeta.question || '').trim();
+    if (metadataQuestion) return metadataQuestion;
+
+    const thread = getThreadById(threadId);
+    const messages = getRenderableMessagesFromThread(thread);
+    let anchorIndex = messages.length;
+    if (draftPlanMessage) {
+        const draftPlanMessageId = ensureMessageId(draftPlanMessage);
+        const matchedIndex = messages.findIndex((msg) => ensureMessageId(msg) === draftPlanMessageId);
+        if (matchedIndex >= 0) {
+            anchorIndex = matchedIndex;
+        }
+    }
+
+    for (let i = anchorIndex - 1; i >= 0; i -= 1) {
+        const candidate = messages[i];
+        if (!candidate || candidate.role !== 'user') continue;
+        const content = String(candidate.content || '').trim();
+        if (content) return content;
+    }
+
+    const fallbackPayload = resolveLastNormalPayload(threadId);
+    const fallbackQuestion = String(fallbackPayload?.user || '').trim();
+    return fallbackQuestion;
+}
+
+function buildPlanActionOutboundPayload(threadId, question) {
+    const fallbackQuestion = String(question || '').trim();
+    const basePayload = clonePayload(resolveLastNormalPayload(threadId) || {
+        user: fallbackQuestion,
+        'meta-message': [],
+        files: []
+    });
+    basePayload.user = fallbackQuestion;
+    if (!Array.isArray(basePayload['meta-message'])) {
+        basePayload['meta-message'] = [];
+    }
+    if (!Array.isArray(basePayload.files)) {
+        basePayload.files = [];
+    }
+    return basePayload;
+}
+
+function applyPlanPayloadToThread(threadId, payload, options = {}) {
+    if (!threadId || !payload || typeof payload !== 'object') return null;
+    const draftPlanSnapshot = (payload.draftPlanSnapshot && typeof payload.draftPlanSnapshot === 'object')
+        ? payload.draftPlanSnapshot
+        : payload;
+    const hasPlanStructure = !!(
+        draftPlanSnapshot
+        && typeof draftPlanSnapshot === 'object'
+        && (
+            Array.isArray(draftPlanSnapshot.steps)
+            || typeof draftPlanSnapshot.title === 'string'
+            || (draftPlanSnapshot.dependencies && typeof draftPlanSnapshot.dependencies === 'object')
+            || (draftPlanSnapshot.progress && typeof draftPlanSnapshot.progress === 'object')
+        )
+    );
+    const approvalState = normalizePlanApprovalState(payload.approvalState || draftPlanSnapshot.approvalState);
+    const workspaceId = normalizeWorkspaceId(payload.workspaceId || options.workspaceId || null);
+    const statusText = String(payload.statusText || draftPlanSnapshot.statusText || '').trim();
+    const latestRevisionPrompt = String(payload.latestRevisionPrompt || draftPlanSnapshot.latestRevisionPrompt || '').trim();
+    const patch = {};
+
+    if (payload.executionId) patch.executionId = String(payload.executionId);
+    if (payload.planSessionId) patch.planSessionId = String(payload.planSessionId);
+    if (approvalState) patch.planApprovalState = approvalState;
+    if (typeof payload.planVersion !== 'undefined') {
+        patch.planVersion = Number(payload.planVersion || 0);
+    }
+    if (typeof latestRevisionPrompt !== 'undefined') {
+        patch.latestRevisionPrompt = latestRevisionPrompt;
+    }
+    if (statusText) {
+        patch.statusText = statusText;
+    }
+    if (workspaceId) {
+        patch.workspaceId = workspaceId;
+        patch.workspacePath = `work_space/${workspaceId}`;
+    }
+    if (hasPlanStructure) {
+        patch.draftPlanSnapshot = draftPlanSnapshot;
+        patch.dagInitData = draftPlanSnapshot;
+        if (draftPlanSnapshot.title) {
+            patch.executionTitle = draftPlanSnapshot.title;
+        }
+    }
+
+    updateThreadPlanState(threadId, patch);
+
+    if (
+        options.renderCurrentThread === true
+        && threadId === AppState.currentThreadId
+        && hasPlanStructure
+        && typeof createDag === 'function'
+    ) {
+        createDag({ data: { content: draftPlanSnapshot } });
+        if (draftPlanSnapshot.title) {
+            updateExecutionTitle(draftPlanSnapshot.title);
+        }
+        rerenderTaskInfoBySelection();
+    }
+
+    return patch;
+}
+
+function ensureThreadPendingPlaceholder(threadId, options = {}) {
+    if (!threadId) return null;
+    const topic = options && typeof options === 'object' ? (options.topic || null) : null;
+    const pendingKind = options && typeof options === 'object' ? (options.pendingKind || 'send') : 'send';
+    const workspaceId = options && typeof options === 'object'
+        ? normalizeWorkspaceId(options.workspaceId || null)
+        : null;
+    const existing = findPendingAssistantPlaceholder(threadId, topic);
+    if (existing && existing.messageId) {
+        return String(existing.messageId);
+    }
+
+    const thread = getThreadById(threadId);
+    if (!thread) return null;
+
+    const pendingAssistantPlaceholder = {
+        role: 'assistant',
+        content: '',
+        timestamp: Date.now(),
+        metadata: {
+            pendingPlaceholder: true,
+            pendingKind: pendingKind,
+            pendingTopic: topic,
+            pendingWorkspaceId: workspaceId
+        }
+    };
+
+    addMessageToThreadStorage(thread, pendingAssistantPlaceholder);
+    const messageId = ensureMessageId(pendingAssistantPlaceholder);
+    if (topic) {
+        pendingTopicMessageMap.set(topic, {
+            threadId,
+            messageId
+        });
+    }
+    void syncThreadMessagesToBackend(thread);
+
+    if (threadId === AppState.currentThreadId) {
+        loadMessages(getRenderableMessagesFromThread(thread));
+        scrollToBottom();
+    } else {
+        renderFolderList();
+    }
+
+    return messageId;
+}
+
+function getThreadPlanApprovalState(threadId) {
+    const thread = getThreadById(threadId);
+    const rightPanelState = (thread && thread.rightPanelState && typeof thread.rightPanelState === 'object')
+        ? thread.rightPanelState
+        : {};
+    return normalizePlanApprovalState(rightPanelState.planApprovalState);
+}
+
+function isThreadPlanApprovalActive(threadId) {
+    return PLAN_APPROVAL_ACTIVE_STATES.has(getThreadPlanApprovalState(threadId));
+}
+
+function isThreadPlanAwaitingApproval(threadId) {
+    return PLAN_APPROVAL_ACTIONABLE_STATES.has(getThreadPlanApprovalState(threadId));
+}
+
+function isThreadInputLocked(threadId) {
+    if (!threadId) return false;
+    if (isThreadExecuting(threadId)) return true;
+    if (hasPendingAssistantPlaceholder(threadId) || hasPendingRedoInThread(threadId)) return true;
+    return isThreadPlanApprovalActive(threadId);
+}
+
+function buildDraftPlanTextFromSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return '';
+    const title = String(snapshot.title || '执行计划').trim();
+    const steps = Array.isArray(snapshot.steps) ? snapshot.steps : [];
+    const lines = [`# ${title}`, ''];
+    steps.forEach((step, index) => {
+        const label = typeof step === 'string'
+            ? step
+            : (step?.title || step?.name || step?.fullName || `步骤 ${index + 1}`);
+        lines.push(`${index + 1}. ${String(label || '').trim()}`);
+    });
+    return lines.join('\n');
+}
+
+function updateThreadPlanState(threadId, patch = {}) {
+    if (!threadId) return false;
+    const thread = getThreadById(threadId);
+    if (!thread) return false;
+    thread.rightPanelState = (thread.rightPanelState && typeof thread.rightPanelState === 'object')
+        ? thread.rightPanelState
+        : {};
+    Object.assign(thread.rightPanelState, patch);
+    thread.updatedAt = Date.now();
+    schedulePersistRightPanelState(threadId, patch);
+    if (threadId === AppState.currentThreadId) {
+        isTaskExecuting = isThreadInputLocked(threadId);
+        updateSendButtonState();
+        syncThinkingStateWithCurrentThread();
+    }
+    return true;
+}
+
+function clearThreadPlanApprovalState(threadId) {
+    if (!threadId) return false;
+    const thread = getThreadById(threadId);
+    if (!thread || !thread.rightPanelState || typeof thread.rightPanelState !== 'object') return false;
+    delete thread.rightPanelState.executionId;
+    delete thread.rightPanelState.planSessionId;
+    delete thread.rightPanelState.planApprovalState;
+    delete thread.rightPanelState.planVersion;
+    delete thread.rightPanelState.latestRevisionPrompt;
+    delete thread.rightPanelState.draftPlanSnapshot;
+    thread.updatedAt = Date.now();
+    schedulePersistRightPanelState(threadId, {
+        executionId: null,
+        planSessionId: null,
+        planApprovalState: null,
+        planVersion: null,
+        latestRevisionPrompt: null,
+        draftPlanSnapshot: null
+    });
+    return true;
+}
+
+function upsertDraftPlanMessage(threadId, payload, options = {}) {
+    const thread = getThreadById(threadId);
+    if (!thread || !payload || typeof payload !== 'object') return null;
+    const executionId = String(payload.executionId || '');
+    const planSessionId = String(payload.planSessionId || '');
+    const approvalState = normalizePlanApprovalState(payload.approvalState);
+    const planVersion = Number(payload.planVersion || 1) || 1;
+    const draftPlanSnapshot = (payload.draftPlanSnapshot && typeof payload.draftPlanSnapshot === 'object')
+        ? payload.draftPlanSnapshot
+        : payload;
+    const draftQuestion = String(payload.question || options.question || '').trim();
+    const metadataPatch = {
+        type: 'draft_plan',
+        executionId,
+        planSessionId,
+        planVersion,
+        approvalState,
+        isActionable: PLAN_APPROVAL_ACTIONABLE_STATES.has(approvalState),
+        draftPlanSnapshot,
+        latestRevisionPrompt: String(payload.latestRevisionPrompt || '').trim(),
+        statusText: String(payload.statusText || '').trim(),
+        errorMessage: String(payload.errorMessage || '').trim()
+    };
+    if (draftQuestion) {
+        metadataPatch.question = draftQuestion;
+    }
+    const content = buildDraftPlanTextFromSnapshot(draftPlanSnapshot);
+    const existingMessage = findDraftPlanMessageByExecution(threadId, executionId);
+    if (existingMessage) {
+        if (!metadataPatch.question) {
+            const existingMeta = (existingMessage.metadata && typeof existingMessage.metadata === 'object')
+                ? existingMessage.metadata
+                : {};
+            if (existingMeta.question) {
+                metadataPatch.question = existingMeta.question;
+            }
+        }
+        updateDraftPlanMessageState(existingMessage, { ...metadataPatch, content });
+        return existingMessage;
+    }
+
+    const replaced = options.topic
+        ? resolvePendingAssistantPlaceholder(threadId, content, metadataPatch, { topic: options.topic })
+        : false;
+    if (replaced) {
+        return findDraftPlanMessageByExecution(threadId, executionId);
+    }
+
+    const nextMessage = {
+        role: 'assistant',
+        content,
+        timestamp: Date.now(),
+        metadata: metadataPatch
+    };
+    addMessageToThreadStorage(thread, nextMessage);
+    if (threadId === AppState.currentThreadId) {
+        loadMessages(getRenderableMessagesFromThread(thread));
+        scrollToBottom();
+    } else {
+        renderFolderList();
+    }
+    return nextMessage;
 }
 
 function persistMessageStateToThread(thread, message, options = {}) {
@@ -2540,6 +2890,83 @@ function renderAssistantContentToBubble(bubbleEl, content) {
     }
 }
 
+function getDraftPlanBadgeText(approvalState) {
+    switch (normalizePlanApprovalState(approvalState)) {
+        case 'drafting':
+            return '生成中';
+        case 'awaiting_user_approval':
+            return '待确认';
+        case 'revising':
+            return '修改中';
+        case 'approved':
+            return '已确认';
+        case 'executing':
+            return '执行中';
+        case 'completed':
+            return '已完成';
+        case 'failed':
+            return '失败';
+        default:
+            return '计划';
+    }
+}
+
+function renderDraftPlanCardToBubble(message, bubbleEl) {
+    const metadata = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
+    const snapshot = (metadata.draftPlanSnapshot && typeof metadata.draftPlanSnapshot === 'object')
+        ? metadata.draftPlanSnapshot
+        : {};
+    const steps = Array.isArray(snapshot.steps) ? snapshot.steps : [];
+    const dependencies = (snapshot.dependencies && typeof snapshot.dependencies === 'object') ? snapshot.dependencies : {};
+    const approvalState = normalizePlanApprovalState(metadata.approvalState || snapshot.approvalState);
+    const isActionable = metadata.isActionable !== false && PLAN_APPROVAL_ACTIONABLE_STATES.has(approvalState);
+    const planTitle = String(snapshot.title || '执行计划').trim() || '执行计划';
+    const planVersion = Number(metadata.planVersion || snapshot.planVersion || 1) || 1;
+    const errorMessage = String(metadata.errorMessage || '').trim();
+    const revisionPrompt = String(metadata.latestRevisionPrompt || snapshot.latestRevisionPrompt || '').trim();
+
+    const stepsHtml = steps.length > 0
+        ? steps.map((step, index) => {
+            const deps = Array.isArray(dependencies[String(index)]) ? dependencies[String(index)] : (Array.isArray(dependencies[index]) ? dependencies[index] : []);
+            const label = typeof step === 'string'
+                ? step
+                : (step?.title || step?.name || step?.fullName || `步骤 ${index + 1}`);
+            const depText = deps.length ? `依赖 ${deps.map((item) => Number(item) + 1).join(', ')}` : '';
+            return `
+                <li class="draft-plan-step-item">
+                    <span class="draft-plan-step-index">${index + 1}</span>
+                    <div class="draft-plan-step-body">
+                        <div class="draft-plan-step-title">${escapeHtml(String(label || '').trim())}</div>
+                        ${depText ? `<div class="draft-plan-step-meta">${escapeHtml(depText)}</div>` : ''}
+                    </div>
+                </li>
+            `;
+        }).join('')
+        : '<li class="draft-plan-step-item draft-plan-step-empty">Planner 尚未返回可执行步骤。</li>';
+
+    bubbleEl.innerHTML = `
+        <div class="draft-plan-card" data-draft-plan-message-id="${escapeHtml(String(ensureMessageId(message)))}">
+            <div class="draft-plan-card-header">
+                <span class="draft-plan-badge draft-plan-badge-${escapeHtml(approvalState || 'unknown')}">${escapeHtml(getDraftPlanBadgeText(approvalState))}</span>
+                <span class="draft-plan-version">v${planVersion}</span>
+            </div>
+            <div class="draft-plan-title">${escapeHtml(planTitle)}</div>
+            <ol class="draft-plan-step-list">${stepsHtml}</ol>
+            ${revisionPrompt ? `<div class="draft-plan-note">最近一次修改建议：${escapeHtml(revisionPrompt)}</div>` : ''}
+            ${errorMessage ? `<div class="draft-plan-error">${escapeHtml(errorMessage)}</div>` : ''}
+            <div class="draft-plan-footer">
+                <span class="draft-plan-status-text">${escapeHtml(String(metadata.statusText || snapshot.statusText || ''))}</span>
+                ${isActionable ? `
+                    <div class="draft-plan-actions">
+                        <button class="btn-modal-primary draft-plan-action-btn" data-draft-plan-action="approve">按此计划执行</button>
+                        <button class="btn-modal-secondary draft-plan-action-btn" data-draft-plan-action="revise">修改计划</button>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
 function renderPendingPlaceholderToBubble(bubbleEl, threadId) {
     if (!bubbleEl) return;
     const startedAt = Date.now();
@@ -2555,6 +2982,10 @@ function renderPendingPlaceholderToBubble(bubbleEl, threadId) {
 function renderMessageBubbleContent(message, bubbleEl) {
     if (!message || !bubbleEl) return;
     const metadata = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
+    if (message.role === 'assistant' && metadata.type === 'draft_plan') {
+        renderDraftPlanCardToBubble(message, bubbleEl);
+        return;
+    }
     const isPendingPlaceholder = message.role === 'assistant' && metadata.pendingPlaceholder === true;
     const isEmptyAssistantMessage = message.role === 'assistant' && String(message.content || '').trim() === '';
     if (isPendingPlaceholder || isEmptyAssistantMessage) {
@@ -2636,6 +3067,61 @@ function resolveActionMessage(messageItem, fallbackMessage) {
     return fallbackMessage;
 }
 
+function findDraftPlanMessageByExecution(threadId, executionId) {
+    const thread = getThreadById(threadId);
+    if (!thread || !executionId) return null;
+    const messages = getRenderableMessagesFromThread(thread);
+    return messages.find((msg) => {
+        if (!msg || msg.role !== 'assistant') return false;
+        const metadata = (msg.metadata && typeof msg.metadata === 'object') ? msg.metadata : {};
+        return metadata.type === 'draft_plan' && String(metadata.executionId || '') === String(executionId);
+    }) || null;
+}
+
+function updateDraftPlanMessageState(message, patch = {}) {
+    if (!message) return false;
+    const located = findMessageByIdInAllThreads(ensureMessageId(message));
+    if (!located || !located.thread || !located.message) return false;
+    const targetMessage = located.message;
+    const thread = located.thread;
+    const baseMeta = (targetMessage.metadata && typeof targetMessage.metadata === 'object') ? targetMessage.metadata : {};
+    targetMessage.metadata = { ...baseMeta, ...patch };
+    if (typeof patch.content === 'string') {
+        targetMessage.content = patch.content;
+    }
+    targetMessage.timestamp = Date.now();
+    persistMessageStateToThread(thread, targetMessage, { syncContent: true, syncTimestamp: true });
+    thread.updatedAt = Date.now();
+    void syncThreadMessagesToBackend(thread);
+    if (thread.id === AppState.currentThreadId) {
+        loadMessages(getRenderableMessagesFromThread(thread));
+        scrollToBottom();
+    } else {
+        renderFolderList();
+    }
+    return true;
+}
+
+function bindDraftPlanCardActions(messageItem, message) {
+    const actionButtons = messageItem.querySelectorAll('[data-draft-plan-action]');
+    actionButtons.forEach((btn) => {
+        btn.addEventListener('click', async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const action = btn.dataset.draftPlanAction;
+            const currentMessage = resolveActionMessage(messageItem, message);
+            if (!currentMessage) return;
+            if (action === 'approve') {
+                await approveDraftPlanMessage(currentMessage);
+                return;
+            }
+            if (action === 'revise') {
+                openPlanRevisionModal(currentMessage);
+            }
+        });
+    });
+}
+
 function bindMessageMetaActions(messageItem, message) {
     const actionButtons = messageItem.querySelectorAll('.message-action-btn');
 
@@ -2714,6 +3200,8 @@ function bindMessageMetaActions(messageItem, message) {
             await setRedoView(targetMessage, messageItem, 1);
         });
     }
+
+    bindDraftPlanCardActions(messageItem, message);
 }
 
 async function defaultCopyMessage(message, btn) {
@@ -2822,6 +3310,208 @@ function initMessageExportFormatModal() {
             exportMessageAsWord(pendingMessageExportContext);
         }
         closeMessageExportFormatModal();
+    });
+}
+
+async function approveDraftPlanMessage(message) {
+    if (!message) return false;
+    const located = findMessageByIdInAllThreads(ensureMessageId(message));
+    if (!located || !located.thread || !located.message) return false;
+
+    const sourceThreadId = located.thread.id;
+    const currentMessage = located.message;
+    const metadata = (currentMessage.metadata && typeof currentMessage.metadata === 'object') ? currentMessage.metadata : {};
+    const approvalState = normalizePlanApprovalState(metadata.approvalState);
+    if (!PLAN_APPROVAL_ACTIONABLE_STATES.has(approvalState)) {
+        return false;
+    }
+
+    const executionId = String(metadata.executionId || '').trim();
+    const planSessionId = String(metadata.planSessionId || '').trim();
+    const question = resolveDraftPlanQuestion(sourceThreadId, currentMessage);
+    if (!executionId || !planSessionId || !question) {
+        console.warn('[approveDraftPlanMessage] 缺少审批所需上下文', {
+            sourceThreadId,
+            executionId,
+            planSessionId,
+            hasQuestion: !!question
+        });
+        return false;
+    }
+
+    updateDraftPlanMessageState(currentMessage, {
+        approvalState: 'approved',
+        isActionable: false,
+        question,
+        statusText: '计划已确认，准备执行',
+        errorMessage: ''
+    });
+    applyPlanPayloadToThread(sourceThreadId, {
+        executionId,
+        planSessionId,
+        approvalState: 'approved',
+        planVersion: metadata.planVersion,
+        latestRevisionPrompt: metadata.latestRevisionPrompt || '',
+        draftPlanSnapshot: metadata.draftPlanSnapshot || {},
+        statusText: '计划已确认，准备执行'
+    }, {
+        renderCurrentThread: false
+    });
+
+    const outboundPayload = buildPlanActionOutboundPayload(sourceThreadId, question);
+    const pendingPlaceholderMessageId = ensureThreadPendingPlaceholder(sourceThreadId, {
+        pendingKind: 'send'
+    });
+
+    const topic = await sendToBackend(question, sourceThreadId, outboundPayload, {
+        wsAction: 'plan_approve',
+        requirePlanApproval: true,
+        executionId,
+        planSessionId,
+        pendingPlaceholderMessageId,
+        pendingKind: 'send'
+    });
+    return !!topic;
+}
+
+function openPlanRevisionModal(message) {
+    if (!message) return;
+    const located = findMessageByIdInAllThreads(ensureMessageId(message));
+    if (!located || !located.thread || !located.message) return;
+
+    const currentMessage = located.message;
+    const metadata = (currentMessage.metadata && typeof currentMessage.metadata === 'object') ? currentMessage.metadata : {};
+    const approvalState = normalizePlanApprovalState(metadata.approvalState);
+    if (!PLAN_APPROVAL_ACTIONABLE_STATES.has(approvalState)) {
+        return;
+    }
+
+    const question = resolveDraftPlanQuestion(located.thread.id, currentMessage);
+    pendingPlanRevisionContext = {
+        threadId: located.thread.id,
+        messageId: ensureMessageId(currentMessage),
+        executionId: String(metadata.executionId || '').trim(),
+        planSessionId: String(metadata.planSessionId || '').trim(),
+        question
+    };
+
+    const modal = document.getElementById('plan-revision-modal-overlay');
+    const textarea = document.getElementById('plan-revision-input');
+    if (!modal || !textarea) return;
+
+    textarea.value = String(metadata.latestRevisionPrompt || '').trim();
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        textarea.focus();
+        textarea.select();
+    }, 0);
+}
+
+function closePlanRevisionModal() {
+    const modal = document.getElementById('plan-revision-modal-overlay');
+    const textarea = document.getElementById('plan-revision-input');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    if (textarea) {
+        textarea.value = '';
+    }
+    pendingPlanRevisionContext = null;
+}
+
+async function submitPlanRevision() {
+    const ctx = pendingPlanRevisionContext;
+    const textarea = document.getElementById('plan-revision-input');
+    if (!ctx || !textarea) return false;
+
+    const revisionPrompt = String(textarea.value || '').trim();
+    if (!revisionPrompt) {
+        textarea.focus();
+        return false;
+    }
+
+    const found = findMessageByIdInAllThreads(ctx.messageId);
+    if (!found || !found.thread || !found.message) {
+        closePlanRevisionModal();
+        return false;
+    }
+
+    const currentMessage = found.message;
+    const metadata = (currentMessage.metadata && typeof currentMessage.metadata === 'object') ? currentMessage.metadata : {};
+    const question = ctx.question || resolveDraftPlanQuestion(found.thread.id, currentMessage);
+    if (!ctx.executionId || !ctx.planSessionId || !question) {
+        console.warn('[submitPlanRevision] 缺少修改计划所需上下文', {
+            threadId: found.thread.id,
+            executionId: ctx.executionId,
+            planSessionId: ctx.planSessionId,
+            hasQuestion: !!question
+        });
+        closePlanRevisionModal();
+        return false;
+    }
+
+    updateDraftPlanMessageState(currentMessage, {
+        approvalState: 'revising',
+        isActionable: false,
+        question,
+        latestRevisionPrompt: revisionPrompt,
+        statusText: '正在根据建议调整计划',
+        errorMessage: ''
+    });
+    applyPlanPayloadToThread(found.thread.id, {
+        executionId: ctx.executionId,
+        planSessionId: ctx.planSessionId,
+        approvalState: 'revising',
+        planVersion: metadata.planVersion,
+        latestRevisionPrompt: revisionPrompt,
+        draftPlanSnapshot: metadata.draftPlanSnapshot || {},
+        statusText: '正在根据建议调整计划'
+    }, {
+        renderCurrentThread: false
+    });
+
+    const outboundPayload = buildPlanActionOutboundPayload(found.thread.id, question);
+    const pendingPlaceholderMessageId = ensureThreadPendingPlaceholder(found.thread.id, {
+        pendingKind: 'send'
+    });
+
+    closePlanRevisionModal();
+    const topic = await sendToBackend(question, found.thread.id, outboundPayload, {
+        wsAction: 'plan_revise_execute',
+        requirePlanApproval: true,
+        executionId: ctx.executionId,
+        planSessionId: ctx.planSessionId,
+        revisionPrompt,
+        pendingPlaceholderMessageId,
+        pendingKind: 'send'
+    });
+    return !!topic;
+}
+
+function initPlanRevisionModal() {
+    const modal = document.getElementById('plan-revision-modal-overlay');
+    const closeBtn = document.getElementById('close-plan-revision-modal');
+    const cancelBtn = document.getElementById('cancel-plan-revision-btn');
+    const confirmBtn = document.getElementById('confirm-plan-revision-btn');
+    const textarea = document.getElementById('plan-revision-input');
+
+    if (!modal || !closeBtn || !cancelBtn || !confirmBtn || !textarea) return;
+
+    closeBtn.addEventListener('click', closePlanRevisionModal);
+    cancelBtn.addEventListener('click', closePlanRevisionModal);
+    confirmBtn.addEventListener('click', () => {
+        void submitPlanRevision();
+    });
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closePlanRevisionModal();
+        }
+    });
+    textarea.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            void submitPlanRevision();
+        }
     });
 }
 
@@ -4185,6 +4875,10 @@ function hasThreadExecutionEvidence(threadId) {
     if (hasPendingAssistantPlaceholder(threadId) || hasPendingRedoInThread(threadId)) {
         return true;
     }
+    const approvalState = getThreadPlanApprovalState(threadId);
+    if (approvalState && !['approved', 'executing', 'completed'].includes(approvalState)) {
+        return false;
+    }
     const rightPanelState = thread.rightPanelState || null;
     if (!rightPanelState) return false;
     const hasProgressState = Boolean(
@@ -4224,7 +4918,7 @@ async function setThreadExecutingState(threadId, executing) {
     }
 
     if (threadId === AppState.currentThreadId) {
-        isTaskExecuting = isThreadExecuting(AppState.currentThreadId);
+        isTaskExecuting = isThreadInputLocked(AppState.currentThreadId);
         updateSendButtonState();
         syncThinkingStateWithCurrentThread();
     }
@@ -4263,7 +4957,7 @@ async function syncSendButtonStateWithCurrentThread(expectedThreadId = null) {
     const executing = await fetchThreadExecutionStatus(currentThreadId);
     if (expectedThreadId && AppState.currentThreadId !== expectedThreadId) return;
 
-    isTaskExecuting = isThreadExecuting(currentThreadId);
+    isTaskExecuting = isThreadInputLocked(currentThreadId);
     updateSendButtonState();
     syncThinkingStateWithCurrentThread();
 }
@@ -4274,7 +4968,7 @@ async function syncSendButtonStateWithCurrentThread(expectedThreadId = null) {
 function updateSendButtonState() {
     const sendBtn = document.getElementById('send-btn');
     if (sendBtn) {
-        if (isTaskExecuting) {
+        if (isThreadInputLocked(AppState.currentThreadId)) {
             sendBtn.disabled = true;
             sendBtn.classList.add('disabled');
         } else {
@@ -4429,7 +5123,7 @@ async function sendMessage() {
 
     // 发送前强制同步一次后端会话状态，前端仅作为镜像
     await syncSendButtonStateWithCurrentThread(sourceThreadId);
-    if (!message || isThreadExecuting(sourceThreadId)) return;
+    if (!message || isThreadInputLocked(sourceThreadId)) return;
 
     // 普通发送发起时立即清空右侧栏，避免等待首包期间显示旧任务结果。
     clearRightPanelImmediatelyForNewRun(sourceThreadId);
@@ -4445,6 +5139,8 @@ async function sendMessage() {
         'meta-message': pendingMetaMessageEvents.slice(),
         files: snapshotUploadedFiles()
     };
+    const executionId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : generateUniqueId('execution');
+    const planSessionId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : generateUniqueId('plan-session');
     
     // 统一通过 addMessage 写入（树结构/线性兼容），避免双写导致错位
     addMessage(userMessage);
@@ -4453,16 +5149,26 @@ async function sendMessage() {
     // 普通发送与 redo 对齐：写入 user + pending 后立即强制落盘，避免 sessions.json 丢消息。
     const sendingThread = getThreadById(sourceThreadId);
     if (sendingThread) {
+        updateThreadPlanState(sourceThreadId, {
+            executionId,
+            planSessionId,
+            planApprovalState: 'drafting',
+            planVersion: 0,
+            latestRevisionPrompt: '',
+            draftPlanSnapshot: null,
+            statusText: '正在生成计划'
+        });
         await syncThreadMessagesToBackend(sendingThread);
     }
     
     chatInput.value = '';
     chatInput.style.height = 'auto';
 
-    // 发送后立即进入执行态，仅锁发送按钮，不锁输入框
-    await setThreadExecutingState(sourceThreadId, true);
-
     void sendToBackend(message, sourceThreadId, outboundPayload, {
+        wsAction: 'plan_draft',
+        requirePlanApproval: true,
+        executionId,
+        planSessionId,
         pendingPlaceholderMessageId,
         pendingKind: 'send'
     });
@@ -4493,7 +5199,12 @@ async function sendToBackend(message, sourceThreadId = AppState.currentThreadId,
         
         // 调用 messageService.sendMessage 通过 WebSocket 发送，并绑定当前线程
         const topic = window.messageService.sendMessage(outboundPayload || message, {
-            threadId: sourceThreadId
+            threadId: sourceThreadId,
+            wsAction: sendOptions.wsAction || 'message',
+            requirePlanApproval: sendOptions.requirePlanApproval === true,
+            executionId: sendOptions.executionId || null,
+            planSessionId: sendOptions.planSessionId || null,
+            revisionPrompt: sendOptions.revisionPrompt || ''
         });
         if (sendOptions && sendOptions.isRedo) {
             console.debug('[REDO_FLOW] sendToBackend 已调用 messageService.sendMessage', {
@@ -4623,6 +5334,10 @@ async function handleWebSocketMessage(message) {
             return;
         }
         const messageType = messageData.data?.contentType || messageData.data?.type;
+        const structuredPayload = extractStructuredPayloadFromSocketMessage(messageData);
+        if (topic) {
+            markPendingRequestDeliveryState(topic);
+        }
 
         if (topic && targetThreadId && !getWorkspaceIdByTopic(topic)) {
             const boundWorkspaceId = await bindTopicToWorkspaceByThread(topic, targetThreadId);
@@ -4630,10 +5345,67 @@ async function handleWebSocketMessage(message) {
                 await persistPendingWorkspaceByTopic(targetThreadId, topic, boundWorkspaceId);
             }
         }
+
+        if (messageType === 'plan_approval_state' || messageType === 'plan_revision_applied' || messageType === 'plan_execution_started') {
+            const payload = (structuredPayload && typeof structuredPayload === 'object') ? structuredPayload : {};
+            const effectiveThreadId = targetThreadId || String(payload.threadId || '').trim() || AppState.currentThreadId;
+            if (!effectiveThreadId) return false;
+
+            const approvalState = normalizePlanApprovalState(payload.approvalState);
+            const executionId = String(payload.executionId || '').trim();
+            const existingDraftMessage = executionId ? findDraftPlanMessageByExecution(effectiveThreadId, executionId) : null;
+            const question = resolveDraftPlanQuestion(effectiveThreadId, existingDraftMessage);
+            const payloadWithQuestion = question ? { ...payload, question } : payload;
+            const shouldRenderCurrentThread = effectiveThreadId === AppState.currentThreadId;
+
+            applyPlanPayloadToThread(effectiveThreadId, payloadWithQuestion, {
+                workspaceId: payload.workspaceId || getWorkspaceIdByTopic(topic),
+                renderCurrentThread: shouldRenderCurrentThread
+            });
+
+            const shouldReplaceInitialPlaceholder = !existingDraftMessage
+                && (messageType === 'plan_approval_state')
+                && ['drafting', 'awaiting_user_approval', 'failed'].includes(approvalState);
+
+            const draftMessage = upsertDraftPlanMessage(effectiveThreadId, payloadWithQuestion, {
+                topic: shouldReplaceInitialPlaceholder ? topic : null,
+                question
+            });
+
+            if (messageType === 'plan_execution_started') {
+                if (draftMessage) {
+                    updateDraftPlanMessageState(draftMessage, {
+                        approvalState: 'executing',
+                        isActionable: false,
+                        question,
+                        statusText: String(payload.statusText || '正在执行中').trim() || '正在执行中',
+                        errorMessage: ''
+                    });
+                }
+                ensureThreadPendingPlaceholder(effectiveThreadId, {
+                    topic,
+                    pendingKind: 'send',
+                    workspaceId: payload.workspaceId || getWorkspaceIdByTopic(topic)
+                });
+                if (finalReportRetryStateByThread.has(effectiveThreadId)) {
+                    finalReportRetryStateByThread.delete(effectiveThreadId);
+                }
+                void setThreadExecutingState(effectiveThreadId, true);
+                return true;
+            }
+
+            if (approvalState === 'awaiting_user_approval' || approvalState === 'failed') {
+                await setThreadExecutingState(effectiveThreadId, false);
+            }
+            return true;
+        }
         
         if (messageType === 'control-status-message') {
             // 任务已完成，触发最终报告发送
             console.info('[handleWebSocketMessage] 收到任务完成信号', { topic, targetThreadId });
+            if (topic) {
+                markPendingRequestDeliveryState(topic, { remove: true });
+            }
             const current = finalReportRetryStateByThread.get(targetThreadId);
             const pendingRedoTarget = resolvePendingRedoTarget(targetThreadId, topic);
             const redoThreadCtx = pendingRedoTarget
@@ -4691,16 +5463,26 @@ async function handleWebSocketMessage(message) {
         
         if (messageType === 'lui-message-manus-step') {
             // DAG 步骤消息，任务开始执行
-            if (!redoTopicContextMap.has(topic)) {
+            const initData = messageData.data?.content || messageData.data?.initData || null;
+            const approvalState = normalizePlanApprovalState(initData?.approvalState);
+            const isApprovalPreviewOnly = approvalState && !['approved', 'executing', 'completed'].includes(approvalState);
+            if (!redoTopicContextMap.has(topic) && !isApprovalPreviewOnly) {
                 void setThreadExecutingState(targetThreadId, true);
+            } else if (approvalState === 'awaiting_user_approval' || approvalState === 'drafting' || approvalState === 'failed') {
+                void setThreadExecutingState(targetThreadId, false);
             }
             if (finalReportRetryStateByThread.has(targetThreadId)) {
                 console.debug('[handleWebSocketMessage] 清除旧 finalReportRetryState', { targetThreadId });
                 finalReportRetryStateByThread.delete(targetThreadId);
             }
             try {
-                const initData = messageData.data?.content || messageData.data?.initData || null;
                 if (targetThreadId && initData && typeof initData === 'object') {
+                    if (approvalState) {
+                        applyPlanPayloadToThread(targetThreadId, initData, {
+                            workspaceId: getWorkspaceIdByTopic(topic),
+                            renderCurrentThread: false
+                        });
+                    }
                     const externalTaskKey = messageData?.data?.uuid || topic || null;
                     const ensured = ensureRuntimeTaskForThread(targetThreadId, {
                         title: initData.title || '任务',
@@ -4713,7 +5495,9 @@ async function handleWebSocketMessage(message) {
                             ? ensured.task.orderedTaskList.map(entry => entry.log).slice(0, 300)
                             : [];
                     }
-                    schedulePersistRightPanelState(targetThreadId, { dagInitData: initData });
+                    if (!approvalState) {
+                        schedulePersistRightPanelState(targetThreadId, { dagInitData: initData });
+                    }
                     if (isDagInitDataAllCompleted(initData)) {
                         const pendingRedoTarget = resolvePendingRedoTarget(targetThreadId, topic);
                         const redoThreadCtx = pendingRedoTarget
@@ -5154,17 +5938,40 @@ async function sendPendingFinalMarkdownPathToChat(threadId, finalMarkdownPath, w
     }
 
     const thread = getThreadById(threadId);
+    if (!thread) return false;
     const metadataPatch = {
         type: 'final_markdown_content',
         finalMarkdownPath: finalMarkdownPath,
         workspaceId: workspaceId,
         finalJsonPath: finalJsonPath
     };
+    const executionId = String(thread?.rightPanelState?.executionId || '').trim();
+    const planSessionId = String(thread?.rightPanelState?.planSessionId || '').trim();
+    if (executionId) metadataPatch.executionId = executionId;
+    if (planSessionId) metadataPatch.planSessionId = planSessionId;
 
     const replaced = resolvePendingAssistantPlaceholder(threadId, markdownContent, metadataPatch, { topic });
     if (!replaced) {
-        console.warn('[sendPendingFinalMarkdownPathToChat] 未找到 pending placeholder，放弃创建新消息', { threadId, finalMarkdownPath });
-        return false;
+        if (hasExistingFinalMarkdownMessage(thread, finalMarkdownPath, workspaceId)) {
+            return true;
+        }
+        const finalMessage = {
+            role: 'assistant',
+            content: markdownContent,
+            timestamp: Date.now(),
+            metadata: metadataPatch
+        };
+        addMessageToThreadStorage(thread, finalMessage);
+        thread.updatedAt = Date.now();
+        void syncThreadMessagesToBackend(thread);
+        if (threadId === AppState.currentThreadId) {
+            loadMessages(getRenderableMessagesFromThread(thread));
+            scrollToBottom();
+        } else {
+            renderFolderList();
+        }
+        forceRefreshThreadBubblesAfterFinalSend(threadId);
+        return true;
     }
     forceRefreshThreadBubblesAfterFinalSend(threadId);
     return true;
@@ -5559,8 +6366,8 @@ async function saveFinalMsgMetadata(threadId, workspaceId, topic = null) {
     let target = findPendingAssistantPlaceholder(threadId, topic);
     if (!target || !target.message) {
         if (topic) {
-            console.warn('[saveFinalMsgMetadata] 未找到匹配 topic 的 pending 占位符', { threadId, topic });
-            return false;
+            console.warn('[saveFinalMsgMetadata] 未找到匹配 topic 的 pending 占位符，转为最终报告兜底模式', { threadId, topic });
+            return finalReportMetadata;
         }
         const messages = getRenderableMessagesFromThread(thread);
         for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -6940,6 +7747,7 @@ function initThreeColumnLayout() {
     initClearChatConfirmModal();
     initDeleteMessageConfirmModal();
     initMessageExportFormatModal();
+    initPlanRevisionModal();
     initFileDuplicateModal();
     initSettingsModal();
     initFolderDragDrop();
@@ -7017,7 +7825,12 @@ function setupPendingRequests() {
                     }
                     // 仅当明确 stillPending===true 时才重发，避免刷新重复执行
                     if (data.stillPending === true) {
-                        WebSocketService.sendMessage(topic, JSON.stringify(data.message));
+                        const wsAction = String(data.wsAction || 'message').trim() || 'message';
+                        if (typeof WebSocketService.sendActionMessage === 'function') {
+                            WebSocketService.sendActionMessage(wsAction, topic, JSON.stringify(data.message));
+                        } else {
+                            WebSocketService.sendMessage(topic, JSON.stringify(data.message));
+                        }
                     }
                 }
             });

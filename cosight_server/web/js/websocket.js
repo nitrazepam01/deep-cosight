@@ -149,13 +149,17 @@ class WebsocketService {
      * @param {string} message - 消息内容
      */
     sendMessage(topic, message) {
+        this.sendActionMessage('message', topic, message);
+    }
+
+    sendActionMessage(action, topic, message) {
         if (!this.isOpen) {
             console.error("WebSocket is not open");
             return;
         }
 
         const data = {
-            action: 'message',
+            action: action || 'message',
             topic: topic,
             data: message,
             lang: this._lang

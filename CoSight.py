@@ -90,6 +90,7 @@ class CoSight:
         )
 
         self.task_planner_agent = self._create_planner(plan_llm)
+        self.plan.configure_approval(execution_id=self.plan_id)
 
         self._actor_configs_cache = {}
         for actor_id in self.allowed_actor_ids:
@@ -208,6 +209,11 @@ class CoSight:
 
     @time_record
     def execute(self, question, output_format=""):
+        self._apply_task_metadata(question)
+        self._ensure_plan_ready(question, output_format)
+        return self.execute_approved_plan(question, output_format)
+
+    def _apply_task_metadata(self, question):
         task_metadata = {
             "task_question": question[:200] if len(question) > 200 else question,
             "plan_id": self.plan_id,
@@ -217,6 +223,7 @@ class CoSight:
             if hasattr(llm, "current_metadata"):
                 llm.current_metadata.update(task_metadata)
 
+    def _ensure_plan_ready(self, question, output_format=""):
         create_task = question
         retry_count = 0
         available_actors = list(self._actor_configs_cache.values()) if self._actor_configs_cache else None
@@ -234,7 +241,9 @@ class CoSight:
                 "and select the create_plan tool to create the plan"
             )
             retry_count += 1
+        return self.plan.get_ready_steps()
 
+    def _execute_plan_steps(self, question):
         active_threads = {}
 
         while True:
@@ -263,6 +272,59 @@ class CoSight:
 
             time.sleep(0.1)
 
+    @time_record
+    def create_draft_plan(self, question, output_format="", plan_session_id=None):
+        self._apply_task_metadata(question)
+        self.plan.configure_approval(
+            execution_id=self.plan_id,
+            plan_session_id=plan_session_id or self.plan.plan_session_id,
+            approval_state="drafting",
+            require_user_approval=True,
+            status_text="正在生成计划",
+        )
+        self._ensure_plan_ready(question, output_format)
+        next_version = self.plan.plan_version if self.plan.plan_version > 0 else 1
+        self.plan.configure_approval(
+            approval_state="awaiting_user_approval",
+            plan_version=next_version,
+            status_text="待确认",
+        )
+        return self.plan.format()
+
+    @time_record
+    def revise_draft_plan(self, question, revision_prompt, output_format=""):
+        self._apply_task_metadata(question)
+        revision_text = str(revision_prompt or "").strip()
+        self.plan.configure_approval(
+            approval_state="revising",
+            latest_revision_prompt=revision_text,
+            status_text="正在根据建议调整计划",
+        )
+        self.task_planner_agent.re_plan(
+            f"{question}\n\nUser revision request:\n{revision_text}",
+            output_format,
+        )
+        next_version = self.plan.plan_version + 1 if self.plan.plan_version > 0 else 2
+        self.plan.configure_approval(
+            approval_state="approved",
+            plan_version=next_version,
+            latest_revision_prompt=revision_text,
+            status_text="计划已更新，准备执行",
+        )
+        return self.plan.format()
+
+    @time_record
+    def execute_approved_plan(self, question, output_format=""):
+        self._apply_task_metadata(question)
+        self.plan.configure_approval(
+            approval_state="executing",
+            status_text="正在执行中",
+        )
+        self._execute_plan_steps(question)
+        self.plan.configure_approval(
+            approval_state="completed",
+            status_text="执行完成",
+        )
         return self.task_planner_agent.finalize_plan(question, output_format)
 
     def _resolve_actor_id_for_step(self, step_index: int) -> str:

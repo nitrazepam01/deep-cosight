@@ -1685,6 +1685,184 @@ select.settings-input option:checked {
     background: rgba(255, 255, 255, 0.2);
 }
 
+.draft-plan-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+}
+
+.draft-plan-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.draft-plan-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.draft-plan-badge-drafting {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.draft-plan-badge-awaiting_user_approval {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.draft-plan-badge-revising {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+.draft-plan-badge-approved {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.draft-plan-badge-executing {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.draft-plan-badge-completed {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.draft-plan-badge-failed {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.draft-plan-version {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.draft-plan-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.4;
+}
+
+.draft-plan-step-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.draft-plan-step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.draft-plan-step-empty {
+    justify-content: center;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.draft-plan-step-index {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #e0f2fe, #dbeafe);
+    color: #1d4ed8;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.draft-plan-step-body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.draft-plan-step-title {
+    color: #1e293b;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.6;
+}
+
+.draft-plan-step-meta {
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.draft-plan-note {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #9a3412;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.draft-plan-error {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.draft-plan-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.draft-plan-status-text {
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.draft-plan-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.draft-plan-action-btn {
+    min-width: 118px;
+}
+
 .input-area {
     padding: 24px 24px 0;
     background: #fff;
@@ -2890,6 +3068,21 @@ select.settings-input option:checked {
     font-size: 16px;
     font-weight: 700;
     color: #1f2937;
+}
+
+.plan-revision-modal {
+    max-width: 560px;
+}
+
+.plan-revision-modal-tip {
+    margin-bottom: 14px;
+    color: #475569;
+}
+
+.plan-revision-textarea {
+    min-height: 144px;
+    resize: vertical;
+    line-height: 1.7;
 }
 
 /* 响应式设计 */

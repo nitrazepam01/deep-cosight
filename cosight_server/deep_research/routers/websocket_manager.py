@@ -116,28 +116,30 @@ async def websocket_handler(
                 manager.bind_topic(topic, websocket)
                 logger.info(f"bind topic >>> {topic} to current websocket")
                 continue
-            if data.get("action") == "message":
+            request_action = data.get("action")
+            if request_action in {"message", "plan_draft", "plan_approve", "plan_revise_execute"}:
                 message = json.loads(data.get("data"))
                 logger.info(f"message >>>>>>>>>>>>>> {message}")
                 # 绑定当前 topic 到该 websocket
                 manager.bind_topic(data.get("topic"), websocket)
 
-                # 推送时间更新的消息给前端
-                await manager.send_json_to_topic(data.get("topic"), {
-                    "topic": data.get("topic"),
-                    "data": {
-                        "type": message.get("type"),
-                        "uuid": message.get("uuid"),
-                        "timestamp": get_timestamp(),
-                        "from": "human",
-                        "changeType": "replace",
-                        "initData": message.get("initData"),
-                        "roleInfo": message.get("roleInfo"),
-                        "status": "in_progress"
-                    }
-                }, websocket)
+                if request_action == "message":
+                    # 推送时间更新的消息给前端
+                    await manager.send_json_to_topic(data.get("topic"), {
+                        "topic": data.get("topic"),
+                        "data": {
+                            "type": message.get("type"),
+                            "uuid": message.get("uuid"),
+                            "timestamp": get_timestamp(),
+                            "from": "human",
+                            "changeType": "replace",
+                            "initData": message.get("initData"),
+                            "roleInfo": message.get("roleInfo"),
+                            "status": "in_progress"
+                        }
+                    }, websocket)
 
-                await _send_resp(websocket, cookie, data.get("topic"), message, lang)
+                await _send_resp(websocket, cookie, data.get("topic"), message, lang, request_action=request_action)
 
 
         # Ended by AICoder, pid:cd2a2pa21827c9b148ae08eff0221b0be93612b0
@@ -148,7 +150,7 @@ async def websocket_handler(
 
 
 # Started by AICoder, pid:wb967gf743u19051414d0be1f088122a49b62acf
-async def _send_resp(websocket, cookie, topic, message, lang):
+async def _send_resp(websocket, cookie, topic, message, lang, request_action="message"):
     cookie_str = "; ".join([f"{key}={value}" for key, value in cookie.items()])
     assistants = [mention['name'] for mention in message['mentions']]
     incoming_session_info = message.get("sessionInfo") if isinstance(message, dict) else {}
@@ -163,9 +165,11 @@ async def _send_resp(websocket, cookie, topic, message, lang):
             "assistantNames": assistants,
             "messageSerialNumber": incoming_session_info.get("messageSerialNumber"),
             "threadId": incoming_session_info.get("threadId"),
+            "planSessionId": incoming_session_info.get("planSessionId"),
         },
         "stream": True,
-        "contentProperties": message.get("extra", {}).get("fromBackEnd", {}).get("actualPrompt")
+        "contentProperties": message.get("extra", {}).get("fromBackEnd", {}).get("actualPrompt"),
+        "planAction": request_action or "message",
     }
     
     # 提取上传的文件ID列表
@@ -179,6 +183,16 @@ async def _send_resp(websocket, cookie, topic, message, lang):
         agent_run_config = from_back_end.get("agentRunConfig")
         if isinstance(agent_run_config, dict):
             params["agentRunConfig"] = agent_run_config
+        require_plan_approval = from_back_end.get("requirePlanApproval")
+        if isinstance(require_plan_approval, bool):
+            params["requirePlanApproval"] = require_plan_approval
+        revision_prompt = from_back_end.get("revisionPrompt")
+        if isinstance(revision_prompt, str) and revision_prompt.strip():
+            params["revisionPrompt"] = revision_prompt
+        plan_session_id = incoming_session_info.get("planSessionId") or from_back_end.get("planSessionId")
+        if isinstance(plan_session_id, str) and plan_session_id:
+            params["planSessionId"] = plan_session_id
+            params.setdefault("sessionInfo", {})["planSessionId"] = plan_session_id
         # 提取知识库选择列表
         knowledge_bases = from_back_end.get("knowledgeBases")
         if isinstance(knowledge_bases, list) and len(knowledge_bases) > 0:
@@ -343,6 +357,9 @@ async def _stream_handler(params, url, headers, topic, websocket):
                                     "styles": {"width": "100%"}
                                 }
                             }, websocket)
+
+                            if msg_type in {"plan_approval_state", "plan_execution_started", "plan_revision_applied"}:
+                                has_dag_update = True
 
                             # 结束唯一判定：仅当 DAG 全部节点 completed 才发送结束信号
                             try:

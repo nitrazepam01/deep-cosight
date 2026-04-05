@@ -711,7 +711,9 @@
         WebSocketService.subscribe(topic, this.receiveMessage.bind(this));
 
         // 生成并复用稳定的 planId 作为 messageSerialNumber
-        const planId = this.ensurePlanIdForTopic(topic);
+        const planId = options.executionId || this.ensurePlanIdForTopic(topic);
+        const planSessionId = options.planSessionId || null;
+        const wsAction = options.wsAction || 'message';
 
         const normalizedContent = (typeof content === 'object' && content !== null)
             ? JSON.stringify(content)
@@ -729,24 +731,40 @@
                 fromBackEnd: {
                     actualPrompt: JSON.stringify({deepResearchEnabled: true}),
                     agentRunConfig: options.agentRunConfig || null,
-                    knowledgeBases: (typeof KnowledgeService !== 'undefined') ? KnowledgeService.getSelectedKBIds() : []
+                    knowledgeBases: (typeof KnowledgeService !== 'undefined') ? KnowledgeService.getSelectedKBIds() : [],
+                    requirePlanApproval: options.requirePlanApproval === true,
+                    revisionPrompt: options.revisionPrompt || '',
+                    planSessionId: planSessionId
                 }
             },
             // 会被服务端解析的会话信息
             sessionInfo: {
                 messageSerialNumber: planId,
-                threadId: options.threadId || null
+                threadId: options.threadId || null,
+                planSessionId: planSessionId
             }
         }
         // 记录pending请求，便于刷新后重发
         try {
             const pendingRaw = localStorage.getItem('cosight:pendingRequests');
             const pendings = pendingRaw ? JSON.parse(pendingRaw) : {};
-            pendings[topic] = { message, savedAt: Date.now(), stillPending: true, threadId: options.threadId || null };
+            pendings[topic] = {
+                message,
+                savedAt: Date.now(),
+                stillPending: true,
+                threadId: options.threadId || null,
+                executionId: planId,
+                planSessionId: planSessionId,
+                wsAction
+            };
             localStorage.setItem('cosight:pendingRequests', JSON.stringify(pendings));
         } catch (e) {
         }
-        WebSocketService.sendMessage(topic, JSON.stringify(message));
+        if (typeof WebSocketService.sendActionMessage === 'function') {
+            WebSocketService.sendActionMessage(wsAction, topic, JSON.stringify(message));
+        } else {
+            WebSocketService.sendMessage(topic, JSON.stringify(message));
+        }
         return topic;
     }
 

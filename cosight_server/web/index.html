@@ -379,6 +379,30 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="plan-revision-modal-overlay" style="display: none;">
+        <div class="modal plan-revision-modal">
+            <div class="modal-header">
+                <h3>修改计划</h3>
+                <button class="btn-close-modal" id="close-plan-revision-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-message plan-revision-modal-tip">告诉 Planner 你希望怎么调整这份计划，提交后会先修订，再直接开始执行。</p>
+                <textarea
+                    class="modal-input plan-revision-textarea"
+                    id="plan-revision-input"
+                    rows="6"
+                    placeholder="例如：请先做文献综述，再把实验设计拆得更细，并把最终输出改成适合论文写作的结构。"
+                ></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal-secondary" id="cancel-plan-revision-btn">取消</button>
+                <button class="btn-modal-primary" id="confirm-plan-revision-btn">修改后执行</button>
+            </div>
+        </div>
+    </div>
+
     <div id="settings-modal"></div>
     <!-- 知识库管理弹窗容器 -->
     <div id="knowledge-modal"></div>
