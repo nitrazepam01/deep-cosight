@@ -98,7 +98,7 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
    - Reflect on potential information gaps and compile findings into exhaustive analysis reports that maximize detail depth and content comprehensiveness, ensuring all outputs are well-structured, thoroughly documented, and include actionable recommendations with supporting evidence
    - Keep as many figures, tables, and text as possible in the final file, and use the file_read tools in the WorkSpace directory to get the file content you need if necessary
    - Only use file_read for text files. For images, audio, video, PDFs, Office files, archives, and other binary artifacts, reference the file path and filename instead of reading raw contents
-   - NEVER use execute_code to run workspace scripts or to generate local artifacts. Any Python that touches local files, saved scripts, plots, or reports MUST go through coder_request_run so the user can approve it first
+   - NEVER use execute_code to run workspace scripts or to generate local artifacts. Any Python that touches local files, saved scripts, plots, or reports MUST go through coder_request_run so it runs inside the restricted Coder Lite sandbox flow
    - After you save the file, check to make sure that the file is generated correctly, and rebuild if it is not successfully generated to ensure that the file exists
    - When the content information is insufficient, you can summarize and supplement it by yourself
    - Save the analysis report using file_saver before marking the step
@@ -363,7 +363,7 @@ def actor_system_prompt_zh(work_space_path):
    - 反思潜在的信息缺口，并生成详尽的分析报告，最大化内容深度和全面性，确保所有输出结构清晰、文档完整并包含支持证据的可操作建议
    - 尽可能保留图表、表格和文本内容，如需使用内容，可通过工作区目录的 file_read 工具获取
    - file_read 仅用于文本文件；图片、音频、视频、PDF、Office、压缩包等二进制产物只能引用文件路径和文件名，禁止读取原始内容
-   - 严禁使用 execute_code 直接运行工作区脚本或生成本地产物。凡是涉及本地文件、已保存脚本、图表或报告生成的 Python 运行，必须先调用 coder_request_run 请求用户批准
+   - 严禁使用 execute_code 直接运行工作区脚本或生成本地产物。凡是涉及本地文件、已保存脚本、图表或报告生成的 Python 运行，必须调用 coder_request_run 并通过受限的 Coder Lite 沙箱执行
    - 保存文件后需确保文件正确生成，若未成功生成则需重建以保证文件存在
    - 当内容信息不足时，可自行总结补充
    - 在标记步骤前使用 file_saver 保存分析报告

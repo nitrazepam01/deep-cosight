@@ -7,7 +7,6 @@ import subprocess
 import sys
 import sysconfig
 from pathlib import Path
-from threading import Event
 from typing import Any, Dict, List, Optional
 
 from app.common.logger_util import logger
@@ -313,9 +312,18 @@ class CoderLiteToolkit:
         approval_state: str,
         preview_only: bool = False,
         language: str = "python",
+        status_text: str = "",
         error_message: str = "",
     ) -> Dict[str, Any]:
         plan = self._get_plan()
+        normalized_status_text = str(status_text or "").strip()
+        if not normalized_status_text:
+            if approval_state == "awaiting_code_run_approval":
+                normalized_status_text = "等待运行代码审批"
+            elif approval_state == "code_running":
+                normalized_status_text = "代码正在自动运行中"
+            elif preview_only:
+                normalized_status_text = "HTML 预览已准备好"
         payload = {
             "eventType": "coder_run_request",
             "type": "coder_run_request",
@@ -326,11 +334,11 @@ class CoderLiteToolkit:
             "sandboxPath": self._public_relative(sandbox_path),
             "targetFile": self._public_relative(target_file),
             "approvalState": approval_state,
-            "isActionable": approval_state == "awaiting_code_run_approval",
+            "isActionable": False,
             "previewOnly": bool(preview_only),
             "language": language,
             "reason": str(reason or "").strip(),
-            "statusText": "等待运行代码审批" if approval_state == "awaiting_code_run_approval" else "HTML 预览已准备好",
+            "statusText": normalized_status_text,
         }
         if error_message:
             payload["errorMessage"] = error_message
@@ -747,58 +755,16 @@ class CoderLiteToolkit:
             sandbox_path=sandbox_path,
             target_file=resolved_target,
             reason=reason,
-            approval_state="awaiting_code_run_approval",
+            approval_state="code_running",
             preview_only=False,
             language="python",
+            status_text="代码正在自动运行中",
         )
-
-        self._update_step_status(step_index, "awaiting_code_run_approval")
-        TaskManager.register_coder_run_request(
-            self.plan_id,
-            step_index,
-            {
-                **payload,
-                "requestState": "pending",
-                "targetFileAbs": str(resolved_target),
-                "sandboxPathAbs": str(sandbox_path),
-                "event": Event(),
-                "planSessionId": payload.get("planSessionId", ""),
-            },
-        )
-        self._publish_coder_event(payload)
-
-        decision = TaskManager.wait_for_coder_run_decision(self.plan_id, step_index)
-        if not decision:
-            self._update_step_status(step_index, "blocked", "代码运行审批超时，步骤已停止。")
-            TaskManager.clear_coder_run_request(self.plan_id, step_index)
-            return json.dumps(
-                {
-                    "approved": False,
-                    "reason": "Code run approval timed out",
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-
-        approval_state = str(decision.get("approvalState") or "").strip().lower()
-        if approval_state in {"skipped", "code_run_skipped"}:
-            self._update_step_status(step_index, "code_run_skipped")
-            TaskManager.clear_coder_run_request(self.plan_id, step_index)
-            return json.dumps(
-                {
-                    "approved": False,
-                    "skipped": True,
-                    "reason": "用户选择跳过代码运行，代码仍保留在沙箱目录中。",
-                    "targetFile": self._public_relative(resolved_target),
-                    "sandboxPath": self._public_relative(sandbox_path),
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
 
         self._update_step_status(step_index, "code_running")
+        self._publish_coder_event(payload)
+
         run_result = self._run_python_in_sandbox(resolved_target, sandbox_path)
-        TaskManager.clear_coder_run_request(self.plan_id, step_index)
         run_exit_code = int(run_result.get("exitCode", 0) or 0)
         run_timed_out = bool(run_result.get("timedOut"))
         artifact_count = len(run_result.get("artifacts") or [])

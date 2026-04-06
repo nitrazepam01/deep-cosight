@@ -26,8 +26,8 @@ def execute_code_skill(work_space_path):
         'skill_type': "function",
         'display_name_zh': '执行代码',
         'display_name_en': 'Execute Code',
-        'description_zh': f'仅执行不涉及本地文件或脚本的轻量 Python 片段。若要运行工作区脚本、读取/写入本地文件或生成图表，请改用 coder_request_run 并先获得批准。工作区: {work_space_path or os.getenv("WORKSPACE_PATH") or os.getcwd()}',
-        'description_en': f'Only execute lightweight Python snippets that do not touch local files or saved scripts. To run workspace scripts, read/write local files, or create plots, use coder_request_run and obtain approval first. Workspace: {work_space_path or os.getenv("WORKSPACE_PATH") or os.getcwd()}',
+        'description_zh': f'仅执行不涉及本地文件或脚本的轻量 Python 片段。若要运行工作区脚本、读取/写入本地文件或生成图表，请改用 coder_request_run 并在受限沙箱内自动执行。工作区: {work_space_path or os.getenv("WORKSPACE_PATH") or os.getcwd()}',
+        'description_en': f'Only execute lightweight Python snippets that do not touch local files or saved scripts. To run workspace scripts, read/write local files, or create plots, use coder_request_run so it runs automatically inside the restricted sandbox. Workspace: {work_space_path or os.getenv("WORKSPACE_PATH") or os.getcwd()}',
         'semantic_apis': ["api_code_execution"],
         'function': SkillFunction(
             id='4c44f9ad-be5c-4e6c-a9d8-1426b23828a9',
@@ -493,14 +493,14 @@ def coder_request_run_skill():
         'skill_type': "function",
         'display_name_zh': 'Coder 请求运行/预览',
         'display_name_en': 'Coder Request Run/Preview',
-        'description_zh': '对 Python 脚本申请一次用户批准后再运行，或为 HTML 文件准备受限预览',
-        'description_en': 'Request a user-approved Python run or prepare a restricted preview for HTML',
+        'description_zh': '自动运行受限沙箱内的 Python 脚本，或为 HTML 文件准备受限预览',
+        'description_en': 'Automatically run a Python script inside the restricted sandbox or prepare a restricted preview for HTML',
         'semantic_apis': ["api_code_execution"],
         'function': SkillFunction(
             id='a4f44f10-2db3-4f9d-8e6a-0ff6718ab006',
             name='app.cosight.tool.coder_lite_toolkit.CoderLiteToolkit.coder_request_run',
-            description_zh='申请运行 Python 代码或准备 HTML 预览',
-            description_en='Request a Python run or prepare an HTML preview',
+            description_zh='运行 Python 代码或准备 HTML 预览',
+            description_en='Run Python code or prepare an HTML preview',
             parameters={
                 "type": "object",
                 "properties": {
@@ -511,8 +511,8 @@ def coder_request_run_skill():
                     },
                     "reason": {
                         "type": "string",
-                        "description_zh": "向用户说明为什么这次运行或预览有价值",
-                        "description_en": "Explain why this run or preview is useful for the user"
+                        "description_zh": "说明为什么这次运行或预览有价值",
+                        "description_en": "Explain why this run or preview is useful"
                     }
                 },
                 "required": ["target_file"]

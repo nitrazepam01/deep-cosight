@@ -134,10 +134,10 @@ class CodeToolkit:
             content = (
                 "ERROR: Execution blocked: legacy execute_code is limited to lightweight inline snippets and "
                 "cannot run workspace scripts, touch local files, or generate local artifacts without "
-                "explicit user approval. "
+                "going through the restricted Coder Lite run flow. "
                 f"Detected risk(s): {reason_text}. "
                 "If you need to run a saved Python file or create plots/files, use Coder Lite to prepare "
-                "the file and then call `coder_request_run` to request approval first."
+                "the file and then call `coder_request_run` to run it in the sandbox."
             )
             logger.warning(content)
             return content

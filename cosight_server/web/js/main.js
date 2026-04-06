@@ -3037,7 +3037,6 @@ function renderCoderRunRequestCardToBubble(message, bubbleEl) {
     const metadata = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
     const approvalState = normalizePlanApprovalState(metadata.approvalState);
     const previewOnly = metadata.previewOnly === true || String(metadata.language || '').toLowerCase() === 'html';
-    const isActionable = metadata.isActionable === true && approvalState === 'awaiting_code_run_approval';
     const targetFile = String(metadata.targetFile || '').trim();
     const sandboxPath = String(metadata.sandboxPath || '').trim();
     const reason = String(metadata.reason || '').trim();
@@ -3047,7 +3046,7 @@ function renderCoderRunRequestCardToBubble(message, bubbleEl) {
     const language = String(metadata.language || (targetFile.endsWith('.html') ? 'html' : 'python')).trim().toLowerCase();
     const readableTitle = previewOnly
         ? 'HTML 预览已生成'
-        : `Step ${Number.isFinite(stepIndex) ? stepIndex + 1 : '?'} 请求运行代码`;
+        : `Step ${Number.isFinite(stepIndex) ? stepIndex + 1 : '?'} 代码运行`;
 
     bubbleEl.innerHTML = `
         <div class="coder-run-card" data-coder-run-message-id="${escapeHtml(String(ensureMessageId(message)))}">
@@ -3064,8 +3063,6 @@ function renderCoderRunRequestCardToBubble(message, bubbleEl) {
                 <span class="coder-run-status-text">${escapeHtml(statusText)}</span>
                 <div class="coder-run-actions">
                     ${previewOnly ? `<button class="btn-modal-secondary coder-run-action-btn" data-coder-run-action="preview">预览 HTML</button>` : ''}
-                    ${isActionable ? `<button class="btn-modal-primary coder-run-action-btn" data-coder-run-action="approve">运行代码</button>` : ''}
-                    ${isActionable ? `<button class="btn-modal-secondary coder-run-action-btn" data-coder-run-action="skip">跳过运行</button>` : ''}
                 </div>
             </div>
         </div>
