@@ -39,6 +39,7 @@ from app.cosight.tool.deep_search.searchers.tavily_search import TavilySearch
 from app.cosight.tool.audio_toolkit import AudioTool
 from app.cosight.tool.video_analysis_toolkit import VideoTool
 from app.cosight.tool.html_visualization_toolkit import HtmlVisualizationToolkit
+from app.cosight.tool.coder_lite_toolkit import CoderLiteToolkit
 from config.config import get_tavily_config
 from app.common.logger_util import logger
 
@@ -91,10 +92,10 @@ class TaskActorAgent(BaseAgent):
             # 配置tavily
             "api_key": get_tavily_config()
         })
-        code_toolkit = CodeToolkit(sandbox="subprocess")
         tavily_search = TavilySearch()
         html_toolkit = HtmlVisualizationToolkit(workspace_path=work_space_path, tool_llm=tool_llm)
-        code_toolkit = CodeToolkit(sandbox="subprocess")
+        coder_lite_toolkit = CoderLiteToolkit(plan_id=plan_id, work_space_path=work_space_path)
+        code_toolkit = CodeToolkit(sandbox="subprocess", work_space_path=self.work_space_path)
         all_functions = {"mark_step": act_toolkit.mark_step,
                          # "deep_search": deep_search_toolkit.deep_search,
                         #  "search_baidu": search_baidu,
@@ -117,13 +118,20 @@ class TaskActorAgent(BaseAgent):
                          "fetch_website_images_only": fetch_website_images_only,
                          "extract_document_content": doc_toolkit.extract_document_content,
                          "create_html_report": lambda title=None, include_charts=True, chart_types=['all'], output_filename=None: html_toolkit.create_html_report(
-                             title=title,
-                             include_charts=include_charts,
-                             chart_types=chart_types,
-                             output_filename=output_filename,
-                             user_query=self.question
-                         ),
-                         }
+                              title=title,
+                              include_charts=include_charts,
+                              chart_types=chart_types,
+                              output_filename=output_filename,
+                              user_query=self.question
+                          ),
+                         "coder_list_files": coder_lite_toolkit.coder_list_files,
+                         "coder_read_file": coder_lite_toolkit.coder_read_file,
+                         "coder_write_file": coder_lite_toolkit.coder_write_file,
+                         "coder_edit_file": coder_lite_toolkit.coder_edit_file,
+                         "coder_find_files": coder_lite_toolkit.coder_find_files,
+                         "coder_request_run": coder_lite_toolkit.coder_request_run,
+                         "coder_mark_step": coder_lite_toolkit.coder_mark_step,
+                          }
         if functions:
             all_functions.update(functions)
         
@@ -159,7 +167,7 @@ class TaskActorAgent(BaseAgent):
             {"role": "user", "content": task_prompt})
         try:
             result = self.execute(self.history, step_index=step_index)
-            if self.plan.step_statuses.get(self.plan.steps[step_index], "") == "in_progress":
+            if self.plan.step_statuses.get(self.plan.steps[step_index], "") in {"in_progress", "code_run_skipped"}:
                 self.plan.mark_step(step_index, step_status="completed", step_notes=str(result))
                 # 步骤完成后，主动上报一次计划进度，确保前端收到manus-step
                 plan_report_event_manager.publish("plan_process", self.plan)

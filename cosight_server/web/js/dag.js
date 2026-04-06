@@ -11,19 +11,28 @@ const DAG_STATUS_BUBBLE_GRADIENTS = {
     not_started: "dag-bubble-not-started",
     in_progress: "dag-bubble-in-progress",
     blocked: "dag-bubble-blocked",
-    completed: "dag-bubble-completed"
+    completed: "dag-bubble-completed",
+    awaiting_code_run_approval: "dag-bubble-awaiting-code-run-approval",
+    code_running: "dag-bubble-code-running",
+    code_run_skipped: "dag-bubble-code-run-skipped"
 };
 const DAG_STATUS_BUBBLE_STROKES = {
     not_started: "#cbe6ff",
     in_progress: "#cbe6ff",
     blocked: "#cbe6ff",
-    completed: "#cbe6ff"
+    completed: "#cbe6ff",
+    awaiting_code_run_approval: "#fde68a",
+    code_running: "#86efac",
+    code_run_skipped: "#c4b5fd"
 };
 const DAG_STATUS_SHADOW_FILTERS = {
     not_started: "dag-bubble-shadow-not-started",
     in_progress: "dag-bubble-shadow-in-progress",
     blocked: "dag-bubble-shadow-blocked",
-    completed: "dag-bubble-shadow-completed"
+    completed: "dag-bubble-shadow-completed",
+    awaiting_code_run_approval: "dag-bubble-shadow-awaiting-code-run-approval",
+    code_running: "dag-bubble-shadow-code-running",
+    code_run_skipped: "dag-bubble-shadow-code-run-skipped"
 };
 const DAG_NODE_MIN_RADIUS = 8;
 let dagNodeRadius = 25;
@@ -168,6 +177,30 @@ function appendDagBubbleDefs(defs) {
                 { offset: "45%", color: "#88d7ad" },
                 { offset: "100%", color: "#57b884" }
             ]
+        },
+        {
+            id: DAG_STATUS_BUBBLE_GRADIENTS.awaiting_code_run_approval,
+            stops: [
+                { offset: "0%", color: "#fef3c7" },
+                { offset: "45%", color: "#fcd34d" },
+                { offset: "100%", color: "#f59e0b" }
+            ]
+        },
+        {
+            id: DAG_STATUS_BUBBLE_GRADIENTS.code_running,
+            stops: [
+                { offset: "0%", color: "#dcfce7" },
+                { offset: "45%", color: "#86efac" },
+                { offset: "100%", color: "#16a34a" }
+            ]
+        },
+        {
+            id: DAG_STATUS_BUBBLE_GRADIENTS.code_run_skipped,
+            stops: [
+                { offset: "0%", color: "#ede9fe" },
+                { offset: "45%", color: "#c4b5fd" },
+                { offset: "100%", color: "#8b5cf6" }
+            ]
         }
     ];
 
@@ -189,7 +222,10 @@ function appendDagBubbleDefs(defs) {
         { id: DAG_STATUS_SHADOW_FILTERS.not_started, color: "#96a7c2", opacity: 0.22 },
         { id: DAG_STATUS_SHADOW_FILTERS.in_progress, color: "#d9b45f", opacity: 0.24 },
         { id: DAG_STATUS_SHADOW_FILTERS.blocked, color: "#d88a8a", opacity: 0.24 },
-        { id: DAG_STATUS_SHADOW_FILTERS.completed, color: "#7dbc98", opacity: 0.24 }
+        { id: DAG_STATUS_SHADOW_FILTERS.completed, color: "#7dbc98", opacity: 0.24 },
+        { id: DAG_STATUS_SHADOW_FILTERS.awaiting_code_run_approval, color: "#f59e0b", opacity: 0.28 },
+        { id: DAG_STATUS_SHADOW_FILTERS.code_running, color: "#16a34a", opacity: 0.28 },
+        { id: DAG_STATUS_SHADOW_FILTERS.code_run_skipped, color: "#8b5cf6", opacity: 0.28 }
     ];
 
     shadowFilters.forEach(({ id, color, opacity }) => {
@@ -598,6 +634,10 @@ function updateProgress() {
     };
 
     dagData.nodes.forEach(node => {
+        if (node.status === 'awaiting_code_run_approval' || node.status === 'code_running' || node.status === 'code_run_skipped') {
+            stats["in_progress"]++;
+            return;
+        }
         stats[node.status]++;
     });
 
@@ -672,6 +712,9 @@ function updateStepProgressOverview() {
                 completedList.appendChild(stepItem);
                 break;
             case 'in_progress':
+            case 'awaiting_code_run_approval':
+            case 'code_running':
+            case 'code_run_skipped':
                 inProgressList.appendChild(stepItem);
                 break;
             case 'blocked':

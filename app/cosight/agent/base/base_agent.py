@@ -500,8 +500,11 @@ class BaseAgent:
         return results
 
     def _handle_max_iteration(self, messages, step_index):
-        messages.append({"role": "user", "content": "Summarize the above conversation, use mark_step to mark the step"})
-        mark_step_tools = [tool for tool in self.tools if tool['function']['name'] == 'mark_step']
+        messages.append({"role": "user", "content": "Summarize the above conversation, then use mark_step or coder_mark_step to mark the step"})
+        mark_step_tools = [
+            tool for tool in self.tools
+            if tool['function']['name'] in {'mark_step', 'coder_mark_step'}
+        ]
         response = self.llm.create_with_tools(messages, mark_step_tools)
 
         result = self._process_response(response, messages, step_index)
@@ -544,7 +547,11 @@ class BaseAgent:
                 except Exception:
                     args_dict = {}
 
-            if step_index is not None and 'step_index' not in args_dict and function_name in ['mark_step']:
+            if (
+                step_index is not None
+                and 'step_index' not in args_dict
+                and (function_name in ['mark_step', 'coder_mark_step'] or str(function_name).startswith('coder_'))
+            ):
                 args_dict['step_index'] = step_index
 
             # 检查file_saver调用频率限制

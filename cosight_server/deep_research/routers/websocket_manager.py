@@ -15,12 +15,14 @@
 
 import json
 import asyncio
+import contextlib
 import uuid
 from typing import List, Optional
 
 import aiohttp
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
+from app.cosight.task.task_manager import TaskManager
 from cosight_server.deep_research.services.i18n_service import i18n
 from cosight_server.sdk.common.config import custom_config
 from app.common.logger_util import get_logger
@@ -35,31 +37,43 @@ class WebsocketManager:
         self.active_clients: List[WebSocket] = []
         # 维护 topic 到最新 WebSocket 的映射（用于断线重连后路由消息）
         self.topic_to_ws: dict[str, WebSocket] = {}
+        # 同一连接上的消息发送需要串行化，避免后台流式任务与审批回执并发写入时互相冲突
+        self.ws_send_locks: dict[int, asyncio.Lock] = {}
 
     async def connect(self, ws: WebSocket):
         # 等待连接
         await ws.accept()
         # 存储ws连接对象
         self.active_clients.append(ws)
+        self.ws_send_locks[id(ws)] = asyncio.Lock()
         logger.info(f"ws connect >>>>>>>>>>>>>> ")
 
     def disconnect(self, ws: WebSocket):
         # 关闭时 移除ws对象
-        self.active_clients.remove(ws)
+        if ws in self.active_clients:
+            self.active_clients.remove(ws)
         # 清理与该 ws 相关的 topic 绑定
         topics_to_remove = [topic for topic, mapped_ws in self.topic_to_ws.items() if mapped_ws is ws]
         for topic in topics_to_remove:
             self.topic_to_ws.pop(topic, None)
+        self.ws_send_locks.pop(id(ws), None)
 
-    @staticmethod
-    async def send_message(message: str, ws: WebSocket):
-        # 发送个人消息
-        await ws.send_text(message)
+    def _get_send_lock(self, ws: WebSocket) -> asyncio.Lock:
+        lock = self.ws_send_locks.get(id(ws))
+        if lock is None:
+            lock = asyncio.Lock()
+            self.ws_send_locks[id(ws)] = lock
+        return lock
 
-    @staticmethod
-    async def send_json(data: dict, ws: WebSocket):
+    async def send_message(self, message: str, ws: WebSocket):
         # 发送个人消息
-        await ws.send_json(data)
+        async with self._get_send_lock(ws):
+            await ws.send_text(message)
+
+    async def send_json(self, data: dict, ws: WebSocket):
+        # 发送个人消息
+        async with self._get_send_lock(ws):
+            await ws.send_json(data)
 
     def bind_topic(self, topic: str, ws: WebSocket):
         if topic:
@@ -72,12 +86,12 @@ class WebsocketManager:
         ws = self.get_ws_for_topic(topic) or default_ws
         if ws is not None:
             logger.info(f"send_json_to_topic >>>>>>>>>>>>>> topic: {topic}, data: {data}")
-            await ws.send_json(data)
+            await self.send_json(data, ws)
 
     async def broadcast(self, message: str):
         # 广播消息
         for client in self.active_clients:
-            await client.send_text(message)
+            await self.send_message(message, client)
 
 
 manager = WebsocketManager()
@@ -89,9 +103,26 @@ async def websocket_handler(
         websocket_client_key: Optional[str] = Query(None, alias="websocket-client-key"),
         lang: str = Query(..., alias="lang")):
     await manager.connect(websocket)
+    background_tasks: set[asyncio.Task] = set()
     cookie = websocket.cookies
     logger.info(f"websocket_handler >>>>>>>>>>>>>> websocket_client_key: {websocket_client_key}, lang: {lang}, "
                 f"cookie: {cookie}")
+
+    def _track_background_task(task: asyncio.Task):
+        background_tasks.add(task)
+
+        def _on_done(done_task: asyncio.Task):
+            background_tasks.discard(done_task)
+            with contextlib.suppress(asyncio.CancelledError):
+                exc = done_task.exception()
+                if exc is not None:
+                    logger.error(
+                        f"background websocket task failed: {exc}",
+                        exc_info=(type(exc), exc, exc.__traceback__),
+                    )
+
+        task.add_done_callback(_on_done)
+        return task
 
     try:
         welcome_message = {
@@ -117,11 +148,15 @@ async def websocket_handler(
                 logger.info(f"bind topic >>> {topic} to current websocket")
                 continue
             request_action = data.get("action")
-            if request_action in {"message", "plan_draft", "plan_approve", "plan_revise_execute"}:
+            if request_action in {"message", "plan_draft", "plan_approve", "plan_revise_execute", "coder_run_approve", "coder_run_skip"}:
                 message = json.loads(data.get("data"))
                 logger.info(f"message >>>>>>>>>>>>>> {message}")
                 # 绑定当前 topic 到该 websocket
                 manager.bind_topic(data.get("topic"), websocket)
+
+                if request_action in {"coder_run_approve", "coder_run_skip"}:
+                    await _handle_coder_run_action(websocket, data.get("topic"), message, request_action)
+                    continue
 
                 if request_action == "message":
                     # 推送时间更新的消息给前端
@@ -139,14 +174,30 @@ async def websocket_handler(
                         }
                     }, websocket)
 
-                await _send_resp(websocket, cookie, data.get("topic"), message, lang, request_action=request_action)
+                _track_background_task(
+                    asyncio.create_task(
+                        _send_resp(
+                            websocket,
+                            cookie,
+                            data.get("topic"),
+                            message,
+                            lang,
+                            request_action=request_action,
+                        )
+                    )
+                )
 
 
         # Ended by AICoder, pid:cd2a2pa21827c9b148ae08eff0221b0be93612b0
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
         logger.error(f"disconnect >>>>>>>>>>>>>> ")
+    finally:
+        for task in list(background_tasks):
+            task.cancel()
+        if background_tasks:
+            await asyncio.gather(*list(background_tasks), return_exceptions=True)
+        manager.disconnect(websocket)
 
 
 # Started by AICoder, pid:wb967gf743u19051414d0be1f088122a49b62acf
@@ -259,6 +310,77 @@ async def _send_resp(websocket, cookie, topic, message, lang, request_action="me
             await _no_stream_handler(params, url, headers, topic, websocket)
     except Exception as e:
         logger.error(f"response websocket error: {e}", exc_info=True)
+
+
+async def _handle_coder_run_action(websocket, topic, message, request_action):
+    incoming_session_info = message.get("sessionInfo") if isinstance(message, dict) else {}
+    incoming_session_info = incoming_session_info if isinstance(incoming_session_info, dict) else {}
+    extra = message.get("extra", {}) if isinstance(message, dict) else {}
+    extra = extra if isinstance(extra, dict) else {}
+    from_back_end = extra.get("fromBackEnd", {}) if isinstance(extra.get("fromBackEnd", {}), dict) else {}
+
+    plan_id = (
+        incoming_session_info.get("messageSerialNumber")
+        or from_back_end.get("executionId")
+        or ""
+    )
+    plan_session_id = (
+        incoming_session_info.get("planSessionId")
+        or from_back_end.get("planSessionId")
+        or ""
+    )
+    thread_id = incoming_session_info.get("threadId") or from_back_end.get("threadId") or ""
+
+    raw_step_index = from_back_end.get("stepIndex")
+    try:
+        step_index = int(raw_step_index)
+    except (TypeError, ValueError):
+        step_index = None
+
+    approval_state = "code_running" if request_action == "coder_run_approve" else "code_run_skipped"
+    response_payload = {
+        "eventType": "coder_run_request_state",
+        "threadId": thread_id,
+        "executionId": plan_id,
+        "planSessionId": plan_session_id,
+        "stepIndex": step_index,
+        "approvalState": approval_state,
+        "isActionable": False,
+        "statusText": "已批准，代码正在运行中" if approval_state == "code_running" else "已跳过代码运行",
+    }
+
+    if not plan_id or step_index is None:
+        response_payload["approvalState"] = "failed"
+        response_payload["errorMessage"] = "缺少代码审批所需的执行上下文。"
+    else:
+        pending_request = TaskManager.get_coder_run_request(plan_id, step_index)
+        if not pending_request:
+            response_payload["approvalState"] = "expired"
+            response_payload["errorMessage"] = "该代码运行请求已失效，请重新生成。"
+        elif plan_session_id and pending_request.get("planSessionId") and pending_request.get("planSessionId") != plan_session_id:
+            response_payload["approvalState"] = "expired"
+            response_payload["errorMessage"] = "该代码运行请求已失效，请重新生成。"
+        else:
+            resolved = TaskManager.resolve_coder_run_request(plan_id, step_index, approval_state)
+            if not resolved:
+                response_payload["approvalState"] = "failed"
+                response_payload["errorMessage"] = "代码运行请求处理失败。"
+            else:
+                response_payload["workspaceId"] = resolved.get("workspaceId")
+                response_payload["sandboxPath"] = resolved.get("sandboxPath")
+                response_payload["targetFile"] = resolved.get("targetFile")
+
+    await manager.send_json_to_topic(topic, {
+        "topic": topic,
+        "data": {
+            "type": "coder_run_request_state",
+            "code": 0,
+            "message": "ok",
+            "task": "coder_run_request",
+            "changeType": "replace",
+            "content": response_payload,
+        }
+    }, websocket)
 
 
 # Ended by AICoder, pid:wb967gf743u19051414d0be1f088122a49b62acf

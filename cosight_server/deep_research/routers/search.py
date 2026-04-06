@@ -782,6 +782,7 @@ async def search(request: Request, params: Any = Body(None)):
             plan_report_event_manager.subscribe("plan_process", plan_id, append_create_plan_local)
             plan_report_event_manager.subscribe("plan_result", plan_id, append_create_plan_local)
             plan_report_event_manager.subscribe("tool_event", plan_id, append_create_plan_local)
+            plan_report_event_manager.subscribe("coder_run_request", plan_id, append_create_plan_local)
 
         def unsubscribe_plan_events():
             plan_report_event_manager.unsubscribe("plan_created", plan_id, append_create_plan_local)
@@ -789,6 +790,7 @@ async def search(request: Request, params: Any = Body(None)):
             plan_report_event_manager.unsubscribe("plan_process", plan_id, append_create_plan_local)
             plan_report_event_manager.unsubscribe("plan_result", plan_id, append_create_plan_local)
             plan_report_event_manager.unsubscribe("tool_event", plan_id, append_create_plan_local)
+            plan_report_event_manager.unsubscribe("coder_run_request", plan_id, append_create_plan_local)
 
         def build_and_persist_session(runtime, approval_state: str, latest_revision: str = ""):
             plan_snapshot = _serialize_plan_data(runtime.plan) if runtime and runtime.plan else None
@@ -1261,7 +1263,13 @@ async def search(request: Request, params: Any = Body(None)):
                 # 计划未完成时的超时：仅发送保活状态。若有最新非工具计划，则基于其发送；否则发送默认等待计划
                 if latest_plan and isinstance(latest_plan, dict):
                     waiting_plan = dict(latest_plan)
-                    waiting_plan["statusText"] = "等待计划更新..."
+                    step_statuses = list((waiting_plan.get("step_statuses") or {}).values())
+                    if "awaiting_code_run_approval" in step_statuses:
+                        waiting_plan["statusText"] = "等待代码运行审批..."
+                    elif "code_running" in step_statuses:
+                        waiting_plan["statusText"] = "代码运行中..."
+                    else:
+                        waiting_plan["statusText"] = "等待计划更新..."
                     try:
                         import hashlib as _hashlib
                         plan_fp = _hashlib.md5(json.dumps(waiting_plan, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
@@ -1359,6 +1367,16 @@ async def search(request: Request, params: Any = Body(None)):
                         "code": 0,
                         "message": "ok",
                         "task": "plan_approval",
+                        "changeType": "replace",
+                        "content": response_data
+                    }
+                elif isinstance(response_data, dict) and response_data.get("eventType") == "coder_run_request":
+                    response_json = {
+                        "contentType": "coder_run_request",
+                        "sessionInfo": params.get("sessionInfo", {}),
+                        "code": 0,
+                        "message": "ok",
+                        "task": "coder_run_request",
                         "changeType": "replace",
                         "content": response_data
                     }

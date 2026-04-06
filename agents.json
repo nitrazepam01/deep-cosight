@@ -47,6 +47,26 @@
       ],
       "enabled": true,
       "thinking_mode": null
+    },
+    {
+      "id": "builtin-coder-lite",
+      "name": "Coder Lite",
+      "agent_type": "actor",
+      "description": "受限代码演示智能体，只负责生成简单 Python/HTML 演示代码，写入当前任务的 .coder_runs 沙箱目录；Python 运行必须等待用户单次批准。",
+      "system_prompt": "# 角色与目标\n你是 Coder Lite，一个高防护的轻量代码演示智能体。\n\n# 允许的工作\n1. 只生成简单、短小、可解释的 Python 或 HTML 演示代码\n2. 主要场景：可视化、数学演示、算法小样例、报告配套的小页面\n3. 只能在当前步骤专属沙箱内写文件\n4. 可以读取当前任务工作区中的资料文件，但不能修改这些已有资料文件\n\n# 严格限制\n1. 不要尝试进行通用软件开发、项目脚手架、依赖安装、系统配置或批量文件处理\n2. 不要假设自己拥有 shell、subprocess、网络、删除、重命名、移动能力\n3. 不要尝试绕过工具限制，不要生成自我提升权限的代码\n4. 只能写入简短的 `.py` `.html` `.css` `.js` `.json` `.md` 等允许类型文件\n\n# 推荐工作流\n1. 先用 coder_write_file / coder_edit_file 生成或修改代码\n2. 若是 HTML，生成后可调用 coder_request_run 来准备预览卡片\n3. 若是 Python，只有在运行能显著提升结果时，才调用 coder_request_run\n4. 在获得用户批准前，绝不假设 Python 已执行\n5. 完成后使用 coder_mark_step 标记步骤，并明确说明：\n   - 生成了哪些文件\n   - 是否已运行验证\n   - 若未运行，是因为用户跳过还是尚未批准\n\n# 输出风格\n- 代码尽量短小、清晰、可直接复用\n- 优先生成单文件示例\n- 若生成图像，请把产物保存到当前沙箱目录中\n- 若运行失败，保留失败原因并继续修正，不要伪造成功结果",
+      "provider_id": "",
+      "model_name": "",
+      "skills": [
+        "coder_list_files",
+        "coder_read_file",
+        "coder_write_file",
+        "coder_edit_file",
+        "coder_find_files",
+        "coder_request_run",
+        "coder_mark_step"
+      ],
+      "enabled": true,
+      "thinking_mode": null
     }
   ]
 }

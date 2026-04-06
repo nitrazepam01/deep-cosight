@@ -177,12 +177,19 @@ class Plan:
         """
         logger.debug(f"get_ready_steps dependencies: {self.dependencies}")
         ready_steps = []
+        dependency_incomplete_statuses = {
+            "not_started",
+            "in_progress",
+            "awaiting_code_run_approval",
+            "code_running",
+            "code_run_skipped",
+        }
         for step_index in range(len(self.steps)):
             # 获取该步骤的所有依赖
             dependencies = self.dependencies.get(step_index, [])
 
             # 检查所有依赖是否都已完成
-            if all(self.step_statuses.get(self.steps[int(dep)]) not  in["not_started","in_progress"]  for dep in dependencies):
+            if all(self.step_statuses.get(self.steps[int(dep)]) not in dependency_incomplete_statuses for dep in dependencies):
                 # 检查步骤本身是否未开始
                 if self.step_statuses.get(self.steps[step_index]) == "not_started":
                     ready_steps.append(step_index)
@@ -367,12 +374,16 @@ class Plan:
 
     def get_progress(self) -> Dict[str, int]:
         """Get progress statistics of the plan."""
+        in_progress_statuses = {"in_progress", "awaiting_code_run_approval", "code_running", "code_run_skipped"}
         return {
             "total": len(self.steps),
             "completed": sum(1 for status in self.step_statuses.values() if status == "completed"),
-            "in_progress": sum(1 for status in self.step_statuses.values() if status == "in_progress"),
+            "in_progress": sum(1 for status in self.step_statuses.values() if status in in_progress_statuses),
             "blocked": sum(1 for status in self.step_statuses.values() if status == "blocked"),
-            "not_started": sum(1 for status in self.step_statuses.values() if status == "not_started")
+            "not_started": sum(1 for status in self.step_statuses.values() if status == "not_started"),
+            "awaiting_code_run_approval": sum(1 for status in self.step_statuses.values() if status == "awaiting_code_run_approval"),
+            "code_running": sum(1 for status in self.step_statuses.values() if status == "code_running"),
+            "code_run_skipped": sum(1 for status in self.step_statuses.values() if status == "code_run_skipped"),
         }
 
     def format(self, with_detail: bool = False) -> str:
@@ -398,6 +409,9 @@ class Plan:
                 "in_progress": "[→]",
                 "completed": "[✓]",
                 "blocked": "[!]",
+                "awaiting_code_run_approval": "[?]",
+                "code_running": "[▶]",
+                "code_run_skipped": "[~]",
             }.get(self.step_statuses.get(step), "[ ]")
 
             # 显示依赖关系

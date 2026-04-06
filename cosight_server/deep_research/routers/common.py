@@ -392,21 +392,22 @@ async def get_thread_final_report(thread_id: str, workspaceId: Optional[str] = Q
             return json_result(404, 'Workspace directory not found', None)
 
         file_candidates = []
-        for name in os.listdir(workspace_dir):
-            abs_path = os.path.join(workspace_dir, name)
-            if not os.path.isfile(abs_path):
-                continue
-            if os.path.splitext(name)[1].lower() != ".md":
-                continue
-            try:
-                mtime = os.path.getmtime(abs_path)
-            except Exception:
-                continue
-            file_candidates.append((name, abs_path, mtime))
+        for current_root, _, files in os.walk(workspace_dir):
+            for name in files:
+                abs_path = os.path.join(current_root, name)
+                if os.path.splitext(name)[1].lower() != ".md":
+                    continue
+                if not _is_safe_workspace_dir(workspace_root, abs_path):
+                    continue
+                try:
+                    mtime = os.path.getmtime(abs_path)
+                except Exception:
+                    continue
+                file_candidates.append((name, abs_path, mtime))
         if not file_candidates:
             return json_result(404, 'No markdown file found in workspace', None)
 
-        # 直接取最后保存（修改时间最新）的文件
+        # 直接取最后保存（修改时间最新）的 markdown，支持 .coder_runs 等嵌套目录中的最终报告
         file_candidates.sort(key=lambda item: item[2])
         target_name, target_abs_path, _ = file_candidates[-1]
 
@@ -417,7 +418,7 @@ async def get_thread_final_report(thread_id: str, workspaceId: Optional[str] = Q
             with open(target_abs_path, "rb") as f:
                 content = f.read().decode("utf-8", errors="replace")
 
-        rel_path = f"work_space/{workspace_id}/{target_name}"
+        rel_path = "work_space/" + os.path.relpath(target_abs_path, workspace_root).replace("\\", "/")
         return json_result(0, 'success', {
             "threadId": thread_id,
             "workspaceId": workspace_id,

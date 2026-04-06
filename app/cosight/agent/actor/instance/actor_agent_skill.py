@@ -26,21 +26,21 @@ def execute_code_skill(work_space_path):
         'skill_type': "function",
         'display_name_zh': '执行代码',
         'display_name_en': 'Execute Code',
-        'description_zh': f'执行给定的代码片段并返回结果,若要处理本地文件，必须在工作区: {work_space_path or os.getenv("WORKSPACE_PATH") or os.getcwd()}',
-        'description_en': f'Execute a given code snippet and return the result. To process the local file, it must be in the working area: {work_space_path or os.getenv("WORKSPACE_PATH") or os.getcwd()}',
+        'description_zh': f'仅执行不涉及本地文件或脚本的轻量 Python 片段。若要运行工作区脚本、读取/写入本地文件或生成图表，请改用 coder_request_run 并先获得批准。工作区: {work_space_path or os.getenv("WORKSPACE_PATH") or os.getcwd()}',
+        'description_en': f'Only execute lightweight Python snippets that do not touch local files or saved scripts. To run workspace scripts, read/write local files, or create plots, use coder_request_run and obtain approval first. Workspace: {work_space_path or os.getenv("WORKSPACE_PATH") or os.getcwd()}',
         'semantic_apis': ["api_code_execution"],
         'function': SkillFunction(
             id='4c44f9ad-be5c-4e6c-a9d8-1426b23828a9',
             name='app.cosight.code_interpreter.execute_code',
-            description_zh='执行Python代码片段并返回输出结果',
-            description_en='Execute Python code snippet and return the output',
+            description_zh='仅执行轻量级、无本地文件副作用的 Python 代码片段并返回输出结果',
+            description_en='Execute lightweight Python snippets without local file side effects and return the output',
             parameters={
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description_zh": "要执行的Python代码",
-                        "description_en": "Python code to execute"
+                        "description_zh": "要执行的 Python 代码。禁止包含工作区脚本路径、本地文件读写或图表/文件生成逻辑",
+                        "description_en": "Python code to execute. Do not include workspace script paths, local file I/O, or plot/file generation logic"
                     }
                 },
                 "required": ["code"]
@@ -311,6 +311,251 @@ def mark_step_skill():
     }
 
 
+def coder_list_files_skill():
+    return {
+        'skill_name': 'coder_list_files',
+        'skill_type': "function",
+        'display_name_zh': 'Coder 沙箱列文件',
+        'display_name_en': 'Coder List Files',
+        'description_zh': '列出当前步骤的 Coder 沙箱目录或当前任务工作区中的文件',
+        'description_en': 'List files from the current coder sandbox or current task workspace',
+        'semantic_apis': ["api_file_management"],
+        'function': SkillFunction(
+            id='a4f44f10-2db3-4f9d-8e6a-0ff6718ab001',
+            name='app.cosight.tool.coder_lite_toolkit.CoderLiteToolkit.coder_list_files',
+            description_zh='列出 Coder Lite 可访问的文件',
+            description_en='List files accessible to Coder Lite',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "scope": {
+                        "type": "string",
+                        "enum": ["sandbox", "workspace"],
+                        "description_zh": "列出当前步骤沙箱还是整个当前任务工作区",
+                        "description_en": "Whether to list files from the step sandbox or the current workspace"
+                    }
+                }
+            }
+        )
+    }
+
+
+def coder_read_file_skill():
+    return {
+        'skill_name': 'coder_read_file',
+        'skill_type': "function",
+        'display_name_zh': 'Coder 读文件',
+        'display_name_en': 'Coder Read File',
+        'description_zh': '读取当前任务工作区中的文本文件内容',
+        'description_en': 'Read a text file from the current task workspace',
+        'semantic_apis': ["api_file_management"],
+        'function': SkillFunction(
+            id='a4f44f10-2db3-4f9d-8e6a-0ff6718ab002',
+            name='app.cosight.tool.coder_lite_toolkit.CoderLiteToolkit.coder_read_file',
+            description_zh='读取 Coder Lite 可访问的文本文件',
+            description_en='Read a text file accessible to Coder Lite',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description_zh": "要读取的文件路径，可以是相对工作区路径",
+                        "description_en": "The file path to read, relative to the workspace if needed"
+                    },
+                    "start_line": {
+                        "type": "integer",
+                        "description_zh": "起始行号（可选）",
+                        "description_en": "Optional starting line number"
+                    },
+                    "end_line": {
+                        "type": "integer",
+                        "description_zh": "结束行号（可选，排他）",
+                        "description_en": "Optional ending line number (exclusive)"
+                    }
+                },
+                "required": ["file_path"]
+            }
+        )
+    }
+
+
+def coder_write_file_skill():
+    return {
+        'skill_name': 'coder_write_file',
+        'skill_type': "function",
+        'display_name_zh': 'Coder 写文件',
+        'display_name_en': 'Coder Write File',
+        'description_zh': '仅向当前步骤的 Coder 沙箱目录写入允许类型的文本文件',
+        'description_en': 'Write allowed text files only inside the current coder step sandbox',
+        'semantic_apis': ["api_file_management"],
+        'function': SkillFunction(
+            id='a4f44f10-2db3-4f9d-8e6a-0ff6718ab003',
+            name='app.cosight.tool.coder_lite_toolkit.CoderLiteToolkit.coder_write_file',
+            description_zh='在 Coder Lite 沙箱中写入文件',
+            description_en='Write a file inside the Coder Lite sandbox',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description_zh": "要写入的相对沙箱路径",
+                        "description_en": "Relative sandbox path to write"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description_zh": "要写入的文件内容",
+                        "description_en": "The file content to write"
+                    }
+                },
+                "required": ["file_path", "content"]
+            }
+        )
+    }
+
+
+def coder_edit_file_skill():
+    return {
+        'skill_name': 'coder_edit_file',
+        'skill_type': "function",
+        'display_name_zh': 'Coder 改文件',
+        'display_name_en': 'Coder Edit File',
+        'description_zh': '在当前步骤的 Coder 沙箱目录中进行一次受限文本替换',
+        'description_en': 'Perform one restricted text replacement inside the current coder sandbox',
+        'semantic_apis': ["api_file_management"],
+        'function': SkillFunction(
+            id='a4f44f10-2db3-4f9d-8e6a-0ff6718ab004',
+            name='app.cosight.tool.coder_lite_toolkit.CoderLiteToolkit.coder_edit_file',
+            description_zh='在 Coder Lite 沙箱中编辑文件',
+            description_en='Edit a file inside the Coder Lite sandbox',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description_zh": "要编辑的相对沙箱路径",
+                        "description_en": "Relative sandbox path to edit"
+                    },
+                    "old_str": {
+                        "type": "string",
+                        "description_zh": "需要替换的旧文本",
+                        "description_en": "Original text to replace"
+                    },
+                    "new_str": {
+                        "type": "string",
+                        "description_zh": "替换后的新文本",
+                        "description_en": "New text to replace with"
+                    }
+                },
+                "required": ["file_path", "old_str", "new_str"]
+            }
+        )
+    }
+
+
+def coder_find_files_skill():
+    return {
+        'skill_name': 'coder_find_files',
+        'skill_type': "function",
+        'display_name_zh': 'Coder 查文件',
+        'display_name_en': 'Coder Find Files',
+        'description_zh': '按文件名在当前任务工作区或沙箱中查找文件',
+        'description_en': 'Find files by file name inside the current workspace or sandbox',
+        'semantic_apis': ["api_file_management"],
+        'function': SkillFunction(
+            id='a4f44f10-2db3-4f9d-8e6a-0ff6718ab005',
+            name='app.cosight.tool.coder_lite_toolkit.CoderLiteToolkit.coder_find_files',
+            description_zh='在 Coder Lite 可访问范围内按文件名查找文件',
+            description_en='Find files by name within the Coder Lite accessible scope',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description_zh": "要匹配的文件名关键字",
+                        "description_en": "Keyword used to match file names"
+                    },
+                    "scope": {
+                        "type": "string",
+                        "enum": ["sandbox", "workspace"],
+                        "description_zh": "查找当前步骤沙箱还是整个当前任务工作区",
+                        "description_en": "Whether to search in the step sandbox or the current workspace"
+                    }
+                },
+                "required": ["query"]
+            }
+        )
+    }
+
+
+def coder_request_run_skill():
+    return {
+        'skill_name': 'coder_request_run',
+        'skill_type': "function",
+        'display_name_zh': 'Coder 请求运行/预览',
+        'display_name_en': 'Coder Request Run/Preview',
+        'description_zh': '对 Python 脚本申请一次用户批准后再运行，或为 HTML 文件准备受限预览',
+        'description_en': 'Request a user-approved Python run or prepare a restricted preview for HTML',
+        'semantic_apis': ["api_code_execution"],
+        'function': SkillFunction(
+            id='a4f44f10-2db3-4f9d-8e6a-0ff6718ab006',
+            name='app.cosight.tool.coder_lite_toolkit.CoderLiteToolkit.coder_request_run',
+            description_zh='申请运行 Python 代码或准备 HTML 预览',
+            description_en='Request a Python run or prepare an HTML preview',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "target_file": {
+                        "type": "string",
+                        "description_zh": "要运行或预览的相对沙箱文件路径，支持 .py 或 .html",
+                        "description_en": "Relative sandbox file path to run or preview, supports .py or .html"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description_zh": "向用户说明为什么这次运行或预览有价值",
+                        "description_en": "Explain why this run or preview is useful for the user"
+                    }
+                },
+                "required": ["target_file"]
+            }
+        )
+    }
+
+
+def coder_mark_step_skill():
+    return {
+        'skill_name': 'coder_mark_step',
+        'skill_type': "function",
+        'display_name_zh': 'Coder 标记步骤',
+        'display_name_en': 'Coder Mark Step',
+        'description_zh': '由 Coder Lite 将当前步骤标记为完成或阻塞',
+        'description_en': 'Mark the current step as completed or blocked from Coder Lite',
+        'semantic_apis': ["api_planning"],
+        'function': SkillFunction(
+            id='a4f44f10-2db3-4f9d-8e6a-0ff6718ab007',
+            name='app.cosight.tool.coder_lite_toolkit.CoderLiteToolkit.coder_mark_step',
+            description_zh='标记当前步骤完成或阻塞',
+            description_en='Mark the current step as completed or blocked',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "step_status": {
+                        "type": "string",
+                        "enum": ["completed", "blocked"],
+                        "description_zh": "步骤状态，只允许 completed 或 blocked",
+                        "description_en": "Step status, only completed or blocked"
+                    },
+                    "step_notes": {
+                        "type": "string",
+                        "description_zh": "步骤执行说明，需要包含运行结果、产物路径或失败原因",
+                        "description_en": "Execution notes including results, artifact paths, or failure reasons"
+                    }
+                },
+                "required": ["step_status", "step_notes"]
+            }
+        )
+    }
+
+
 def file_saver_skill():
     return {
         'skill_name': 'file_saver',
@@ -364,14 +609,14 @@ def file_read_skill():
         'skill_type': "function",
         'display_name_zh': '文件读取',
         'display_name_en': 'File Read',
-        'description_zh': '读取指定路径的本地文件内容，支持文本和二进制文件（如图片、音频、视频）',
-        'description_en': 'Read content from a local file at a specified path. Supports both text and binary files (e.g., images, audio, video)',
+        'description_zh': '读取指定路径的文本文件内容。遇到图片、音频、视频、PDF、Office、压缩包等二进制文件时，仅返回元数据和路径，不返回原始内容',
+        'description_en': 'Read textual content from a local file. For images, audio, video, PDFs, Office files, archives, and other binary files, it returns metadata and the path instead of raw contents',
         'semantic_apis': ["api_file_management"],
         'function': SkillFunction(
             id='6c44f9ad-be5c-4e6c-a9d8-1426b23828a3',
             name='app.cosight.tool.file_toolkit.FileToolkit.file_read',
-            description_zh='读取指定路径的文件内容，支持文本和二进制文件',
-            description_en='Read content from a file at the specified path. Supports both text and binary files',
+            description_zh='读取指定路径的文本文件内容；二进制文件仅返回元数据和路径',
+            description_en='Read textual content from a file; binary files return metadata and the file path only',
             parameters={
                 "type": "object",
                 "properties": {
@@ -400,8 +645,8 @@ def file_read_skill():
                     },
                     "binary": {
                         "type": "boolean",
-                        "description_zh": "是否为二进制文件模式",
-                        "description_en": "Whether to use binary mode",
+                        "description_zh": "兼容参数。即使请求二进制文件，也只返回元数据，不返回原始字节",
+                        "description_en": "Compatibility flag. Even for binary files, the tool returns metadata instead of raw bytes",
                         "default": False
                     }
                 },
