@@ -38,6 +38,7 @@ const DAG_NODE_MIN_RADIUS = 8;
 let dagNodeRadius = 25;
 const DAG_EDGE_ENDPOINT_GAP = 4;
 const DAG_BASE_NODE_RADIUS = 25;
+const DAG_NODE_MAX_RADIUS = DAG_BASE_NODE_RADIUS * 2;
 
 function getDagNodeRadius() {
     return dagNodeRadius;
@@ -333,7 +334,8 @@ function calculateAdaptiveDiameter(levels) {
 
     const diameter = Math.floor(Math.min(diameterByWidth, diameterByHeight));
     const minDiameter = DAG_NODE_MIN_RADIUS * 2;
-    return Math.max(minDiameter, diameter);
+    const maxDiameter = DAG_NODE_MAX_RADIUS * 2;
+    return Math.min(maxDiameter, Math.max(minDiameter, diameter));
 }
 
 // 计算层次化布局
