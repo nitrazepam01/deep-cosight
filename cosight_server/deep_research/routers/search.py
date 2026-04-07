@@ -1004,18 +1004,21 @@ async def search(request: Request, params: Any = Body(None)):
 
                 def run_approval_flow():
                     latest_revision = revision_prompt
+                    revise_only_mode = plan_action == "plan_revise_execute"
                     try:
                         if work_space_path_time:
                             os.environ['WORKSPACE_PATH'] = work_space_path_time
                         subscribe_plan_events()
-                        if plan_action == "plan_revise_execute":
+                        if revise_only_mode:
                             build_and_persist_session(runtime, "revising", latest_revision)
                             emit_plan_state_event("plan_approval_state", "revising")
                             runtime.revise_draft_plan(query_content, latest_revision)
-                            _, revised_snapshot = build_and_persist_session(runtime, "approved", latest_revision)
+                            _, revised_snapshot = build_and_persist_session(runtime, "awaiting_user_approval", latest_revision)
                             if isinstance(revised_snapshot, dict):
                                 push_queue(revised_snapshot)
-                            emit_plan_state_event("plan_revision_applied", "approved", plan_snapshot=revised_snapshot)
+                            emit_plan_state_event("plan_revision_applied", "awaiting_user_approval", plan_snapshot=revised_snapshot)
+                            push_queue({"eventType": "plan_stream_end", "mode": "approval"})
+                            return
                         else:
                             _, approved_snapshot = build_and_persist_session(runtime, "approved")
                             emit_plan_state_event("plan_approval_state", "approved", plan_snapshot=approved_snapshot)
@@ -1036,7 +1039,8 @@ async def search(request: Request, params: Any = Body(None)):
                     finally:
                         unsubscribe_plan_events()
                         TaskManager.mark_completed(plan_id)
-                        TaskManager.remove_plan(plan_id)
+                        if not revise_only_mode:
+                            TaskManager.remove_plan(plan_id)
                         try:
                             if thread_id and not is_replay_request:
                                 set_thread_execution_status(thread_id, False)

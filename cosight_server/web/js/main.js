@@ -38,6 +38,21 @@ let displayThreadId = null; // 当前显示的thread，用于redo切换
 const PLAN_APPROVAL_ACTIVE_STATES = new Set(['drafting', 'awaiting_user_approval', 'revising', 'approved', 'executing']);
 const PLAN_APPROVAL_ACTIONABLE_STATES = new Set(['awaiting_user_approval']);
 let pendingPlanRevisionContext = null;
+const planRevisionDraftByKey = new Map();
+
+function buildPlanRevisionDraftKey(threadId, executionId, planSessionId) {
+    return `${String(threadId || '').trim()}|${String(executionId || '').trim()}|${String(planSessionId || '').trim()}`;
+}
+
+function getPlanRevisionDraftText(draftKey) {
+    if (!draftKey) return '';
+    return String(planRevisionDraftByKey.get(draftKey) || '');
+}
+
+function setPlanRevisionDraftText(draftKey, text) {
+    if (!draftKey) return;
+    planRevisionDraftByKey.set(draftKey, String(text || ''));
+}
 
 // ==================== 工具函数 ====================
 
@@ -2411,6 +2426,9 @@ function buildAssistantActionsHtml(message) {
 function createMessageElement(message) {
     const div = document.createElement('div');
     div.className = `message-item ${message.role}`;
+    if (message.role === 'assistant' && isDraftPlanMessage(message)) {
+        div.classList.add('draft-plan-message');
+    }
     const messageId = ensureMessageId(message);
     div.dataset.messageId = messageId;
     div.dataset.originalMessageId = messageId;
@@ -2989,7 +3007,6 @@ function renderDraftPlanCardToBubble(message, bubbleEl) {
     const planTitle = String(snapshot.title || '执行计划').trim() || '执行计划';
     const planVersion = Number(metadata.planVersion || snapshot.planVersion || 1) || 1;
     const errorMessage = String(metadata.errorMessage || '').trim();
-    const revisionPrompt = String(metadata.latestRevisionPrompt || snapshot.latestRevisionPrompt || '').trim();
 
     const stepsHtml = steps.length > 0
         ? steps.map((step, index) => {
@@ -3012,19 +3029,16 @@ function renderDraftPlanCardToBubble(message, bubbleEl) {
 
     bubbleEl.innerHTML = `
         <div class="draft-plan-card" data-draft-plan-message-id="${escapeHtml(String(ensureMessageId(message)))}">
-            <div class="draft-plan-card-header">
-                <span class="draft-plan-badge draft-plan-badge-${escapeHtml(approvalState || 'unknown')}">${escapeHtml(getDraftPlanBadgeText(approvalState))}</span>
+            <div class="draft-plan-title-row">
+                <div class="draft-plan-title">${escapeHtml(planTitle)}</div>
                 <span class="draft-plan-version">v${planVersion}</span>
             </div>
-            <div class="draft-plan-title">${escapeHtml(planTitle)}</div>
             <ol class="draft-plan-step-list">${stepsHtml}</ol>
-            ${revisionPrompt ? `<div class="draft-plan-note">最近一次修改建议：${escapeHtml(revisionPrompt)}</div>` : ''}
             ${errorMessage ? `<div class="draft-plan-error">${escapeHtml(errorMessage)}</div>` : ''}
             <div class="draft-plan-footer">
-                <span class="draft-plan-status-text">${escapeHtml(String(metadata.statusText || snapshot.statusText || ''))}</span>
                 ${isActionable ? `
                     <div class="draft-plan-actions">
-                        <button class="btn-modal-primary draft-plan-action-btn" data-draft-plan-action="approve">按此计划执行</button>
+                        <button class="btn-modal-primary draft-plan-action-btn" data-draft-plan-action="approve">执行计划</button>
                         <button class="btn-modal-secondary draft-plan-action-btn" data-draft-plan-action="revise">修改计划</button>
                     </div>
                 ` : ''}
@@ -3692,7 +3706,8 @@ function openPlanRevisionModal(message) {
     const currentMessage = located.message;
     const metadata = (currentMessage.metadata && typeof currentMessage.metadata === 'object') ? currentMessage.metadata : {};
     const approvalState = normalizePlanApprovalState(metadata.approvalState);
-    if (!PLAN_APPROVAL_ACTIONABLE_STATES.has(approvalState)) {
+    const isActionable = metadata.isActionable === true || PLAN_APPROVAL_ACTIONABLE_STATES.has(approvalState);
+    if (!isActionable) {
         return;
     }
 
@@ -3702,14 +3717,21 @@ function openPlanRevisionModal(message) {
         messageId: ensureMessageId(currentMessage),
         executionId: String(metadata.executionId || '').trim(),
         planSessionId: String(metadata.planSessionId || '').trim(),
-        question
+        question,
+        draftKey: buildPlanRevisionDraftKey(
+            located.thread.id,
+            String(metadata.executionId || '').trim(),
+            String(metadata.planSessionId || '').trim()
+        )
     };
 
     const modal = document.getElementById('plan-revision-modal-overlay');
     const textarea = document.getElementById('plan-revision-input');
     if (!modal || !textarea) return;
 
-    textarea.value = String(metadata.latestRevisionPrompt || '').trim();
+    const cachedDraft = getPlanRevisionDraftText(pendingPlanRevisionContext.draftKey);
+    textarea.value = cachedDraft || String(metadata.latestRevisionPrompt || '').trim();
+    applyAdaptiveTextareaHeight(textarea, 6, 9, 22.5);
     modal.style.display = 'flex';
     setTimeout(() => {
         textarea.focus();
@@ -3720,6 +3742,9 @@ function openPlanRevisionModal(message) {
 function closePlanRevisionModal() {
     const modal = document.getElementById('plan-revision-modal-overlay');
     const textarea = document.getElementById('plan-revision-input');
+    if (pendingPlanRevisionContext && textarea) {
+        setPlanRevisionDraftText(pendingPlanRevisionContext.draftKey, textarea.value || '');
+    }
     if (modal) {
         modal.style.display = 'none';
     }
@@ -3735,6 +3760,8 @@ async function submitPlanRevision() {
     if (!ctx || !textarea) return false;
 
     const revisionPrompt = String(textarea.value || '').trim();
+        setPlanRevisionDraftText(ctx.draftKey, revisionPrompt);
+
     if (!revisionPrompt) {
         textarea.focus();
         return false;
@@ -3823,6 +3850,14 @@ function initPlanRevisionModal() {
             void submitPlanRevision();
         }
     });
+    textarea.addEventListener('input', () => {
+        applyAdaptiveTextareaHeight(textarea, 6, 9, 22.5);
+        if (pendingPlanRevisionContext && pendingPlanRevisionContext.draftKey) {
+            setPlanRevisionDraftText(pendingPlanRevisionContext.draftKey, textarea.value || '');
+        }
+    });
+
+    applyAdaptiveTextareaHeight(textarea, 6, 9, 22.5);
 }
 
 async function defaultRedoMessage(message, messageItem) {
@@ -5176,6 +5211,34 @@ function getAllowedFileTypesAttr() {
 
 // ==================== 输入处理 ====================
 
+function applyAdaptiveTextareaHeight(textarea, minRows, maxRows, lineHeight = 22.5) {
+    if (!textarea) return;
+
+    lineHeight = Number(lineHeight || 22.5);
+    minRows = Math.max(1, Number(minRows) || 3);
+    maxRows = Math.max(minRows, Number(maxRows) || 6);
+
+    const chatInput = textarea;
+    chatInput.style.height = 'auto';
+    chatInput.style.overflowY = 'hidden';
+
+    const scrollHeight = chatInput.scrollHeight;
+    if (!chatInput.value.trim()) {
+        chatInput.style.height = minRows * lineHeight + 'px';
+        return;
+    }
+
+    const extraRows = Math.max(0, Math.floor(scrollHeight / lineHeight) - minRows);
+    const newHeight = Math.min(maxRows, extraRows + minRows) * lineHeight;
+    chatInput.style.height = newHeight + 'px';
+
+    if (extraRows > maxRows - minRows) {
+        chatInput.style.overflowY = 'auto';
+    } else {
+        chatInput.style.overflowY = 'hidden';
+    }
+}
+
 function initInputArea() {
     const chatInput = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
@@ -5188,38 +5251,7 @@ function initInputArea() {
     
     function adjustTextareaHeight() {
         const chatInput = document.getElementById('chat-input');
-        if (!chatInput) return;
-        
-        const minHeight = 68;
-        const maxHeight = 136;
-        const lineHeight = 22.5;
-        
-        chatInput.style.height = 'auto';
-        chatInput.style.overflowY = 'hidden';
-        
-        const scrollHeight = chatInput.scrollHeight;
-        
-        if (!chatInput.value.trim()) {
-            chatInput.style.height = minHeight + 'px';
-            return;
-        }
-        
-        let newHeight = scrollHeight;
-        newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
-        
-        const extraHeight = newHeight - minHeight;
-        const extraRows = Math.ceil(extraHeight / lineHeight);
-        newHeight = minHeight + (extraRows * lineHeight);
-        
-        newHeight = Math.min(newHeight, maxHeight);
-        
-        chatInput.style.height = newHeight + 'px';
-        
-        if (scrollHeight > maxHeight) {
-            chatInput.style.overflowY = 'auto';
-        } else {
-            chatInput.style.overflowY = 'hidden';
-        }
+        applyAdaptiveTextareaHeight(chatInput, 3, 6, 22.5);
     }
     
     chatInput.addEventListener('input', adjustTextareaHeight);

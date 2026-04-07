@@ -4,6 +4,7 @@
  */
 const KnowledgeService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
+    const MODAL_ANIMATION_MS = 300;
     let _kbList = [];
     let _currentKbId = null;
     let _lightragStatus = 'unknown';       // connected, disconnected, starting
@@ -194,6 +195,7 @@ const KnowledgeService = (function () {
             </div>
         `;
 
+        modal.classList.remove('closing');
         modal.classList.add('show');
         document.body.style.overflow = 'hidden';
     }
@@ -1057,7 +1059,13 @@ const KnowledgeService = (function () {
         const modal = document.getElementById('knowledge-modal');
         if (modal) {
             modal.classList.remove('show');
-            setTimeout(() => { if (modal) modal.innerHTML = ''; }, 300);
+            modal.classList.add('closing');
+            setTimeout(() => {
+                if (modal) {
+                    modal.classList.remove('closing');
+                    modal.innerHTML = '';
+                }
+            }, MODAL_ANIMATION_MS);
         }
         document.body.style.overflow = '';
         _currentKbId = null;

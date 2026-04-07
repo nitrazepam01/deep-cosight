@@ -1842,6 +1842,7 @@ window.AgentConfigService = AgentConfigService;
 const AgentRuntimeService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
     const STORAGE_KEY = 'cosight:agentRunConfig';
+    const MODAL_ANIMATION_MS = 300;
 
     let _config = {
         planner_id: '',
@@ -2095,7 +2096,13 @@ const AgentRuntimeService = (function () {
         const modal = document.getElementById('agent-runtime-modal');
         if (modal) {
             modal.classList.remove('show');
-            modal.innerHTML = '';
+            modal.classList.add('closing');
+            setTimeout(() => {
+                if (modal) {
+                    modal.classList.remove('closing');
+                    modal.innerHTML = '';
+                }
+            }, MODAL_ANIMATION_MS);
         }
         document.body.style.overflow = '';
     }
@@ -2110,8 +2117,8 @@ const AgentRuntimeService = (function () {
         }
 
         modal.innerHTML = `
-            <div class="agent-runtime-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);z-index:10001;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;">
-                <div class="agent-runtime-panel" style="position:relative;width:720px;max-width:92vw;height:490px;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);display:flex;flex-direction:column;overflow:hidden;pointer-events:auto;">
+            <div class="settings-overlay agent-runtime-overlay"></div>
+            <div class="settings-panel agent-runtime-panel" style="width:720px;max-width:92vw;height:490px;pointer-events:auto;">
                     <div class="agent-runtime-header" style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #eee;background:linear-gradient(135deg,#f8f9fa 0%,#fff 100%);flex-shrink:0;">
                         <h2 style="margin:0;font-size:20px;font-weight:600;color:#333;display:flex;align-items:center;gap:10px;">
                             <i class="fas fa-cog" style="color:#667eea;"></i> 运行时智能体配置
@@ -2124,7 +2131,6 @@ const AgentRuntimeService = (function () {
                         ${renderConfigForm()}
                     </div>
                 </div>
-            </div>
         `;
 
         bindEvents();
@@ -2136,6 +2142,7 @@ const AgentRuntimeService = (function () {
             });
         }
 
+        modal.classList.remove('closing');
         modal.classList.add('show');
         document.body.style.overflow = 'hidden';
     }
