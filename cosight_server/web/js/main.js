@@ -37,6 +37,7 @@ const RIGHT_PANEL_COMPLETED_STATUS_TEXT = '执行完成';
 let displayThreadId = null; // 当前显示的thread，用于redo切换
 const PLAN_APPROVAL_ACTIVE_STATES = new Set(['drafting', 'awaiting_user_approval', 'revising', 'approved', 'executing']);
 const PLAN_APPROVAL_ACTIONABLE_STATES = new Set(['awaiting_user_approval']);
+const PLAN_DRAFT_RENDER_STATES = new Set(['drafting', 'revising', 'awaiting_user_approval', 'failed']);
 let pendingPlanRevisionContext = null;
 const planRevisionDraftByKey = new Map();
 
@@ -839,6 +840,17 @@ function bindTopicToWorkspace(topic, workspaceId) {
 async function bindTopicToWorkspaceByThread(topic, threadId) {
     if (!topic || !threadId) return null;
 
+    const persistedWorkspaceId = getWorkspaceIdByTopic(topic);
+    if (persistedWorkspaceId) {
+        return bindTopicToWorkspace(topic, persistedWorkspaceId);
+    }
+
+    const localThread = getThreadById(threadId);
+    const localWorkspaceId = getWorkspaceIdFromThreadState(localThread);
+    if (localWorkspaceId) {
+        return bindTopicToWorkspace(topic, localWorkspaceId);
+    }
+
     if (window.SessionService && typeof window.SessionService.getThreadFromBackend === 'function') {
         try {
             const backendThread = await window.SessionService.getThreadFromBackend(threadId);
@@ -851,7 +863,7 @@ async function bindTopicToWorkspaceByThread(topic, threadId) {
         }
     }
 
-    // 不再回退本地线程状态，避免 redo 误继承旧 workspaceId。
+    // workspace 绑定只在明确可得时生效，避免隐式派生不一致状态。
     return null;
 }
 
@@ -1861,6 +1873,7 @@ function clearRightPanelImmediatelyForNewRun(threadId) {
 
     if (shouldClearVisiblePanel) {
         clearDagViewState();
+        clearProgressOverview();
         resetExecutionTitle();
         clearRuntimeLogs();
         clearRuntimeLogFilter();
@@ -2386,7 +2399,8 @@ function loadMessages(messages) {
 
 function isDraftPlanMessage(message) {
     const metadata = (message && message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
-    return metadata.type === 'draft_plan';
+    return String(metadata.pendingKind || '').trim() === 'plan_draft'
+        && metadata.pendingPlaceholder === false;
 }
 
 function isCoderRunRequestMessage(message) {
@@ -2404,14 +2418,6 @@ function isFinalReportMessage(message) {
 
 function buildAssistantActionsHtml(message) {
     if (!message || message.role !== 'assistant') return '';
-    if (isDraftPlanMessage(message) || isCoderRunRequestMessage(message)) {
-        return `
-            <div class="message-actions">
-                <button class="message-action-btn" data-action="copy" title="复制"><i class="fas fa-copy"></i></button>
-                <button class="message-action-btn" data-action="delete" title="删除"><i class="fas fa-trash"></i></button>
-            </div>
-        `;
-    }
     return `
         <div class="message-actions">
             <button class="message-action-btn" data-action="copy" title="复制"><i class="fas fa-copy"></i></button>
@@ -2539,6 +2545,60 @@ function normalizePlanApprovalState(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
+function shouldUpsertDraftPlanForEvent(eventType, approvalState) {
+    const normalizedEventType = String(eventType || '').trim();
+    const normalizedApprovalState = normalizePlanApprovalState(approvalState);
+
+    if (normalizedEventType === 'plan_revision_applied') {
+        return true;
+    }
+    if (normalizedEventType === 'plan_execution_started') {
+        return false;
+    }
+    return PLAN_DRAFT_RENDER_STATES.has(normalizedApprovalState);
+}
+
+function shouldTreatAsExecutionPending(eventType, approvalState) {
+    const normalizedEventType = String(eventType || '').trim();
+    const normalizedApprovalState = normalizePlanApprovalState(approvalState);
+    return normalizedEventType === 'plan_execution_started'
+        || normalizedApprovalState === 'executing'
+        || normalizedApprovalState === 'completed';
+}
+
+function sanitizeDraftPlanSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return null;
+
+    const title = String(snapshot.title || '执行计划').trim() || '执行计划';
+    const rawSteps = Array.isArray(snapshot.steps) ? snapshot.steps : [];
+    const steps = rawSteps
+        .map((step, index) => {
+            if (typeof step === 'string') {
+                return String(step || '').trim();
+            }
+            const label = step?.title || step?.name || step?.fullName || `步骤 ${index + 1}`;
+            return String(label || '').trim();
+        })
+        .filter(Boolean);
+
+    const rawDependencies = (snapshot.dependencies && typeof snapshot.dependencies === 'object')
+        ? snapshot.dependencies
+        : {};
+    const dependencies = {};
+    Object.entries(rawDependencies).forEach(([key, value]) => {
+        const values = Array.isArray(value)
+            ? value
+                .map((item) => Number(item))
+                .filter((item) => Number.isFinite(item) && item >= 0)
+            : [];
+        if (values.length > 0) {
+            dependencies[String(key)] = Array.from(new Set(values));
+        }
+    });
+
+    return { title, steps, dependencies };
+}
+
 function extractStructuredPayloadFromSocketMessage(messageData) {
     const data = messageData && messageData.data ? messageData.data : null;
     if (!data || typeof data !== 'object') return null;
@@ -2601,9 +2661,11 @@ function buildPlanActionOutboundPayload(threadId, question) {
 
 function applyPlanPayloadToThread(threadId, payload, options = {}) {
     if (!threadId || !payload || typeof payload !== 'object') return null;
-    const draftPlanSnapshot = (payload.draftPlanSnapshot && typeof payload.draftPlanSnapshot === 'object')
-        ? payload.draftPlanSnapshot
-        : payload;
+    const draftPlanSnapshot = sanitizeDraftPlanSnapshot(
+        (payload.draftPlanSnapshot && typeof payload.draftPlanSnapshot === 'object')
+            ? payload.draftPlanSnapshot
+            : payload
+    );
     const hasPlanStructure = !!(
         draftPlanSnapshot
         && typeof draftPlanSnapshot === 'object'
@@ -2611,13 +2673,10 @@ function applyPlanPayloadToThread(threadId, payload, options = {}) {
             Array.isArray(draftPlanSnapshot.steps)
             || typeof draftPlanSnapshot.title === 'string'
             || (draftPlanSnapshot.dependencies && typeof draftPlanSnapshot.dependencies === 'object')
-            || (draftPlanSnapshot.progress && typeof draftPlanSnapshot.progress === 'object')
         )
     );
     const approvalState = normalizePlanApprovalState(payload.approvalState || draftPlanSnapshot.approvalState);
     const workspaceId = normalizeWorkspaceId(payload.workspaceId || options.workspaceId || null);
-    const statusText = String(payload.statusText || draftPlanSnapshot.statusText || '').trim();
-    const latestRevisionPrompt = String(payload.latestRevisionPrompt || draftPlanSnapshot.latestRevisionPrompt || '').trim();
     const patch = {};
 
     if (payload.executionId) patch.executionId = String(payload.executionId);
@@ -2625,12 +2684,6 @@ function applyPlanPayloadToThread(threadId, payload, options = {}) {
     if (approvalState) patch.planApprovalState = approvalState;
     if (typeof payload.planVersion !== 'undefined') {
         patch.planVersion = Number(payload.planVersion || 0);
-    }
-    if (typeof latestRevisionPrompt !== 'undefined') {
-        patch.latestRevisionPrompt = latestRevisionPrompt;
-    }
-    if (statusText) {
-        patch.statusText = statusText;
     }
     if (workspaceId) {
         patch.workspaceId = workspaceId;
@@ -2772,7 +2825,6 @@ function clearThreadPlanApprovalState(threadId) {
     delete thread.rightPanelState.planSessionId;
     delete thread.rightPanelState.planApprovalState;
     delete thread.rightPanelState.planVersion;
-    delete thread.rightPanelState.latestRevisionPrompt;
     delete thread.rightPanelState.draftPlanSnapshot;
     thread.updatedAt = Date.now();
     schedulePersistRightPanelState(threadId, {
@@ -2780,7 +2832,6 @@ function clearThreadPlanApprovalState(threadId) {
         planSessionId: null,
         planApprovalState: null,
         planVersion: null,
-        latestRevisionPrompt: null,
         draftPlanSnapshot: null
     });
     return true;
@@ -2791,52 +2842,78 @@ function upsertDraftPlanMessage(threadId, payload, options = {}) {
     if (!thread || !payload || typeof payload !== 'object') return null;
     const executionId = String(payload.executionId || '');
     const planSessionId = String(payload.planSessionId || '');
-    const approvalState = normalizePlanApprovalState(payload.approvalState);
+    const existingMessage = findDraftPlanMessageByExecution(threadId, executionId);
+    const existingMeta = (existingMessage && existingMessage.metadata && typeof existingMessage.metadata === 'object')
+        ? existingMessage.metadata
+        : {};
+    const threadState = (thread.rightPanelState && typeof thread.rightPanelState === 'object')
+        ? thread.rightPanelState
+        : {};
+    const approvalState = normalizePlanApprovalState(
+        payload.approvalState || existingMeta.approvalState || threadState.planApprovalState
+    ) || 'awaiting_user_approval';
     const planVersion = Number(payload.planVersion || 1) || 1;
-    const draftPlanSnapshot = (payload.draftPlanSnapshot && typeof payload.draftPlanSnapshot === 'object')
-        ? payload.draftPlanSnapshot
-        : payload;
+    const draftPlanSnapshot = sanitizeDraftPlanSnapshot(
+        (payload.draftPlanSnapshot && typeof payload.draftPlanSnapshot === 'object')
+            ? payload.draftPlanSnapshot
+            : payload
+    ) || { title: '执行计划', steps: [], dependencies: {} };
     const draftQuestion = String(payload.question || options.question || '').trim();
+    const incomingLatestRevisionPrompt = String(payload.latestRevisionPrompt || '').trim();
+    const existingLatestRevisionPrompt = String(existingMeta.latestRevisionPrompt || '').trim();
     const metadataPatch = {
-        type: 'draft_plan',
         executionId,
         planSessionId,
         planVersion,
         approvalState,
-        isActionable: PLAN_APPROVAL_ACTIONABLE_STATES.has(approvalState),
         draftPlanSnapshot,
-        latestRevisionPrompt: String(payload.latestRevisionPrompt || '').trim(),
-        statusText: String(payload.statusText || '').trim(),
-        errorMessage: String(payload.errorMessage || '').trim()
+        pendingKind: 'plan_draft',
+        pendingPlaceholder: false
     };
+    if (incomingLatestRevisionPrompt) {
+        metadataPatch.latestRevisionPrompt = incomingLatestRevisionPrompt;
+    } else if (existingLatestRevisionPrompt) {
+        metadataPatch.latestRevisionPrompt = existingLatestRevisionPrompt;
+    }
     if (draftQuestion) {
         metadataPatch.question = draftQuestion;
     }
     const content = buildDraftPlanTextFromSnapshot(draftPlanSnapshot);
-    const existingMessage = findDraftPlanMessageByExecution(threadId, executionId);
+    metadataPatch.content = content;
     if (existingMessage) {
         if (!metadataPatch.question) {
-            const existingMeta = (existingMessage.metadata && typeof existingMessage.metadata === 'object')
-                ? existingMessage.metadata
-                : {};
             if (existingMeta.question) {
                 metadataPatch.question = existingMeta.question;
             }
         }
-        updateDraftPlanMessageState(existingMessage, { ...metadataPatch, content });
+        updateDraftPlanMessageState(existingMessage, { ...metadataPatch, content: '' });
         return existingMessage;
     }
 
     const replaced = options.topic
-        ? resolvePendingAssistantPlaceholder(threadId, content, metadataPatch, { topic: options.topic })
+        ? resolvePendingAssistantPlaceholder(threadId, '', metadataPatch, { topic: options.topic })
         : false;
     if (replaced) {
         return findDraftPlanMessageByExecution(threadId, executionId);
     }
 
+    const fallbackPending = findPendingAssistantPlaceholder(threadId);
+    if (fallbackPending && fallbackPending.message) {
+        const fallbackMeta = (fallbackPending.message.metadata && typeof fallbackPending.message.metadata === 'object')
+            ? fallbackPending.message.metadata
+            : {};
+        const fallbackKind = String(fallbackMeta.pendingKind || '').trim();
+        if (fallbackMeta.pendingPlaceholder === true && (fallbackKind === 'plan_draft' || fallbackKind === 'send')) {
+            const replacedByFallback = resolvePendingAssistantPlaceholder(threadId, '', metadataPatch, {});
+            if (replacedByFallback) {
+                return findDraftPlanMessageByExecution(threadId, executionId);
+            }
+        }
+    }
+
     const nextMessage = {
         role: 'assistant',
-        content,
+        content: '',
         timestamp: Date.now(),
         metadata: metadataPatch
     };
@@ -2870,11 +2947,11 @@ function persistMessageStateToThread(thread, message, options = {}) {
         
         const hasExplicitPendingFlag = Object.prototype.hasOwnProperty.call(msgMeta, 'pendingPlaceholder');
         const shouldPreservePlaceholderMeta = hasExplicitPendingFlag
-            ? (msgMeta.pendingPlaceholder === true)
+            ? true
             : (baseMeta.pendingPlaceholder === true);
         const blacklistedMetaKeys = ['redoState', 'redoOf', 'redo_of', 'redoVersion'];
         if (!shouldPreservePlaceholderMeta) {
-            blacklistedMetaKeys.push('pendingPlaceholder', 'pendingKind', 'pendingTopic');
+            blacklistedMetaKeys.push('pendingPlaceholder', 'pendingKind', 'pendingTopic', 'pendingWorkspaceId');
         }
         blacklistedMetaKeys.forEach((key) => {
             if (Object.prototype.hasOwnProperty.call(mergedMeta, key)) {
@@ -2959,6 +3036,16 @@ function getDraftPlanBadgeText(approvalState) {
     }
 }
 
+function canOperateDraftPlanByState(approvalState) {
+    return PLAN_APPROVAL_ACTIONABLE_STATES.has(normalizePlanApprovalState(approvalState));
+}
+
+function getDraftPlanApprovalState(message) {
+    const metadata = (message && message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
+    const approvalState = normalizePlanApprovalState(metadata.approvalState);
+    return approvalState || 'awaiting_user_approval';
+}
+
 function getCoderRunBadgeText(approvalState, previewOnly = false) {
     if (previewOnly) return '可预览';
     switch (normalizePlanApprovalState(approvalState)) {
@@ -3002,46 +3089,50 @@ function renderDraftPlanCardToBubble(message, bubbleEl) {
         : {};
     const steps = Array.isArray(snapshot.steps) ? snapshot.steps : [];
     const dependencies = (snapshot.dependencies && typeof snapshot.dependencies === 'object') ? snapshot.dependencies : {};
-    const approvalState = normalizePlanApprovalState(metadata.approvalState || snapshot.approvalState);
-    const isActionable = metadata.isActionable !== false && PLAN_APPROVAL_ACTIONABLE_STATES.has(approvalState);
     const planTitle = String(snapshot.title || '执行计划').trim() || '执行计划';
     const planVersion = Number(metadata.planVersion || snapshot.planVersion || 1) || 1;
-    const errorMessage = String(metadata.errorMessage || '').trim();
 
-    const stepsHtml = steps.length > 0
-        ? steps.map((step, index) => {
-            const deps = Array.isArray(dependencies[String(index)]) ? dependencies[String(index)] : (Array.isArray(dependencies[index]) ? dependencies[index] : []);
-            const label = typeof step === 'string'
-                ? step
-                : (step?.title || step?.name || step?.fullName || `步骤 ${index + 1}`);
-            const depText = deps.length ? `依赖 ${deps.map((item) => Number(item) + 1).join(', ')}` : '';
-            return `
-                <li class="draft-plan-step-item">
-                    <span class="draft-plan-step-index">${index + 1}</span>
-                    <div class="draft-plan-step-body">
-                        <div class="draft-plan-step-title">${escapeHtml(String(label || '').trim())}</div>
-                        ${depText ? `<div class="draft-plan-step-meta">${escapeHtml(depText)}</div>` : ''}
-                    </div>
-                </li>
-            `;
-        }).join('')
-        : '<li class="draft-plan-step-item draft-plan-step-empty">Planner 尚未返回可执行步骤。</li>';
+    if (steps.length === 0) {
+        const startedAt = Number(message.timestamp) || Date.now();
+        const threadId = AppState.currentThreadId || '';
+        bubbleEl.innerHTML = `
+            <div class="thinking-indicator" data-thinking-kind="normal" data-thread-id="${threadId}" data-start-ts="${startedAt}">
+                <i class="fas fa-cog loading-spinner"></i>
+                <span class="thinking-label">正在制定问题解决方案</span>
+            </div>
+        `;
+        return;
+    }
+
+    const stepsHtml = steps.map((step, index) => {
+        const deps = Array.isArray(dependencies[String(index)]) ? dependencies[String(index)] : (Array.isArray(dependencies[index]) ? dependencies[index] : []);
+        const label = typeof step === 'string'
+            ? step
+            : (step?.title || step?.name || step?.fullName || `步骤 ${index + 1}`);
+        const depText = deps.length ? `依赖 ${deps.map((item) => Number(item) + 1).join(', ')}` : '';
+        return `
+            <li class="draft-plan-step-item">
+                <span class="draft-plan-step-index">${index + 1}</span>
+                <div class="draft-plan-step-body">
+                    <div class="draft-plan-step-title">${escapeHtml(String(label || '').trim())}</div>
+                    ${depText ? `<div class="draft-plan-step-meta">${escapeHtml(depText)}</div>` : ''}
+                </div>
+            </li>
+        `;
+    }).join('');
 
     bubbleEl.innerHTML = `
         <div class="draft-plan-card" data-draft-plan-message-id="${escapeHtml(String(ensureMessageId(message)))}">
             <div class="draft-plan-title-row">
                 <div class="draft-plan-title">${escapeHtml(planTitle)}</div>
-                <span class="draft-plan-version">v${planVersion}</span>
+                <span class="draft-plan-version">V${planVersion}</span>
             </div>
             <ol class="draft-plan-step-list">${stepsHtml}</ol>
-            ${errorMessage ? `<div class="draft-plan-error">${escapeHtml(errorMessage)}</div>` : ''}
             <div class="draft-plan-footer">
-                ${isActionable ? `
-                    <div class="draft-plan-actions">
-                        <button class="btn-modal-primary draft-plan-action-btn" data-draft-plan-action="approve">执行计划</button>
-                        <button class="btn-modal-secondary draft-plan-action-btn" data-draft-plan-action="revise">修改计划</button>
-                    </div>
-                ` : ''}
+                <div class="draft-plan-actions">
+                    <button class="btn-modal-primary draft-plan-action-btn" data-draft-plan-action="approve">执行计划</button>
+                    <button class="btn-modal-secondary draft-plan-action-btn" data-draft-plan-action="revise">修改计划</button>
+                </div>
             </div>
         </div>
     `;
@@ -3087,18 +3178,23 @@ function renderPendingPlaceholderToBubble(bubbleEl, threadId) {
     if (!bubbleEl) return;
     const startedAt = Date.now();
     const threadIdAttr = String(threadId || '');
+    const labelText = '正在制定问题解决方案';
     bubbleEl.innerHTML = `
         <div class="thinking-indicator" data-thinking-kind="normal" data-thread-id="${threadIdAttr}" data-start-ts="${startedAt}">
             <i class="fas fa-cog loading-spinner"></i>
-            <span class="thinking-label">正在制定问题解决方案</span>
+            <span class="thinking-label">${labelText}</span>
         </div>
     `;
+}
+
+function resolvePendingPlaceholderLabel(metadata = {}, threadId = '') {
+    return '正在制定问题解决方案';
 }
 
 function renderMessageBubbleContent(message, bubbleEl) {
     if (!message || !bubbleEl) return;
     const metadata = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
-    if (message.role === 'assistant' && metadata.type === 'draft_plan') {
+    if (message.role === 'assistant' && isDraftPlanMessage(message)) {
         renderDraftPlanCardToBubble(message, bubbleEl);
         return;
     }
@@ -3111,10 +3207,11 @@ function renderMessageBubbleContent(message, bubbleEl) {
     if (isPendingPlaceholder || isEmptyAssistantMessage) {
         const startedAt = Number(message.timestamp) || Date.now();
         const threadId = AppState.currentThreadId || '';
+        const labelText = resolvePendingPlaceholderLabel(metadata, threadId);
         bubbleEl.innerHTML = `
             <div class="thinking-indicator" data-thinking-kind="normal" data-thread-id="${threadId}" data-start-ts="${startedAt}">
                 <i class="fas fa-cog loading-spinner"></i>
-                <span class="thinking-label">正在制定问题解决方案</span>
+                <span class="thinking-label">${labelText}</span>
             </div>
         `;
         return;
@@ -3194,7 +3291,9 @@ function findDraftPlanMessageByExecution(threadId, executionId) {
     return messages.find((msg) => {
         if (!msg || msg.role !== 'assistant') return false;
         const metadata = (msg.metadata && typeof msg.metadata === 'object') ? msg.metadata : {};
-        return metadata.type === 'draft_plan' && String(metadata.executionId || '') === String(executionId);
+        return String(metadata.pendingKind || '').trim() === 'plan_draft'
+            && metadata.pendingPlaceholder === false
+            && String(metadata.executionId || '') === String(executionId);
     }) || null;
 }
 
@@ -3218,14 +3317,113 @@ function updateDraftPlanMessageState(message, patch = {}) {
     const targetMessage = located.message;
     const thread = located.thread;
     const baseMeta = (targetMessage.metadata && typeof targetMessage.metadata === 'object') ? targetMessage.metadata : {};
-    targetMessage.metadata = { ...baseMeta, ...patch };
-    if (typeof patch.content === 'string') {
-        targetMessage.content = patch.content;
+    const nextContent = (typeof patch.content === 'string') ? patch.content : null;
+    const metaPatch = { ...patch };
+    delete metaPatch.content;
+    const nextMeta = { ...baseMeta, ...metaPatch };
+    nextMeta.pendingPlaceholder = false;
+    nextMeta.pendingKind = 'plan_draft';
+    delete nextMeta.type;
+    delete nextMeta.pendingStatus;
+    delete nextMeta.statusText;
+    delete nextMeta.errorMessage;
+    targetMessage.metadata = nextMeta;
+    if (nextContent !== null) {
+        targetMessage.content = nextContent;
     }
     targetMessage.timestamp = Date.now();
     persistMessageStateToThread(thread, targetMessage, { syncContent: true, syncTimestamp: true });
     thread.updatedAt = Date.now();
     void syncThreadMessagesToBackend(thread);
+    if (thread.id === AppState.currentThreadId) {
+        loadMessages(getRenderableMessagesFromThread(thread));
+        scrollToBottom();
+    } else {
+        renderFolderList();
+    }
+    return true;
+}
+
+function replaceDraftPlanMessageWithPendingPlaceholder(message, options = {}) {
+    if (!message) return null;
+    const located = findMessageByIdInAllThreads(ensureMessageId(message));
+    if (!located || !located.thread || !located.message) return null;
+
+    const targetMessage = located.message;
+    const thread = located.thread;
+    const previousMeta = (targetMessage.metadata && typeof targetMessage.metadata === 'object') ? targetMessage.metadata : {};
+    const pendingKind = String(options.pendingKind || 'send').trim() || 'send';
+    const pendingTopic = Object.prototype.hasOwnProperty.call(previousMeta, 'pendingTopic')
+        ? previousMeta.pendingTopic
+        : null;
+    const pendingWorkspaceId = Object.prototype.hasOwnProperty.call(previousMeta, 'pendingWorkspaceId')
+        ? previousMeta.pendingWorkspaceId
+        : null;
+    const nextMeta = {
+        ...previousMeta,
+        pendingPlaceholder: true,
+        pendingKind,
+        pendingTopic,
+        pendingWorkspaceId,
+        pendingStatus: null,
+        executionId: null,
+        planSessionId: null,
+        planVersion: null,
+        approvalState: null,
+        draftPlanSnapshot: null,
+        question: null,
+        latestRevisionPrompt: null,
+        content: null,
+        type: null,
+        statusText: null,
+        errorMessage: null
+    };
+    targetMessage.metadata = nextMeta;
+    targetMessage.content = '';
+    targetMessage.timestamp = Date.now();
+
+    persistMessageStateToThread(thread, targetMessage, { syncContent: true, syncTimestamp: true });
+    thread.updatedAt = Date.now();
+    void syncThreadMessagesToBackend(thread);
+
+    if (thread.id === AppState.currentThreadId) {
+        loadMessages(getRenderableMessagesFromThread(thread));
+        scrollToBottom();
+    } else {
+        renderFolderList();
+    }
+
+    return ensureMessageId(targetMessage);
+}
+
+function updatePendingPlaceholderState(threadId, options = {}) {
+    const topic = String(options.topic || '').trim();
+    const found = topic ? findPendingAssistantPlaceholder(threadId, topic) : findPendingAssistantPlaceholder(threadId);
+    if (!found || !found.message || !found.thread) return false;
+
+    const targetMessage = found.message;
+    const thread = found.thread;
+    const baseMeta = (targetMessage.metadata && typeof targetMessage.metadata === 'object') ? targetMessage.metadata : {};
+    const patch = (options.patch && typeof options.patch === 'object') ? options.patch : {};
+    const nextMeta = {
+        ...baseMeta,
+        ...patch,
+        pendingPlaceholder: true,
+        pendingKind: String(baseMeta.pendingKind || 'plan_draft').trim() || 'plan_draft'
+    };
+
+    Object.keys(patch).forEach((key) => {
+        if (patch[key] === null) {
+            delete nextMeta[key];
+        }
+    });
+
+    targetMessage.metadata = nextMeta;
+    targetMessage.timestamp = Date.now();
+    persistMessageStateToThread(thread, targetMessage, { syncContent: false, syncTimestamp: true });
+    thread.updatedAt = Date.now();
+    void syncThreadMessagesToBackend(thread);
+
     if (thread.id === AppState.currentThreadId) {
         loadMessages(getRenderableMessagesFromThread(thread));
         scrollToBottom();
@@ -3278,7 +3476,6 @@ function upsertCoderRunMessage(threadId, payload, options = {}) {
         targetFile: String(payload.targetFile || '').trim(),
         topic: String(options.topic || payload.topic || '').trim(),
         approvalState: normalizePlanApprovalState(payload.approvalState),
-        isActionable: payload.isActionable === true,
         previewOnly: payload.previewOnly === true,
         language: String(payload.language || '').trim(),
         reason: String(payload.reason || '').trim(),
@@ -3423,7 +3620,6 @@ function bindCoderRunCardActions(messageItem, message) {
             if (!sourceThreadId || !executionId || !topic || !window.WebSocketService || typeof WebSocketService.sendActionMessage !== 'function') {
                 updateCoderRunMessageState(currentMessage, {
                     approvalState: 'failed',
-                    isActionable: false,
                     statusText: '未找到当前运行会话，代码运行请求已失效',
                     errorMessage: '未找到当前运行会话，代码运行请求已失效'
                 });
@@ -3435,8 +3631,7 @@ function bindCoderRunCardActions(messageItem, message) {
                 ? { approvalState: 'code_running', statusText: '已批准，代码正在运行中', errorMessage: '' }
                 : { approvalState: 'code_run_skipped', statusText: '已跳过代码运行，代码保留在沙箱中', errorMessage: '' };
             updateCoderRunMessageState(currentMessage, {
-                ...nextState,
-                isActionable: false
+                ...nextState
             });
 
             const outboundMessage = buildCoderRunActionMessage(sourceThreadId, metadata, wsAction);
@@ -3462,8 +3657,9 @@ function bindMessageMetaActions(messageItem, message) {
                 resolvedMessageId: ensureMessageId(currentMessage)
             });
 
-            const threadBusy = isThreadExecuting(AppState.currentThreadId) || hasThreadExecutionEvidence(AppState.currentThreadId);
-            if (threadBusy && (action === 'redo' || action === 'delete' || action === 'locate')) {
+            const threadBusy = isThreadInputLocked(AppState.currentThreadId)
+                || hasThreadExecutionEvidence(AppState.currentThreadId);
+            if (threadBusy && (action === 'redo' || action === 'delete' || action === 'locate' || action === 'export')) {
                 return;
             }
 
@@ -3645,13 +3841,11 @@ async function approveDraftPlanMessage(message) {
     const sourceThreadId = located.thread.id;
     const currentMessage = located.message;
     const metadata = (currentMessage.metadata && typeof currentMessage.metadata === 'object') ? currentMessage.metadata : {};
-    const approvalState = normalizePlanApprovalState(metadata.approvalState);
-    if (!PLAN_APPROVAL_ACTIONABLE_STATES.has(approvalState)) {
-        return false;
-    }
-
-    const executionId = String(metadata.executionId || '').trim();
-    const planSessionId = String(metadata.planSessionId || '').trim();
+    const threadState = (located.thread && located.thread.rightPanelState && typeof located.thread.rightPanelState === 'object')
+        ? located.thread.rightPanelState
+        : {};
+    const executionId = String(metadata.executionId || threadState.executionId || '').trim();
+    const planSessionId = String(metadata.planSessionId || threadState.planSessionId || '').trim();
     const question = resolveDraftPlanQuestion(sourceThreadId, currentMessage);
     if (!executionId || !planSessionId || !question) {
         console.warn('[approveDraftPlanMessage] 缺少审批所需上下文', {
@@ -3663,12 +3857,14 @@ async function approveDraftPlanMessage(message) {
         return false;
     }
 
-    updateDraftPlanMessageState(currentMessage, {
-        approvalState: 'approved',
-        isActionable: false,
-        question,
-        statusText: '计划已确认，准备执行',
-        errorMessage: ''
+    clearRightPanelImmediatelyForNewRun(sourceThreadId);
+
+    const pendingPlaceholderMessageId = replaceDraftPlanMessageWithPendingPlaceholder(currentMessage, {
+        pendingKind: 'send',
+        executionId,
+        planSessionId,
+        latestRevisionPrompt: String(metadata.latestRevisionPrompt || '').trim(),
+        question
     });
     applyPlanPayloadToThread(sourceThreadId, {
         executionId,
@@ -3676,16 +3872,12 @@ async function approveDraftPlanMessage(message) {
         approvalState: 'approved',
         planVersion: metadata.planVersion,
         latestRevisionPrompt: metadata.latestRevisionPrompt || '',
-        draftPlanSnapshot: metadata.draftPlanSnapshot || {},
-        statusText: '计划已确认，准备执行'
+        draftPlanSnapshot: metadata.draftPlanSnapshot || {}
     }, {
         renderCurrentThread: false
     });
 
     const outboundPayload = buildPlanActionOutboundPayload(sourceThreadId, question);
-    const pendingPlaceholderMessageId = ensureThreadPendingPlaceholder(sourceThreadId, {
-        pendingKind: 'send'
-    });
 
     const topic = await sendToBackend(question, sourceThreadId, outboundPayload, {
         wsAction: 'plan_approve',
@@ -3693,7 +3885,8 @@ async function approveDraftPlanMessage(message) {
         executionId,
         planSessionId,
         pendingPlaceholderMessageId,
-        pendingKind: 'send'
+        pendingKind: 'send',
+        workspaceId: normalizeWorkspaceId(metadata.pendingWorkspaceId || threadState.workspaceId || null)
     });
     return !!topic;
 }
@@ -3705,23 +3898,20 @@ function openPlanRevisionModal(message) {
 
     const currentMessage = located.message;
     const metadata = (currentMessage.metadata && typeof currentMessage.metadata === 'object') ? currentMessage.metadata : {};
-    const approvalState = normalizePlanApprovalState(metadata.approvalState);
-    const isActionable = metadata.isActionable === true || PLAN_APPROVAL_ACTIONABLE_STATES.has(approvalState);
-    if (!isActionable) {
-        return;
-    }
-
+    const threadState = (located.thread && located.thread.rightPanelState && typeof located.thread.rightPanelState === 'object')
+        ? located.thread.rightPanelState
+        : {};
     const question = resolveDraftPlanQuestion(located.thread.id, currentMessage);
     pendingPlanRevisionContext = {
         threadId: located.thread.id,
         messageId: ensureMessageId(currentMessage),
-        executionId: String(metadata.executionId || '').trim(),
-        planSessionId: String(metadata.planSessionId || '').trim(),
+        executionId: String(metadata.executionId || threadState.executionId || '').trim(),
+        planSessionId: String(metadata.planSessionId || threadState.planSessionId || '').trim(),
         question,
         draftKey: buildPlanRevisionDraftKey(
             located.thread.id,
-            String(metadata.executionId || '').trim(),
-            String(metadata.planSessionId || '').trim()
+            String(metadata.executionId || threadState.executionId || '').trim(),
+            String(metadata.planSessionId || threadState.planSessionId || '').trim()
         )
     };
 
@@ -3775,52 +3965,60 @@ async function submitPlanRevision() {
 
     const currentMessage = found.message;
     const metadata = (currentMessage.metadata && typeof currentMessage.metadata === 'object') ? currentMessage.metadata : {};
+    const threadState = (found.thread && found.thread.rightPanelState && typeof found.thread.rightPanelState === 'object')
+        ? found.thread.rightPanelState
+        : {};
+    const executionId = String(ctx.executionId || metadata.executionId || threadState.executionId || '').trim();
+    const planSessionId = String(ctx.planSessionId || metadata.planSessionId || threadState.planSessionId || '').trim();
     const question = ctx.question || resolveDraftPlanQuestion(found.thread.id, currentMessage);
-    if (!ctx.executionId || !ctx.planSessionId || !question) {
+    if (!executionId || !planSessionId || !question) {
         console.warn('[submitPlanRevision] 缺少修改计划所需上下文', {
             threadId: found.thread.id,
-            executionId: ctx.executionId,
-            planSessionId: ctx.planSessionId,
+            executionId,
+            planSessionId,
             hasQuestion: !!question
         });
-        closePlanRevisionModal();
+        alert('当前计划上下文不完整，请先重新生成计划后再修改。');
         return false;
     }
 
+    clearRightPanelImmediatelyForNewRun(found.thread.id);
+
     updateDraftPlanMessageState(currentMessage, {
-        approvalState: 'revising',
-        isActionable: false,
-        question,
-        latestRevisionPrompt: revisionPrompt,
-        statusText: '正在根据建议调整计划',
-        errorMessage: ''
+        latestRevisionPrompt: revisionPrompt
     });
+
+    const pendingPlaceholderMessageId = replaceDraftPlanMessageWithPendingPlaceholder(currentMessage, {
+        pendingKind: 'send',
+        executionId,
+        planSessionId,
+        latestRevisionPrompt: revisionPrompt,
+        question
+    });
+
     applyPlanPayloadToThread(found.thread.id, {
-        executionId: ctx.executionId,
-        planSessionId: ctx.planSessionId,
+        executionId,
+        planSessionId,
         approvalState: 'revising',
         planVersion: metadata.planVersion,
         latestRevisionPrompt: revisionPrompt,
-        draftPlanSnapshot: metadata.draftPlanSnapshot || {},
-        statusText: '正在根据建议调整计划'
+        draftPlanSnapshot: metadata.draftPlanSnapshot || {}
     }, {
         renderCurrentThread: false
     });
 
     const outboundPayload = buildPlanActionOutboundPayload(found.thread.id, question);
-    const pendingPlaceholderMessageId = ensureThreadPendingPlaceholder(found.thread.id, {
-        pendingKind: 'send'
-    });
 
     closePlanRevisionModal();
     const topic = await sendToBackend(question, found.thread.id, outboundPayload, {
         wsAction: 'plan_revise_execute',
         requirePlanApproval: true,
-        executionId: ctx.executionId,
-        planSessionId: ctx.planSessionId,
-        revisionPrompt,
+        executionId,
+        planSessionId,
         pendingPlaceholderMessageId,
-        pendingKind: 'send'
+        pendingKind: 'send',
+        revisionPrompt,
+        workspaceId: normalizeWorkspaceId(metadata.pendingWorkspaceId || threadState.workspaceId || null)
     });
     return !!topic;
 }
@@ -4103,7 +4301,7 @@ function markMessageAsRedoPending(message, messageItem) {
     return ensureMessageId(pendingAssistantPlaceholder);
 }
 
-function markMessageAsSendPending() {
+function markMessageAsSendPending(pendingKind = 'send') {
     const thread = getCurrentThread();
     if (!thread) return null;
 
@@ -4113,7 +4311,7 @@ function markMessageAsSendPending() {
         timestamp: Date.now(),
         metadata: {
             pendingPlaceholder: true,
-            pendingKind: 'send'
+            pendingKind: String(pendingKind || 'send').trim() || 'send'
         }
     };
 
@@ -4513,18 +4711,49 @@ function resolvePendingAssistantPlaceholder(threadId, content, metadataPatch = {
     const { thread, message, messageId } = found;
     const baseMeta = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
     const previousPendingTopic = baseMeta.pendingTopic;
+    const hasExplicitPendingKind = Object.prototype.hasOwnProperty.call(metadataPatch, 'pendingKind');
+    const nextPendingKind = String(metadataPatch.pendingKind || '').trim();
+    const hasExplicitPendingPlaceholder = Object.prototype.hasOwnProperty.call(metadataPatch, 'pendingPlaceholder');
+    const nextPendingPlaceholder = hasExplicitPendingPlaceholder
+        ? metadataPatch.pendingPlaceholder === true
+        : false;
 
     const mergedMeta = {
         ...baseMeta,
         ...metadataPatch,
-        pendingPlaceholder: false
+        pendingPlaceholder: nextPendingPlaceholder
     };
-    delete mergedMeta.pendingTopic;
-    delete mergedMeta.pendingKind;
-    delete mergedMeta.pendingWorkspaceId;
+
+    // 仅当上游明确要求时才保留 pendingKind，避免普通消息替换被误判为 draft 卡片。
+    if (hasExplicitPendingKind) {
+        mergedMeta.pendingKind = nextPendingKind;
+    } else {
+        mergedMeta.pendingKind = null;
+    }
+
+    if (!hasExplicitPendingPlaceholder) {
+        mergedMeta.pendingPlaceholder = null;
+    }
+
+    if (!hasExplicitPendingPlaceholder || nextPendingPlaceholder !== true) {
+        mergedMeta.pendingStatus = null;
+        const keepDraftIdentity = hasExplicitPendingKind
+            && nextPendingKind === 'plan_draft'
+            && nextPendingPlaceholder === false;
+        if (!keepDraftIdentity) {
+            mergedMeta.pendingKind = null;
+            mergedMeta.pendingTopic = null;
+            mergedMeta.pendingWorkspaceId = null;
+        }
+    }
+
+    delete mergedMeta.type;
     delete mergedMeta.rightPanelState;
     message.metadata = mergedMeta;
-    if (previousPendingTopic) {
+    const shouldKeepTopicBinding =
+        mergedMeta.pendingPlaceholder === true
+        || (String(mergedMeta.pendingKind || '').trim() === 'plan_draft' && mergedMeta.pendingPlaceholder === false);
+    if (previousPendingTopic && !shouldKeepTopicBinding) {
         unbindTopic(previousPendingTopic);
     }
     message.content = String(content || '');
@@ -4572,6 +4801,49 @@ function tryConsumeRedoByAssistantMessage(message, threadId = AppState.currentTh
 
 const pendingAssistantMessages = [];
 let pendingAssistantFlushTimer = null;
+const planDraftRetryTimers = new Map();
+
+function clearPlanDraftRetry(threadId) {
+    const key = String(threadId || '').trim();
+    if (!key) return;
+    const timer = planDraftRetryTimers.get(key);
+    if (timer) {
+        clearTimeout(timer);
+        planDraftRetryTimers.delete(key);
+    }
+}
+
+function schedulePlanDraftRetry(threadId, payload = {}) {
+    const key = String(threadId || '').trim();
+    if (!key) return;
+    if (planDraftRetryTimers.has(key)) return;
+
+    const timer = setTimeout(async () => {
+        planDraftRetryTimers.delete(key);
+
+        const thread = getThreadById(key);
+        if (!thread) return;
+
+        const executionId = String(payload.executionId || '').trim() || String(thread?.rightPanelState?.executionId || '').trim();
+        const planSessionId = String(payload.planSessionId || '').trim() || String(thread?.rightPanelState?.planSessionId || '').trim();
+        const question = resolveDraftPlanQuestion(key, executionId ? findDraftPlanMessageByExecution(key, executionId) : null);
+        if (!executionId || !planSessionId || !question) {
+            console.warn('[plan-draft-retry] 缺少重试上下文，取消本次重试', { threadId: key, executionId, planSessionId, hasQuestion: !!question });
+            return;
+        }
+
+        const outboundPayload = buildPlanActionOutboundPayload(key, question);
+        console.warn('[plan-draft-retry] 收到失败状态，发起自动重试', { threadId: key, executionId, planSessionId });
+        await sendToBackend(question, key, outboundPayload, {
+            wsAction: 'plan_draft',
+            requirePlanApproval: true,
+            executionId,
+            planSessionId
+        });
+    }, 1200);
+
+    planDraftRetryTimers.set(key, timer);
+}
 
 function flushPendingAssistantMessages() {
     if (pendingAssistantFlushTimer) return;
@@ -5592,7 +5864,7 @@ async function sendMessage() {
     
     // 统一通过 addMessage 写入（树结构/线性兼容），避免双写导致错位
     addMessage(userMessage);
-    const pendingPlaceholderMessageId = markMessageAsSendPending();
+    const pendingPlaceholderMessageId = markMessageAsSendPending('plan_draft');
 
     // 普通发送与 redo 对齐：写入 user + pending 后立即强制落盘，避免 sessions.json 丢消息。
     const sendingThread = getThreadById(sourceThreadId);
@@ -5602,9 +5874,7 @@ async function sendMessage() {
             planSessionId,
             planApprovalState: 'drafting',
             planVersion: 0,
-            latestRevisionPrompt: '',
-            draftPlanSnapshot: null,
-            statusText: '正在生成计划'
+            draftPlanSnapshot: null
         });
         await syncThreadMessagesToBackend(sendingThread);
     }
@@ -5618,7 +5888,7 @@ async function sendMessage() {
         executionId,
         planSessionId,
         pendingPlaceholderMessageId,
-        pendingKind: 'send'
+        pendingKind: 'send',
     });
 }
 
@@ -5668,6 +5938,7 @@ async function sendToBackend(message, sourceThreadId = AppState.currentThreadId,
             executionId: sendOptions.executionId || null,
             planSessionId: sendOptions.planSessionId || null,
             revisionPrompt: sendOptions.revisionPrompt || '',
+            workspaceId: normalizeWorkspaceId(sendOptions.workspaceId || null),
             agentRunConfig
         });
         if (sendOptions && sendOptions.isRedo) {
@@ -5693,7 +5964,13 @@ async function sendToBackend(message, sourceThreadId = AppState.currentThreadId,
                 const placeholderMsg = found && found.message ? found.message : null;
                 if (thread && placeholderMsg) {
                     const baseMeta = (placeholderMsg.metadata && typeof placeholderMsg.metadata === 'object') ? placeholderMsg.metadata : {};
-                    const boundWorkspaceId = getWorkspaceIdByTopic(topic);
+                    const preferredWorkspaceId = normalizeWorkspaceId(sendOptions.workspaceId)
+                        || normalizeWorkspaceId(baseMeta.pendingWorkspaceId)
+                        || null;
+                    const boundWorkspaceId = getWorkspaceIdByTopic(topic) || preferredWorkspaceId;
+                    if (boundWorkspaceId) {
+                        bindTopicToWorkspace(topic, boundWorkspaceId);
+                    }
                     placeholderMsg.metadata = {
                         ...baseMeta,
                         pendingPlaceholder: true,
@@ -5828,34 +6105,67 @@ async function handleWebSocketMessage(message) {
             });
 
             const shouldReplaceInitialPlaceholder = !existingDraftMessage
-                && (messageType === 'plan_approval_state')
-                && ['drafting', 'awaiting_user_approval', 'failed'].includes(approvalState);
+                && !!topic
+                && (
+                    (messageType === 'plan_approval_state'
+                        && ['drafting', 'revising', 'awaiting_user_approval', 'failed'].includes(approvalState))
+                    || messageType === 'plan_revision_applied'
+                );
 
-            const draftMessage = upsertDraftPlanMessage(effectiveThreadId, payloadWithQuestion, {
-                topic: shouldReplaceInitialPlaceholder ? topic : null,
-                question
-            });
+            const pendingByTopic = topic ? findPendingAssistantPlaceholder(effectiveThreadId, topic) : null;
+            const pendingMetaByTopic = (pendingByTopic && pendingByTopic.message && pendingByTopic.message.metadata && typeof pendingByTopic.message.metadata === 'object')
+                ? pendingByTopic.message.metadata
+                : {};
+            const shouldMarkExecutionPending = shouldTreatAsExecutionPending(messageType, approvalState);
+            const isExecutionLocked =
+                shouldMarkExecutionPending
+                && pendingMetaByTopic.pendingPlaceholder === true
+                && String(pendingMetaByTopic.pendingKind || '').trim() !== 'plan_draft';
+            const shouldUpsertDraft = !isExecutionLocked && shouldUpsertDraftPlanForEvent(messageType, approvalState);
 
-            if (messageType === 'plan_execution_started') {
+            const draftMessage = shouldUpsertDraft
+                ? upsertDraftPlanMessage(effectiveThreadId, payloadWithQuestion, {
+                    topic: shouldReplaceInitialPlaceholder ? topic : null,
+                    question
+                })
+                : null;
+
+            if (shouldMarkExecutionPending) {
+                updatePendingPlaceholderState(effectiveThreadId, {
+                    topic,
+                    patch: {
+                        pendingKind: 'send',
+                        pendingStatus: null
+                    }
+                });
                 if (draftMessage) {
                     updateDraftPlanMessageState(draftMessage, {
                         approvalState: 'executing',
-                        isActionable: false,
-                        question,
-                        statusText: String(payload.statusText || '正在执行中').trim() || '正在执行中',
-                        errorMessage: ''
+                        question
                     });
                 }
-                ensureThreadPendingPlaceholder(effectiveThreadId, {
-                    topic,
-                    pendingKind: 'send',
-                    workspaceId: payload.workspaceId || getWorkspaceIdByTopic(topic)
-                });
                 if (finalReportRetryStateByThread.has(effectiveThreadId)) {
                     finalReportRetryStateByThread.delete(effectiveThreadId);
                 }
                 void setThreadExecutingState(effectiveThreadId, true);
+                clearPlanDraftRetry(effectiveThreadId);
                 return true;
+            }
+
+            if (approvalState === 'approved') {
+                updatePendingPlaceholderState(effectiveThreadId, {
+                    topic,
+                    patch: {
+                        pendingKind: 'send',
+                        pendingStatus: null
+                    }
+                });
+            }
+
+            if (approvalState === 'failed') {
+                schedulePlanDraftRetry(effectiveThreadId, payloadWithQuestion);
+            } else {
+                clearPlanDraftRetry(effectiveThreadId);
             }
 
             if (approvalState === 'awaiting_user_approval' || approvalState === 'failed') {
@@ -5874,7 +6184,6 @@ async function handleWebSocketMessage(message) {
                 const approvalState = normalizePlanApprovalState(payload.approvalState);
                 updateCoderRunMessageState(message, {
                     approvalState,
-                    isActionable: false,
                     statusText: String(payload.statusText || '').trim(),
                     errorMessage: String(payload.errorMessage || '').trim()
                 });
@@ -5967,7 +6276,6 @@ async function handleWebSocketMessage(message) {
                     if (embeddedEventType === 'coder_run_request_state' && coderRunMessage) {
                         updateCoderRunMessageState(coderRunMessage, {
                             approvalState: normalizePlanApprovalState(initData?.approvalState),
-                            isActionable: false,
                             statusText: String(initData?.statusText || '').trim(),
                             errorMessage: String(initData?.errorMessage || '').trim()
                         });
@@ -5999,6 +6307,19 @@ async function handleWebSocketMessage(message) {
                             workspaceId: getWorkspaceIdByTopic(topic),
                             renderCurrentThread: false
                         });
+
+                        const embeddedPlanEventType = embeddedEventType || 'plan_approval_state';
+                        const shouldMarkEmbeddedExecutionPending = shouldTreatAsExecutionPending(embeddedPlanEventType, approvalState);
+
+                        if (shouldMarkEmbeddedExecutionPending) {
+                            updatePendingPlaceholderState(targetThreadId, {
+                                topic,
+                                patch: {
+                                    pendingKind: 'send',
+                                    pendingStatus: null
+                                }
+                            });
+                        }
                     }
                     const externalTaskKey = messageData?.data?.uuid || topic || null;
                     const ensured = ensureRuntimeTaskForThread(targetThreadId, {

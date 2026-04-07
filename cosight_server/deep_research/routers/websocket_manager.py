@@ -240,6 +240,9 @@ async def _send_resp(websocket, cookie, topic, message, lang, request_action="me
         revision_prompt = from_back_end.get("revisionPrompt")
         if isinstance(revision_prompt, str) and revision_prompt.strip():
             params["revisionPrompt"] = revision_prompt
+        workspace_id = from_back_end.get("workspaceId")
+        if isinstance(workspace_id, str) and workspace_id.strip():
+            params["workspaceId"] = workspace_id.strip()
         plan_session_id = incoming_session_info.get("planSessionId") or from_back_end.get("planSessionId")
         if isinstance(plan_session_id, str) and plan_session_id:
             params["planSessionId"] = plan_session_id

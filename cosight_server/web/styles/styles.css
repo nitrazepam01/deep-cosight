@@ -1568,9 +1568,7 @@ select.settings-input option:checked {
     justify-content: flex-start;
 }
 
-.message-item.draft-plan-message .message-meta {
-    display: none;
-}
+
 
 .message-meta-right {
     margin-left: auto;
@@ -1867,19 +1865,9 @@ select.settings-input option:checked {
     color: #b45309;
 }
 
-.draft-plan-badge-revising {
-    background: #ede9fe;
-    color: #6d28d9;
-}
-
 .draft-plan-badge-approved {
     background: #dbeafe;
     color: #1d4ed8;
-}
-
-.draft-plan-badge-executing {
-    background: #dcfce7;
-    color: #15803d;
 }
 
 .draft-plan-badge-completed {
@@ -1933,12 +1921,6 @@ select.settings-input option:checked {
     border: 1px solid #e2e8f0;
     border-radius: 14px;
     background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-}
-
-.draft-plan-step-empty {
-    justify-content: center;
-    color: #64748b;
-    font-size: 14px;
 }
 
 .draft-plan-step-index {

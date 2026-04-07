@@ -734,6 +734,7 @@
                     knowledgeBases: (typeof KnowledgeService !== 'undefined') ? KnowledgeService.getSelectedKBIds() : [],
                     requirePlanApproval: options.requirePlanApproval === true,
                     revisionPrompt: options.revisionPrompt || '',
+                    workspaceId: options.workspaceId || '',
                     planSessionId: planSessionId
                 }
             },

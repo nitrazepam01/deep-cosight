@@ -671,6 +671,7 @@ async def search(request: Request, params: Any = Body(None)):
         plan_session_id = f"plan_session_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
     plan_action = _normalize_plan_action(params.get("planAction"), require_plan_approval=require_plan_approval)
     revision_prompt = str(params.get("revisionPrompt") or "").strip()
+    requested_workspace_id = str(params.get("workspaceId") or "").strip()
 
     # 获取查询内容
     content_array = params.get('content', [])
@@ -699,8 +700,12 @@ async def search(request: Request, params: Any = Body(None)):
 
     # 确定 workspace_id
     if is_existing_approval_followup:
-        workspace_id = (existing_plan_session or {}).get("workspace_id")
+        workspace_id = requested_workspace_id or (existing_plan_session or {}).get("workspace_id")
         work_space_path_time = (existing_plan_session or {}).get("workspace_path")
+        if not work_space_path_time and workspace_id:
+            candidate_workspace = os.path.join(work_space_path, workspace_id)
+            if os.path.exists(candidate_workspace):
+                work_space_path_time = candidate_workspace
         if work_space_path_time:
             os.environ['WORKSPACE_PATH'] = work_space_path_time
     elif not is_replay_request:

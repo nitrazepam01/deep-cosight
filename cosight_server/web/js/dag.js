@@ -876,6 +876,10 @@ function createDag(messageData) {
         const isKeyZeroBased = minKey === 0;
         const isValZeroBased = minVal === 0;
         
+        const stepStatuses = (initData.step_statuses && typeof initData.step_statuses === 'object')
+            ? initData.step_statuses
+            : {};
+
         // 构建节点数据
         const nodes = initData.steps.map((step, index) => {
             const stepId = index + 1; // 步骤ID始终是1-based
@@ -916,7 +920,7 @@ function createDag(messageData) {
                 id: stepId,
                 name: `Step${stepId}`,
                 fullName: step,  // 保留完整名称用于其他用途
-                status: initData.step_statuses[step] || "not_started",
+                status: stepStatuses[step] || stepStatuses[`step_${stepId}`] || stepStatuses[String(stepId)] || "not_started",
                 step_notes: stepNotesValue,
                 dependencies: dependencies,
                 plannedAgentId: plannedAgentId,

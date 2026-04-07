@@ -169,7 +169,79 @@ def sanitize_right_panel_state(incoming_state: dict, current_state: Optional[Dic
         return None
     current_state = current_state if isinstance(current_state, dict) else {}
     merged_state = {**current_state, **incoming_state}
+
+    if "latestRevisionPrompt" in merged_state:
+        merged_state.pop("latestRevisionPrompt", None)
+    if "statusText" in merged_state:
+        merged_state.pop("statusText", None)
+
+    if "draftPlanSnapshot" in merged_state:
+        merged_state["draftPlanSnapshot"] = sanitize_draft_plan_snapshot(merged_state.get("draftPlanSnapshot"))
+
     return merged_state
+
+
+def sanitize_draft_plan_snapshot(snapshot):
+    if not isinstance(snapshot, dict):
+        return None
+
+    title = str(snapshot.get("title") or "执行计划").strip() or "执行计划"
+
+    raw_steps = snapshot.get("steps") if isinstance(snapshot.get("steps"), list) else []
+    steps = []
+    for idx, step in enumerate(raw_steps):
+        if isinstance(step, str):
+            label = step.strip()
+        elif isinstance(step, dict):
+            label = str(step.get("title") or step.get("name") or step.get("fullName") or f"步骤 {idx + 1}").strip()
+        else:
+            label = str(step or "").strip()
+        if label:
+            steps.append(label)
+
+    raw_deps = snapshot.get("dependencies") if isinstance(snapshot.get("dependencies"), dict) else {}
+    dependencies = {}
+    for key, value in raw_deps.items():
+        if not isinstance(value, list):
+            continue
+        sanitized = []
+        for item in value:
+            try:
+                num = int(item)
+                if num >= 0:
+                    sanitized.append(num)
+            except Exception:
+                continue
+        if sanitized:
+            dependencies[str(key)] = list(dict.fromkeys(sanitized))
+
+    return {
+        "title": title,
+        "steps": steps,
+        "dependencies": dependencies
+    }
+
+
+def sanitize_message_tree_draft_snapshot(message_tree):
+    if not isinstance(message_tree, dict):
+        return message_tree
+    nodes = message_tree.get("nodes")
+    if not isinstance(nodes, dict):
+        return message_tree
+
+    for _, node in nodes.items():
+        if not isinstance(node, dict):
+            continue
+        metadata = node.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+        if "draftPlanSnapshot" in metadata:
+            metadata["draftPlanSnapshot"] = sanitize_draft_plan_snapshot(metadata.get("draftPlanSnapshot"))
+        if metadata.get("type") == "draft_plan":
+            metadata.pop("statusText", None)
+            metadata.pop("errorMessage", None)
+
+    return message_tree
 
 
 def _get_workspace_root_dir() -> str:
@@ -634,7 +706,7 @@ async def update_thread(thread_id: str, body: dict = Body(...)):
                     if "folderId" in body:
                         thread["folderId"] = body["folderId"]
                     if "messageTree" in body and isinstance(body["messageTree"], dict):
-                        thread["messageTree"] = body["messageTree"]
+                        thread["messageTree"] = sanitize_message_tree_draft_snapshot(body["messageTree"])
                     if "messageCount" in body:
                         thread["messageCount"] = body["messageCount"]
                     elif "messageTree" in body and isinstance(body["messageTree"], dict):
