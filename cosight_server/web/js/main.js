@@ -1765,10 +1765,8 @@ function updateThreadActiveState() {
     }
 }
 
-function setTaskInfoMode(mode) {
+function syncTaskInfoModeUI(mode) {
     const nextMode = mode === 'log' ? 'log' : 'detail';
-    AppState.taskInfoMode = nextMode;
-
     const titleEl = document.getElementById('task-info-title');
     const detailView = document.getElementById('task-detail-view');
     const logView = document.getElementById('task-log-view');
@@ -1795,6 +1793,12 @@ function setTaskInfoMode(mode) {
             nextMode === 'detail' ? '切换到任务日志' : '切换到任务详情'
         );
     }
+}
+
+function setTaskInfoMode(mode) {
+    const nextMode = mode === 'log' ? 'log' : 'detail';
+    AppState.taskInfoMode = nextMode;
+    syncTaskInfoModeUI(nextMode);
 
     rerenderTaskInfoBySelection();
 }
@@ -1820,6 +1824,9 @@ function initDagResetButton() {
         if (typeof window.resetDagViewport === 'function') {
             window.resetDagViewport();
         }
+        AppState.selectedTaskNodeId = null;
+        clearRuntimeLogFilter();
+        rerenderTaskInfoBySelection();
     });
 }
 
@@ -1908,8 +1915,9 @@ function applyRuntimeLogFilter() {
     const toolCountEl = document.getElementById('tool-count');
     if (!list) return;
 
-    const filterNodeId = Number.isFinite(Number(AppState.runtimeLogFilterNodeId))
-        ? Number(AppState.runtimeLogFilterNodeId)
+    const normalizedFilterNodeId = Number(AppState.runtimeLogFilterNodeId);
+    const filterNodeId = Number.isFinite(normalizedFilterNodeId) && normalizedFilterNodeId > 0
+        ? normalizedFilterNodeId
         : null;
     const visibleCalls = AppState.toolCalls.filter(call => {
         const callNodeId = Number.isFinite(Number(call?.nodeId)) ? Number(call.nodeId) : null;
@@ -1927,7 +1935,10 @@ function applyRuntimeLogFilter() {
 }
 
 function setRuntimeLogFilter(nodeId) {
-    AppState.runtimeLogFilterNodeId = Number.isFinite(Number(nodeId)) ? Number(nodeId) : null;
+    const normalizedNodeId = Number(nodeId);
+    AppState.runtimeLogFilterNodeId = Number.isFinite(normalizedNodeId) && normalizedNodeId > 0
+        ? normalizedNodeId
+        : null;
     applyRuntimeLogFilter();
 }
 
@@ -2210,10 +2221,66 @@ function getActiveTaskLogsForThread(threadId) {
     AppState.runtimeLogActiveTaskId = activeTask.taskId;
     book.activeTaskId = activeTask.taskId;
 
-    return (activeTask.orderedTaskList || [])
-        .map((entry) => normalizeRuntimeLogItem(entry?.log || entry))
-        .filter(Boolean)
-        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    const mergedOrderedLogs = (book.tasks || []).flatMap((taskItem) => (
+        Array.isArray(taskItem?.orderedTaskList) ? taskItem.orderedTaskList : []
+    ));
+
+    const mergedLogs = mergedOrderedLogs
+        .map((entry) => ({
+            seq: Number.isFinite(Number(entry?.seq)) ? Number(entry.seq) : null,
+            log: normalizeRuntimeLogItem(entry?.log || entry)
+        }))
+        .filter((entry) => Boolean(entry.log))
+        .sort((a, b) => {
+            const tsA = Number(a.log?.timestamp) || 0;
+            const tsB = Number(b.log?.timestamp) || 0;
+            if (tsA !== tsB) return tsA - tsB;
+            const seqA = Number.isFinite(a.seq) ? a.seq : 0;
+            const seqB = Number.isFinite(b.seq) ? b.seq : 0;
+            return seqA - seqB;
+        })
+        .map((entry) => entry.log)
+        .filter(Boolean);
+
+    return mergedLogs;
+}
+
+function getActiveTaskLogsFromRightPanelState(rightPanelState) {
+    if (!rightPanelState || typeof rightPanelState !== 'object') return [];
+
+    const book = normalizeRuntimeLogBook(rightPanelState.runtimeLogBook);
+    rightPanelState.runtimeLogBook = book;
+
+    const activeTaskId = book.activeTaskId || AppState.runtimeLogActiveTaskId || (book.tasks.length ? book.tasks[0]?.taskId : null);
+    const activeTask = getTaskByIdFromBook(book, activeTaskId) || (book.tasks.length ? book.tasks[0] : null);
+    if (!activeTask) return [];
+
+    AppState.runtimeLogActiveTaskId = activeTask.taskId;
+    book.activeTaskId = activeTask.taskId;
+    rightPanelState.runtimeLogBook = book;
+
+    const mergedOrderedLogs = (book.tasks || []).flatMap((taskItem) => (
+        Array.isArray(taskItem?.orderedTaskList) ? taskItem.orderedTaskList : []
+    ));
+
+    const mergedLogs = mergedOrderedLogs
+        .map((entry) => ({
+            seq: Number.isFinite(Number(entry?.seq)) ? Number(entry.seq) : null,
+            log: normalizeRuntimeLogItem(entry?.log || entry)
+        }))
+        .filter((entry) => Boolean(entry.log))
+        .sort((a, b) => {
+            const tsA = Number(a.log?.timestamp) || 0;
+            const tsB = Number(b.log?.timestamp) || 0;
+            if (tsA !== tsB) return tsA - tsB;
+            const seqA = Number.isFinite(a.seq) ? a.seq : 0;
+            const seqB = Number.isFinite(b.seq) ? b.seq : 0;
+            return seqA - seqB;
+        })
+        .map((entry) => entry.log)
+        .filter(Boolean);
+
+    return mergedLogs;
 }
 
 async function restoreRightPanelByThread(threadId) {
@@ -2330,11 +2397,14 @@ async function loadThread(threadId) {
         AppState.runtimeLogActiveTaskId = savedTaskState.runtimeLogActiveTaskId || null;
         AppState.selectedTaskNodeId = savedTaskState.selectedTaskNodeId || null;
         AppState.taskInfoMode = savedTaskState.taskInfoMode || 'detail';
+        syncTaskInfoModeUI(AppState.taskInfoMode);
     }
     
     // 根据是否有正在执行的任务，决定是否清空右侧栏
     if (!hasExecutingTaskState) {
         // 无执行任务的线程优先使用树最下层 active msg 的 finalJsonPath 渲染右侧栏
+        AppState.taskInfoMode = 'detail';
+        syncTaskInfoModeUI('detail');
         resetExecutionTitle();
         clearRuntimeLogs();
         AppState.selectedTaskNodeId = null;
@@ -2350,6 +2420,7 @@ async function loadThread(threadId) {
         // 恢复执行中的线程的视图选择状态（不覆盖当前任务 activeTaskId）
         AppState.selectedTaskNodeId = savedTaskState.selectedTaskNodeId;
         AppState.taskInfoMode = savedTaskState.taskInfoMode || 'detail';
+        syncTaskInfoModeUI(AppState.taskInfoMode);
         console.debug('[loadThread] 恢复执行中的线程任务显示状态', {
             threadId,
             state: savedTaskState,
@@ -2661,6 +2732,7 @@ function buildPlanActionOutboundPayload(threadId, question) {
 
 function applyPlanPayloadToThread(threadId, payload, options = {}) {
     if (!threadId || !payload || typeof payload !== 'object') return null;
+    const fullDagInitData = cloneSerializable(payload, null);
     const draftPlanSnapshot = sanitizeDraftPlanSnapshot(
         (payload.draftPlanSnapshot && typeof payload.draftPlanSnapshot === 'object')
             ? payload.draftPlanSnapshot
@@ -2690,10 +2762,13 @@ function applyPlanPayloadToThread(threadId, payload, options = {}) {
         patch.workspacePath = `work_space/${workspaceId}`;
     }
     if (hasPlanStructure) {
+        const dagInitDataForPersist = (fullDagInitData && typeof fullDagInitData === 'object')
+            ? fullDagInitData
+            : draftPlanSnapshot;
         patch.draftPlanSnapshot = draftPlanSnapshot;
-        patch.dagInitData = draftPlanSnapshot;
-        if (draftPlanSnapshot.title) {
-            patch.executionTitle = draftPlanSnapshot.title;
+        patch.dagInitData = dagInitDataForPersist;
+        if (dagInitDataForPersist.title || draftPlanSnapshot.title) {
+            patch.executionTitle = dagInitDataForPersist.title || draftPlanSnapshot.title;
         }
     }
 
@@ -2705,9 +2780,12 @@ function applyPlanPayloadToThread(threadId, payload, options = {}) {
         && hasPlanStructure
         && typeof createDag === 'function'
     ) {
-        createDag({ data: { content: draftPlanSnapshot } });
-        if (draftPlanSnapshot.title) {
-            updateExecutionTitle(draftPlanSnapshot.title);
+        const dagInitDataForRender = (fullDagInitData && typeof fullDagInitData === 'object')
+            ? fullDagInitData
+            : draftPlanSnapshot;
+        createDag({ data: { content: dagInitDataForRender } });
+        if (dagInitDataForRender.title || draftPlanSnapshot.title) {
+            updateExecutionTitle(dagInitDataForRender.title || draftPlanSnapshot.title);
         }
         rerenderTaskInfoBySelection();
     }
@@ -4176,6 +4254,7 @@ function defaultLocateMessage(message) {
 
         // 强制刷新当前任务数据，切换右侧日志内容
         const runtimeLogs = getActiveTaskLogsForThread(AppState.currentThreadId);
+        clearRuntimeLogs(true);
         if (Array.isArray(runtimeLogs)) {
             runtimeLogs
                 .map(normalizeRuntimeLogItem)
@@ -7080,26 +7159,6 @@ function showSandboxedHtmlPreviewInRightPanel(filePath, title = 'HTML 预览') {
     return true;
 }
 
-function getActiveTaskLogsFromRightPanelState(rightPanelState) {
-    if (!rightPanelState || typeof rightPanelState !== 'object') return [];
-
-    const book = normalizeRuntimeLogBook(rightPanelState.runtimeLogBook);
-    rightPanelState.runtimeLogBook = book;
-
-    const activeTaskId = book.activeTaskId || AppState.runtimeLogActiveTaskId || (book.tasks.length ? book.tasks[0]?.taskId : null);
-    const activeTask = getTaskByIdFromBook(book, activeTaskId) || (book.tasks.length ? book.tasks[0] : null);
-    if (!activeTask) return [];
-
-    AppState.runtimeLogActiveTaskId = activeTask.taskId;
-    book.activeTaskId = activeTask.taskId;
-    rightPanelState.runtimeLogBook = book;
-
-    return (activeTask.orderedTaskList || [])
-        .map((entry) => normalizeRuntimeLogItem(entry?.log || entry))
-        .filter(Boolean)
-        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-}
-
 async function restoreRightPanelStateFromData(rightPanelState, threadId) {
     if (!rightPanelState || typeof rightPanelState !== 'object') return false;
     if (!threadId) {
@@ -7700,9 +7759,6 @@ function clearRuntimeLogs(preserveActiveTaskId = false) {
 }
 
 function addToolCallToChain(toolCall) {
-    const toolChainList = document.getElementById('tool-chain-list');
-    if (!toolChainList) return;
-
     const identityKey = toolCall?.identityKey || null;
     if (identityKey) {
         const existingIndex = AppState.toolCalls.findIndex(call => call?.identityKey === identityKey);
@@ -7744,9 +7800,10 @@ function createToolChainItem(toolCall) {
 
 function focusRuntimeLogByNode(nodeId) {
     const list = document.getElementById('tool-chain-list');
-    if (!list || !Number.isFinite(Number(nodeId))) return;
+    const normalizedNodeId = Number(nodeId);
+    if (!list || !Number.isFinite(normalizedNodeId) || normalizedNodeId <= 0) return;
 
-    setRuntimeLogFilter(nodeId);
+    setRuntimeLogFilter(normalizedNodeId);
     const items = Array.from(list.querySelectorAll('.tool-chain-item'));
     items.forEach(item => item.classList.remove('step-focused'));
     const target = items.length ? items[0] : null;

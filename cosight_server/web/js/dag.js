@@ -38,7 +38,7 @@ const DAG_NODE_MIN_RADIUS = 8;
 let dagNodeRadius = 25;
 const DAG_EDGE_ENDPOINT_GAP = 4;
 const DAG_BASE_NODE_RADIUS = 25;
-const DAG_NODE_MAX_RADIUS = DAG_BASE_NODE_RADIUS * 2;
+const DAG_NODE_MAX_RADIUS = DAG_BASE_NODE_RADIUS * 1.2;
 
 function getDagNodeRadius() {
     return dagNodeRadius;
