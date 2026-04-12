@@ -784,7 +784,8 @@ function normalizeWorkspaceId(candidate) {
     if (!candidate) return null;
     if (typeof candidate === 'string' || typeof candidate === 'number') {
         const normalized = String(candidate).trim();
-        return normalized || null;
+        if (!normalized) return null;
+        return /^work_space_/.test(normalized) ? normalized : null;
     }
     if (typeof candidate === 'object') {
         if (candidate.workspaceId) return normalizeWorkspaceId(candidate.workspaceId);
@@ -3439,11 +3440,11 @@ function renderCoderRunRequestCardToBubble(message, bubbleEl) {
     `;
 }
 
-function renderPendingPlaceholderToBubble(bubbleEl, threadId) {
+function renderPendingPlaceholderToBubble(bubbleEl, threadId, metadata = {}) {
     if (!bubbleEl) return;
     const startedAt = Date.now();
-    const threadIdAttr = String(threadId || '');
-    const labelText = '正在制定问题解决方案';
+    const threadIdAttr = String(threadId || AppState.currentThreadId || '');
+    const labelText = resolvePendingPlaceholderLabel(metadata, threadIdAttr);
     bubbleEl.innerHTML = `
         <div class="thinking-indicator" data-thinking-kind="normal" data-thread-id="${threadIdAttr}" data-start-ts="${startedAt}">
             <i class="fas fa-cog loading-spinner"></i>
@@ -3453,17 +3454,50 @@ function renderPendingPlaceholderToBubble(bubbleEl, threadId) {
 }
 
 function resolvePendingPlaceholderLabel(metadata = {}, threadId = '') {
+    const pendingKind = String(metadata.pendingKind || '').trim();
     const pendingAction = String(metadata.pendingAction || '').trim();
     const pendingStatus = String(metadata.pendingStatus || '').trim();
+    const planApprovalState = getThreadPlanApprovalState(threadId);
 
-    if (pendingAction === 'execute' || pendingAction === 'replan') {
-        if (pendingStatus === 'running_task') {
-            return getThinkingStatusTextForThread(threadId).text;
-        }
+    if (pendingStatus === 'running_task') {
+        return getThinkingStatusTextForThread(threadId).text;
+    }
+
+    if (isPlanningApprovalState(planApprovalState)) {
+        return '正在制定问题解决方案';
+    }
+
+    // 计划阶段默认文案：正在制定问题解决方案。
+    const isPlanningStage =
+        pendingKind === 'plan_draft'
+        || pendingKind === 'pendingPlaceholder'
+        || pendingAction === 'draft';
+
+    if (isPlanningStage) {
+        return '正在制定问题解决方案';
+    }
+
+    // 非计划阶段（例如 redo / 执行阶段）默认文案：正在启动任务执行线程。
+    if (
+        pendingStatus === 'starting_execution_thread'
+        || pendingAction === 'execute'
+        || pendingAction === 'replan'
+        || pendingKind === 'redo'
+        || pendingKind === 'send'
+    ) {
         return '正在启动任务执行线程';
     }
 
-    return '正在制定问题解决方案';
+    // 兜底按非计划阶段处理，避免执行态误回退到“制定方案”。
+    return '正在启动任务执行线程';
+}
+
+function isPlanningApprovalState(approvalState) {
+    const normalized = normalizePlanApprovalState(approvalState);
+    return normalized === 'drafting'
+        || normalized === 'awaiting_user_approval'
+        || normalized === 'revising'
+        || normalized === 'failed';
 }
 
 function renderMessageBubbleContent(message, bubbleEl) {
@@ -3687,7 +3721,7 @@ function updatePendingPlaceholderState(threadId, options = {}) {
         ...baseMeta,
         ...patch,
         pendingPlaceholder: true,
-        pendingKind: String(baseMeta.pendingKind || 'plan_draft').trim() || 'plan_draft'
+        pendingKind: String(baseMeta.pendingKind || 'send').trim() || 'send'
     };
 
     Object.keys(patch).forEach((key) => {
@@ -4135,6 +4169,12 @@ async function approveDraftPlanMessage(message) {
         return false;
     }
 
+    await persistPlanCacheToParentNode(sourceThreadId, currentMessage, {
+        executionId,
+        planSessionId,
+        draftPlanSnapshot: metadata.draftPlanSnapshot || {}
+    });
+
     const pendingPlaceholderMessageId = replaceDraftPlanMessageWithPendingPlaceholder(currentMessage, {
         pendingKind: 'send',
         pendingAction: 'execute',
@@ -4167,6 +4207,98 @@ async function approveDraftPlanMessage(message) {
         workspaceId: normalizeWorkspaceId(metadata.pendingWorkspaceId || threadState.workspaceId || null)
     });
     return !!topic;
+}
+
+async function persistPlanCacheToParentNode(threadId, childMessage, context = {}) {
+    const thread = getThreadById(threadId);
+    if (!thread || !thread.messageTree || !thread.messageTree.nodes) return false;
+    const childMessageId = ensureMessageId(childMessage);
+    if (!childMessageId) return false;
+
+    const childNode = thread.messageTree.nodes[childMessageId];
+    if (!childNode || !childNode.parentId) return false;
+    const parentNode = thread.messageTree.nodes[childNode.parentId];
+    if (!parentNode) return false;
+
+    const executionId = String(context.executionId || '').trim();
+    const planSessionId = String(context.planSessionId || '').trim();
+    const draftPlanSnapshot = sanitizeDraftPlanSnapshot(context.draftPlanSnapshot || null);
+    if (!executionId || !planSessionId || !draftPlanSnapshot || !Array.isArray(draftPlanSnapshot.steps) || draftPlanSnapshot.steps.length === 0) {
+        return false;
+    }
+
+    const baseMeta = (parentNode.metadata && typeof parentNode.metadata === 'object') ? parentNode.metadata : {};
+    parentNode.metadata = {
+        ...baseMeta,
+        planCache: {
+            executionId,
+            planSessionId,
+            draftPlanSnapshot
+        }
+    };
+
+    thread.updatedAt = Date.now();
+    await syncThreadMessagesToBackend(thread);
+    return true;
+}
+
+function resolvePlanCacheFromParentForRedo(threadId, redoTargetMessage) {
+    const thread = getThreadById(threadId);
+    if (!thread || !thread.messageTree || !thread.messageTree.nodes || !redoTargetMessage) return null;
+
+    const targetMessageId = ensureMessageId(redoTargetMessage);
+    if (!targetMessageId) return null;
+
+    const targetNode = thread.messageTree.nodes[targetMessageId];
+    if (!targetNode || !targetNode.parentId) return null;
+
+    const parentNode = thread.messageTree.nodes[targetNode.parentId];
+    const parentMeta = (parentNode && parentNode.metadata && typeof parentNode.metadata === 'object')
+        ? parentNode.metadata
+        : {};
+    const planCache = (parentMeta.planCache && typeof parentMeta.planCache === 'object') ? parentMeta.planCache : null;
+    if (!planCache) return null;
+
+    const executionId = String(planCache.executionId || '').trim();
+    const planSessionId = String(planCache.planSessionId || '').trim();
+    const draftPlanSnapshot = sanitizeDraftPlanSnapshot(planCache.draftPlanSnapshot || null);
+    if (!executionId || !planSessionId || !draftPlanSnapshot || !Array.isArray(draftPlanSnapshot.steps) || draftPlanSnapshot.steps.length === 0) {
+        return null;
+    }
+
+    return {
+        executionId,
+        planSessionId,
+        draftPlanSnapshot
+    };
+}
+
+function markRedoPlaceholderAsPlanExecute(threadId, placeholderMessageId) {
+    if (!threadId || !placeholderMessageId) return false;
+    const located = findMessageByIdInAllThreads(String(placeholderMessageId));
+    if (!located || !located.thread || !located.message) return false;
+    if (located.thread.id !== threadId) return false;
+
+    const targetMessage = located.message;
+    const thread = located.thread;
+    const baseMeta = (targetMessage.metadata && typeof targetMessage.metadata === 'object') ? targetMessage.metadata : {};
+    targetMessage.metadata = {
+        ...baseMeta,
+        pendingPlaceholder: true,
+        pendingKind: 'send',
+        pendingAction: 'execute',
+        pendingStatus: 'starting_execution_thread'
+    };
+    targetMessage.timestamp = Date.now();
+    persistMessageStateToThread(thread, targetMessage, { syncContent: false, syncTimestamp: true });
+    thread.updatedAt = Date.now();
+    void syncThreadMessagesToBackend(thread);
+
+    if (threadId === AppState.currentThreadId) {
+        loadMessages(getRenderableMessagesFromThread(thread));
+        scrollToBottom();
+    }
+    return true;
 }
 
 function openPlanRevisionModal(message) {
@@ -4282,7 +4414,7 @@ async function submitPlanRevision() {
         approvalState: 'revising',
         planVersion: metadata.planVersion,
         latestRevisionPrompt: revisionPrompt,
-        draftPlanSnapshot: metadata.draftPlanSnapshot || {}
+        draftPlanSnapshot: {}
     }, {
         renderCurrentThread: false
     });
@@ -4720,7 +4852,7 @@ function applyRedoViewState(messageItem, message) {
     if (placeholderEl) {
         placeholderEl.style.display = isPendingPage ? 'block' : 'none';
         if (isPendingPage) {
-            renderPendingPlaceholderToBubble(placeholderEl, null);
+            renderPendingPlaceholderToBubble(placeholderEl, AppState.currentThreadId || '', currentMetadata || {});
             const indicatorEl = placeholderEl.querySelector('.thinking-indicator');
             if (indicatorEl) {
                 const startTs = Number(currentVersion && currentVersion.timestamp) || Date.now();
@@ -4820,6 +4952,30 @@ async function resendLastNormalPayloadByRedo(redoTargetMessage, targetThreadId =
     if (!userContent) {
         console.error('[REDO_FLOW] payload.user 为空，无法发送重做', payload);
         return false;
+    }
+
+    const inheritedPlanCache = resolvePlanCacheFromParentForRedo(sourceThreadId, redoTargetMessage);
+    if (inheritedPlanCache) {
+        markRedoPlaceholderAsPlanExecute(sourceThreadId, redoPlaceholderMessageId);
+        const topic = await sendToBackend(userContent, sourceThreadId, payload, {
+            isRedo: true,
+            wsAction: 'plan_approve',
+            requirePlanApproval: true,
+            executionId: inheritedPlanCache.executionId,
+            planSessionId: inheritedPlanCache.planSessionId,
+            draftPlanSnapshot: inheritedPlanCache.draftPlanSnapshot,
+            pendingPlaceholderMessageId: redoPlaceholderMessageId,
+            pendingKind: 'send',
+            redoTargetMessage,
+            redoPlaceholderMessageId
+        });
+        console.debug('[REDO_FLOW] 命中父节点 planCache，直接走 plan_approve', {
+            threadId: sourceThreadId,
+            topic,
+            executionId: inheritedPlanCache.executionId,
+            planSessionId: inheritedPlanCache.planSessionId
+        });
+        return !!topic;
     }
 
     // 为重试添加时间戳后缀，确保后端生成不同内容
@@ -6027,6 +6183,7 @@ function getThinkingStatusTextForThread(threadId) {
     const titles = getInProgressStepTitlesForThread(threadId);
     const now = Date.now();
     const signature = titles.join('|');
+    const planApprovalState = getThreadPlanApprovalState(threadId);
     const state = thinkingTitleRotationStateByThread.get(threadId) || {
         signature: '',
         index: 0,
@@ -6044,9 +6201,16 @@ function getThinkingStatusTextForThread(threadId) {
     }
 
     const hasFinalReportPending = finalReportRetryStateByThread.has(threadId);
-    const nextText = titles.length > 0
-        ? `${titles[state.index] || titles[0]}`
-        : (isThreadDagAllCompleted(threadId) || hasFinalReportPending ? '正在整理问题最终报告' : '正在制定问题解决方案');
+    let nextText = '';
+    if (titles.length > 0) {
+        nextText = `${titles[state.index] || titles[0]}`;
+    } else if (isThreadDagAllCompleted(threadId) || hasFinalReportPending) {
+        nextText = '正在整理问题最终报告';
+    } else if (isPlanningApprovalState(planApprovalState)) {
+        nextText = '正在制定问题解决方案';
+    } else {
+        nextText = '正在启动任务执行线程';
+    }
     const changed = nextText !== state.lastText;
     state.lastText = nextText;
     thinkingTitleRotationStateByThread.set(threadId, state);
@@ -6175,6 +6339,7 @@ async function sendToBackend(message, sourceThreadId = AppState.currentThreadId,
             requirePlanApproval: sendOptions.requirePlanApproval === true,
             executionId: sendOptions.executionId || null,
             planSessionId: sendOptions.planSessionId || null,
+            draftPlanSnapshot: sendOptions.draftPlanSnapshot || null,
             revisionPrompt: sendOptions.revisionPrompt || '',
             workspaceId: normalizeWorkspaceId(sendOptions.workspaceId || null),
             agentRunConfig
@@ -6458,7 +6623,16 @@ async function handleWebSocketMessage(message) {
             const metadata = await saveFinalMsgMetadata(targetThreadId, boundWorkspaceId, topic);
             if (!metadata) {
                 console.info('[handleWebSocketMessage] metadata 落盘失败');
-                return;
+                startFinalReportPolling(
+                    targetThreadId,
+                    topic,
+                    redoThreadCtx,
+                    boundWorkspaceId,
+                    null,
+                    null,
+                    null
+                );
+                return true;
             };
             await backupOrderedTaskListForThread(targetThreadId, metadata.workspaceId);
             
@@ -7110,10 +7284,22 @@ async function sendPendingFinalMarkdownPathToChat(threadId, finalMarkdownPath, w
 
 async function trySendPendingFinalMarkdownContent(threadId, options = {}) {
     const topic = options.topic || null;
-    const finalMarkdownPath = options.finalMarkdownPath;
-    const finalJsonPath = options.finalJsonPath;
+    let finalMarkdownPath = options.finalMarkdownPath;
+    let finalJsonPath = options.finalJsonPath;
     const workspaceId = options.workspaceId;
-    const finalMarkdownContent = options.finalMarkdownContent || null;
+    let finalMarkdownContent = options.finalMarkdownContent || null;
+
+    if (!finalMarkdownPath && workspaceId) {
+        const report = await fetchFinalReportByThreadId(threadId, workspaceId);
+        if (report && report.filePath) {
+            finalMarkdownPath = report.filePath;
+            finalMarkdownContent = typeof report.content === 'string' ? report.content : finalMarkdownContent;
+            if (!finalJsonPath) {
+                const finalJsonData = await fetchFinalJsonPath(workspaceId);
+                finalJsonPath = finalJsonData?.path || null;
+            }
+        }
+    }
 
     if (finalMarkdownPath) {
         return await sendPendingFinalMarkdownPathToChat(
@@ -7630,12 +7816,6 @@ async function recoverFinalMarkdownMessageForCompletedThread(thread) {
 async function clearThreadRightPanelState(threadId) {
     if (!threadId) return false;
 
-    const pendingTimer = rightPanelPersistTimers.get(threadId);
-    if (pendingTimer) {
-        clearTimeout(pendingTimer);
-        rightPanelPersistTimers.delete(threadId);
-    }
-
     const thread = getThreadById(threadId);
     if (thread) {
         delete thread.workspaceId;
@@ -7790,8 +7970,6 @@ function buildPersistableThreadMetadata(rightPanelState) {
     return { rightPanelState: JSON.parse(JSON.stringify(rightPanelState)) };
 }
 
-const rightPanelPersistTimers = new Map();
-
 function schedulePersistRightPanelState(threadId, partialState) {
     if (!threadId || !partialState) return;
     const thread = getThreadById(threadId);
@@ -7804,39 +7982,18 @@ function schedulePersistRightPanelState(threadId, partialState) {
     };
     thread.rightPanelState = nextState;
 
-    const existingTimer = rightPanelPersistTimers.get(threadId);
-    if (existingTimer) {
-        clearTimeout(existingTimer);
+    if (!window.SessionService || typeof window.SessionService.updateThread !== 'function') {
+        return;
     }
 
-    const timer = setTimeout(async () => {
-        rightPanelPersistTimers.delete(threadId);
-        try {
-            if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
-                const latestThread = getThreadById(threadId);
-                const latestState = (latestThread && latestThread.rightPanelState && typeof latestThread.rightPanelState === 'object')
-                    ? latestThread.rightPanelState
-                    : nextState;
-                const persistState = buildPersistableThreadMetadata(latestState);
-                if (persistState) {
-                    await window.SessionService.updateThread(threadId, persistState);
-                }
-            }
-        } catch (e) {
-            // ignore persistence errors
-        }
-    }, 250);
+    const persistState = buildPersistableThreadMetadata(nextState);
+    if (!persistState) return;
 
-    rightPanelPersistTimers.set(threadId, timer);
+    void window.SessionService.updateThread(threadId, persistState).catch(() => {});
 }
 
 async function flushPersistedRightPanelState(threadId) {
     if (!threadId) return;
-    const timer = rightPanelPersistTimers.get(threadId);
-    if (timer) {
-        clearTimeout(timer);
-        rightPanelPersistTimers.delete(threadId);
-    }
 
     const thread = getThreadById(threadId);
     if (!thread || !window.SessionService || typeof window.SessionService.updateThread !== 'function') {

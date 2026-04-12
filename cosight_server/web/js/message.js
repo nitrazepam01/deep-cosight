@@ -735,7 +735,10 @@
                     requirePlanApproval: options.requirePlanApproval === true,
                     revisionPrompt: options.revisionPrompt || '',
                     workspaceId: options.workspaceId || '',
-                    planSessionId: planSessionId
+                    planSessionId: planSessionId,
+                    draftPlanSnapshot: (options.draftPlanSnapshot && typeof options.draftPlanSnapshot === 'object')
+                        ? options.draftPlanSnapshot
+                        : null
                 }
             },
             // 会被服务端解析的会话信息

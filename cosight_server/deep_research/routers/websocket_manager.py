@@ -247,6 +247,9 @@ async def _send_resp(websocket, cookie, topic, message, lang, request_action="me
         if isinstance(plan_session_id, str) and plan_session_id:
             params["planSessionId"] = plan_session_id
             params.setdefault("sessionInfo", {})["planSessionId"] = plan_session_id
+        draft_plan_snapshot = from_back_end.get("draftPlanSnapshot")
+        if isinstance(draft_plan_snapshot, dict):
+            params["draftPlanSnapshot"] = draft_plan_snapshot
         # 提取知识库选择列表
         knowledge_bases = from_back_end.get("knowledgeBases")
         if isinstance(knowledge_bases, list) and len(knowledge_bases) > 0:
