@@ -950,17 +950,97 @@ function unbindTopic(topic) {
     }
 }
 
-function getThreadIdByTopic(topic) {
-    if (!topic) return null;
+function cleanupThreadTransientState(threadId) {
+    if (!threadId) return;
 
-    if (AppState.topicThreadMap[topic]) {
-        return AppState.topicThreadMap[topic];
+    const topicsToUnbind = new Set();
+    try {
+        Object.entries(AppState.topicThreadMap || {}).forEach(([topic, mappedThreadId]) => {
+            if (String(mappedThreadId || '') === String(threadId)) {
+                topicsToUnbind.add(topic);
+            }
+        });
+    } catch (e) {
+    }
+
+    for (const [topic, ctx] of pendingTopicMessageMap.entries()) {
+        if (ctx && String(ctx.threadId || '') === String(threadId)) {
+            topicsToUnbind.add(topic);
+        }
+    }
+
+    for (const [topic, ctx] of redoTopicContextMap.entries()) {
+        if (ctx && String(ctx.threadId || '') === String(threadId)) {
+            topicsToUnbind.add(topic);
+        }
     }
 
     try {
         const pendingRaw = localStorage.getItem('cosight:pendingRequests');
         const pendings = pendingRaw ? JSON.parse(pendingRaw) : {};
-        return pendings[topic]?.threadId || null;
+        let changed = false;
+        Object.entries(pendings || {}).forEach(([topic, record]) => {
+            if (record && String(record.threadId || '') === String(threadId)) {
+                topicsToUnbind.add(topic);
+                delete pendings[topic];
+                changed = true;
+            }
+        });
+        if (changed) {
+            const keys = Object.keys(pendings || {});
+            if (keys.length === 0) {
+                localStorage.removeItem('cosight:pendingRequests');
+            } else {
+                localStorage.setItem('cosight:pendingRequests', JSON.stringify(pendings));
+            }
+        }
+    } catch (e) {
+    }
+
+    topicsToUnbind.forEach((topic) => unbindTopic(topic));
+
+    redoThreadContextMap.delete(threadId);
+    finalReportRetryStateByThread.delete(threadId);
+    threadCompletionHandled.delete(threadId);
+    threadMessageSyncQueue.delete(threadId);
+    thinkingTitleRotationStateByThread.delete(threadId);
+
+    if (AppState.threadExecutionState && Object.prototype.hasOwnProperty.call(AppState.threadExecutionState, threadId)) {
+        delete AppState.threadExecutionState[threadId];
+    }
+    if (AppState.lastNormalSendPayloadByThread && Object.prototype.hasOwnProperty.call(AppState.lastNormalSendPayloadByThread, threadId)) {
+        delete AppState.lastNormalSendPayloadByThread[threadId];
+    }
+}
+
+function getThreadIdByTopic(topic) {
+    if (!topic) return null;
+
+    if (AppState.topicThreadMap[topic]) {
+        const mappedThreadId = AppState.topicThreadMap[topic];
+        if (getThreadById(mappedThreadId)) {
+            return mappedThreadId;
+        }
+        unbindTopic(topic);
+    }
+
+    try {
+        const pendingRaw = localStorage.getItem('cosight:pendingRequests');
+        const pendings = pendingRaw ? JSON.parse(pendingRaw) : {};
+        const pendingThreadId = pendings[topic]?.threadId || null;
+        if (pendingThreadId && getThreadById(pendingThreadId)) {
+            return pendingThreadId;
+        }
+        if (pendingThreadId && Object.prototype.hasOwnProperty.call(pendings, topic)) {
+            delete pendings[topic];
+            const keys = Object.keys(pendings);
+            if (keys.length === 0) {
+                localStorage.removeItem('cosight:pendingRequests');
+            } else {
+                localStorage.setItem('cosight:pendingRequests', JSON.stringify(pendings));
+            }
+        }
+        return null;
     } catch (e) {
         return null;
     }
@@ -1821,6 +1901,17 @@ function initDagResetButton() {
     if (!resetBtn) return;
 
     resetBtn.addEventListener('click', () => {
+        const thread = getCurrentThread();
+        const dagRenderContent = resolveDagRenderContent(
+            thread?.rightPanelState?.dagInitData || null,
+            thread?.rightPanelState?.draftPlanSnapshot || null
+        );
+        if (dagRenderContent && typeof createDag === 'function') {
+            createDag({ data: { content: dagRenderContent } });
+            if (dagRenderContent.title) {
+                updateExecutionTitle(dagRenderContent.title);
+            }
+        }
         if (typeof window.resetDagViewport === 'function') {
             window.resetDagViewport();
         }
@@ -1871,8 +1962,8 @@ function clearDagViewState() {
     }
 }
 
-function clearRightPanelImmediatelyForNewRun(threadId) {
-    if (!threadId) return;
+async function clearRightPanelImmediatelyForNewRun(threadId) {
+    if (!threadId) return false;
 
     // 仅当发送目标线程就是当前激活线程时，才清空可视区域。
     const activeThreadId = AppState.currentThreadId;
@@ -1890,7 +1981,8 @@ function clearRightPanelImmediatelyForNewRun(threadId) {
         }
     }
 
-    void clearThreadRightPanelState(threadId);
+    await clearThreadRightPanelState(threadId);
+    return true;
 }
 
 // 清理 progress-overview 显示
@@ -2313,12 +2405,14 @@ async function restoreRightPanelByThread(threadId) {
     migrateLegacyRuntimeLogsToBook(localThread);
     const rightPanelState = ensureThreadRightPanelState(localThread);
     const dagInitData = rightPanelState.dagInitData || null;
+    const draftPlanSnapshot = rightPanelState.draftPlanSnapshot || null;
+    const dagRenderContent = resolveDagRenderContent(dagInitData, draftPlanSnapshot);
     const runtimeLogs = getActiveTaskLogsForThread(threadId);
 
-    if (dagInitData && typeof createDag === 'function') {
-        createDag({ data: { content: dagInitData } });
-        if (dagInitData.title) {
-            updateExecutionTitle(dagInitData.title);
+    if (dagRenderContent && typeof createDag === 'function') {
+        createDag({ data: { content: dagRenderContent } });
+        if (dagRenderContent.title) {
+            updateExecutionTitle(dagRenderContent.title);
         }
     }
 
@@ -2670,6 +2764,95 @@ function sanitizeDraftPlanSnapshot(snapshot) {
     return { title, steps, dependencies };
 }
 
+function resolveDagRenderContent(rawDagInitData, fallbackDraftPlanSnapshot = null) {
+    const normalizedRaw = (rawDagInitData && typeof rawDagInitData === 'object')
+        ? rawDagInitData
+        : null;
+    const normalizedFallback = (fallbackDraftPlanSnapshot && typeof fallbackDraftPlanSnapshot === 'object')
+        ? fallbackDraftPlanSnapshot
+        : null;
+    const inlineSnapshot = (normalizedRaw && normalizedRaw.draftPlanSnapshot && typeof normalizedRaw.draftPlanSnapshot === 'object')
+        ? normalizedRaw.draftPlanSnapshot
+        : null;
+
+    const baseSnapshot = sanitizeDraftPlanSnapshot(inlineSnapshot || normalizedFallback || normalizedRaw);
+    if (!baseSnapshot || !Array.isArray(baseSnapshot.steps) || baseSnapshot.steps.length === 0) {
+        return null;
+    }
+
+    const output = cloneSerializable(baseSnapshot, null) || {
+        title: '执行计划',
+        steps: [],
+        dependencies: {}
+    };
+    const stepCount = output.steps.length;
+
+    const copyField = (field) => {
+        if (normalizedRaw && typeof normalizedRaw[field] !== 'undefined') {
+            output[field] = cloneSerializable(normalizedRaw[field], normalizedRaw[field]);
+            return;
+        }
+        if (inlineSnapshot && typeof inlineSnapshot[field] !== 'undefined') {
+            output[field] = cloneSerializable(inlineSnapshot[field], inlineSnapshot[field]);
+            return;
+        }
+        if (normalizedFallback && typeof normalizedFallback[field] !== 'undefined') {
+            output[field] = cloneSerializable(normalizedFallback[field], normalizedFallback[field]);
+        }
+    };
+
+    [
+        'step_files',
+        'step_statuses',
+        'step_notes',
+        'step_details',
+        'step_tool_calls',
+        'step_agents',
+        'step_execution_agents',
+        'progress',
+        'result',
+        'selected_planner_id',
+        'allowed_actor_ids',
+        'default_actor_id',
+        'dispatch_mode',
+        'executionId',
+        'planSessionId',
+        'approvalState',
+        'planVersion',
+        'latestRevisionPrompt',
+        'statusText',
+        'workspaceId',
+        'threadId',
+        'eventType',
+        'question'
+    ].forEach(copyField);
+
+    if (!output.title) {
+        output.title = String(
+            (normalizedRaw && normalizedRaw.title)
+            || (inlineSnapshot && inlineSnapshot.title)
+            || (normalizedFallback && normalizedFallback.title)
+            || '执行计划'
+        ).trim() || '执行计划';
+    }
+
+    if (!output.dependencies || typeof output.dependencies !== 'object') {
+        output.dependencies = {};
+    }
+
+    if (!output.progress || typeof output.progress !== 'object') {
+        output.progress = {
+            total: stepCount,
+            completed: 0,
+            in_progress: 0,
+            blocked: 0,
+            not_started: stepCount
+        };
+    }
+
+    return output;
+}
+
 function extractStructuredPayloadFromSocketMessage(messageData) {
     const data = messageData && messageData.data ? messageData.data : null;
     if (!data || typeof data !== 'object') return null;
@@ -2732,12 +2915,29 @@ function buildPlanActionOutboundPayload(threadId, question) {
 
 function applyPlanPayloadToThread(threadId, payload, options = {}) {
     if (!threadId || !payload || typeof payload !== 'object') return null;
+    const thread = getThreadById(threadId);
+    const threadRightPanelState = (thread && thread.rightPanelState && typeof thread.rightPanelState === 'object')
+        ? thread.rightPanelState
+        : {};
+    const previousDraftPlanSnapshot = sanitizeDraftPlanSnapshot(
+        (threadRightPanelState.draftPlanSnapshot && typeof threadRightPanelState.draftPlanSnapshot === 'object')
+            ? threadRightPanelState.draftPlanSnapshot
+            : threadRightPanelState.dagInitData
+    );
     const fullDagInitData = cloneSerializable(payload, null);
-    const draftPlanSnapshot = sanitizeDraftPlanSnapshot(
+    const incomingDraftPlanSnapshot = sanitizeDraftPlanSnapshot(
         (payload.draftPlanSnapshot && typeof payload.draftPlanSnapshot === 'object')
             ? payload.draftPlanSnapshot
             : payload
     );
+    const incomingHasUsableSteps = !!(
+        incomingDraftPlanSnapshot
+        && Array.isArray(incomingDraftPlanSnapshot.steps)
+        && incomingDraftPlanSnapshot.steps.length > 0
+    );
+    const draftPlanSnapshot = incomingHasUsableSteps
+        ? incomingDraftPlanSnapshot
+        : (previousDraftPlanSnapshot || incomingDraftPlanSnapshot);
     const hasPlanStructure = !!(
         draftPlanSnapshot
         && typeof draftPlanSnapshot === 'object'
@@ -2761,14 +2961,15 @@ function applyPlanPayloadToThread(threadId, payload, options = {}) {
         patch.workspaceId = workspaceId;
         patch.workspacePath = `work_space/${workspaceId}`;
     }
+    const dagRenderContent = resolveDagRenderContent(fullDagInitData, draftPlanSnapshot);
     if (hasPlanStructure) {
         const dagInitDataForPersist = (fullDagInitData && typeof fullDagInitData === 'object')
             ? fullDagInitData
             : draftPlanSnapshot;
         patch.draftPlanSnapshot = draftPlanSnapshot;
-        patch.dagInitData = dagInitDataForPersist;
-        if (dagInitDataForPersist.title || draftPlanSnapshot.title) {
-            patch.executionTitle = dagInitDataForPersist.title || draftPlanSnapshot.title;
+        patch.dagInitData = dagRenderContent || dagInitDataForPersist;
+        if ((dagRenderContent && dagRenderContent.title) || dagInitDataForPersist.title || draftPlanSnapshot.title) {
+            patch.executionTitle = (dagRenderContent && dagRenderContent.title) || dagInitDataForPersist.title || draftPlanSnapshot.title;
         }
     }
 
@@ -2780,12 +2981,11 @@ function applyPlanPayloadToThread(threadId, payload, options = {}) {
         && hasPlanStructure
         && typeof createDag === 'function'
     ) {
-        const dagInitDataForRender = (fullDagInitData && typeof fullDagInitData === 'object')
-            ? fullDagInitData
-            : draftPlanSnapshot;
-        createDag({ data: { content: dagInitDataForRender } });
-        if (dagInitDataForRender.title || draftPlanSnapshot.title) {
-            updateExecutionTitle(dagInitDataForRender.title || draftPlanSnapshot.title);
+        if (dagRenderContent) {
+            createDag({ data: { content: dagRenderContent } });
+        }
+        if ((dagRenderContent && dagRenderContent.title) || draftPlanSnapshot.title) {
+            updateExecutionTitle((dagRenderContent && dagRenderContent.title) || draftPlanSnapshot.title);
         }
         rerenderTaskInfoBySelection();
     }
@@ -2946,7 +3146,8 @@ function upsertDraftPlanMessage(threadId, payload, options = {}) {
         approvalState,
         draftPlanSnapshot,
         pendingKind: 'plan_draft',
-        pendingPlaceholder: false
+        pendingPlaceholder: false,
+        pendingAction: 'draft'
     };
     if (incomingLatestRevisionPrompt) {
         metadataPatch.latestRevisionPrompt = incomingLatestRevisionPrompt;
@@ -2973,20 +3174,6 @@ function upsertDraftPlanMessage(threadId, payload, options = {}) {
         : false;
     if (replaced) {
         return findDraftPlanMessageByExecution(threadId, executionId);
-    }
-
-    const fallbackPending = findPendingAssistantPlaceholder(threadId);
-    if (fallbackPending && fallbackPending.message) {
-        const fallbackMeta = (fallbackPending.message.metadata && typeof fallbackPending.message.metadata === 'object')
-            ? fallbackPending.message.metadata
-            : {};
-        const fallbackKind = String(fallbackMeta.pendingKind || '').trim();
-        if (fallbackMeta.pendingPlaceholder === true && (fallbackKind === 'plan_draft' || fallbackKind === 'send')) {
-            const replacedByFallback = resolvePendingAssistantPlaceholder(threadId, '', metadataPatch, {});
-            if (replacedByFallback) {
-                return findDraftPlanMessageByExecution(threadId, executionId);
-            }
-        }
     }
 
     const nextMessage = {
@@ -3266,6 +3453,16 @@ function renderPendingPlaceholderToBubble(bubbleEl, threadId) {
 }
 
 function resolvePendingPlaceholderLabel(metadata = {}, threadId = '') {
+    const pendingAction = String(metadata.pendingAction || '').trim();
+    const pendingStatus = String(metadata.pendingStatus || '').trim();
+
+    if (pendingAction === 'execute' || pendingAction === 'replan') {
+        if (pendingStatus === 'running_task') {
+            return getThinkingStatusTextForThread(threadId).text;
+        }
+        return '正在启动任务执行线程';
+    }
+
     return '正在制定问题解决方案';
 }
 
@@ -3431,6 +3628,8 @@ function replaceDraftPlanMessageWithPendingPlaceholder(message, options = {}) {
     const thread = located.thread;
     const previousMeta = (targetMessage.metadata && typeof targetMessage.metadata === 'object') ? targetMessage.metadata : {};
     const pendingKind = String(options.pendingKind || 'send').trim() || 'send';
+    const pendingAction = String(options.pendingAction || '').trim() || null;
+    const pendingStatus = String(options.pendingStatus || '').trim() || null;
     const pendingTopic = Object.prototype.hasOwnProperty.call(previousMeta, 'pendingTopic')
         ? previousMeta.pendingTopic
         : null;
@@ -3441,9 +3640,10 @@ function replaceDraftPlanMessageWithPendingPlaceholder(message, options = {}) {
         ...previousMeta,
         pendingPlaceholder: true,
         pendingKind,
+        pendingAction,
+        pendingStatus,
         pendingTopic,
         pendingWorkspaceId,
-        pendingStatus: null,
         executionId: null,
         planSessionId: null,
         planVersion: null,
@@ -3935,10 +4135,10 @@ async function approveDraftPlanMessage(message) {
         return false;
     }
 
-    clearRightPanelImmediatelyForNewRun(sourceThreadId);
-
     const pendingPlaceholderMessageId = replaceDraftPlanMessageWithPendingPlaceholder(currentMessage, {
         pendingKind: 'send',
+        pendingAction: 'execute',
+        pendingStatus: 'starting_execution_thread',
         executionId,
         planSessionId,
         latestRevisionPrompt: String(metadata.latestRevisionPrompt || '').trim(),
@@ -4060,7 +4260,7 @@ async function submitPlanRevision() {
         return false;
     }
 
-    clearRightPanelImmediatelyForNewRun(found.thread.id);
+    await clearRightPanelImmediatelyForNewRun(found.thread.id);
 
     updateDraftPlanMessageState(currentMessage, {
         latestRevisionPrompt: revisionPrompt
@@ -4068,6 +4268,8 @@ async function submitPlanRevision() {
 
     const pendingPlaceholderMessageId = replaceDraftPlanMessageWithPendingPlaceholder(currentMessage, {
         pendingKind: 'send',
+        pendingAction: 'replan',
+        pendingStatus: 'starting_execution_thread',
         executionId,
         planSessionId,
         latestRevisionPrompt: revisionPrompt,
@@ -4585,7 +4787,7 @@ async function resendLastNormalPayloadByRedo(redoTargetMessage, targetThreadId =
     const sourceThreadId = targetThreadId || AppState.currentThreadId;
 
     // 重做发起时立即清空右侧栏，避免等待首包期间显示旧任务结果。
-    clearRightPanelImmediatelyForNewRun(sourceThreadId);
+    await clearRightPanelImmediatelyForNewRun(sourceThreadId);
 
     // redo 点击后立即锁定发送按钮，避免等待后端状态同步造成可点击窗口。
     AppState.threadExecutionState[sourceThreadId] = true;
@@ -4880,49 +5082,6 @@ function tryConsumeRedoByAssistantMessage(message, threadId = AppState.currentTh
 
 const pendingAssistantMessages = [];
 let pendingAssistantFlushTimer = null;
-const planDraftRetryTimers = new Map();
-
-function clearPlanDraftRetry(threadId) {
-    const key = String(threadId || '').trim();
-    if (!key) return;
-    const timer = planDraftRetryTimers.get(key);
-    if (timer) {
-        clearTimeout(timer);
-        planDraftRetryTimers.delete(key);
-    }
-}
-
-function schedulePlanDraftRetry(threadId, payload = {}) {
-    const key = String(threadId || '').trim();
-    if (!key) return;
-    if (planDraftRetryTimers.has(key)) return;
-
-    const timer = setTimeout(async () => {
-        planDraftRetryTimers.delete(key);
-
-        const thread = getThreadById(key);
-        if (!thread) return;
-
-        const executionId = String(payload.executionId || '').trim() || String(thread?.rightPanelState?.executionId || '').trim();
-        const planSessionId = String(payload.planSessionId || '').trim() || String(thread?.rightPanelState?.planSessionId || '').trim();
-        const question = resolveDraftPlanQuestion(key, executionId ? findDraftPlanMessageByExecution(key, executionId) : null);
-        if (!executionId || !planSessionId || !question) {
-            console.warn('[plan-draft-retry] 缺少重试上下文，取消本次重试', { threadId: key, executionId, planSessionId, hasQuestion: !!question });
-            return;
-        }
-
-        const outboundPayload = buildPlanActionOutboundPayload(key, question);
-        console.warn('[plan-draft-retry] 收到失败状态，发起自动重试', { threadId: key, executionId, planSessionId });
-        await sendToBackend(question, key, outboundPayload, {
-            wsAction: 'plan_draft',
-            requirePlanApproval: true,
-            executionId,
-            planSessionId
-        });
-    }, 1200);
-
-    planDraftRetryTimers.set(key, timer);
-}
 
 function flushPendingAssistantMessages() {
     if (pendingAssistantFlushTimer) return;
@@ -5925,7 +6084,7 @@ async function sendMessage() {
     if (!message || isThreadInputLocked(sourceThreadId)) return;
 
     // 普通发送发起时立即清空右侧栏，避免等待首包期间显示旧任务结果。
-    clearRightPanelImmediatelyForNewRun(sourceThreadId);
+    await clearRightPanelImmediatelyForNewRun(sourceThreadId);
     
     const sendTimestamp = Date.now();
     const userMessage = {
@@ -5943,7 +6102,7 @@ async function sendMessage() {
     
     // 统一通过 addMessage 写入（树结构/线性兼容），避免双写导致错位
     addMessage(userMessage);
-    const pendingPlaceholderMessageId = markMessageAsSendPending('plan_draft');
+    const pendingPlaceholderMessageId = markMessageAsSendPending('pendingPlaceholder');
 
     // 普通发送与 redo 对齐：写入 user + pending 后立即强制落盘，避免 sessions.json 丢消息。
     const sendingThread = getThreadById(sourceThreadId);
@@ -5967,7 +6126,7 @@ async function sendMessage() {
         executionId,
         planSessionId,
         pendingPlaceholderMessageId,
-        pendingKind: 'send',
+        pendingKind: 'pendingPlaceholder',
     });
 }
 
@@ -6214,7 +6373,7 @@ async function handleWebSocketMessage(message) {
                     topic,
                     patch: {
                         pendingKind: 'send',
-                        pendingStatus: null
+                        pendingStatus: 'starting_execution_thread'
                     }
                 });
                 if (draftMessage) {
@@ -6227,7 +6386,6 @@ async function handleWebSocketMessage(message) {
                     finalReportRetryStateByThread.delete(effectiveThreadId);
                 }
                 void setThreadExecutingState(effectiveThreadId, true);
-                clearPlanDraftRetry(effectiveThreadId);
                 return true;
             }
 
@@ -6239,12 +6397,6 @@ async function handleWebSocketMessage(message) {
                         pendingStatus: null
                     }
                 });
-            }
-
-            if (approvalState === 'failed') {
-                schedulePlanDraftRetry(effectiveThreadId, payloadWithQuestion);
-            } else {
-                clearPlanDraftRetry(effectiveThreadId);
             }
 
             if (approvalState === 'awaiting_user_approval' || approvalState === 'failed') {
@@ -6384,21 +6536,66 @@ async function handleWebSocketMessage(message) {
                     if (approvalState) {
                         applyPlanPayloadToThread(targetThreadId, initData, {
                             workspaceId: getWorkspaceIdByTopic(topic),
-                            renderCurrentThread: false
+                            renderCurrentThread: targetThreadId === AppState.currentThreadId
                         });
 
                         const embeddedPlanEventType = embeddedEventType || 'plan_approval_state';
+                        const executionId = String(initData.executionId || '').trim();
+                        const existingDraftMessage = executionId
+                            ? findDraftPlanMessageByExecution(targetThreadId, executionId)
+                            : null;
+                        const question = resolveDraftPlanQuestion(targetThreadId, existingDraftMessage);
+                        const payloadWithQuestion = question ? { ...initData, question } : initData;
+                        const shouldReplaceInitialPlaceholder = !existingDraftMessage
+                            && !!topic
+                            && (
+                                (embeddedPlanEventType === 'plan_approval_state'
+                                    && ['drafting', 'revising', 'awaiting_user_approval', 'failed'].includes(approvalState))
+                                || embeddedPlanEventType === 'plan_revision_applied'
+                            );
+
+                        const pendingByTopic = topic ? findPendingAssistantPlaceholder(targetThreadId, topic) : null;
+                        const pendingMetaByTopic = (pendingByTopic && pendingByTopic.message && pendingByTopic.message.metadata && typeof pendingByTopic.message.metadata === 'object')
+                            ? pendingByTopic.message.metadata
+                            : {};
                         const shouldMarkEmbeddedExecutionPending = shouldTreatAsExecutionPending(embeddedPlanEventType, approvalState);
+                        const isExecutionLocked =
+                            shouldMarkEmbeddedExecutionPending
+                            && pendingMetaByTopic.pendingPlaceholder === true
+                            && String(pendingMetaByTopic.pendingKind || '').trim() !== 'plan_draft';
+                        const shouldUpsertDraft = !isExecutionLocked && shouldUpsertDraftPlanForEvent(embeddedPlanEventType, approvalState);
+                        const draftMessage = shouldUpsertDraft
+                            ? upsertDraftPlanMessage(targetThreadId, payloadWithQuestion, {
+                                topic: shouldReplaceInitialPlaceholder ? topic : null,
+                                question
+                            })
+                            : null;
 
                         if (shouldMarkEmbeddedExecutionPending) {
                             updatePendingPlaceholderState(targetThreadId, {
                                 topic,
                                 patch: {
                                     pendingKind: 'send',
-                                    pendingStatus: null
+                                    pendingStatus: 'starting_execution_thread'
                                 }
                             });
+                            if (draftMessage) {
+                                updateDraftPlanMessageState(draftMessage, {
+                                    approvalState: 'executing',
+                                    question
+                                });
+                            }
                         }
+                    }
+                    const hasRuntimeDagSteps = Array.isArray(initData?.steps) && initData.steps.length > 0;
+                    if (!isApprovalPreviewOnly && hasRuntimeDagSteps) {
+                        updatePendingPlaceholderState(targetThreadId, {
+                            topic,
+                            patch: {
+                                pendingKind: 'send',
+                                pendingStatus: 'running_task'
+                            }
+                        });
                     }
                     const externalTaskKey = messageData?.data?.uuid || topic || null;
                     const ensured = ensureRuntimeTaskForThread(targetThreadId, {
@@ -6413,7 +6610,17 @@ async function handleWebSocketMessage(message) {
                             : [];
                     }
                     if (!approvalState) {
-                        schedulePersistRightPanelState(targetThreadId, { dagInitData: initData });
+                        const targetThread = getThreadById(targetThreadId);
+                        const currentRightPanelState = (targetThread && targetThread.rightPanelState && typeof targetThread.rightPanelState === 'object')
+                            ? targetThread.rightPanelState
+                            : {};
+                        const fallbackDraftSnapshot = sanitizeDraftPlanSnapshot(
+                            (currentRightPanelState.draftPlanSnapshot && typeof currentRightPanelState.draftPlanSnapshot === 'object')
+                                ? currentRightPanelState.draftPlanSnapshot
+                                : currentRightPanelState.dagInitData
+                        );
+                        const normalizedDagInitData = resolveDagRenderContent(initData, fallbackDraftSnapshot) || initData;
+                        schedulePersistRightPanelState(targetThreadId, { dagInitData: normalizedDagInitData });
                     }
                     if (isDagInitDataAllCompleted(initData)) {
                         const pendingRedoTarget = resolvePendingRedoTarget(targetThreadId, topic);
@@ -7177,12 +7384,14 @@ async function restoreRightPanelStateFromData(rightPanelState, threadId) {
     normalizedState.runtimeLogBook = normalizeRuntimeLogBook(normalizedState.runtimeLogBook);
 
     const dagInitData = normalizedState.dagInitData || null;
-    const uiTitle = normalizedState.executionTitle || (dagInitData && dagInitData.title) || null;
+    const draftPlanSnapshot = normalizedState.draftPlanSnapshot || null;
+    const dagRenderContent = resolveDagRenderContent(dagInitData, draftPlanSnapshot);
+    const uiTitle = normalizedState.executionTitle || (dagRenderContent && dagRenderContent.title) || null;
     if (uiTitle) {
         updateExecutionTitle(uiTitle);
     }
-    if (dagInitData && typeof createDag === 'function') {
-        createDag({ data: { content: dagInitData } });
+    if (dagRenderContent && typeof createDag === 'function') {
+        createDag({ data: { content: dagRenderContent } });
     }
 
     const runtimeLogs = getActiveTaskLogsFromRightPanelState(normalizedState);
@@ -7604,7 +7813,11 @@ function schedulePersistRightPanelState(threadId, partialState) {
         rightPanelPersistTimers.delete(threadId);
         try {
             if (window.SessionService && typeof window.SessionService.updateThread === 'function') {
-                const persistState = buildPersistableThreadMetadata(nextState);
+                const latestThread = getThreadById(threadId);
+                const latestState = (latestThread && latestThread.rightPanelState && typeof latestThread.rightPanelState === 'object')
+                    ? latestThread.rightPanelState
+                    : nextState;
+                const persistState = buildPersistableThreadMetadata(latestState);
                 if (persistState) {
                     await window.SessionService.updateThread(threadId, persistState);
                 }
@@ -8229,6 +8442,7 @@ function toggleThreadStar(threadId) {
 }
 
 async function deleteThread(threadId) {
+    cleanupThreadTransientState(threadId);
     await animateThreadDeleteAndPushUp(threadId);
 
     // 使用 SessionService 删除会话
