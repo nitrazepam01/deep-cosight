@@ -452,6 +452,8 @@ def _persist_thread_plan_approval_state(
     if not thread_id:
         return False
 
+    normalized_approval_state = str(approval_state or "").strip().lower()
+
     data = load_sessions()
     updated = False
     now_ms = int(datetime.now().timestamp() * 1000)
@@ -460,6 +462,17 @@ def _persist_thread_plan_approval_state(
         for thread in folder.get("threads", []):
             if thread.get("id") != thread_id:
                 continue
+
+            if normalized_approval_state == "completed":
+                # 任务完成后，线程级 rightPanelState 必须完全清空。
+                thread["rightPanelState"] = None
+                thread.pop("workspaceId", None)
+                thread.pop("workspacePath", None)
+                thread.pop("planLogPath", None)
+                thread["updatedAt"] = now_ms
+                updated = True
+                break
+
             right_panel_state = thread.get("rightPanelState")
             if not isinstance(right_panel_state, dict):
                 right_panel_state = {}
