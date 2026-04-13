@@ -1992,8 +1992,8 @@ const AgentRuntimeService = (function () {
         const allowedActorIds = Array.isArray(_config.allowed_actor_ids) ? _config.allowed_actor_ids : [];
         _config.allowed_actor_ids = allowedActorIds.filter(id => actorIds.has(id));
 
-        if (!_config.allowed_actor_ids.includes(_config.default_actor_id)) {
-            _config.default_actor_id = _config.allowed_actor_ids[0] || '';
+        if (!actorIds.has(_config.default_actor_id)) {
+            _config.default_actor_id = _actors[0]?.id || '';
         }
 
         if (!_config.dispatch_mode) {
@@ -2001,11 +2001,8 @@ const AgentRuntimeService = (function () {
         }
     }
 
-    function getSelectedActorItems() {
-        const allowedIds = Array.isArray(_config.allowed_actor_ids) ? _config.allowed_actor_ids : [];
-        return _actors
-            .filter(actor => allowedIds.includes(actor.id))
-            .map(actor => ({ value: actor.id, label: actor.name }));
+    function getAllActorItems() {
+        return (_actors || []).map(actor => ({ value: actor.id, label: actor.name }));
     }
 
     function renderInfoStateHtml(text) {
@@ -2055,7 +2052,7 @@ const AgentRuntimeService = (function () {
         const defaultActorContainer = document.getElementById('agent-default-actor-select-container');
         if (!defaultActorContainer || typeof CustomSelect === 'undefined') return;
 
-        const items = getSelectedActorItems();
+        const items = getAllActorItems();
         const itemIds = items.map(item => item.value);
         if (!itemIds.includes(_config.default_actor_id)) {
             _config.default_actor_id = itemIds[0] || '';
@@ -2063,7 +2060,7 @@ const AgentRuntimeService = (function () {
         }
 
         if (_selectInstances.defaultActor) {
-            _selectInstances.defaultActor.options.placeholder = defaultActorContainer.dataset.placeholder || '请先选择 Actors';
+            _selectInstances.defaultActor.options.placeholder = defaultActorContainer.dataset.placeholder || '请选择 Actor';
             _selectInstances.defaultActor.setItems(items);
             _selectInstances.defaultActor.setValue(_config.default_actor_id || '');
             return;
@@ -2071,7 +2068,7 @@ const AgentRuntimeService = (function () {
 
         _selectInstances.defaultActor = new CustomSelect(defaultActorContainer, {
             items,
-            placeholder: defaultActorContainer.dataset.placeholder || '请先选择 Actors',
+            placeholder: defaultActorContainer.dataset.placeholder || '请选择 Actor',
             selectedValue: _config.default_actor_id || '',
             expandUp: true,
             onChange: function(value) {
@@ -2217,7 +2214,7 @@ const AgentRuntimeService = (function () {
                             <span style="font-size:12px;color:#888;">默认的任务执行智能体</span>
                         </div>
                     </div>
-                    <div id="agent-default-actor-select-container" data-value="${escapeHtml(_config.default_actor_id)}" data-placeholder="请先选择 Actors" style="flex:1;"></div>
+                    <div id="agent-default-actor-select-container" data-value="${escapeHtml(_config.default_actor_id)}" data-placeholder="${_actors.length ? '请选择 Actor' : '无可用 Actor'}" style="flex:1;"></div>
                     <div id="agent-default-actor-usage-hint" style="margin-top:auto;padding-top:10px;flex-shrink:0;">
                         ${isSingleActor ? renderInfoStateHtml('当前模式正在使用此配置') : renderInfoStateHtml('')}
                     </div>
@@ -2308,9 +2305,6 @@ const AgentRuntimeService = (function () {
                 onChange: function(values) {
                     const nextValues = Array.isArray(values) ? [...values] : [];
                     _config.allowed_actor_ids = nextValues;
-                    if (!nextValues.includes(_config.default_actor_id)) {
-                        _config.default_actor_id = nextValues[0] || '';
-                    }
                     saveConfig();
                     syncDefaultActorSelect();
                 }
