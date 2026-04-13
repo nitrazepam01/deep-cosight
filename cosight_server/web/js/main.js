@@ -4227,18 +4227,35 @@ function defaultDeleteMessage(message, messageItem) {
 function defaultLocateMessage(message) {
     if (!message) return;
 
+    const clickedMessageId = ensureMessageId(message);
+    const located = clickedMessageId ? findMessageByIdInAllThreads(clickedMessageId) : null;
+    const targetMessage = (located && located.message) ? located.message : message;
+    const targetThread = (located && located.thread) ? located.thread : getCurrentThread();
+    if (!targetThread) return;
+
+    if (targetThread.id && targetThread.id !== AppState.currentThreadId) {
+        void switchThread(targetThread.id).then(() => {
+            const refreshed = clickedMessageId ? findMessageByIdInAllThreads(clickedMessageId) : null;
+            if (refreshed && refreshed.message) {
+                defaultLocateMessage(refreshed.message);
+            }
+        });
+        return;
+    }
+
     // 任务进行中不切换右侧栏状态，只保持显示当前任务的信息
     const isCurrentTaskExecuting =
         isThreadExecuting(AppState.currentThreadId) ||
         hasThreadExecutionEvidence(AppState.currentThreadId);
     
     console.info('[message-action] 执行 defaultLocateMessage', {
-        messageId: message.id,
-        metadata: message.metadata,
-        associatedTaskId: message.associatedTaskId,
+        messageId: targetMessage.id,
+        metadata: targetMessage.metadata,
+        associatedTaskId: targetMessage.associatedTaskId,
         runtimeLogActiveTaskId: AppState.runtimeLogActiveTaskId,
         displayThreadId,
-        isCurrentTaskExecuting
+        isCurrentTaskExecuting,
+        locatedThreadId: targetThread.id || null
     });
 
     // 任务进行中时，防止定位按钮切换线程和右侧栏状态
@@ -4253,7 +4270,7 @@ function defaultLocateMessage(message) {
         return;
     }
 
-    let associatedTaskId = message.associatedTaskId || (message.metadata && message.metadata.taskId) || AppState.runtimeLogActiveTaskId;
+    let associatedTaskId = targetMessage.associatedTaskId || (targetMessage.metadata && targetMessage.metadata.taskId) || AppState.runtimeLogActiveTaskId;
 
     // fallback: 从当前线程已加载的 rightPanelState/runtimeLogBook 里获取 activeTaskId
     if (!associatedTaskId) {
@@ -4278,12 +4295,12 @@ function defaultLocateMessage(message) {
     }
 
     if (!associatedTaskId) {
-        if (!(message.metadata && (message.metadata.finalJsonPath || message.metadata.finalMarkdownPath))) {
-            console.warn('[message-action] 关联任务ID缺失，仍尝试根据消息路径定位', message);
+        if (!(targetMessage.metadata && (targetMessage.metadata.finalJsonPath || targetMessage.metadata.finalMarkdownPath))) {
+            console.warn('[message-action] 关联任务ID缺失，仍尝试根据消息路径定位', targetMessage);
         } else {
             console.debug('[message-action] final report message no associatedTaskId, will restore from finalJsonPath/metadata', {
-                messageId: message.id,
-                metadata: message.metadata
+                messageId: targetMessage.id,
+                metadata: targetMessage.metadata
             });
         }
     } else {
@@ -4314,87 +4331,10 @@ function defaultLocateMessage(message) {
         rerenderTaskInfoBySelection();
     }
 
-    // 更新右侧面板显示对应版本的文件（优先使用消息元数据）
-    const workspaceIdFromMsg = message.metadata && message.metadata.workspaceId;
-    const finalPathFromMsg = message.metadata && message.metadata.finalMarkdownPath;
-
-    // 恢复右侧栏状态（DAG图、任务详情、日志等）
-    if (message.metadata && message.metadata.finalJsonPath) {
-        const thread = getCurrentThread();
-        const workspaceIdFallback = message.metadata.workspaceId || thread?.rightPanelState?.workspaceId || null;
-        if (thread) {
-            void loadThreadRightPanelStateFromFinalJson(thread, message.metadata.finalJsonPath, workspaceIdFallback)
-                .catch(err => console.warn('[message-action] 恢复 finalJsonData 失败:', err));
-        }
-    }
-
-    if (finalPathFromMsg) {
-        const thread = getCurrentThread();
-        if (thread) {
-            thread.rightPanelState = thread.rightPanelState || {};
-            if (workspaceIdFromMsg) {
-                thread.rightPanelState.workspaceId = workspaceIdFromMsg;
-            }
-        }
-        showMarkdownFileInRightPanel(finalPathFromMsg);
-    } else if (workspaceIdFromMsg) {
-        // 即便没有路径，也可能有workspaceId，尝试从后端重新拉取该workspace的最新报告
-        const thread = getCurrentThread();
-        if (thread) {
-            thread.rightPanelState = thread.rightPanelState || {};
-            thread.rightPanelState.workspaceId = workspaceIdFromMsg;
-        }
-        void fetchFinalJsonPath(workspaceIdFromMsg).then((finalJsonData) => {
-            if (finalJsonData && finalJsonData.path) {
-                const currentThread = getCurrentThread();
-                if (currentThread) {
-                    void loadThreadRightPanelStateFromFinalJson(currentThread, finalJsonData.path, workspaceIdFromMsg);
-                }
-            }
-        }).catch(err => console.warn('[message-action] 查找 finalJsonPath 失败:', err));
-        console.info('[message-action] defaultLocateMessage: workspaceIdFromMsg 有值，尝试 fetchFinalReportByThreadId', {
-            workspaceIdFromMsg,
-            messageId: message.id,
-            messageMeta: message.metadata
-        });
-        void fetchFinalReportByThreadId(AppState.currentThreadId, workspaceIdFromMsg).then((report) => {
-            if (report && report.filePath) {
-                console.info('[message-action] defaultLocateMessage: fetchFinalReportByThreadId 返回', report);
-                showMarkdownFileInRightPanel(report.filePath, report.fileName);
-                return;
-            }
-            console.warn('[message-action] defaultLocateMessage: fetchFinalReportByThreadId 无可用文件，fallback 直接内容渲染', report);
-            // fallback: 直接显示消息内容
-            if (message && message.content) {
-                const markdownContent = document.getElementById('markdown-content');
-                const iframe = document.getElementById('content-iframe');
-                if (iframe) iframe.style.display = 'none';
-                if (markdownContent) {
-                    markdownContent.style.display = 'block';
-                    if (window.MarkdownRenderer && typeof window.MarkdownRenderer.render === 'function') {
-                        window.MarkdownRenderer.render(message.content, markdownContent);
-                    } else {
-                        markdownContent.textContent = message.content;
-                    }
-                }
-            }
-        });
-    } else {
-        // 没有路径没有workspaceId，则直接展示当前气泡内容（确保版本展示能见）
-        if (message && message.content) {
-            const markdownContent = document.getElementById('markdown-content');
-            const iframe = document.getElementById('content-iframe');
-            if (iframe) iframe.style.display = 'none';
-            if (markdownContent) {
-                markdownContent.style.display = 'block';
-                if (window.MarkdownRenderer && typeof window.MarkdownRenderer.render === 'function') {
-                    window.MarkdownRenderer.render(message.content, markdownContent);
-                } else {
-                    markdownContent.textContent = message.content;
-                }
-            }
-        }
-    }
+    // 与切线程保持完全一致：统一由线程级恢复链路处理右侧栏状态
+    void restoreRightPanelByNonExecutingThread(targetThread).catch((err) => {
+        console.warn('[message-action] restoreRightPanelByNonExecutingThread 失败:', err);
+    });
 
     console.info('[message-action] 定位到任务', {
         taskId: associatedTaskId || '未知',
@@ -7504,35 +7444,6 @@ async function clearThreadRightPanelState(threadId) {
         console.warn('[clearThreadRightPanelState] 清理失败:', { threadId, error });
         return false;
     }
-}
-
-// 在右侧面板显示 markdown 文件
-function showMarkdownFileInRightPanel(filePath, fileName) {
-    const iframe = document.getElementById('content-iframe');
-    const markdownContent = document.getElementById('markdown-content');
-    const rightStatus = document.getElementById('right-container-status');
-
-    if (!iframe || !markdownContent) {
-        console.warn('[showMarkdownFileInRightPanel] 右侧面板元素不存在');
-        return;
-    }
-
-    showRightPanel();
-
-    if (rightStatus) {
-        rightStatus.textContent = `正在查看：${fileName || '最终报告'}`;
-    }
-
-    // filePath 形如 work_space/work_space_xxx/最终报告.md，直接走静态挂载目录
-    const normalizedPath = String(filePath || '').replace(/^\/+/, '');
-    const apiBase = (window.SessionService && window.SessionService.apiBaseUrl)
-        ? window.SessionService.apiBaseUrl
-        : (window.location.origin + '/api/nae-deep-research/v1');
-    const apiUrl = `${apiBase}/${normalizedPath}`;
-    iframe.removeAttribute('sandbox');
-    iframe.src = apiUrl;
-    iframe.style.display = 'block';
-    markdownContent.style.display = 'none';
 }
 
 function showThinkingState() {
