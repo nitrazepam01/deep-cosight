@@ -28,6 +28,7 @@ const redoTopicContextMap = new Map();
 const redoThreadContextMap = new Map();
 const topicWorkspaceIdMap = new Map();
 const pendingTopicMessageMap = new Map();
+const autoCoderRunApprovalSent = new Set();
 const thinkingTitleRotationStateByThread = new Map();
 let thinkingIndicatorRefreshTimer = null;
 const finalReportRetryStateByThread = new Map();
@@ -285,15 +286,6 @@ function createToolCallItem(toolCall) {
     item.className = `tool-call-item ${toolCall.status}`;
     item.dataset.callId = toolCall.id;
 
-    const hasContent = toolCall.url || toolCall.path;
-    if (hasContent) {
-        item.style.cursor = "pointer";
-        item.title = "点击查看详情";
-        item.addEventListener("click", function () {
-            showRightPanelForTool(toolCall);
-        });
-    }
-
     const icon = document.createElement("div");
     icon.className = `tool-call-icon ${toolCall.status}`;
 
@@ -416,94 +408,11 @@ function clearAllFloatingToolPanels() {
 // ==================== 右侧内容面板控制 ====================
 
 // 显示右侧面板用于工具内容展示
-function showRightPanelForTool(toolCall) {
-    // 获取右侧内容区域
-    const iframe = document.getElementById('content-iframe');
-    const markdownContent = document.getElementById('markdown-content');
-    const rightStatus = document.getElementById('right-container-status');
-
-    if (!iframe || !markdownContent) {
-        return;
-    }
-
-    showRightPanel();
-
-    // 显示 iframe 或 markdown 内容
-    iframe.removeAttribute('sandbox');
-    iframe.style.display = 'block';
-    markdownContent.style.display = 'none';
-
-    // 更新状态文本
-    if (rightStatus) {
-        if (toolCall.url) {
-            rightStatus.textContent = `正在查看：${toolCall.toolName}`;
-        } else if (toolCall.path) {
-            rightStatus.textContent = `正在查看：${toolCall.toolName}`;
-        }
-    }
-
-    // 如果有 URL，在 iframe 中显示
-    if (toolCall.url) {
-        iframe.src = toolCall.url;
-        iframe.style.display = 'block';
-        markdownContent.style.display = 'none';
-    } else if (toolCall.path) {
-        // 如果是文件路径，显示文件内容
-        showFileContentInIframe(toolCall.path);
-    }
-}
-
-// 在 iframe 中显示文件内容
-function showFileContentInIframe(filePath) {
-    const iframe = document.getElementById('content-iframe');
-    if (!iframe) return;
-
-    // filePath 形如 work_space/work_space_xxx/最终报告.md，直接走静态挂载目录
-    const normalizedPath = String(filePath || '').replace(/^\/+/, '');
-    const apiBase = (window.SessionService && window.SessionService.apiBaseUrl)
-        ? window.SessionService.apiBaseUrl
-        : (window.location.origin + '/api/nae-deep-research/v1');
-    const apiUrl = `${apiBase}/${normalizedPath}`;
-    showRightPanel();
-    iframe.removeAttribute('sandbox');
-    iframe.src = apiUrl;
-    iframe.style.display = 'block';
-}
-
-// 显示右侧面板（通用）
 function showRightPanel() {
     const rightContainer = document.getElementById('right-container');
     if (!rightContainer) return false;
     rightContainer.style.display = 'block';
     return true;
-}
-
-// 隐藏右侧面板
-function hideRightPanel() {
-    const rightContainer = document.getElementById('right-container');
-    if (!rightContainer) return false;
-    rightContainer.style.display = 'none';
-    return true;
-}
-
-// 切换右侧内容面板的显示/隐藏（与 index.html 保持一致）
-function toggleRightContainer() {
-    const rightContainer = document.getElementById('right-container');
-    if (rightContainer) {
-        if (rightContainer.style.display === 'none') {
-            showRightPanel();
-        } else {
-            hideRightPanel();
-        }
-    }
-}
-
-// 最大化/还原右侧面板
-function toggleMaximizePanel() {
-    const rightContainer = document.getElementById('right-container');
-    if (rightContainer) {
-        rightContainer.classList.toggle('maximized');
-    }
 }
 
 // 更新动态标题
@@ -2569,11 +2478,6 @@ function isDraftPlanMessage(message) {
         && metadata.pendingPlaceholder === false;
 }
 
-function isCoderRunRequestMessage(message) {
-    const metadata = (message && message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
-    return metadata.type === 'coder_run_request';
-}
-
 function isFinalReportMessage(message) {
     if (!message || message.role !== 'assistant') return false;
     const metadata = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
@@ -3312,42 +3216,6 @@ function getDraftPlanApprovalState(message) {
     return approvalState || 'awaiting_user_approval';
 }
 
-function getCoderRunBadgeText(approvalState, previewOnly = false) {
-    if (previewOnly) return '可预览';
-    switch (normalizePlanApprovalState(approvalState)) {
-        case 'awaiting_code_run_approval':
-            return '待批准';
-        case 'approved':
-            return '已批准';
-        case 'code_running':
-            return '运行中';
-        case 'completed':
-            return '已完成';
-        case 'skipped':
-        case 'code_run_skipped':
-            return '已跳过';
-        case 'expired':
-            return '已失效';
-        case 'failed':
-            return '失败';
-        default:
-            return '代码';
-    }
-}
-
-function buildCoderRunPlainText(metadata = {}) {
-    const parts = [];
-    const targetFile = String(metadata.targetFile || '').trim();
-    const sandboxPath = String(metadata.sandboxPath || '').trim();
-    const reason = String(metadata.reason || '').trim();
-    const statusText = String(metadata.statusText || '').trim();
-    if (targetFile) parts.push(`目标文件: ${targetFile}`);
-    if (sandboxPath) parts.push(`沙箱目录: ${sandboxPath}`);
-    if (reason) parts.push(`说明: ${reason}`);
-    if (statusText) parts.push(`状态: ${statusText}`);
-    return parts.join('\n');
-}
-
 function renderDraftPlanCardToBubble(message, bubbleEl) {
     const metadata = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
     const snapshot = (metadata.draftPlanSnapshot && typeof metadata.draftPlanSnapshot === 'object')
@@ -3398,42 +3266,6 @@ function renderDraftPlanCardToBubble(message, bubbleEl) {
                 <div class="draft-plan-actions">
                     <button class="btn-modal-primary draft-plan-action-btn" data-draft-plan-action="approve">执行计划</button>
                     <button class="btn-modal-secondary draft-plan-action-btn" data-draft-plan-action="revise">修改计划</button>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function renderCoderRunRequestCardToBubble(message, bubbleEl) {
-    const metadata = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
-    const approvalState = normalizePlanApprovalState(metadata.approvalState);
-    const previewOnly = metadata.previewOnly === true || String(metadata.language || '').toLowerCase() === 'html';
-    const targetFile = String(metadata.targetFile || '').trim();
-    const sandboxPath = String(metadata.sandboxPath || '').trim();
-    const reason = String(metadata.reason || '').trim();
-    const statusText = String(metadata.statusText || '').trim();
-    const errorMessage = String(metadata.errorMessage || '').trim();
-    const stepIndex = Number(metadata.stepIndex);
-    const language = String(metadata.language || (targetFile.endsWith('.html') ? 'html' : 'python')).trim().toLowerCase();
-    const readableTitle = previewOnly
-        ? 'HTML 预览已生成'
-        : `Step ${Number.isFinite(stepIndex) ? stepIndex + 1 : '?'} 代码运行`;
-
-    bubbleEl.innerHTML = `
-        <div class="coder-run-card" data-coder-run-message-id="${escapeHtml(String(ensureMessageId(message)))}">
-            <div class="coder-run-card-header">
-                <span class="coder-run-badge coder-run-badge-${escapeHtml(approvalState || 'unknown')}">${escapeHtml(getCoderRunBadgeText(approvalState, previewOnly))}</span>
-                <span class="coder-run-lang">${escapeHtml(language.toUpperCase())}</span>
-            </div>
-            <div class="coder-run-title">${escapeHtml(readableTitle)}</div>
-            ${targetFile ? `<div class="coder-run-row"><span class="coder-run-label">目标文件</span><span class="coder-run-value">${escapeHtml(targetFile)}</span></div>` : ''}
-            ${sandboxPath ? `<div class="coder-run-row"><span class="coder-run-label">沙箱目录</span><span class="coder-run-value">${escapeHtml(sandboxPath)}</span></div>` : ''}
-            ${reason ? `<div class="coder-run-note">${escapeHtml(reason)}</div>` : ''}
-            ${errorMessage ? `<div class="coder-run-error">${escapeHtml(errorMessage)}</div>` : ''}
-            <div class="coder-run-footer">
-                <span class="coder-run-status-text">${escapeHtml(statusText)}</span>
-                <div class="coder-run-actions">
-                    ${previewOnly ? `<button class="btn-modal-secondary coder-run-action-btn" data-coder-run-action="preview">预览 HTML</button>` : ''}
                 </div>
             </div>
         </div>
@@ -3505,10 +3337,6 @@ function renderMessageBubbleContent(message, bubbleEl) {
     const metadata = (message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
     if (message.role === 'assistant' && isDraftPlanMessage(message)) {
         renderDraftPlanCardToBubble(message, bubbleEl);
-        return;
-    }
-    if (message.role === 'assistant' && metadata.type === 'coder_run_request') {
-        renderCoderRunRequestCardToBubble(message, bubbleEl);
         return;
     }
     const isPendingPlaceholder = message.role === 'assistant' && metadata.pendingPlaceholder === true;
@@ -3606,18 +3434,6 @@ function findDraftPlanMessageByExecution(threadId, executionId) {
     }) || null;
 }
 
-function findCoderRunMessage(threadId, executionId, stepIndex) {
-    const thread = getThreadById(threadId);
-    if (!thread || !executionId || !Number.isFinite(Number(stepIndex))) return null;
-    const messages = getRenderableMessagesFromThread(thread);
-    return messages.find((msg) => {
-        if (!msg || msg.role !== 'assistant') return false;
-        const metadata = (msg.metadata && typeof msg.metadata === 'object') ? msg.metadata : {};
-        return metadata.type === 'coder_run_request'
-            && String(metadata.executionId || '') === String(executionId)
-            && Number(metadata.stepIndex) === Number(stepIndex);
-    }) || null;
-}
 
 function updateDraftPlanMessageState(message, patch = {}) {
     if (!message) return false;
@@ -3745,78 +3561,6 @@ function updatePendingPlaceholderState(threadId, options = {}) {
     return true;
 }
 
-function updateCoderRunMessageState(message, patch = {}) {
-    if (!message) return false;
-    const located = findMessageByIdInAllThreads(ensureMessageId(message));
-    if (!located || !located.thread || !located.message) return false;
-    const targetMessage = located.message;
-    const thread = located.thread;
-    const baseMeta = (targetMessage.metadata && typeof targetMessage.metadata === 'object') ? targetMessage.metadata : {};
-    targetMessage.metadata = { ...baseMeta, ...patch };
-    if (typeof patch.content === 'string') {
-        targetMessage.content = patch.content;
-    } else {
-        targetMessage.content = buildCoderRunPlainText(targetMessage.metadata);
-    }
-    targetMessage.timestamp = Date.now();
-    persistMessageStateToThread(thread, targetMessage, { syncContent: true, syncTimestamp: true });
-    thread.updatedAt = Date.now();
-    void syncThreadMessagesToBackend(thread);
-    if (thread.id === AppState.currentThreadId) {
-        loadMessages(getRenderableMessagesFromThread(thread));
-        scrollToBottom();
-    } else {
-        renderFolderList();
-    }
-    return true;
-}
-
-function upsertCoderRunMessage(threadId, payload, options = {}) {
-    const thread = getThreadById(threadId);
-    if (!thread || !payload || typeof payload !== 'object') return null;
-    const executionId = String(payload.executionId || '').trim();
-    const stepIndex = Number(payload.stepIndex);
-    if (!executionId || !Number.isFinite(stepIndex)) return null;
-
-    const metadataPatch = {
-        type: 'coder_run_request',
-        executionId,
-        planSessionId: String(payload.planSessionId || '').trim(),
-        stepIndex,
-        workspaceId: normalizeWorkspaceId(payload.workspaceId || null),
-        sandboxPath: String(payload.sandboxPath || '').trim(),
-        targetFile: String(payload.targetFile || '').trim(),
-        topic: String(options.topic || payload.topic || '').trim(),
-        approvalState: normalizePlanApprovalState(payload.approvalState),
-        previewOnly: payload.previewOnly === true,
-        language: String(payload.language || '').trim(),
-        reason: String(payload.reason || '').trim(),
-        statusText: String(payload.statusText || '').trim(),
-        errorMessage: String(payload.errorMessage || '').trim()
-    };
-    const content = buildCoderRunPlainText(metadataPatch);
-
-    const existingMessage = findCoderRunMessage(threadId, executionId, stepIndex);
-    if (existingMessage) {
-        updateCoderRunMessageState(existingMessage, { ...metadataPatch, content });
-        return existingMessage;
-    }
-
-    const nextMessage = {
-        role: 'assistant',
-        content,
-        timestamp: Date.now(),
-        metadata: metadataPatch
-    };
-    addMessageToThreadStorage(thread, nextMessage);
-    if (threadId === AppState.currentThreadId) {
-        loadMessages(getRenderableMessagesFromThread(thread));
-        scrollToBottom();
-    } else {
-        renderFolderList();
-    }
-    return nextMessage;
-}
 
 function bindDraftPlanCardActions(messageItem, message) {
     const actionButtons = messageItem.querySelectorAll('[data-draft-plan-action]');
@@ -3873,18 +3617,27 @@ function getActiveTopicForExecution(threadId, executionId = '') {
     return fallbackTopics.length ? fallbackTopics[fallbackTopics.length - 1] : null;
 }
 
-function buildCoderRunActionMessage(threadId, metadata, action) {
-    const executionId = String(metadata.executionId || '').trim();
-    const planSessionId = String(metadata.planSessionId || '').trim();
-    const stepIndex = Number(metadata.stepIndex);
-    return {
+function forwardCoderRunApprovalToAi(topic, payload = {}, threadId = '') {
+    const resolvedTopic = String(topic || '').trim();
+    const executionId = String(payload.executionId || '').trim();
+    const planSessionId = String(payload.planSessionId || '').trim();
+    const stepIndex = Number(payload.stepIndex);
+    const resolvedThreadId = String(threadId || payload.threadId || '').trim();
+
+    if (!resolvedTopic || !executionId || !Number.isFinite(stepIndex)) return false;
+
+    const dedupeKey = `${resolvedTopic}|${executionId}|${stepIndex}`;
+    if (autoCoderRunApprovalSent.has(dedupeKey)) return true;
+    autoCoderRunApprovalSent.add(dedupeKey);
+
+    const message = {
         uuid: (window.WebSocketService && typeof WebSocketService.generateUUID === 'function')
             ? WebSocketService.generateUUID()
             : generateUniqueId('coder_run_action'),
         type: 'multi-modal',
         from: 'human',
         timestamp: Date.now(),
-        initData: [{ type: 'text', value: action === 'coder_run_approve' ? '批准运行代码' : '跳过运行代码' }],
+        initData: [{ type: 'text', value: '批准运行代码' }],
         roleInfo: { name: 'admin' },
         mentions: [],
         extra: {
@@ -3892,64 +3645,23 @@ function buildCoderRunActionMessage(threadId, metadata, action) {
                 executionId,
                 planSessionId,
                 stepIndex,
-                threadId
+                threadId: resolvedThreadId
             }
         },
         sessionInfo: {
             messageSerialNumber: executionId,
-            threadId,
+            threadId: resolvedThreadId,
             planSessionId
         }
     };
-}
 
-function previewCoderRunMessage(message) {
-    const metadata = (message && message.metadata && typeof message.metadata === 'object') ? message.metadata : {};
-    const targetFile = String(metadata.targetFile || '').trim();
-    if (!targetFile) return false;
-    const title = targetFile.split('/').pop() || 'HTML 预览';
-    return showSandboxedHtmlPreviewInRightPanel(targetFile, title);
-}
+    if (!window.WebSocketService || typeof WebSocketService.sendActionMessage !== 'function') {
+        autoCoderRunApprovalSent.delete(dedupeKey);
+        return false;
+    }
 
-function bindCoderRunCardActions(messageItem, message) {
-    const actionButtons = messageItem.querySelectorAll('[data-coder-run-action]');
-    actionButtons.forEach((btn) => {
-        btn.addEventListener('click', async (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            const action = String(btn.dataset.coderRunAction || '').trim();
-            const currentMessage = resolveActionMessage(messageItem, message);
-            if (!currentMessage) return;
-            const metadata = (currentMessage.metadata && typeof currentMessage.metadata === 'object') ? currentMessage.metadata : {};
-            if (action === 'preview') {
-                previewCoderRunMessage(currentMessage);
-                return;
-            }
-
-            const sourceThreadId = AppState.currentThreadId || findMessageByIdInAllThreads(ensureMessageId(currentMessage))?.thread?.id;
-            const executionId = String(metadata.executionId || '').trim();
-            const topic = String(metadata.topic || '').trim() || getActiveTopicForExecution(sourceThreadId, executionId);
-            if (!sourceThreadId || !executionId || !topic || !window.WebSocketService || typeof WebSocketService.sendActionMessage !== 'function') {
-                updateCoderRunMessageState(currentMessage, {
-                    approvalState: 'failed',
-                    statusText: '未找到当前运行会话，代码运行请求已失效',
-                    errorMessage: '未找到当前运行会话，代码运行请求已失效'
-                });
-                return;
-            }
-
-            const wsAction = action === 'approve' ? 'coder_run_approve' : 'coder_run_skip';
-            const nextState = action === 'approve'
-                ? { approvalState: 'code_running', statusText: '已批准，代码正在运行中', errorMessage: '' }
-                : { approvalState: 'code_run_skipped', statusText: '已跳过代码运行，代码保留在沙箱中', errorMessage: '' };
-            updateCoderRunMessageState(currentMessage, {
-                ...nextState
-            });
-
-            const outboundMessage = buildCoderRunActionMessage(sourceThreadId, metadata, wsAction);
-            WebSocketService.sendActionMessage(wsAction, topic, JSON.stringify(outboundMessage));
-        });
-    });
+    WebSocketService.sendActionMessage('coder_run_approve', resolvedTopic, JSON.stringify(message));
+    return true;
 }
 
 function bindMessageMetaActions(messageItem, message) {
@@ -4033,7 +3745,6 @@ function bindMessageMetaActions(messageItem, message) {
     }
 
     bindDraftPlanCardActions(messageItem, message);
-    bindCoderRunCardActions(messageItem, message);
 }
 
 async function defaultCopyMessage(message, btn) {
@@ -6575,14 +6286,8 @@ async function handleWebSocketMessage(message) {
             const effectiveThreadId = targetThreadId || String(payload.threadId || '').trim() || AppState.currentThreadId;
             if (!effectiveThreadId) return false;
 
-            const message = upsertCoderRunMessage(effectiveThreadId, payload, { topic });
-            if (messageType === 'coder_run_request_state' && message) {
-                const approvalState = normalizePlanApprovalState(payload.approvalState);
-                updateCoderRunMessageState(message, {
-                    approvalState,
-                    statusText: String(payload.statusText || '').trim(),
-                    errorMessage: String(payload.errorMessage || '').trim()
-                });
+            if (messageType === 'coder_run_request') {
+                forwardCoderRunApprovalToAi(topic, payload, effectiveThreadId);
             }
 
             if (payload.workspaceId) {
@@ -6676,22 +6381,14 @@ async function handleWebSocketMessage(message) {
             const embeddedEventType = String(initData?.eventType || initData?.type || '').trim();
             if (embeddedEventType === 'coder_run_request' || embeddedEventType === 'coder_run_request_state') {
                 const effectiveThreadId = targetThreadId || String(initData?.threadId || '').trim() || AppState.currentThreadId;
-                if (effectiveThreadId) {
-                    const coderRunMessage = upsertCoderRunMessage(effectiveThreadId, initData, { topic });
-                    if (embeddedEventType === 'coder_run_request_state' && coderRunMessage) {
-                        updateCoderRunMessageState(coderRunMessage, {
-                            approvalState: normalizePlanApprovalState(initData?.approvalState),
-                            statusText: String(initData?.statusText || '').trim(),
-                            errorMessage: String(initData?.errorMessage || '').trim()
-                        });
-                    }
-
-                    if (initData?.workspaceId) {
-                        updateThreadPlanState(effectiveThreadId, {
-                            workspaceId: normalizeWorkspaceId(initData.workspaceId),
-                            workspacePath: `work_space/${normalizeWorkspaceId(initData.workspaceId)}`
-                        });
-                    }
+                if (embeddedEventType === 'coder_run_request') {
+                    forwardCoderRunApprovalToAi(topic, initData || {}, effectiveThreadId || '');
+                }
+                if (effectiveThreadId && initData?.workspaceId) {
+                    updateThreadPlanState(effectiveThreadId, {
+                        workspaceId: normalizeWorkspaceId(initData.workspaceId),
+                        workspacePath: `work_space/${normalizeWorkspaceId(initData.workspaceId)}`
+                    });
                 }
             }
             const approvalState = normalizePlanApprovalState(initData?.approvalState);
@@ -7476,9 +7173,6 @@ async function loadThreadRightPanelStateFromFinalJson(thread, finalJsonPath, wor
             if (persistCache && window.SessionService && typeof window.SessionService.updateThread === 'function') {
                 void schedulePersistRightPanelState(thread.id, thread.rightPanelState);
             }
-            if (thread.id === AppState.currentThreadId) {
-                showMarkdownContentInRightPanel(resultContent, title);
-            }
             return true;
         }
         return false;
@@ -7524,33 +7218,6 @@ function showMarkdownContentInRightPanel(content, title = '最终报告') {
     }
 }
 
-function showSandboxedHtmlPreviewInRightPanel(filePath, title = 'HTML 预览') {
-    const iframe = document.getElementById('content-iframe');
-    const markdownContent = document.getElementById('markdown-content');
-    const rightStatus = document.getElementById('right-container-status');
-    if (!iframe || !markdownContent) return false;
-
-    const normalizedPath = String(filePath || '').replace(/^\/+/, '');
-    if (!normalizedPath) return false;
-
-    const apiBase = (window.SessionService && window.SessionService.apiBaseUrl)
-        ? window.SessionService.apiBaseUrl
-        : (window.location.origin + '/api/nae-deep-research/v1');
-    const apiUrl = `${apiBase}/${normalizedPath}`;
-
-    showRightPanel();
-    markdownContent.style.display = 'none';
-    iframe.style.display = 'block';
-    iframe.setAttribute('sandbox', 'allow-scripts');
-    iframe.src = apiUrl;
-    if (rightStatus) {
-        rightStatus.textContent = `正在预览：${title}`;
-    }
-    if (typeof updateExecutionTitle === 'function' && title) {
-        updateExecutionTitle(title);
-    }
-    return true;
-}
 
 async function restoreRightPanelStateFromData(rightPanelState, threadId) {
     if (!rightPanelState || typeof rightPanelState !== 'object') return false;
