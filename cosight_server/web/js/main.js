@@ -1886,17 +1886,9 @@ async function clearRightPanelImmediatelyForNewRun(threadId) {
         clearRuntimeLogs();
         clearRuntimeLogFilter();
         AppState.selectedTaskNodeId = null;
-        AppState.runtimeLogActiveTaskId = null;
-        AppState.taskInfoMode = 'detail';
-        syncTaskInfoModeUI('detail');
         if (AppState.currentThreadId === threadId && typeof window.rerenderTaskInfoBySelection === 'function') {
             window.rerenderTaskInfoBySelection();
         }
-    }
-
-    // 清理线程级任务缓存，避免切换回来时恢复旧 DAG/日志视图状态。
-    if (AppState.threadTaskStateMemory && typeof AppState.threadTaskStateMemory.delete === 'function') {
-        AppState.threadTaskStateMemory.delete(threadId);
     }
 
     await clearThreadRightPanelState(threadId);
@@ -4130,7 +4122,16 @@ async function submitPlanRevision() {
         question
     });
 
-    // 重计划发起阶段不预写旧计划结构，保持 rightPanelState 在新计划回包前为空。
+    applyPlanPayloadToThread(found.thread.id, {
+        executionId,
+        planSessionId,
+        approvalState: 'revising',
+        planVersion: metadata.planVersion,
+        latestRevisionPrompt: revisionPrompt,
+        draftPlanSnapshot: {}
+    }, {
+        renderCurrentThread: false
+    });
 
     const outboundPayload = buildPlanActionOutboundPayload(found.thread.id, question);
 
