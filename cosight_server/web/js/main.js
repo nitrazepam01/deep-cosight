@@ -1860,16 +1860,16 @@ function clearDagViewState() {
     clearProgressOverview();
 
     // 重试或重置时，清空当前线程已缓存的 DAG 结构，避免旧完成状态误导状态文案
-    try {
-        const currentThread = getCurrentThread();
-        if (currentThread) {
-            currentThread.rightPanelState = currentThread.rightPanelState || {};
-            currentThread.rightPanelState.dagInitData = null;
-            schedulePersistRightPanelState(currentThread.threadId, { dagInitData: null });
-        }
-    } catch (err) {
-        console.warn('[clearDagViewState] 清理线程 DAG 缓存失败：', err);
-    }
+    // try {
+    //     const currentThread = getCurrentThread();
+    //     if (currentThread) {
+    //         currentThread.rightPanelState = currentThread.rightPanelState || {};
+    //         currentThread.rightPanelState.dagInitData = null;
+    //         schedulePersistRightPanelState(currentThread.threadId, { dagInitData: null });
+    //     }
+    // } catch (err) {
+    //     console.warn('[clearDagViewState] 清理线程 DAG 缓存失败：', err);
+    // }
 }
 
 async function clearRightPanelImmediatelyForNewRun(threadId) {
