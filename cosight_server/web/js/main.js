@@ -5925,13 +5925,15 @@ async function sendMessage() {
     // 普通发送与 redo 对齐：写入 user + pending 后立即强制落盘，避免 sessions.json 丢消息。
     const sendingThread = getThreadById(sourceThreadId);
     if (sendingThread) {
-        updateThreadPlanState(sourceThreadId, {
-            executionId,
-            planSessionId,
-            planApprovalState: 'drafting',
-            planVersion: 0,
-            draftPlanSnapshot: null
-        });
+        if (message !== '测试') {
+            updateThreadPlanState(sourceThreadId, {
+                executionId,
+                planSessionId,
+                planApprovalState: 'drafting',
+                planVersion: 0,
+                draftPlanSnapshot: null
+            });
+        }
         await syncThreadMessagesToBackend(sendingThread);
     }
     
