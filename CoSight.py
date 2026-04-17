@@ -306,10 +306,10 @@ class CoSight:
         )
         next_version = self.plan.plan_version + 1 if self.plan.plan_version > 0 else 2
         self.plan.configure_approval(
-            approval_state="approved",
+            approval_state="awaiting_user_approval",
             plan_version=next_version,
             latest_revision_prompt=revision_text,
-            status_text="计划已更新，准备执行",
+            status_text="计划已更新，请确认",
         )
         return self.plan.format()
 

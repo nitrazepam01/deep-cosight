@@ -130,30 +130,6 @@
             </div>
         </main>
 
-        <!-- 右侧内容面板（用于显示工具调用结果） -->
-        <div class="right-container" id="right-container" style="display: none;">
-            <div class="right-header">
-                <h3><i class="fas fa-info-circle"></i> Co-Sight 的电脑</h3>
-                <span id="right-container-status">正在查看文件内容...</span>
-                <div class="right-header-icons">
-                    <button class="btn-icon" id="toggle-maximize-btn" onclick="toggleMaximizePanel()">
-                        <i class="fas fa-expand-alt"></i>
-                    </button>
-                    <button class="btn-icon" id="close-right-panel-btn" onclick="toggleRightContainer()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="right-content">
-                <iframe id="content-iframe" width="100%" height="100%" frameborder="0"
-                    style="display: none;"></iframe>
-                <div id="markdown-content"></div>
-                <div id="loading-indicator" class="loading-indicator" style="display: none;">
-                    <div class="loading-spinner"></div>
-                </div>
-            </div>
-        </div>
-        
         <aside class="sidebar-right" id="sidebar-right">
             <div class="sidebar-right-header">
                 <div class="sidebar-right-title">
@@ -388,17 +364,18 @@
                 </button>
             </div>
             <div class="modal-body">
-                <p class="modal-message plan-revision-modal-tip">告诉 Planner 你希望怎么调整这份计划，提交后会先修订，再直接开始执行。</p>
-                <textarea
-                    class="modal-input plan-revision-textarea"
-                    id="plan-revision-input"
-                    rows="6"
-                    placeholder="例如：请先做文献综述，再把实验设计拆得更细，并把最终输出改成适合论文写作的结构。"
-                ></textarea>
+                <div class="input-wrapper plan-revision-input-wrapper">
+                    <textarea
+                        class="chat-input plan-revision-textarea"
+                        id="plan-revision-input"
+                        rows="6"
+                        placeholder="告诉 Planner 你希望怎么调整这份计划，例如：请先做文献综述，再把实验设计拆得更细，并把最终输出改成适合论文写作的结构。"
+                    ></textarea>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn-modal-secondary" id="cancel-plan-revision-btn">取消</button>
-                <button class="btn-modal-primary" id="confirm-plan-revision-btn">修改后执行</button>
+                <button class="btn-modal-primary" id="confirm-plan-revision-btn">提交修改需求</button>
             </div>
         </div>
     </div>

@@ -452,6 +452,8 @@ def _persist_thread_plan_approval_state(
     if not thread_id:
         return False
 
+    normalized_approval_state = str(approval_state or "").strip().lower()
+
     data = load_sessions()
     updated = False
     now_ms = int(datetime.now().timestamp() * 1000)
@@ -460,6 +462,17 @@ def _persist_thread_plan_approval_state(
         for thread in folder.get("threads", []):
             if thread.get("id") != thread_id:
                 continue
+
+            if normalized_approval_state == "completed":
+                # 任务完成后，线程级 rightPanelState 必须完全清空。
+                thread["rightPanelState"] = None
+                thread.pop("workspaceId", None)
+                thread.pop("workspacePath", None)
+                thread.pop("planLogPath", None)
+                thread["updatedAt"] = now_ms
+                updated = True
+                break
+
             right_panel_state = thread.get("rightPanelState")
             if not isinstance(right_panel_state, dict):
                 right_panel_state = {}
@@ -490,6 +503,66 @@ def _persist_thread_plan_approval_state(
     if updated:
         save_sessions(data)
     return updated
+
+
+def _rehydrate_runtime_from_draft_snapshot(
+    *,
+    plan_id: str,
+    plan_session_id: str,
+    draft_plan_snapshot: dict,
+    workspace_path_value: str | None,
+    agent_run_config: dict | None,
+) -> CoSight | None:
+    if not isinstance(draft_plan_snapshot, dict):
+        return None
+
+    raw_steps = draft_plan_snapshot.get("steps")
+    if not isinstance(raw_steps, list) or len(raw_steps) == 0:
+        return None
+
+    steps: list[str] = []
+    for idx, step in enumerate(raw_steps):
+        if isinstance(step, str):
+            label = step.strip()
+        elif isinstance(step, dict):
+            label = str(step.get("title") or step.get("name") or step.get("fullName") or f"步骤 {idx + 1}").strip()
+        else:
+            label = ""
+        if label:
+            steps.append(label)
+
+    if len(steps) == 0:
+        return None
+
+    dependencies = draft_plan_snapshot.get("dependencies")
+    if not isinstance(dependencies, dict):
+        dependencies = {}
+
+    title = str(draft_plan_snapshot.get("title") or "执行计划").strip() or "执行计划"
+    plan_version = int(draft_plan_snapshot.get("planVersion") or 1)
+    latest_revision_prompt = str(draft_plan_snapshot.get("latestRevisionPrompt") or "")
+
+    runtime = CoSight(
+        llm_for_plan,
+        llm_for_act,
+        llm_for_tool,
+        llm_for_vision,
+        work_space_path=workspace_path_value,
+        message_uuid=plan_id,
+        agent_run_config=agent_run_config,
+    )
+
+    runtime.plan.update(title=title, steps=steps, dependencies=dependencies)
+    runtime.plan.configure_approval(
+        execution_id=plan_id,
+        plan_session_id=plan_session_id,
+        approval_state="approved",
+        plan_version=plan_version,
+        latest_revision_prompt=latest_revision_prompt,
+        require_user_approval=True,
+        status_text="已确认",
+    )
+    return runtime
 
 
 async def append_create_plan(data: Any, plan_log_path: str = None, plan_final_path: str = None):
@@ -671,6 +744,8 @@ async def search(request: Request, params: Any = Body(None)):
         plan_session_id = f"plan_session_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
     plan_action = _normalize_plan_action(params.get("planAction"), require_plan_approval=require_plan_approval)
     revision_prompt = str(params.get("revisionPrompt") or "").strip()
+    requested_workspace_id = str(params.get("workspaceId") or "").strip()
+    incoming_draft_snapshot = params.get("draftPlanSnapshot") if isinstance(params.get("draftPlanSnapshot"), dict) else None
 
     # 获取查询内容
     content_array = params.get('content', [])
@@ -699,8 +774,23 @@ async def search(request: Request, params: Any = Body(None)):
 
     # 确定 workspace_id
     if is_existing_approval_followup:
-        workspace_id = (existing_plan_session or {}).get("workspace_id")
+        workspace_id = requested_workspace_id or (existing_plan_session or {}).get("workspace_id")
         work_space_path_time = (existing_plan_session or {}).get("workspace_path")
+        if workspace_id and not work_space_path_time:
+            candidate_workspace = os.path.join(work_space_path, workspace_id)
+            if os.path.exists(candidate_workspace):
+                work_space_path_time = candidate_workspace
+
+        # redo/followup 在没有可用 workspace 绑定时，按普通发送路径创建新的工作区。
+        if not workspace_id:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+            workspace_id = f'work_space_{timestamp}'
+            work_space_path_time = os.path.join(work_space_path, workspace_id)
+            os.makedirs(work_space_path_time, exist_ok=True)
+        elif not work_space_path_time and not is_replay_request:
+            work_space_path_time = os.path.join(work_space_path, workspace_id)
+            os.makedirs(work_space_path_time, exist_ok=True)
+
         if work_space_path_time:
             os.environ['WORKSPACE_PATH'] = work_space_path_time
     elif not is_replay_request:
@@ -714,11 +804,15 @@ async def search(request: Request, params: Any = Body(None)):
     else:
         # 回放请求，从 replayWorkspace 提取 workspace_id
         replay_workspace = params.get("replayWorkspace", "")
-        workspace_id = os.path.basename(replay_workspace) if replay_workspace else plan_id  # 降级使用 plan_id
+        workspace_id = os.path.basename(replay_workspace) if replay_workspace else ""
         work_space_path_time = None
+        if not workspace_id:
+            return {
+                "contentType": "multi-modal",
+                "content": [{"type": "text", "value": "replayWorkspace 缺失，无法回放。"}],
+                "promptSentences": []
+            }
 
-    if not workspace_id:
-        workspace_id = plan_id
     if not work_space_path_time and workspace_id and not is_replay_request:
         candidate_workspace = os.path.join(work_space_path, workspace_id)
         if os.path.exists(candidate_workspace):
@@ -782,6 +876,7 @@ async def search(request: Request, params: Any = Body(None)):
             plan_report_event_manager.subscribe("plan_process", plan_id, append_create_plan_local)
             plan_report_event_manager.subscribe("plan_result", plan_id, append_create_plan_local)
             plan_report_event_manager.subscribe("tool_event", plan_id, append_create_plan_local)
+            plan_report_event_manager.subscribe("coder_run_request", plan_id, append_create_plan_local)
 
         def unsubscribe_plan_events():
             plan_report_event_manager.unsubscribe("plan_created", plan_id, append_create_plan_local)
@@ -789,6 +884,7 @@ async def search(request: Request, params: Any = Body(None)):
             plan_report_event_manager.unsubscribe("plan_process", plan_id, append_create_plan_local)
             plan_report_event_manager.unsubscribe("plan_result", plan_id, append_create_plan_local)
             plan_report_event_manager.unsubscribe("tool_event", plan_id, append_create_plan_local)
+            plan_report_event_manager.unsubscribe("coder_run_request", plan_id, append_create_plan_local)
 
         def build_and_persist_session(runtime, approval_state: str, latest_revision: str = ""):
             plan_snapshot = _serialize_plan_data(runtime.plan) if runtime and runtime.plan else None
@@ -981,7 +1077,41 @@ async def search(request: Request, params: Any = Body(None)):
         if is_existing_approval_followup:
             expected_session = existing_plan_session or {}
             runtime = TaskManager.get_runtime(plan_id)
-            if not runtime or expected_session.get("plan_session_id") != plan_session_id:
+            if not runtime and isinstance(incoming_draft_snapshot, dict):
+                runtime = _rehydrate_runtime_from_draft_snapshot(
+                    plan_id=plan_id,
+                    plan_session_id=plan_session_id,
+                    draft_plan_snapshot=incoming_draft_snapshot,
+                    workspace_path_value=work_space_path_time,
+                    agent_run_config=params.get("agentRunConfig") if isinstance(params.get("agentRunConfig"), dict) else None,
+                )
+                if runtime:
+                    TaskManager.set_runtime(plan_id, runtime)
+                    if not isinstance(expected_session, dict) or not expected_session:
+                        TaskManager.set_plan_session(
+                            plan_id,
+                            _build_plan_session_snapshot(
+                                plan_id=plan_id,
+                                thread_id=thread_id,
+                                workspace_id=workspace_id,
+                                workspace_path_value=work_space_path_time,
+                                query_content=query_content,
+                                plan_session_id=plan_session_id,
+                                approval_state="approved",
+                                plan_version=int(incoming_draft_snapshot.get("planVersion") or 1),
+                                latest_revision_prompt=str(incoming_draft_snapshot.get("latestRevisionPrompt") or ""),
+                                draft_plan_snapshot=incoming_draft_snapshot,
+                                agent_run_config=params.get("agentRunConfig") if isinstance(params.get("agentRunConfig"), dict) else None,
+                            )
+                        )
+                        expected_session = TaskManager.get_plan_session(plan_id) or {}
+
+            session_id_mismatch = bool(
+                isinstance(expected_session, dict)
+                and expected_session.get("plan_session_id")
+                and expected_session.get("plan_session_id") != plan_session_id
+            )
+            if not runtime or session_id_mismatch:
                 emit_plan_state_event(
                     "plan_approval_state",
                     "failed",
@@ -1002,18 +1132,21 @@ async def search(request: Request, params: Any = Body(None)):
 
                 def run_approval_flow():
                     latest_revision = revision_prompt
+                    revise_only_mode = plan_action == "plan_revise_execute"
                     try:
                         if work_space_path_time:
                             os.environ['WORKSPACE_PATH'] = work_space_path_time
                         subscribe_plan_events()
-                        if plan_action == "plan_revise_execute":
+                        if revise_only_mode:
                             build_and_persist_session(runtime, "revising", latest_revision)
                             emit_plan_state_event("plan_approval_state", "revising")
                             runtime.revise_draft_plan(query_content, latest_revision)
-                            _, revised_snapshot = build_and_persist_session(runtime, "approved", latest_revision)
+                            _, revised_snapshot = build_and_persist_session(runtime, "awaiting_user_approval", latest_revision)
                             if isinstance(revised_snapshot, dict):
                                 push_queue(revised_snapshot)
-                            emit_plan_state_event("plan_revision_applied", "approved", plan_snapshot=revised_snapshot)
+                            emit_plan_state_event("plan_revision_applied", "awaiting_user_approval", plan_snapshot=revised_snapshot)
+                            push_queue({"eventType": "plan_stream_end", "mode": "approval"})
+                            return
                         else:
                             _, approved_snapshot = build_and_persist_session(runtime, "approved")
                             emit_plan_state_event("plan_approval_state", "approved", plan_snapshot=approved_snapshot)
@@ -1034,7 +1167,8 @@ async def search(request: Request, params: Any = Body(None)):
                     finally:
                         unsubscribe_plan_events()
                         TaskManager.mark_completed(plan_id)
-                        TaskManager.remove_plan(plan_id)
+                        if not revise_only_mode:
+                            TaskManager.remove_plan(plan_id)
                         try:
                             if thread_id and not is_replay_request:
                                 set_thread_execution_status(thread_id, False)
@@ -1261,7 +1395,13 @@ async def search(request: Request, params: Any = Body(None)):
                 # 计划未完成时的超时：仅发送保活状态。若有最新非工具计划，则基于其发送；否则发送默认等待计划
                 if latest_plan and isinstance(latest_plan, dict):
                     waiting_plan = dict(latest_plan)
-                    waiting_plan["statusText"] = "等待计划更新..."
+                    step_statuses = list((waiting_plan.get("step_statuses") or {}).values())
+                    if "awaiting_code_run_approval" in step_statuses:
+                        waiting_plan["statusText"] = "等待代码运行审批..."
+                    elif "code_running" in step_statuses:
+                        waiting_plan["statusText"] = "代码运行中..."
+                    else:
+                        waiting_plan["statusText"] = "等待计划更新..."
                     try:
                         import hashlib as _hashlib
                         plan_fp = _hashlib.md5(json.dumps(waiting_plan, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
@@ -1359,6 +1499,16 @@ async def search(request: Request, params: Any = Body(None)):
                         "code": 0,
                         "message": "ok",
                         "task": "plan_approval",
+                        "changeType": "replace",
+                        "content": response_data
+                    }
+                elif isinstance(response_data, dict) and response_data.get("eventType") == "coder_run_request":
+                    response_json = {
+                        "contentType": "coder_run_request",
+                        "sessionInfo": params.get("sessionInfo", {}),
+                        "code": 0,
+                        "message": "ok",
+                        "task": "coder_run_request",
                         "changeType": "replace",
                         "content": response_data
                     }

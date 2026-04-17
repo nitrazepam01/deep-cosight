@@ -129,16 +129,6 @@ class I18nService {
             stepDescription.textContent = this.t('select_node_description');
         }
 
-        const cosightComputer = document.querySelector('.right-header h3');
-        if (cosightComputer) {
-            cosightComputer.innerHTML = `<i class="fas fa-info-circle"></i> ${this.t('cosight_computer')}`;
-        }
-
-        const viewingContent = document.getElementById('right-container-status');
-        if (viewingContent) {
-            viewingContent.textContent = this.t('viewing_file_content');
-        }
-
         // 更新DAG操作提示
         const dagTips = document.querySelectorAll('.tip-content span');
         if (dagTips.length >= 2) {

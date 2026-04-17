@@ -177,12 +177,19 @@ class Plan:
         """
         logger.debug(f"get_ready_steps dependencies: {self.dependencies}")
         ready_steps = []
+        dependency_incomplete_statuses = {
+            "not_started",
+            "in_progress",
+            "awaiting_code_run_approval",
+            "code_running",
+            "code_run_skipped",
+        }
         for step_index in range(len(self.steps)):
             # 获取该步骤的所有依赖
             dependencies = self.dependencies.get(step_index, [])
 
             # 检查所有依赖是否都已完成
-            if all(self.step_statuses.get(self.steps[int(dep)]) not  in["not_started","in_progress"]  for dep in dependencies):
+            if all(self.step_statuses.get(self.steps[int(dep)]) not in dependency_incomplete_statuses for dep in dependencies):
                 # 检查步骤本身是否未开始
                 if self.step_statuses.get(self.steps[step_index]) == "not_started":
                     ready_steps.append(step_index)
@@ -338,6 +345,56 @@ class Plan:
         from datetime import datetime
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    def _has_reachable_path(self, source: int, target: int, graph: Dict[int, List[int]], skip_edge: tuple[int, int]) -> bool:
+        """判断在跳过某条边后，source 是否仍可到达 target。"""
+        if source == target:
+            return True
+
+        visited = set()
+        stack = [source]
+        while stack:
+            node = stack.pop()
+            if node in visited:
+                continue
+            visited.add(node)
+
+            for nxt in graph.get(node, []):
+                if node == skip_edge[0] and nxt == skip_edge[1]:
+                    continue
+                if nxt == target:
+                    return True
+                if nxt not in visited:
+                    stack.append(nxt)
+        return False
+
+    def _prune_transitive_dependencies(self, dependencies: Dict[int, List[int]]) -> Dict[int, List[int]]:
+        """删除传递冗余边：若 A->C 可由 A->...->C 拼接得到，则去掉 A->C。"""
+        if not dependencies:
+            return {}
+
+        # 依赖表是 target -> [sources]，先转成 source -> [targets] 便于路径搜索
+        forward_graph: Dict[int, List[int]] = {i: [] for i in range(len(self.steps))}
+        edges: List[tuple[int, int]] = []
+        for target, sources in dependencies.items():
+            for source in sources:
+                forward_graph.setdefault(source, []).append(target)
+                edges.append((source, target))
+
+        redundant_edges = set()
+        for source, target in edges:
+            if self._has_reachable_path(source, target, forward_graph, (source, target)):
+                redundant_edges.add((source, target))
+
+        if not redundant_edges:
+            return dependencies
+
+        reduced: Dict[int, List[int]] = {}
+        for target, sources in dependencies.items():
+            kept_sources = [s for s in sources if (s, target) not in redundant_edges]
+            if kept_sources:
+                reduced[target] = kept_sources
+        return reduced
+
     def _normalize_dependencies(self, dependencies: Dict[int, List[int]]) -> Dict[int, List[int]]:
         """将可能为 1 基编号的依赖转换为 0 基编号。
 
@@ -358,21 +415,44 @@ class Plan:
         values = [d for v in deps_int.values() for d in v]
         # 若已包含 0，则认为是 0 基编号
         if 0 in keys or any(d == 0 for d in values):
-            return deps_int
+            normalized = deps_int
         # 若最小 key 和所有依赖值都 >=1，则视为 1 基编号，整体减 1
-        if min(keys) >= 1 and (not values or min(values) >= 1):
-            return {k - 1: [d - 1 for d in v] for k, v in deps_int.items()}
-        return deps_int
+        elif min(keys) >= 1 and (not values or min(values) >= 1):
+            normalized = {k - 1: [d - 1 for d in v] for k, v in deps_int.items()}
+        else:
+            normalized = deps_int
+
+        max_index = len(self.steps) - 1
+        sanitized: Dict[int, List[int]] = {}
+        for target, sources in normalized.items():
+            if target < 0 or target > max_index:
+                continue
+            valid_sources = []
+            for source in sources:
+                if source < 0 or source > max_index or source == target:
+                    continue
+                valid_sources.append(source)
+
+            # 去重并保持顺序
+            dedup_sources = list(dict.fromkeys(valid_sources))
+            if dedup_sources:
+                sanitized[target] = dedup_sources
+
+        return self._prune_transitive_dependencies(sanitized)
 
 
     def get_progress(self) -> Dict[str, int]:
         """Get progress statistics of the plan."""
+        in_progress_statuses = {"in_progress", "awaiting_code_run_approval", "code_running", "code_run_skipped"}
         return {
             "total": len(self.steps),
             "completed": sum(1 for status in self.step_statuses.values() if status == "completed"),
-            "in_progress": sum(1 for status in self.step_statuses.values() if status == "in_progress"),
+            "in_progress": sum(1 for status in self.step_statuses.values() if status in in_progress_statuses),
             "blocked": sum(1 for status in self.step_statuses.values() if status == "blocked"),
-            "not_started": sum(1 for status in self.step_statuses.values() if status == "not_started")
+            "not_started": sum(1 for status in self.step_statuses.values() if status == "not_started"),
+            "awaiting_code_run_approval": sum(1 for status in self.step_statuses.values() if status == "awaiting_code_run_approval"),
+            "code_running": sum(1 for status in self.step_statuses.values() if status == "code_running"),
+            "code_run_skipped": sum(1 for status in self.step_statuses.values() if status == "code_run_skipped"),
         }
 
     def format(self, with_detail: bool = False) -> str:
@@ -398,6 +478,9 @@ class Plan:
                 "in_progress": "[→]",
                 "completed": "[✓]",
                 "blocked": "[!]",
+                "awaiting_code_run_approval": "[?]",
+                "code_running": "[▶]",
+                "code_run_skipped": "[~]",
             }.get(self.step_statuses.get(step), "[ ]")
 
             # 显示依赖关系

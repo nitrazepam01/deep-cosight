@@ -1842,6 +1842,7 @@ window.AgentConfigService = AgentConfigService;
 const AgentRuntimeService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
     const STORAGE_KEY = 'cosight:agentRunConfig';
+    const MODAL_ANIMATION_MS = 300;
 
     let _config = {
         planner_id: '',
@@ -1852,6 +1853,12 @@ const AgentRuntimeService = (function () {
 
     let _planners = [];
     let _actors = [];
+    let _selectInstances = {
+        planner: null,
+        mode: null,
+        defaultActor: null,
+        actors: null
+    };
 
     function escapeHtml(str) {
         if (!str) return '';
@@ -1886,12 +1893,194 @@ const AgentRuntimeService = (function () {
         }
     }
 
+    function cloneConfig(config) {
+        return JSON.parse(JSON.stringify(config || {}));
+    }
+
+    function hasExplicitRuntimeConfig(config) {
+        if (!config || typeof config !== 'object') return false;
+        const allowedActorIds = Array.isArray(config.allowed_actor_ids) ? config.allowed_actor_ids.filter(Boolean) : [];
+        return Boolean(
+            String(config.planner_id || '').trim() ||
+            allowedActorIds.length > 0 ||
+            String(config.default_actor_id || '').trim()
+        );
+    }
+
+    function buildSuggestedConfig(runtimeDefaults = {}) {
+        const defaultPlannerId = runtimeDefaults.default_planner?.id || _planners[0]?.id || '';
+        const defaultActorId = runtimeDefaults.default_actor?.id || _actors[0]?.id || '';
+        const actorIds = (_actors || []).map(item => item.id).filter(Boolean);
+
+        const allowedActorIds = [];
+        if (defaultActorId) {
+            allowedActorIds.push(defaultActorId);
+        }
+        if (actorIds.includes('builtin-coder-lite') && !allowedActorIds.includes('builtin-coder-lite')) {
+            allowedActorIds.push('builtin-coder-lite');
+        }
+        if (allowedActorIds.length === 0) {
+            allowedActorIds.push(...actorIds);
+        }
+
+        return {
+            planner_id: defaultPlannerId,
+            allowed_actor_ids: allowedActorIds,
+            default_actor_id: defaultActorId || allowedActorIds[0] || '',
+            dispatch_mode: allowedActorIds.length > 1 ? 'planner_assign' : 'single_actor'
+        };
+    }
+
+    function applySuggestedDefaults(runtimeDefaults = {}, { force = false } = {}) {
+        const suggested = buildSuggestedConfig(runtimeDefaults);
+        if (!_config || typeof _config !== 'object') {
+            _config = {};
+        }
+
+        if (force || !_config.planner_id) {
+            _config.planner_id = suggested.planner_id;
+        }
+
+        const currentAllowedActorIds = Array.isArray(_config.allowed_actor_ids)
+            ? _config.allowed_actor_ids.filter(Boolean)
+            : [];
+        if (force || currentAllowedActorIds.length === 0) {
+            _config.allowed_actor_ids = [...suggested.allowed_actor_ids];
+        }
+
+        if (force || !_config.default_actor_id) {
+            _config.default_actor_id = suggested.default_actor_id;
+        }
+
+        if (force || !_config.dispatch_mode) {
+            _config.dispatch_mode = suggested.dispatch_mode;
+        }
+    }
+
+    async function getConfig() {
+        const data = await fetchRuntimeDefaults();
+        _planners = data.planners || [];
+        _actors = data.actors || [];
+        loadConfig();
+        applySuggestedDefaults(data, { force: !hasExplicitRuntimeConfig(_config) });
+        normalizeConfig();
+        saveConfig();
+        return cloneConfig(_config);
+    }
+
+    function destroySelectInstances() {
+        Object.keys(_selectInstances).forEach((key) => {
+            try {
+                if (_selectInstances[key] && typeof _selectInstances[key].destroy === 'function') {
+                    _selectInstances[key].destroy();
+                }
+            } catch (e) {
+                console.warn(`destroySelectInstances failed for ${key}:`, e);
+            }
+            _selectInstances[key] = null;
+        });
+    }
+
+    function normalizeConfig() {
+        const plannerIds = new Set((_planners || []).map(item => item.id));
+        const actorIds = new Set((_actors || []).map(item => item.id));
+
+        if (!plannerIds.has(_config.planner_id)) {
+            _config.planner_id = _planners[0]?.id || '';
+        }
+
+        const allowedActorIds = Array.isArray(_config.allowed_actor_ids) ? _config.allowed_actor_ids : [];
+        _config.allowed_actor_ids = allowedActorIds.filter(id => actorIds.has(id));
+
+        if (!actorIds.has(_config.default_actor_id)) {
+            _config.default_actor_id = _actors[0]?.id || '';
+        }
+
+        if (!_config.dispatch_mode) {
+            _config.dispatch_mode = 'single_actor';
+        }
+    }
+
+    function getAllActorItems() {
+        return (_actors || []).map(actor => ({ value: actor.id, label: actor.name }));
+    }
+
+    function renderInfoStateHtml(text) {
+        if (!text) {
+            return '<div style="height:35px;"></div>';
+        }
+        return `<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i><span style="transform:translateY(-1px);">${text}</span></div>`;
+    }
+
+    function updateModeDependentHints() {
+        const currentMode = _config.dispatch_mode || 'single_actor';
+        const plannerHint = document.getElementById('agent-planner-usage-hint');
+        const modeHint = document.getElementById('agent-mode-usage-hint');
+        const defaultActorHint = document.getElementById('agent-default-actor-usage-hint');
+        const actorsHint = document.getElementById('agent-actors-usage-hint');
+
+        let modeHintText = '';
+        if (currentMode === 'single_actor') {
+            modeHintText = '当前使用「默认执行器」处理所有任务';
+        } else if (currentMode === 'multi_actor') {
+            modeHintText = '当前使用「执行器列表」中的多个执行器';
+        } else if (currentMode === 'planner_assign') {
+            modeHintText = '当前由规划器根据任务类型智能分配';
+        }
+
+        if (plannerHint) {
+            plannerHint.innerHTML = currentMode === 'planner_assign'
+                ? renderInfoStateHtml('当前模式正在使用此配置')
+                : renderInfoStateHtml('');
+        }
+        if (modeHint) {
+            modeHint.innerHTML = renderInfoStateHtml(modeHintText);
+        }
+        if (defaultActorHint) {
+            defaultActorHint.innerHTML = currentMode === 'single_actor'
+                ? renderInfoStateHtml('当前模式正在使用此配置')
+                : renderInfoStateHtml('');
+        }
+        if (actorsHint) {
+            actorsHint.innerHTML = currentMode === 'multi_actor'
+                ? renderInfoStateHtml('当前模式正在使用此配置')
+                : renderInfoStateHtml('');
+        }
+    }
+
+    function syncDefaultActorSelect() {
+        const defaultActorContainer = document.getElementById('agent-default-actor-select-container');
+        if (!defaultActorContainer || typeof CustomSelect === 'undefined') return;
+
+        const items = getAllActorItems();
+        const itemIds = items.map(item => item.value);
+        if (!itemIds.includes(_config.default_actor_id)) {
+            _config.default_actor_id = itemIds[0] || '';
+            saveConfig();
+        }
+
+        if (_selectInstances.defaultActor) {
+            _selectInstances.defaultActor.options.placeholder = defaultActorContainer.dataset.placeholder || '请选择 Actor';
+            _selectInstances.defaultActor.setItems(items);
+            _selectInstances.defaultActor.setValue(_config.default_actor_id || '');
+            return;
+        }
+
+        _selectInstances.defaultActor = new CustomSelect(defaultActorContainer, {
+            items,
+            placeholder: defaultActorContainer.dataset.placeholder || '请选择 Actor',
+            selectedValue: _config.default_actor_id || '',
+            expandUp: true,
+            onChange: function(value) {
+                _config.default_actor_id = value;
+                saveConfig();
+            }
+        });
+    }
+
     async function open() {
         try {
-            const data = await fetchRuntimeDefaults();
-            _planners = data.planners || [];
-            _actors = data.actors || [];
-            loadConfig();
+            await getConfig();
             renderPanel();
         } catch (e) {
             console.error('open failed:', e);
@@ -1900,15 +2089,23 @@ const AgentRuntimeService = (function () {
     }
 
     function close() {
+        destroySelectInstances();
         const modal = document.getElementById('agent-runtime-modal');
         if (modal) {
             modal.classList.remove('show');
-            modal.innerHTML = '';
+            modal.classList.add('closing');
+            setTimeout(() => {
+                if (modal) {
+                    modal.classList.remove('closing');
+                    modal.innerHTML = '';
+                }
+            }, MODAL_ANIMATION_MS);
         }
         document.body.style.overflow = '';
     }
 
     function renderPanel() {
+        destroySelectInstances();
         let modal = document.getElementById('agent-runtime-modal');
         if (!modal) {
             modal = document.createElement('div');
@@ -1917,8 +2114,8 @@ const AgentRuntimeService = (function () {
         }
 
         modal.innerHTML = `
-            <div class="agent-runtime-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);z-index:10001;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;">
-                <div class="agent-runtime-panel" style="position:relative;width:720px;max-width:92vw;height:490px;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);display:flex;flex-direction:column;overflow:hidden;pointer-events:auto;">
+            <div class="settings-overlay agent-runtime-overlay"></div>
+            <div class="settings-panel agent-runtime-panel" style="width:720px;max-width:92vw;height:490px;pointer-events:auto;">
                     <div class="agent-runtime-header" style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #eee;background:linear-gradient(135deg,#f8f9fa 0%,#fff 100%);flex-shrink:0;">
                         <h2 style="margin:0;font-size:20px;font-weight:600;color:#333;display:flex;align-items:center;gap:10px;">
                             <i class="fas fa-cog" style="color:#667eea;"></i> 运行时智能体配置
@@ -1931,7 +2128,6 @@ const AgentRuntimeService = (function () {
                         ${renderConfigForm()}
                     </div>
                 </div>
-            </div>
         `;
 
         bindEvents();
@@ -1943,6 +2139,7 @@ const AgentRuntimeService = (function () {
             });
         }
 
+        modal.classList.remove('closing');
         modal.classList.add('show');
         document.body.style.overflow = 'hidden';
     }
@@ -1979,9 +2176,9 @@ const AgentRuntimeService = (function () {
                             <span style="font-size:12px;color:#888;">负责任务分解和规划的专业助手</span>
                         </div>
                     </div>
-                    <div id="agent-planner-select-container" data-value="${escapeHtml(_config.planner_id)}" data-placeholder="无可用 Planner" style="flex:1;"></div>
-                    <div style="margin-top:auto;padding-top:10px;flex-shrink:0;">
-                        ${isPlannerAssign ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i><span style="transform:translateY(-2px);">当前模式正在使用此配置</span></div>' : '<div style="height:35px;"></div>'}
+                    <div id="agent-planner-select-container" data-value="${escapeHtml(_config.planner_id)}" data-placeholder="${_planners.length ? '请选择 Planner' : '无可用 Planner'}" style="flex:1;"></div>
+                    <div id="agent-planner-usage-hint" style="margin-top:auto;padding-top:10px;flex-shrink:0;">
+                        ${isPlannerAssign ? renderInfoStateHtml('当前模式正在使用此配置') : renderInfoStateHtml('')}
                     </div>
                 </div>
 
@@ -1999,8 +2196,8 @@ const AgentRuntimeService = (function () {
                         </div>
                     </div>
                     <div id="agent-allocation-mode-select-container" data-value="${_config.dispatch_mode || 'single_actor'}" style="flex:1;"></div>
-                    <div style="margin-top:auto;padding-top:10px;flex-shrink:0;">
-                        ${modeHintText ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i><span style="transform:translateY(-2px);">' + modeHintText + '</span></div>' : '<div style="height:35px;"></div>'}
+                    <div id="agent-mode-usage-hint" style="margin-top:auto;padding-top:10px;flex-shrink:0;">
+                        ${renderInfoStateHtml(modeHintText)}
                     </div>
                 </div>
 
@@ -2017,9 +2214,9 @@ const AgentRuntimeService = (function () {
                             <span style="font-size:12px;color:#888;">默认的任务执行智能体</span>
                         </div>
                     </div>
-                    <div id="agent-default-actor-select-container" data-value="${escapeHtml(_config.default_actor_id)}" data-placeholder="请先选择 Actors" style="flex:1;"></div>
-                    <div style="margin-top:auto;padding-top:10px;flex-shrink:0;">
-                        ${isSingleActor ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i><span style="transform:translateY(-1px);">当前模式正在使用此配置</span></div>' : '<div style="height:35px;"></div>'}
+                    <div id="agent-default-actor-select-container" data-value="${escapeHtml(_config.default_actor_id)}" data-placeholder="${_actors.length ? '请选择 Actor' : '无可用 Actor'}" style="flex:1;"></div>
+                    <div id="agent-default-actor-usage-hint" style="margin-top:auto;padding-top:10px;flex-shrink:0;">
+                        ${isSingleActor ? renderInfoStateHtml('当前模式正在使用此配置') : renderInfoStateHtml('')}
                     </div>
                 </div>
 
@@ -2036,9 +2233,9 @@ const AgentRuntimeService = (function () {
                             <span style="font-size:12px;color:#888;">按住 Ctrl/Cmd 可多选</span>
                         </div>
                     </div>
-                    <div id="agent-actors-select-container" data-values="${escapeHtml(JSON.stringify(_config.allowed_actor_ids || []))}" data-placeholder="无可用 Actor" data-multiple="true" style="flex:1;"></div>
-                    <div style="margin-top:auto;padding-top:10px;flex-shrink:0;">
-                        ${isMultiActor ? '<div style="padding:8px 12px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#666;display:flex;align-items:center;gap:6px;"><i class="fas fa-info-circle" style="color:#2196f3;font-size:11px;"></i><span style="transform:translateY(-1px);">当前模式正在使用此配置</span></div>' : '<div style="height:35px;"></div>'}
+                    <div id="agent-actors-select-container" data-values="${escapeHtml(JSON.stringify(_config.allowed_actor_ids || []))}" data-placeholder="${_actors.length ? '请选择 Actors' : '无可用 Actor'}" data-multiple="true" style="flex:1;"></div>
+                    <div id="agent-actors-usage-hint" style="margin-top:auto;padding-top:10px;flex-shrink:0;">
+                        ${isMultiActor ? renderInfoStateHtml('当前模式正在使用此配置') : renderInfoStateHtml('')}
                     </div>
                 </div>
             </div>
@@ -2062,13 +2259,13 @@ const AgentRuntimeService = (function () {
         // 初始化 Planner 下拉框
         if (plannerContainer && typeof CustomSelect !== 'undefined') {
             const plannerValue = plannerContainer.dataset.value || '';
-            new CustomSelect(plannerContainer, {
+            _selectInstances.planner = new CustomSelect(plannerContainer, {
                 items: _planners.map(p => ({ value: p.id, label: p.name })),
                 placeholder: plannerContainer.dataset.placeholder || '请选择 Planner',
                 selectedValue: plannerValue,
                 onChange: function(value) {
                     _config.planner_id = value;
-                    saveConfigAndRefresh();
+                    saveConfig();
                 }
             });
         }
@@ -2076,33 +2273,19 @@ const AgentRuntimeService = (function () {
         // 初始化分配模式下拉框
         if (modeContainer && typeof CustomSelect !== 'undefined') {
             const modeValue = modeContainer.dataset.value || 'single_actor';
-            new CustomSelect(modeContainer, {
+            _selectInstances.mode = new CustomSelect(modeContainer, {
                 items: allocationModeItems,
                 placeholder: '请选择分配模式',
                 selectedValue: modeValue,
                 onChange: function(value) {
                     _config.dispatch_mode = value;
-                    saveConfigAndRefresh();
+                    saveConfig();
+                    updateModeDependentHints();
                 }
             });
         }
 
-        // 初始化默认 Actor 下拉框 - 向上展开
-        if (defaultActorContainer && typeof CustomSelect !== 'undefined') {
-            const defaultActorValue = defaultActorContainer.dataset.value || '';
-            const allowedIds = _config.allowed_actor_ids || [];
-            const availableActors = _actors.filter(a => allowedIds.includes(a.id));
-            new CustomSelect(defaultActorContainer, {
-                items: availableActors.map(a => ({ value: a.id, label: a.name })),
-                placeholder: defaultActorContainer.dataset.placeholder || '请先选择 Actors',
-                selectedValue: defaultActorValue,
-                expandUp: true,
-                onChange: function(value) {
-                    _config.default_actor_id = value;
-                    saveConfigAndRefresh();
-                }
-            });
-        }
+        syncDefaultActorSelect();
 
         // 初始化 Actors 多选下拉框 - 向上展开
         if (actorsContainer && typeof CustomSelect !== 'undefined') {
@@ -2112,7 +2295,7 @@ const AgentRuntimeService = (function () {
             } catch (e) {
                 allowedActorIds = [];
             }
-            new CustomSelect(actorsContainer, {
+            _selectInstances.actors = new CustomSelect(actorsContainer, {
                 items: _actors.map(a => ({ value: a.id, label: a.name })),
                 placeholder: actorsContainer.dataset.placeholder || '请选择 Actors',
                 multiple: true,
@@ -2120,42 +2303,17 @@ const AgentRuntimeService = (function () {
                 selectedValues: allowedActorIds,
                 expandUp: true,
                 onChange: function(values) {
-                    _config.allowed_actor_ids = values;
-                    _config.default_actor_id = values.length > 0 ? values[0] : '';
-                    // 更新默认 Actor 下拉框的选项
-                    const defaultActorContainer2 = document.getElementById('agent-default-actor-select-container');
-                    if (defaultActorContainer2) {
-                        const selectedActors = _actors.filter(a => values.includes(a.id));
-                        const defaultActorSelect = defaultActorContainer2.querySelector('.custom-select-display');
-                        if (defaultActorSelect && typeof CustomSelect !== 'undefined') {
-                            // 重新渲染默认 Actor 下拉框
-                            const currentDefaultValue = defaultActorContainer2.dataset.value || '';
-                            defaultActorContainer2.innerHTML = '';
-                            new CustomSelect(defaultActorContainer2, {
-                                items: selectedActors.map(a => ({ value: a.id, label: a.name })),
-                                placeholder: '请先选择 Actors',
-                                selectedValue: currentDefaultValue,
-                                expandUp: true,
-                                onChange: function(value) {
-                                    _config.default_actor_id = value;
-                                    saveConfigAndRefresh();
-                                }
-                            });
-                        }
-                    }
-                    saveConfigAndRefresh();
+                    const nextValues = Array.isArray(values) ? [...values] : [];
+                    _config.allowed_actor_ids = nextValues;
+                    saveConfig();
+                    syncDefaultActorSelect();
                 }
             });
         }
+        updateModeDependentHints();
     }
 
-    function saveConfigAndRefresh() {
-        if (saveConfig()) {
-            renderPanel();
-        }
-    }
-
-    return { open, close };
+    return { open, close, getConfig };
 })();
 
 window.AgentRuntimeService = AgentRuntimeService;

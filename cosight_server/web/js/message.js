@@ -734,7 +734,11 @@
                     knowledgeBases: (typeof KnowledgeService !== 'undefined') ? KnowledgeService.getSelectedKBIds() : [],
                     requirePlanApproval: options.requirePlanApproval === true,
                     revisionPrompt: options.revisionPrompt || '',
-                    planSessionId: planSessionId
+                    workspaceId: options.workspaceId || '',
+                    planSessionId: planSessionId,
+                    draftPlanSnapshot: (options.draftPlanSnapshot && typeof options.draftPlanSnapshot === 'object')
+                        ? options.draftPlanSnapshot
+                        : null
                 }
             },
             // 会被服务端解析的会话信息

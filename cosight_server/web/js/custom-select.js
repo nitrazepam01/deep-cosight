@@ -34,6 +34,8 @@ class CustomSelect {
         this.isOpen = false;
         this.selectedValues = this.options.multiple ? (options.selectedValues !== undefined ? options.selectedValues : []) : (options.selectedValue !== undefined ? options.selectedValue : null);
         this.items = options.items || [];
+        this.closeTimeout = null;
+        this.boundHandlers = {};
         
         this.init();
     }
@@ -124,14 +126,13 @@ class CustomSelect {
     }
 
     bindEvents() {
-        // 点击显示/隐藏下拉框
-        this.displayEl.addEventListener('click', (e) => {
+        this.boundHandlers.displayClick = (e) => {
             e.stopPropagation();
             this.toggle();
-        });
+        };
+        this.displayEl.addEventListener('click', this.boundHandlers.displayClick);
 
-        // 键盘导航
-        this.displayEl.addEventListener('keydown', (e) => {
+        this.boundHandlers.displayKeydown = (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 this.toggle();
@@ -142,68 +143,70 @@ class CustomSelect {
                 this.open();
                 this.focusFirstOption();
             }
-        });
+        };
+        this.displayEl.addEventListener('keydown', this.boundHandlers.displayKeydown);
 
-        // 选项点击
-        this.optionsEl.addEventListener('click', (e) => {
+        this.boundHandlers.optionsClick = (e) => {
             const optionEl = e.target.closest('.custom-select-option');
             if (optionEl) {
                 e.stopPropagation();
                 this.selectOption(optionEl.dataset.value);
             }
-        });
+        };
+        this.optionsEl.addEventListener('click', this.boundHandlers.optionsClick);
 
-        // 搜索功能
         if (this.searchInputEl) {
-            this.searchInputEl.addEventListener('input', (e) => {
+            this.boundHandlers.searchInput = (e) => {
                 const searchTerm = e.target.value.toLowerCase();
                 const options = this.optionsEl.querySelectorAll('.custom-select-option');
                 options.forEach(option => {
                     const label = option.querySelector('.custom-select-option-label').textContent.toLowerCase();
                     option.style.display = label.includes(searchTerm) ? 'flex' : 'none';
                 });
-            });
+            };
+            this.searchInputEl.addEventListener('input', this.boundHandlers.searchInput);
         }
 
-        // 点击外部关闭
-        document.addEventListener('click', (e) => {
+        this.boundHandlers.documentClick = (e) => {
             if (this.isOpen && !this.container.contains(e.target)) {
                 this.close();
             }
-        });
+        };
+        document.addEventListener('click', this.boundHandlers.documentClick);
 
-        // 鼠标离开时关闭下拉框 - 使用延时判断
-        let closeTimeout = null;
-        
-        this.container.addEventListener('mouseenter', (e) => {
-            if (closeTimeout) {
-                clearTimeout(closeTimeout);
-                closeTimeout = null;
+        this.boundHandlers.containerMouseEnter = () => {
+            if (this.closeTimeout) {
+                clearTimeout(this.closeTimeout);
+                this.closeTimeout = null;
             }
-        });
-        
-        this.container.addEventListener('mouseleave', (e) => {
-            closeTimeout = setTimeout(() => {
+        };
+        this.container.addEventListener('mouseenter', this.boundHandlers.containerMouseEnter);
+
+        this.boundHandlers.containerMouseLeave = () => {
+            this.closeTimeout = setTimeout(() => {
                 if (this.isOpen) {
                     this.close();
                 }
             }, 50);
-        });
-        
-        this.dropdownEl.addEventListener('mouseenter', (e) => {
-            if (closeTimeout) {
-                clearTimeout(closeTimeout);
-                closeTimeout = null;
+        };
+        this.container.addEventListener('mouseleave', this.boundHandlers.containerMouseLeave);
+
+        this.boundHandlers.dropdownMouseEnter = () => {
+            if (this.closeTimeout) {
+                clearTimeout(this.closeTimeout);
+                this.closeTimeout = null;
             }
-        });
-        
-        this.dropdownEl.addEventListener('mouseleave', (e) => {
-            closeTimeout = setTimeout(() => {
+        };
+        this.dropdownEl.addEventListener('mouseenter', this.boundHandlers.dropdownMouseEnter);
+
+        this.boundHandlers.dropdownMouseLeave = () => {
+            this.closeTimeout = setTimeout(() => {
                 if (this.isOpen) {
                     this.close();
                 }
             }, 50);
-        });
+        };
+        this.dropdownEl.addEventListener('mouseleave', this.boundHandlers.dropdownMouseLeave);
     }
 
     toggle() {
@@ -232,6 +235,11 @@ class CustomSelect {
             this.searchInputEl.value = '';
             const options = this.optionsEl.querySelectorAll('.custom-select-option');
             options.forEach(option => option.style.display = 'flex');
+        }
+
+        if (this.closeTimeout) {
+            clearTimeout(this.closeTimeout);
+            this.closeTimeout = null;
         }
     }
 
@@ -294,6 +302,7 @@ class CustomSelect {
 
     setItems(items) {
         this.items = items;
+        this.updateDisplay();
         this.renderOptions();
     }
 
@@ -312,6 +321,37 @@ class CustomSelect {
     }
 
     destroy() {
+        this.close();
+
+        if (this.displayEl && this.boundHandlers.displayClick) {
+            this.displayEl.removeEventListener('click', this.boundHandlers.displayClick);
+        }
+        if (this.displayEl && this.boundHandlers.displayKeydown) {
+            this.displayEl.removeEventListener('keydown', this.boundHandlers.displayKeydown);
+        }
+        if (this.optionsEl && this.boundHandlers.optionsClick) {
+            this.optionsEl.removeEventListener('click', this.boundHandlers.optionsClick);
+        }
+        if (this.searchInputEl && this.boundHandlers.searchInput) {
+            this.searchInputEl.removeEventListener('input', this.boundHandlers.searchInput);
+        }
+        if (this.boundHandlers.documentClick) {
+            document.removeEventListener('click', this.boundHandlers.documentClick);
+        }
+        if (this.container && this.boundHandlers.containerMouseEnter) {
+            this.container.removeEventListener('mouseenter', this.boundHandlers.containerMouseEnter);
+        }
+        if (this.container && this.boundHandlers.containerMouseLeave) {
+            this.container.removeEventListener('mouseleave', this.boundHandlers.containerMouseLeave);
+        }
+        if (this.dropdownEl && this.boundHandlers.dropdownMouseEnter) {
+            this.dropdownEl.removeEventListener('mouseenter', this.boundHandlers.dropdownMouseEnter);
+        }
+        if (this.dropdownEl && this.boundHandlers.dropdownMouseLeave) {
+            this.dropdownEl.removeEventListener('mouseleave', this.boundHandlers.dropdownMouseLeave);
+        }
+
+        this.boundHandlers = {};
         this.container.innerHTML = '';
     }
 }

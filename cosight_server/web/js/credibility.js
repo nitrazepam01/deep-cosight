@@ -92,134 +92,29 @@ class CredibilityService {
     updateNodeCredibilityIndicator(stepIndex, credibilityData) {
         const nodeId = stepIndex + 1;
         const nodeElement = svg.selectAll(".node").filter(d => d.id === nodeId);
-        const runningIndicator = nodeElement.selectAll(".node-indicator, .credibility-circle-group");
-        if (runningIndicator.empty()) {
-            return;
-        }
+        if (!nodeElement || nodeElement.empty()) return;
 
-        // 检查是否存在可信分级信息
-        credibilityData = credibilityData ? credibilityData : this.getStepCredibilityData(stepIndex);
-        if (credibilityData) {
-            // 如果存在可信分级信息，将圆圈改为绿色并添加点击事件
-            const circle = runningIndicator.select(".action-circle");
+        const data = credibilityData || this.getStepCredibilityData(stepIndex);
+        const runningIndicator = nodeElement.select(".credibility-circle-group");
+        if (runningIndicator.empty()) return;
 
-            // 先添加点击事件
-            circle.on("click", event => {
-                event.stopPropagation();
-                // 在右侧内容面板中显示可信分级信息
-                this.showCredibilityInfoInRightPanel(nodeId, credibilityData);
-            });
-
-            // 然后进行样式更新和过渡动画
-            circle
-                .style("fill", "#4CAF50")
-                .style("cursor", "pointer")
-                .transition()
-                .duration(500);
-
-            // 更新文字为 "T" 表示 Credibility
-            runningIndicator.select("text")
-                .html(`T`);
-        } else {
-            // 如果没有可信分级信息，保持灰色，不添加点击事件
-            const circle = runningIndicator.select(".action-circle");
-            // 移除点击事件
+        const circle = runningIndicator.select(".action-circle");
+        if (!data) {
             circle.on("click", null);
-            // 更新样式
             circle
                 .style("fill", "#9E9E9E")
                 .style("cursor", "not-allowed");
-            // 更新文字为 "D" 表示 Done
-            runningIndicator.select("text")
-                .html(`D`);
-        }
-    }
-
-    // 在右侧内容面板中显示可信分级信息
-    showCredibilityInfoInRightPanel(nodeId, credibilityData) {
-        const result = showRightPanel();
-        if (!result) {
+            runningIndicator.select("text").html("D");
             return;
         }
 
-        const iframe = document.getElementById('content-iframe');
-        iframe.style.display = 'none';
-        const markdownContent = document.getElementById('markdown-content');
-        markdownContent.style.display = 'block';
-
-        // 获取右侧内容面板
-        const rightContent = document.getElementById('markdown-content');
-        const rightStatus = document.getElementById('right-container-status');
-        // 更新右侧面板状态
-        if (rightStatus) {
-            rightStatus.textContent = (window.I18nService ? window.I18nService.t('viewing_credibility_info').replace('{nodeId}', nodeId) : `正在查看节点 ${nodeId} 的可信分级信息...`);
-        }
-
-        // 检查是否存在可信分级信息
-        if (!credibilityData) {
-            rightContent.innerHTML = `
-                <div style="text-align: center; color: #999; padding: 40px 20px;">
-                    <i class="fas fa-info-circle" style="font-size: 48px; margin-bottom: 16px; color: #ccc;"></i>
-                    <h3 style="color: #666; margin-bottom: 8px;">${(window.I18nService ? window.I18nService.t('no_credibility_info') : '暂无可信分级信息')}</h3>
-                    <p style="color: #999;">${(window.I18nService ? window.I18nService.t('no_credibility_info_desc').replace('{nodeId}', nodeId) : `节点 ${nodeId} 目前没有可信分级数据`)}</p>
-                </div>
-            `;
-            return;
-        }
-
-        // 获取可信分级数据
-        const currentStepLevels = credibilityData.content;
-        if (!currentStepLevels || currentStepLevels.length === 0) {
-            rightContent.innerHTML = `
-                <div style="text-align: center; color: #999; padding: 40px 20px;">
-                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px; color: #ff9800;"></i>
-                    <h3 style="color: #666; margin-bottom: 8px;">${(window.I18nService ? window.I18nService.t('data_anomaly') : '数据异常')}</h3>
-                    <p style="color: #999;">${(window.I18nService ? window.I18nService.t('data_anomaly_desc').replace('{nodeId}', nodeId) : `节点 ${nodeId} 的可信分级数据格式异常`)}</p>
-                </div>
-            `;
-            return;
-        }
-
-        // 构建可信分级信息HTML
-        let credibilityHTML = `
-            <div class="credibility-section">
-                <h4>
-                    <i class="fas fa-shield-alt"></i> ${(window.I18nService ? window.I18nService.t('credibility_info_title').replace('{nodeId}', nodeId) : `步骤 ${nodeId} 的可信分级信息`)}
-                </h4>
-                <div class="credibility-levels">
-        `;
-
-        // 遍历可信分级数据
-        currentStepLevels.forEach((levelData, index) => {
-            const level = index + 1;
-            credibilityHTML += `
-            <div class="credibility-level level-${level}" style="border-left: 4px solid ${this.getLevelColor(level)};">
-                <div class="level-badge level-${level}" style="background: ${this.getLevelColor(level)};">
-                    ${level}
-                </div>
-                <div class="level-content">
-                    <div class="level-content-header">
-                        <div class="level-title">
-                            ${levelData.title}
-                        </div>
-                    </div>
-                    <div class="level-content-description">
-                        <ul>
-                            ${levelData.items.map(item => `<li>${item}</li>`).join('')}
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        `;
-        });
-
-        credibilityHTML += `
-                </div>
-            </div>
-        `;
-
-        // 设置内容并显示右侧面板
-        rightContent.innerHTML = credibilityHTML;
+        const levelCount = Array.isArray(data.content) ? data.content.length : 0;
+        const level = Math.max(1, Math.min(5, levelCount || 1));
+        circle.on("click", null);
+        circle
+            .style("fill", this.getLevelColor(level))
+            .style("cursor", "default");
+        runningIndicator.select("text").html("T");
     }
 
     // 获取可信分级颜色

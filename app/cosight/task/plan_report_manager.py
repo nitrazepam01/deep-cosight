@@ -39,21 +39,21 @@ class EventManager:
 
     def publish(self, event_type: str, plan_or_plan_id=None, event_data=None):
         """发布事件 - 支持Plan对象和工具事件数据"""
-        # 处理工具事件的特殊情况
-        if event_type == "tool_event" and isinstance(plan_or_plan_id, str) and event_data is not None:
+        # 处理基于 plan_id 的即时事件（工具事件、审批事件等）
+        if isinstance(plan_or_plan_id, str) and event_data is not None:
             plan_id = plan_or_plan_id
             callbacks = []
             with self._lock:
                 if event_type in self._subscribers and plan_id in self._subscribers[event_type]:
                     callbacks = self._subscribers[event_type][plan_id].copy()
 
-            logger.info(f"Publishing tool_event for plan_id: {plan_id}, callbacks: {len(callbacks)}")
-            # 对于工具事件，使用同步调用确保顺序
+            logger.info(f"Publishing {event_type} for plan_id: {plan_id}, callbacks: {len(callbacks)}")
+            # 这类事件通常要求顺序稳定，使用同步调用
             for callback in callbacks:
                 try:
                     callback(event_data)
                 except Exception as e:
-                    logger.error(f"工具事件回调执行失败: {e}", exc_info=True)
+                    logger.error(f"事件回调执行失败: {e}", exc_info=True)
             return
         
         # 原有的Plan对象处理逻辑

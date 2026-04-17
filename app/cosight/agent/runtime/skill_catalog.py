@@ -19,7 +19,7 @@ from app.common.logger_util import logger
 ACTOR_SKILL_CATALOG: Dict[str, dict] = {
     "execute_code": {
         "display_name_zh": "执行代码",
-        "description_zh": "执行 Python 代码片段并返回结果",
+        "description_zh": "仅执行不涉及本地文件或工作区脚本的轻量 Python 片段",
         "needs_workspace": True,
     },
     "search_google": {
@@ -49,7 +49,7 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
     },
     "file_read": {
         "display_name_zh": "文件读取",
-        "description_zh": "读取文件内容",
+        "description_zh": "读取文本文件内容；二进制文件仅返回元数据和路径",
         "needs_workspace": False,
     },
     "file_str_replace": {
@@ -102,6 +102,41 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "仅获取网页中的图片",
         "needs_workspace": False,
     },
+    "coder_list_files": {
+        "display_name_zh": "Coder 沙箱列文件",
+        "description_zh": "列出当前步骤 Coder 沙箱或当前任务工作区中的文件",
+        "needs_workspace": True,
+    },
+    "coder_read_file": {
+        "display_name_zh": "Coder 读文件",
+        "description_zh": "读取当前任务工作区中的文件内容，但只允许在沙箱内写入",
+        "needs_workspace": True,
+    },
+    "coder_write_file": {
+        "display_name_zh": "Coder 写文件",
+        "description_zh": "仅向当前步骤的 Coder 沙箱目录写入允许类型的文件",
+        "needs_workspace": True,
+    },
+    "coder_edit_file": {
+        "display_name_zh": "Coder 改文件",
+        "description_zh": "仅在当前步骤的 Coder 沙箱目录中做受限文本替换",
+        "needs_workspace": True,
+    },
+    "coder_find_files": {
+        "display_name_zh": "Coder 查文件",
+        "description_zh": "按文件名在当前任务工作区或沙箱中查找文件",
+        "needs_workspace": True,
+    },
+    "coder_request_run": {
+        "display_name_zh": "Coder 请求运行",
+        "description_zh": "为 Python 代码请求一次用户批准后再运行，或为 HTML 准备受限预览",
+        "needs_workspace": True,
+    },
+    "coder_mark_step": {
+        "display_name_zh": "Coder 标记步骤",
+        "description_zh": "由 Coder Lite 标记当前步骤完成或阻塞",
+        "needs_workspace": True,
+    },
 }
 
 # Planner 固定技能集（v1 不可自定义）
@@ -149,6 +184,9 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         audio_recognition_skill, extract_document_content_skill,
         create_html_report_skill, fetch_website_content_skill,
         fetch_website_content_with_images_skill, fetch_website_images_only_skill,
+        coder_list_files_skill, coder_read_file_skill, coder_write_file_skill,
+        coder_edit_file_skill, coder_find_files_skill, coder_request_run_skill,
+        coder_mark_step_skill,
     )
 
     SKILL_BUILDERS = {
@@ -169,6 +207,13 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "fetch_website_content": fetch_website_content_skill,
         "fetch_website_content_with_images": fetch_website_content_with_images_skill,
         "fetch_website_images_only": fetch_website_images_only_skill,
+        "coder_list_files": coder_list_files_skill,
+        "coder_read_file": coder_read_file_skill,
+        "coder_write_file": coder_write_file_skill,
+        "coder_edit_file": coder_edit_file_skill,
+        "coder_find_files": coder_find_files_skill,
+        "coder_request_run": coder_request_run_skill,
+        "coder_mark_step": coder_mark_step_skill,
     }
 
     skills = []
