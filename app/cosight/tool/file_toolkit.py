@@ -22,11 +22,47 @@ from app.common.logger_util import logger
 
 default_encoding: str = "utf-8"
 DEFAULT_FORMAT: str = ".md"  # Default format for files without extension
+KNOWN_BINARY_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".ico", ".tif", ".tiff",
+    ".pdf", ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz",
+    ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".mp3", ".wav", ".flac", ".aac", ".m4a", ".ogg",
+    ".mp4", ".mov", ".avi", ".mkv", ".webm",
+    ".exe", ".dll", ".so", ".bin", ".dat", ".pickle", ".pkl",
+}
+KNOWN_IMAGE_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".ico", ".tif", ".tiff",
+}
 
 
 class FileToolkit:
     def __init__(self, work_space_path: str = None):
         self.work_space_path = work_space_path if work_space_path else os.environ.get("WORKSPACE_PATH") or os.getcwd()
+
+    def _is_likely_binary_file(self, file_path: str) -> bool:
+        suffix = Path(file_path).suffix.lower()
+        if suffix in KNOWN_BINARY_EXTENSIONS:
+            return True
+
+        try:
+            with open(file_path, "rb") as probe:
+                sample = probe.read(4096)
+        except OSError:
+            return False
+
+        return b"\x00" in sample
+
+    def _build_binary_read_message(self, absolute_path: str) -> str:
+        suffix = Path(absolute_path).suffix.lower()
+        file_kind = "image" if suffix in KNOWN_IMAGE_EXTENSIONS else "binary"
+        size_bytes = os.path.getsize(absolute_path)
+        return (
+            f"Binary file detected at {absolute_path} "
+            f"(type={file_kind}, suffix={suffix or 'none'}, size={size_bytes} bytes). "
+            "file_read only returns textual content and will not expose raw binary bytes. "
+            "Reference this file path in the report instead of embedding its contents. "
+            "For images, use ask_question_about_image if you need semantic analysis."
+        )
 
     def file_saver(self, content: str | bytes = None, file_path: str = None, mode: str = "a", binary: bool = False) -> str:
         r"""Save content to a file at the specified path. Supports both text and binary files. Default mode is append to preserve existing content.
@@ -92,18 +128,18 @@ class FileToolkit:
             return f"Error saving file: {str(e)}"
 
     def file_read(self, file: str, start_line: int = None, end_line: int = None, sudo: bool = False,
-                  binary: bool = False) -> str | bytes:
-        r"""Read file content. Supports both text and binary files.
+                  binary: bool = False) -> str:
+        r"""Read file content.
 
         Args:
             file (str): Absolute path of the file to read. The file must be in workspace.
             start_line (int, optional): Starting line to read from, 0-based (text files only)
             end_line (int, optional): Ending line number (exclusive, text files only)
             sudo (bool, optional): Whether to use sudo privileges
-            binary (bool, optional): Whether to read file in binary mode
+            binary (bool, optional): Legacy compatibility flag. Binary files return metadata only.
 
         Returns:
-            str | bytes: The file content or error message
+            str: The file content or error message
         """
         try:
             logger.info(f"reading content to file: {file}")
@@ -132,12 +168,12 @@ class FileToolkit:
                 except PermissionError:
                     return f"Error: Permission denied accessing directory {absolute_path}"
 
+            if binary or self._is_likely_binary_file(absolute_path):
+                return self._build_binary_read_message(absolute_path)
+
             # Read file content
-            with open(absolute_path, 'rb' if binary else 'r', encoding=None if binary else 'utf-8') as f:
-                if binary:
-                    return f.read()
-                else:
-                    lines = f.readlines()
+            with open(absolute_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
 
             # Handle line range for text files
             if start_line is not None or end_line is not None:
@@ -146,6 +182,8 @@ class FileToolkit:
                 lines = lines[start:end]
 
             return ''.join(lines)
+        except UnicodeDecodeError:
+            return self._build_binary_read_message(absolute_path)
         except PermissionError as e:
             logger.error(f"Error: Permission denied. Try with sudo=True if appropriate: {str(e)}",exc_info=True)
             return "Error: Permission denied. Try with sudo=True if appropriate"

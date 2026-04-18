@@ -36,8 +36,8 @@ SESSIONS_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "web", "data
 SESSIONS_DIR = os.path.dirname(SESSIONS_FILE)
 os.makedirs(SESSIONS_DIR, exist_ok=True)
 
-# 文件锁，防止并发写入
-_file_lock = threading.Lock()
+# 文件锁，防止并发写入。使用可重入锁以支持同一线程的嵌套调用。
+_file_lock = threading.RLock()
 _ordered_task_list_backup_lock = threading.Lock()
 _ordered_task_list_backup = {}
 
@@ -147,20 +147,21 @@ def get_thread_and_folder_by_id(thread_id: str) -> tuple[Optional[Dict], Optiona
 
 def set_thread_execution_status(thread_id: str, is_executing: bool) -> Optional[Dict]:
     """内部方法：更新会话执行状态，返回状态对象；找不到会话时返回 None"""
-    data = load_sessions()
-    status_updated_at = int(datetime.now().timestamp() * 1000)
+    with _file_lock:
+        data = load_sessions()
+        status_updated_at = int(datetime.now().timestamp() * 1000)
 
-    for folder in data.get("folders", []):
-        for thread in folder.get("threads", []):
-            if thread.get("id") == thread_id:
-                thread["isExecuting"] = bool(is_executing)
-                thread["statusUpdatedAt"] = status_updated_at
-                save_sessions(data)
-                return {
-                    "threadId": thread_id,
-                    "isExecuting": bool(is_executing),
-                    "statusUpdatedAt": status_updated_at
-                }
+        for folder in data.get("folders", []):
+            for thread in folder.get("threads", []):
+                if thread.get("id") == thread_id:
+                    thread["isExecuting"] = bool(is_executing)
+                    thread["statusUpdatedAt"] = status_updated_at
+                    save_sessions(data)
+                    return {
+                        "threadId": thread_id,
+                        "isExecuting": bool(is_executing),
+                        "statusUpdatedAt": status_updated_at
+                    }
     return None
 
 
@@ -169,7 +170,79 @@ def sanitize_right_panel_state(incoming_state: dict, current_state: Optional[Dic
         return None
     current_state = current_state if isinstance(current_state, dict) else {}
     merged_state = {**current_state, **incoming_state}
+
+    if "latestRevisionPrompt" in merged_state:
+        merged_state.pop("latestRevisionPrompt", None)
+    if "statusText" in merged_state:
+        merged_state.pop("statusText", None)
+
+    if "draftPlanSnapshot" in merged_state:
+        merged_state["draftPlanSnapshot"] = sanitize_draft_plan_snapshot(merged_state.get("draftPlanSnapshot"))
+
     return merged_state
+
+
+def sanitize_draft_plan_snapshot(snapshot):
+    if not isinstance(snapshot, dict):
+        return None
+
+    title = str(snapshot.get("title") or "执行计划").strip() or "执行计划"
+
+    raw_steps = snapshot.get("steps") if isinstance(snapshot.get("steps"), list) else []
+    steps = []
+    for idx, step in enumerate(raw_steps):
+        if isinstance(step, str):
+            label = step.strip()
+        elif isinstance(step, dict):
+            label = str(step.get("title") or step.get("name") or step.get("fullName") or f"步骤 {idx + 1}").strip()
+        else:
+            label = str(step or "").strip()
+        if label:
+            steps.append(label)
+
+    raw_deps = snapshot.get("dependencies") if isinstance(snapshot.get("dependencies"), dict) else {}
+    dependencies = {}
+    for key, value in raw_deps.items():
+        if not isinstance(value, list):
+            continue
+        sanitized = []
+        for item in value:
+            try:
+                num = int(item)
+                if num >= 0:
+                    sanitized.append(num)
+            except Exception:
+                continue
+        if sanitized:
+            dependencies[str(key)] = list(dict.fromkeys(sanitized))
+
+    return {
+        "title": title,
+        "steps": steps,
+        "dependencies": dependencies
+    }
+
+
+def sanitize_message_tree_draft_snapshot(message_tree):
+    if not isinstance(message_tree, dict):
+        return message_tree
+    nodes = message_tree.get("nodes")
+    if not isinstance(nodes, dict):
+        return message_tree
+
+    for _, node in nodes.items():
+        if not isinstance(node, dict):
+            continue
+        metadata = node.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+        if "draftPlanSnapshot" in metadata:
+            metadata["draftPlanSnapshot"] = sanitize_draft_plan_snapshot(metadata.get("draftPlanSnapshot"))
+        if metadata.get("type") == "draft_plan":
+            metadata.pop("statusText", None)
+            metadata.pop("errorMessage", None)
+
+    return message_tree
 
 
 def _get_workspace_root_dir() -> str:
@@ -392,21 +465,22 @@ async def get_thread_final_report(thread_id: str, workspaceId: Optional[str] = Q
             return json_result(404, 'Workspace directory not found', None)
 
         file_candidates = []
-        for name in os.listdir(workspace_dir):
-            abs_path = os.path.join(workspace_dir, name)
-            if not os.path.isfile(abs_path):
-                continue
-            if os.path.splitext(name)[1].lower() != ".md":
-                continue
-            try:
-                mtime = os.path.getmtime(abs_path)
-            except Exception:
-                continue
-            file_candidates.append((name, abs_path, mtime))
+        for current_root, _, files in os.walk(workspace_dir):
+            for name in files:
+                abs_path = os.path.join(current_root, name)
+                if os.path.splitext(name)[1].lower() != ".md":
+                    continue
+                if not _is_safe_workspace_dir(workspace_root, abs_path):
+                    continue
+                try:
+                    mtime = os.path.getmtime(abs_path)
+                except Exception:
+                    continue
+                file_candidates.append((name, abs_path, mtime))
         if not file_candidates:
             return json_result(404, 'No markdown file found in workspace', None)
 
-        # 直接取最后保存（修改时间最新）的文件
+        # 直接取最后保存（修改时间最新）的 markdown，支持 .coder_runs 等嵌套目录中的最终报告
         file_candidates.sort(key=lambda item: item[2])
         target_name, target_abs_path, _ = file_candidates[-1]
 
@@ -417,7 +491,7 @@ async def get_thread_final_report(thread_id: str, workspaceId: Optional[str] = Q
             with open(target_abs_path, "rb") as f:
                 content = f.read().decode("utf-8", errors="replace")
 
-        rel_path = f"work_space/{workspace_id}/{target_name}"
+        rel_path = "work_space/" + os.path.relpath(target_abs_path, workspace_root).replace("\\", "/")
         return json_result(0, 'success', {
             "threadId": thread_id,
             "workspaceId": workspace_id,
@@ -620,54 +694,55 @@ async def update_folder(folder_id: str, body: dict = Body(...)):
 async def update_thread(thread_id: str, body: dict = Body(...)):
     """更新会话（标题、标星状态、消息等）"""
     try:
-        data = load_sessions()
-        
-        # 在默认分组中查找
-        for folder in data["folders"]:
-            for thread in folder.get("threads", []):
-                if thread["id"] == thread_id:
-                    if "title" in body:
-                        thread["title"] = body["title"]
-                    if "starred" in body:
-                        thread["starred"] = body["starred"]
-                    if "folderId" in body:
-                        thread["folderId"] = body["folderId"]
-                    if "messageTree" in body and isinstance(body["messageTree"], dict):
-                        thread["messageTree"] = body["messageTree"]
-                    if "messageCount" in body:
-                        thread["messageCount"] = body["messageCount"]
-                    elif "messageTree" in body and isinstance(body["messageTree"], dict):
-                        node_count = len((body["messageTree"].get("nodes") or {}).keys())
-                        thread["messageCount"] = max(0, node_count - 1)
-                    if "activeMessageCount" in body:
-                        thread["activeMessageCount"] = body["activeMessageCount"]
-                    if "rightPanelState" in body:
-                        incoming_state = body["rightPanelState"]
-                        current_state = thread.get("rightPanelState")
-                        if not isinstance(current_state, dict):
-                            current_state = {}
-                        if incoming_state is None:
-                            thread["rightPanelState"] = None
-                        elif isinstance(incoming_state, dict):
-                            thread["rightPanelState"] = sanitize_right_panel_state(incoming_state, current_state)
+        with _file_lock:
+            data = load_sessions()
+
+            # 在默认分组中查找
+            for folder in data["folders"]:
+                for thread in folder.get("threads", []):
+                    if thread["id"] == thread_id:
+                        if "title" in body:
+                            thread["title"] = body["title"]
+                        if "starred" in body:
+                            thread["starred"] = body["starred"]
+                        if "folderId" in body:
+                            thread["folderId"] = body["folderId"]
+                        if "messageTree" in body and isinstance(body["messageTree"], dict):
+                            thread["messageTree"] = sanitize_message_tree_draft_snapshot(body["messageTree"])
+                        if "messageCount" in body:
+                            thread["messageCount"] = body["messageCount"]
+                        elif "messageTree" in body and isinstance(body["messageTree"], dict):
+                            node_count = len((body["messageTree"].get("nodes") or {}).keys())
+                            thread["messageCount"] = max(0, node_count - 1)
+                        if "activeMessageCount" in body:
+                            thread["activeMessageCount"] = body["activeMessageCount"]
+                        if "rightPanelState" in body:
+                            incoming_state = body["rightPanelState"]
+                            current_state = thread.get("rightPanelState")
+                            if not isinstance(current_state, dict):
+                                current_state = {}
+                            if incoming_state is None:
+                                thread["rightPanelState"] = None
+                            elif isinstance(incoming_state, dict):
+                                thread["rightPanelState"] = sanitize_right_panel_state(incoming_state, current_state)
+                            else:
+                                thread["rightPanelState"] = incoming_state
+                        if "userRenamedTitle" in body:
+                            thread["userRenamedTitle"] = bool(body["userRenamedTitle"])
+                        if "autoRenamedByTask" in body:
+                            thread["autoRenamedByTask"] = bool(body["autoRenamedByTask"])
+                        if "isExecuting" in body:
+                            thread["isExecuting"] = bool(body["isExecuting"])
+                        if "statusUpdatedAt" in body:
+                            thread["statusUpdatedAt"] = body["statusUpdatedAt"]
+
+                        if "updatedAt" in body:
+                            thread["updatedAt"] = body["updatedAt"]
                         else:
-                            thread["rightPanelState"] = incoming_state
-                    if "userRenamedTitle" in body:
-                        thread["userRenamedTitle"] = bool(body["userRenamedTitle"])
-                    if "autoRenamedByTask" in body:
-                        thread["autoRenamedByTask"] = bool(body["autoRenamedByTask"])
-                    if "isExecuting" in body:
-                        thread["isExecuting"] = bool(body["isExecuting"])
-                    if "statusUpdatedAt" in body:
-                        thread["statusUpdatedAt"] = body["statusUpdatedAt"]
-                    
-                    if "updatedAt" in body:
-                        thread["updatedAt"] = body["updatedAt"]
-                    else:
-                        thread["updatedAt"] = int(datetime.now().timestamp() * 1000)
-                    save_sessions(data)
-                    logger.info(f"更新会话：{thread_id}")
-                    return json_result(0, 'success', thread)
+                            thread["updatedAt"] = int(datetime.now().timestamp() * 1000)
+                        save_sessions(data)
+                        logger.info(f"更新会话：{thread_id}")
+                        return json_result(0, 'success', thread)
         
         return json_result(404, 'Thread not found', None)
     except Exception as e:

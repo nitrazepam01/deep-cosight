@@ -163,7 +163,7 @@ def create_actor_runtime(
         )
     else:
         skills = build_actor_skills(skill_names, work_space_path)
-        if "mark_step" not in skill_names:
+        if "mark_step" not in skill_names and "coder_mark_step" not in skill_names:
             from app.cosight.agent.actor.instance.actor_agent_skill import mark_step_skill
 
             skills.append(mark_step_skill())

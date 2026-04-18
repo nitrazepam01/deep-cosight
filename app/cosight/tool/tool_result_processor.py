@@ -658,23 +658,46 @@ class ToolResultProcessor:
         try:
             # 提取代码内容
             code_content = tool_args if tool_args else "无代码内容"
-            
+
+            normalized_result = str(tool_result).lower()
+            is_blocked = any(keyword in normalized_result for keyword in [
+                "execution blocked",
+                "blocked:",
+                "not allowed",
+                "permission denied",
+                "explicit user approval",
+            ])
+
             # 判断执行是否成功
-            is_success = "error" not in tool_result.lower() and "exception" not in tool_result.lower()
+            is_success = (
+                "error" not in normalized_result
+                and "exception" not in normalized_result
+                and "failed" not in normalized_result
+                and "denied" not in normalized_result
+                and not is_blocked
+            )
             
             # 提取输出长度
             output_length = len(tool_result)
+
+            if is_blocked:
+                summary_zh = "代码执行已拦截"
+                summary_en = "Code execution blocked"
+            else:
+                summary_zh = f"代码执行{'成功' if is_success else '失败'}"
+                summary_en = f"Code execution {'successful' if is_success else 'failed'}"
             
             return {
                 "tool_type": "code_execution",
                 "summary": ToolResultProcessor._get_localized_summary(
-                    f"代码执行{'成功' if is_success else '失败'}",
-                    f"Code execution {'successful' if is_success else 'failed'}",
+                    summary_zh,
+                    summary_en,
                     task_title
                 ),
                 "code_content": code_content[:200] + "..." if len(code_content) > 200 else code_content,
                 "output_length": output_length,
-                "is_success": is_success
+                "is_success": is_success,
+                "is_blocked": is_blocked
             }
         except Exception as e:
             logger.error(f"Error processing code result: {e}")

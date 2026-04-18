@@ -22,6 +22,11 @@ class TaskManager:
     plan_to_id = {}
     # 运行中计划集合，用于幂等与判重
     running_plans = set()
+    # 保留运行时实例，支持“先生成计划，后批准执行”的两阶段流
+    runtimes = {}
+    plan_sessions = {}
+    coder_run_requests = {}
+    coder_run_counters = {}
 
     @classmethod
     def set_plan(cls, plan_id: str, plan):
@@ -52,6 +57,10 @@ class TaskManager:
             # 从运行集中移除（容错处理）
             if plan_id in cls.running_plans:
                 cls.running_plans.discard(plan_id)
+            cls.runtimes.pop(plan_id, None)
+            cls.plan_sessions.pop(plan_id, None)
+            cls.coder_run_requests.pop(plan_id, None)
+            cls.coder_run_counters.pop(plan_id, None)
 
     @classmethod
     def is_running(cls, plan_id: str) -> bool:
@@ -67,4 +76,108 @@ class TaskManager:
     def mark_completed(cls, plan_id: str):
         with cls._lock:
             cls.running_plans.discard(plan_id)
+
+    @classmethod
+    def set_runtime(cls, plan_id: str, runtime):
+        with cls._lock:
+            cls.runtimes[plan_id] = runtime
+
+    @classmethod
+    def get_runtime(cls, plan_id: str):
+        with cls._lock:
+            return cls.runtimes.get(plan_id)
+
+    @classmethod
+    def remove_runtime(cls, plan_id: str):
+        with cls._lock:
+            cls.runtimes.pop(plan_id, None)
+
+    @classmethod
+    def set_plan_session(cls, plan_id: str, session: dict):
+        with cls._lock:
+            cls.plan_sessions[plan_id] = dict(session or {})
+            return dict(cls.plan_sessions[plan_id])
+
+    @classmethod
+    def get_plan_session(cls, plan_id: str):
+        with cls._lock:
+            session = cls.plan_sessions.get(plan_id)
+            return dict(session) if isinstance(session, dict) else None
+
+    @classmethod
+    def update_plan_session(cls, plan_id: str, **updates):
+        with cls._lock:
+            current = dict(cls.plan_sessions.get(plan_id) or {})
+            current.update({k: v for k, v in updates.items() if v is not None})
+            cls.plan_sessions[plan_id] = current
+            return dict(current)
+
+    @classmethod
+    def remove_plan_session(cls, plan_id: str):
+        with cls._lock:
+            cls.plan_sessions.pop(plan_id, None)
+
+    @classmethod
+    def register_coder_run_request(cls, plan_id: str, step_index: int, request: dict):
+        with cls._lock:
+            request_bucket = cls.coder_run_requests.setdefault(plan_id, {})
+            request_bucket[int(step_index)] = dict(request or {})
+            return dict(request_bucket[int(step_index)])
+
+    @classmethod
+    def get_coder_run_request(cls, plan_id: str, step_index: int):
+        with cls._lock:
+            request = (cls.coder_run_requests.get(plan_id) or {}).get(int(step_index))
+            return dict(request) if isinstance(request, dict) else None
+
+    @classmethod
+    def resolve_coder_run_request(cls, plan_id: str, step_index: int, approval_state: str):
+        with cls._lock:
+            request_bucket = cls.coder_run_requests.get(plan_id) or {}
+            request = request_bucket.get(int(step_index))
+            if not isinstance(request, dict):
+                return None
+            request["approvalState"] = approval_state
+            request["requestState"] = "resolved"
+            event = request.get("event")
+        if event is not None:
+            try:
+                event.set()
+            except Exception:
+                pass
+        with cls._lock:
+            request = (cls.coder_run_requests.get(plan_id) or {}).get(int(step_index))
+            return dict(request) if isinstance(request, dict) else None
+
+    @classmethod
+    def wait_for_coder_run_decision(cls, plan_id: str, step_index: int, timeout: float = 3600):
+        event = None
+        with cls._lock:
+            request = (cls.coder_run_requests.get(plan_id) or {}).get(int(step_index))
+            if isinstance(request, dict):
+                event = request.get("event")
+        if event is None:
+            return None
+        triggered = event.wait(timeout=timeout)
+        if not triggered:
+            return None
+        with cls._lock:
+            request = (cls.coder_run_requests.get(plan_id) or {}).get(int(step_index))
+            return dict(request) if isinstance(request, dict) else None
+
+    @classmethod
+    def clear_coder_run_request(cls, plan_id: str, step_index: int):
+        with cls._lock:
+            request_bucket = cls.coder_run_requests.get(plan_id) or {}
+            request_bucket.pop(int(step_index), None)
+            if not request_bucket and plan_id in cls.coder_run_requests:
+                cls.coder_run_requests.pop(plan_id, None)
+
+    @classmethod
+    def increment_coder_run_count(cls, plan_id: str, step_index: int) -> int:
+        with cls._lock:
+            counter_bucket = cls.coder_run_counters.setdefault(plan_id, {})
+            next_value = int(counter_bucket.get(int(step_index), 0)) + 1
+            counter_bucket[int(step_index)] = next_value
+            return next_value
 

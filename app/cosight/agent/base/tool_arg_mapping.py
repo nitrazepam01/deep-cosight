@@ -47,6 +47,47 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
         'aliases': {
             'file': ['file_path', 'filepath', 'path', 'save_path', 'output', 'output_path', 'file_path','file_name','filename'],
         }
+    },
+    'coder_write_file': {
+        'required': ['file_path', 'content'],
+        'aliases': {
+            'file_path': ['file', 'filepath', 'path', 'output', 'output_path', 'filename', 'file_name'],
+            'content': ['text', 'data', 'body', 'contents', 'value', 'file_content'],
+        }
+    },
+    'coder_read_file': {
+        'required': ['file_path'],
+        'aliases': {
+            'file_path': ['file', 'filepath', 'path', 'filename', 'file_name'],
+        }
+    },
+    'coder_edit_file': {
+        'required': ['file_path', 'old_str', 'new_str'],
+        'aliases': {
+            'file_path': ['file', 'filepath', 'path', 'filename', 'file_name'],
+            'old_str': ['old_text', 'before', 'source_text'],
+            'new_str': ['new_text', 'after', 'replacement'],
+        }
+    },
+    'coder_find_files': {
+        'required': ['query'],
+        'aliases': {
+            'query': ['keyword', 'keywords', 'pattern', 'search'],
+        }
+    },
+    'coder_request_run': {
+        'required': ['target_file'],
+        'aliases': {
+            'target_file': ['file', 'file_path', 'filepath', 'path', 'script', 'entry_file'],
+            'reason': ['purpose', 'why', 'run_reason'],
+        }
+    },
+    'coder_mark_step': {
+        'required': ['step_status', 'step_notes'],
+        'aliases': {
+            'step_status': ['status'],
+            'step_notes': ['notes', 'summary', 'result'],
+        }
     }
 }
 

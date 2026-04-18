@@ -293,8 +293,10 @@ dependencies: {1: [0], 2: [0], 3: [1], 4: [1], 5: [3, 4], 6: [5]}
 1. 在调用 create_plan 或 update_plan 时，可以额外传入 step_agents 参数
 2. step_agents 格式为字典：{{"0": "actor_id", "1": "actor_id", ...}}
 3. 根据每个步骤的任务性质，选择最匹配的 Actor
-4. 如果某个步骤不指定 Actor，系统会使用默认 Actor
-5. 只能从上述列表中选择 Actor，不能使用不存在的 ID
+4. 如果存在受限代码演示类 Actor（如 Coder Lite），只在“简单可视化、简短算法/数学演示、小型 HTML 页面”这类步骤中使用它
+5. 不要把复杂工程开发、系统操作、依赖安装、联网调试分配给受限代码演示类 Actor
+6. 如果某个步骤不指定 Actor，系统会使用默认 Actor
+7. 只能从上述列表中选择 Actor，不能使用不存在的 ID
 """
         system_prompt += actor_section
 

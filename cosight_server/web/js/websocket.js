@@ -12,6 +12,7 @@ class WebsocketService {
         this._webSocketPath = '/api/openans-support-chatbot/v1/robot/wss/messages';
         this._topics = [];
         this._subscribers = {};
+        this._pendingOutboundMessages = [];
         this._receiveMessage = new EventTarget();
         this._tryCount = 1;
         this.MAX_RETRY = Infinity;
@@ -134,12 +135,14 @@ class WebsocketService {
             if (this._topics.indexOf(topic) !== -1) {
                 this._topics.splice(this._topics.indexOf(topic), 1);
             }
+            this._removePendingOutboundMessagesByTopic(topic);
         } else {
             // 取消所有订阅
             Object.keys(this._subscribers).forEach(subscriber => {
                 this._subscribers[subscriber].unsubscribe();
             });
             this._topics = [];
+            this._clearPendingOutboundMessages();
         }
     }
 
@@ -149,19 +152,90 @@ class WebsocketService {
      * @param {string} message - 消息内容
      */
     sendMessage(topic, message) {
-        if (!this.isOpen) {
-            console.error("WebSocket is not open");
-            return;
-        }
+        this.sendActionMessage('message', topic, message);
+    }
+
+    sendActionMessage(action, topic, message) {
+        this.initWebSocket();
 
         const data = {
-            action: 'message',
+            action: action || 'message',
             topic: topic,
             data: message,
             lang: this._lang
         };
 
-        this._webSocket.send(JSON.stringify(data));
+        if (!this.isOpen) {
+            this._enqueueOutboundMessage(data);
+            console.warn('[WebsocketService] WebSocket 未就绪，消息已入队等待自动补发:', {
+                action: data.action,
+                topic: data.topic,
+                readyState: this._webSocket ? this._webSocket.readyState : null
+            });
+            return false;
+        }
+
+        try {
+            this._webSocket.send(JSON.stringify(data));
+            return true;
+        } catch (error) {
+            this._enqueueOutboundMessage(data);
+            console.warn('[WebsocketService] 发送失败，消息已回退到队列等待重试:', {
+                action: data.action,
+                topic: data.topic,
+                error
+            });
+            return false;
+        }
+    }
+
+    _enqueueOutboundMessage(data) {
+        if (!data || !data.topic) return;
+        const exists = this._pendingOutboundMessages.some((item) => {
+            if (!item) return false;
+            return item.topic === data.topic
+                && item.action === data.action
+                && item.data === data.data;
+        });
+        if (!exists) {
+            this._pendingOutboundMessages.push({
+                action: data.action || 'message',
+                topic: data.topic,
+                data: data.data,
+                lang: data.lang || this._lang
+            });
+        }
+    }
+
+    _flushPendingOutboundMessages() {
+        if (!this.isOpen || !Array.isArray(this._pendingOutboundMessages) || this._pendingOutboundMessages.length === 0) {
+            return;
+        }
+
+        const queue = this._pendingOutboundMessages.splice(0, this._pendingOutboundMessages.length);
+        queue.forEach((data) => {
+            try {
+                this._webSocket.send(JSON.stringify(data));
+            } catch (error) {
+                console.warn('[WebsocketService] 补发失败，重新入队:', {
+                    action: data?.action,
+                    topic: data?.topic,
+                    error
+                });
+                this._enqueueOutboundMessage(data);
+            }
+        });
+    }
+
+    _removePendingOutboundMessagesByTopic(topic) {
+        if (!topic || !Array.isArray(this._pendingOutboundMessages) || this._pendingOutboundMessages.length === 0) {
+            return;
+        }
+        this._pendingOutboundMessages = this._pendingOutboundMessages.filter((item) => item && item.topic !== topic);
+    }
+
+    _clearPendingOutboundMessages() {
+        this._pendingOutboundMessages = [];
     }
 
     /**
@@ -218,11 +292,13 @@ class WebsocketService {
      */
     _onopen() {
         console.info('[WebsocketService] 连接成功');
+        this._tryCount = 1;
         this.websocketConnected.dispatchEvent(new CustomEvent('connected'));
         // 断线重连后，重新向后端声明订阅过的所有topic
         if (Array.isArray(this._topics)) {
             this._topics.forEach(t => this._sendSubscribe(t));
         }
+        this._flushPendingOutboundMessages();
     }
 
     /**

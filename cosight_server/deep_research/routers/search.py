@@ -376,7 +376,193 @@ def _serialize_plan_data(plan_obj: Plan) -> dict:
         "step_execution_agents": plan_obj.get_step_execution_agents_payload()
         if hasattr(plan_obj, "get_step_execution_agents_payload")
         else {},
+        "executionId": getattr(plan_obj, "execution_id", "") or TaskManager.get_plan_id(plan_obj) or "",
+        "planSessionId": getattr(plan_obj, "plan_session_id", ""),
+        "approvalState": getattr(plan_obj, "approval_state", ""),
+        "planVersion": getattr(plan_obj, "plan_version", 0),
+        "latestRevisionPrompt": getattr(plan_obj, "latest_revision_prompt", ""),
+        "statusText": getattr(plan_obj, "status_text", ""),
     }
+
+
+def _normalize_plan_action(raw_action: Any, require_plan_approval: bool = False) -> str:
+    action = str(raw_action or "").strip().lower()
+    if action in {"plan_draft", "plan_approve", "plan_revise_execute"}:
+        return action
+    if require_plan_approval:
+        return "plan_draft"
+    return "message"
+
+
+def _build_plan_status_text(approval_state: str, fallback: str = "") -> str:
+    mapping = {
+        "drafting": "正在生成计划",
+        "awaiting_user_approval": "待确认",
+        "revising": "正在根据建议调整计划",
+        "approved": "计划已更新，准备执行",
+        "executing": "正在执行中",
+        "completed": "执行完成",
+        "failed": "计划处理失败",
+    }
+    return mapping.get(str(approval_state or "").strip(), fallback or "")
+
+
+def _build_plan_session_snapshot(
+    *,
+    plan_id: str,
+    thread_id: str,
+    workspace_id: str,
+    workspace_path_value: str | None,
+    query_content: str,
+    plan_session_id: str,
+    approval_state: str,
+    plan_version: int = 0,
+    latest_revision_prompt: str = "",
+    draft_plan_snapshot: dict | None = None,
+    agent_run_config: dict | None = None,
+) -> dict:
+    return {
+        "plan_id": plan_id,
+        "thread_id": thread_id,
+        "workspace_id": workspace_id,
+        "workspace_path": workspace_path_value,
+        "query_content": query_content,
+        "plan_session_id": plan_session_id,
+        "approval_state": approval_state,
+        "plan_version": int(plan_version or 0),
+        "latest_revision_prompt": latest_revision_prompt or "",
+        "draft_plan_snapshot": draft_plan_snapshot if isinstance(draft_plan_snapshot, dict) else None,
+        "agent_run_config": dict(agent_run_config or {}),
+        "updated_at": int(datetime.now().timestamp() * 1000),
+    }
+
+
+def _persist_thread_plan_approval_state(
+    thread_id: str,
+    *,
+    workspace_id: str,
+    workspace_path_value: str | None,
+    execution_id: str,
+    plan_session_id: str,
+    approval_state: str,
+    plan_version: int = 0,
+    latest_revision_prompt: str = "",
+    draft_plan_snapshot: dict | None = None,
+):
+    if not thread_id:
+        return False
+
+    normalized_approval_state = str(approval_state or "").strip().lower()
+
+    data = load_sessions()
+    updated = False
+    now_ms = int(datetime.now().timestamp() * 1000)
+
+    for folder in data.get("folders", []):
+        for thread in folder.get("threads", []):
+            if thread.get("id") != thread_id:
+                continue
+
+            if normalized_approval_state == "completed":
+                # 任务完成后，线程级 rightPanelState 必须完全清空。
+                thread["rightPanelState"] = None
+                thread.pop("workspaceId", None)
+                thread.pop("workspacePath", None)
+                thread.pop("planLogPath", None)
+                thread["updatedAt"] = now_ms
+                updated = True
+                break
+
+            right_panel_state = thread.get("rightPanelState")
+            if not isinstance(right_panel_state, dict):
+                right_panel_state = {}
+            right_panel_state["workspaceId"] = workspace_id
+            right_panel_state["workspacePath"] = (
+                f"work_space/{workspace_id}" if workspace_id else right_panel_state.get("workspacePath")
+            )
+            right_panel_state["executionId"] = execution_id
+            right_panel_state["planSessionId"] = plan_session_id
+            right_panel_state["planApprovalState"] = approval_state
+            right_panel_state["planVersion"] = int(plan_version or 0)
+            right_panel_state["latestRevisionPrompt"] = latest_revision_prompt or ""
+            right_panel_state["statusText"] = _build_plan_status_text(approval_state, right_panel_state.get("statusText", ""))
+            if workspace_path_value:
+                right_panel_state["workspacePath"] = (
+                    f"work_space/{workspace_id}" if workspace_id else right_panel_state.get("workspacePath")
+                )
+            if isinstance(draft_plan_snapshot, dict):
+                right_panel_state["dagInitData"] = draft_plan_snapshot
+                right_panel_state["draftPlanSnapshot"] = draft_plan_snapshot
+            thread["rightPanelState"] = right_panel_state
+            thread["updatedAt"] = now_ms
+            updated = True
+            break
+        if updated:
+            break
+
+    if updated:
+        save_sessions(data)
+    return updated
+
+
+def _rehydrate_runtime_from_draft_snapshot(
+    *,
+    plan_id: str,
+    plan_session_id: str,
+    draft_plan_snapshot: dict,
+    workspace_path_value: str | None,
+    agent_run_config: dict | None,
+) -> CoSight | None:
+    if not isinstance(draft_plan_snapshot, dict):
+        return None
+
+    raw_steps = draft_plan_snapshot.get("steps")
+    if not isinstance(raw_steps, list) or len(raw_steps) == 0:
+        return None
+
+    steps: list[str] = []
+    for idx, step in enumerate(raw_steps):
+        if isinstance(step, str):
+            label = step.strip()
+        elif isinstance(step, dict):
+            label = str(step.get("title") or step.get("name") or step.get("fullName") or f"步骤 {idx + 1}").strip()
+        else:
+            label = ""
+        if label:
+            steps.append(label)
+
+    if len(steps) == 0:
+        return None
+
+    dependencies = draft_plan_snapshot.get("dependencies")
+    if not isinstance(dependencies, dict):
+        dependencies = {}
+
+    title = str(draft_plan_snapshot.get("title") or "执行计划").strip() or "执行计划"
+    plan_version = int(draft_plan_snapshot.get("planVersion") or 1)
+    latest_revision_prompt = str(draft_plan_snapshot.get("latestRevisionPrompt") or "")
+
+    runtime = CoSight(
+        llm_for_plan,
+        llm_for_act,
+        llm_for_tool,
+        llm_for_vision,
+        work_space_path=workspace_path_value,
+        message_uuid=plan_id,
+        agent_run_config=agent_run_config,
+    )
+
+    runtime.plan.update(title=title, steps=steps, dependencies=dependencies)
+    runtime.plan.configure_approval(
+        execution_id=plan_id,
+        plan_session_id=plan_session_id,
+        approval_state="approved",
+        plan_version=plan_version,
+        latest_revision_prompt=latest_revision_prompt,
+        require_user_approval=True,
+        status_text="已确认",
+    )
+    return runtime
 
 
 async def append_create_plan(data: Any, plan_log_path: str = None, plan_final_path: str = None):
@@ -538,18 +724,28 @@ async def search(request: Request, params: Any = Body(None)):
 
     # 是否为回放请求（由 WebSocket 层透传）
     is_replay_request = False
+    require_plan_approval = False
     try:
         if isinstance(params, dict):
             is_replay_request = bool(params.get("replay", False))
+            require_plan_approval = bool(params.get("requirePlanApproval", False))
     except Exception:
         is_replay_request = False
+        require_plan_approval = False
 
     session_info = params.get("sessionInfo", {})
     plan_id = session_info.get("messageSerialNumber", "")
     thread_id = session_info.get("threadId", "")
+    plan_session_id = session_info.get("planSessionId") or params.get("planSessionId") or ""
     if not plan_id:
         # 退化方案：使用时间戳，建议前端传稳定ID
         plan_id = f"plan_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+    if not plan_session_id:
+        plan_session_id = f"plan_session_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+    plan_action = _normalize_plan_action(params.get("planAction"), require_plan_approval=require_plan_approval)
+    revision_prompt = str(params.get("revisionPrompt") or "").strip()
+    requested_workspace_id = str(params.get("workspaceId") or "").strip()
+    incoming_draft_snapshot = params.get("draftPlanSnapshot") if isinstance(params.get("draftPlanSnapshot"), dict) else None
 
     # 获取查询内容
     content_array = params.get('content', [])
@@ -572,8 +768,32 @@ async def search(request: Request, params: Any = Body(None)):
         except Exception as e:
             logger.warning(f"Failed to query knowledge bases: {e}")
 
+    existing_plan_session = TaskManager.get_plan_session(plan_id)
+    is_plan_approval_action = plan_action in {"plan_draft", "plan_approve", "plan_revise_execute"}
+    is_existing_approval_followup = plan_action in {"plan_approve", "plan_revise_execute"}
+
     # 确定 workspace_id
-    if not is_replay_request:
+    if is_existing_approval_followup:
+        workspace_id = requested_workspace_id or (existing_plan_session or {}).get("workspace_id")
+        work_space_path_time = (existing_plan_session or {}).get("workspace_path")
+        if workspace_id and not work_space_path_time:
+            candidate_workspace = os.path.join(work_space_path, workspace_id)
+            if os.path.exists(candidate_workspace):
+                work_space_path_time = candidate_workspace
+
+        # redo/followup 在没有可用 workspace 绑定时，按普通发送路径创建新的工作区。
+        if not workspace_id:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+            workspace_id = f'work_space_{timestamp}'
+            work_space_path_time = os.path.join(work_space_path, workspace_id)
+            os.makedirs(work_space_path_time, exist_ok=True)
+        elif not work_space_path_time and not is_replay_request:
+            work_space_path_time = os.path.join(work_space_path, workspace_id)
+            os.makedirs(work_space_path_time, exist_ok=True)
+
+        if work_space_path_time:
+            os.environ['WORKSPACE_PATH'] = work_space_path_time
+    elif not is_replay_request:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
         workspace_id = f'work_space_{timestamp}'
         work_space_path_time = os.path.join(work_space_path, workspace_id)
@@ -584,8 +804,20 @@ async def search(request: Request, params: Any = Body(None)):
     else:
         # 回放请求，从 replayWorkspace 提取 workspace_id
         replay_workspace = params.get("replayWorkspace", "")
-        workspace_id = os.path.basename(replay_workspace) if replay_workspace else plan_id  # 降级使用 plan_id
+        workspace_id = os.path.basename(replay_workspace) if replay_workspace else ""
         work_space_path_time = None
+        if not workspace_id:
+            return {
+                "contentType": "multi-modal",
+                "content": [{"type": "text", "value": "replayWorkspace 缺失，无法回放。"}],
+                "promptSentences": []
+            }
+
+    if not work_space_path_time and workspace_id and not is_replay_request:
+        candidate_workspace = os.path.join(work_space_path, workspace_id)
+        if os.path.exists(candidate_workspace):
+            work_space_path_time = candidate_workspace
+            os.environ['WORKSPACE_PATH'] = work_space_path_time
 
     # 规划每个 plan 的持久化文件，使用 workspace_id 命名
     plan_log_path = os.path.join(LOGS_PATH, f"{workspace_id}.log")
@@ -605,7 +837,7 @@ async def search(request: Request, params: Any = Body(None)):
     
     # 处理上传的文件：将上传的文件复制到工作区
     uploaded_files = params.get('uploadedFiles', [])
-    if uploaded_files:
+    if uploaded_files and work_space_path_time and not is_existing_approval_followup:
         logger.info(f"Copying uploaded files to workspace: {uploaded_files}")
         try:
             copy_result = copy_uploaded_files_to_workspace(
@@ -630,6 +862,79 @@ async def search(request: Request, params: Any = Body(None)):
         latest_plan = None
         # 本次会话内已触发可信分析的步骤集合，避免重复分析
         analyzed_steps_local = set()
+        approval_only_mode = plan_action == "plan_draft"
+        agent_run_config = params.get("agentRunConfig", None)
+
+        def push_queue(payload: Any):
+            if plan_queue is not None and main_loop is not None:
+                asyncio.run_coroutine_threadsafe(plan_queue.put(payload), main_loop)
+
+        def subscribe_plan_events():
+            logger.info(f"Subscribing to events for plan_id: {plan_id}")
+            plan_report_event_manager.subscribe("plan_created", plan_id, append_create_plan_local)
+            plan_report_event_manager.subscribe("plan_updated", plan_id, append_create_plan_local)
+            plan_report_event_manager.subscribe("plan_process", plan_id, append_create_plan_local)
+            plan_report_event_manager.subscribe("plan_result", plan_id, append_create_plan_local)
+            plan_report_event_manager.subscribe("tool_event", plan_id, append_create_plan_local)
+            plan_report_event_manager.subscribe("coder_run_request", plan_id, append_create_plan_local)
+
+        def unsubscribe_plan_events():
+            plan_report_event_manager.unsubscribe("plan_created", plan_id, append_create_plan_local)
+            plan_report_event_manager.unsubscribe("plan_updated", plan_id, append_create_plan_local)
+            plan_report_event_manager.unsubscribe("plan_process", plan_id, append_create_plan_local)
+            plan_report_event_manager.unsubscribe("plan_result", plan_id, append_create_plan_local)
+            plan_report_event_manager.unsubscribe("tool_event", plan_id, append_create_plan_local)
+            plan_report_event_manager.unsubscribe("coder_run_request", plan_id, append_create_plan_local)
+
+        def build_and_persist_session(runtime, approval_state: str, latest_revision: str = ""):
+            plan_snapshot = _serialize_plan_data(runtime.plan) if runtime and runtime.plan else None
+            session_snapshot = _build_plan_session_snapshot(
+                plan_id=plan_id,
+                thread_id=thread_id,
+                workspace_id=workspace_id,
+                workspace_path_value=work_space_path_time,
+                query_content=query_content,
+                plan_session_id=plan_session_id,
+                approval_state=approval_state,
+                plan_version=(plan_snapshot or {}).get("planVersion", 0),
+                latest_revision_prompt=latest_revision,
+                draft_plan_snapshot=plan_snapshot,
+                agent_run_config=agent_run_config,
+            )
+            TaskManager.set_plan_session(plan_id, session_snapshot)
+            if thread_id and not is_replay_request:
+                try:
+                    _persist_thread_plan_approval_state(
+                        thread_id,
+                        workspace_id=workspace_id,
+                        workspace_path_value=work_space_path_time,
+                        execution_id=plan_id,
+                        plan_session_id=plan_session_id,
+                        approval_state=approval_state,
+                        plan_version=session_snapshot.get("plan_version", 0),
+                        latest_revision_prompt=latest_revision,
+                        draft_plan_snapshot=plan_snapshot,
+                    )
+                except Exception as persist_err:
+                    logger.warning(f"持久化计划审批状态失败: {persist_err}")
+            return session_snapshot, plan_snapshot
+
+        def emit_plan_state_event(event_type: str, approval_state: str, *, plan_snapshot=None, error_message: str = ""):
+            payload = {
+                "eventType": event_type,
+                "threadId": thread_id,
+                "workspaceId": workspace_id,
+                "executionId": plan_id,
+                "planSessionId": plan_session_id,
+                "approvalState": approval_state,
+                "planVersion": int((plan_snapshot or {}).get("planVersion", 0)),
+                "statusText": _build_plan_status_text(approval_state),
+            }
+            if isinstance(plan_snapshot, dict):
+                payload["draftPlanSnapshot"] = plan_snapshot
+            if error_message:
+                payload["errorMessage"] = error_message
+            push_queue(payload)
 
         def append_create_plan_local(data: Any):
             """
@@ -659,7 +964,7 @@ async def search(request: Request, params: Any = Body(None)):
                     if plan_queue is not None and main_loop is not None:
                         logger.info(f"Pushing Plan data to queue for plan_id: {plan_id}")
                         # 确保 plan 数据立即放入队列，优先于可信分析
-                        asyncio.run_coroutine_threadsafe(plan_queue.put(plan_dict), main_loop)
+                        push_queue(plan_dict)
 
                     # 检查是否有新完成的步骤，触发可信分析（仅对当前会话内未分析的步骤触发一次）
                     # 注意：可信分析是异步的，不会阻塞计划进度的发送
@@ -731,7 +1036,7 @@ async def search(request: Request, params: Any = Body(None)):
                         # 非Plan（包括工具事件）在入队前再做一次路径改写兜底
                         safe_data = _rewrite_paths_in_payload(data)
                         logger.info(f"Pushing non-Plan data to queue: {type(data).__name__} for plan_id: {plan_id}")
-                        asyncio.run_coroutine_threadsafe(plan_queue.put(safe_data), main_loop)
+                        push_queue(safe_data)
                 else:
                     logger.warning(f"Queue or main_loop is None, cannot push data for plan_id: {plan_id}")
 
@@ -742,17 +1047,16 @@ async def search(request: Request, params: Any = Body(None)):
             except Exception as e:
                 logger.error(f"未知错误: {e}", exc_info=True)
 
-        # 如果已存在最终结果，且当前不在运行，直接回放并结束
+        should_replay_persisted_files = (plan_action == "message") and not is_replay_request
         try:
-            if not TaskManager.is_running(plan_id) and os.path.exists(plan_final_path):
+            if should_replay_persisted_files and not TaskManager.is_running(plan_id) and os.path.exists(plan_final_path):
                 with open(plan_final_path, 'r', encoding='utf-8') as rf:
                     final_obj = json.load(rf)
                 final_obj = dict(final_obj)
-                final_obj["status_text"] = "执行完成"
+                final_obj["statusText"] = "执行完成"
                 yield {"plan": final_obj}
                 return
-            # 若存在历史日志且不在运行，回放日志后结束
-            if not TaskManager.is_running(plan_id) and os.path.exists(plan_log_path):
+            if should_replay_persisted_files and not TaskManager.is_running(plan_id) and os.path.exists(plan_log_path):
                 with open(plan_log_path, 'r', encoding='utf-8') as lf:
                     for line in lf:
                         line = line.strip()
@@ -762,90 +1066,229 @@ async def search(request: Request, params: Any = Body(None)):
                             obj = json.loads(line)
                         except Exception:
                             continue
-                        # 工具事件透传
                         if isinstance(obj, dict) and obj.get("event_type") in ["tool_start", "tool_complete", "tool_error"]:
-                            yield {"plan": obj}
+                            yield obj
                         else:
                             yield {"plan": obj}
                 return
-        except Exception as _:
-            # 回放失败时忽略，继续后续逻辑
+        except Exception:
             pass
 
-        # 在子线程中执行CoSight任务（若未在运行）
-        def run_manus():
-            try:
-                # 避免进程级环境变量被并发覆盖，优先通过参数传递
-                os.environ['WORKSPACE_PATH'] = work_space_path_time
-                
-                # 先订阅事件，关联plan_id - 确保在CoSight初始化之前完成订阅
-                logger.info(f"Subscribing to events for plan_id: {plan_id}")
-                plan_report_event_manager.subscribe("plan_created", plan_id, append_create_plan_local)
-                plan_report_event_manager.subscribe("plan_updated", plan_id, append_create_plan_local)
-                plan_report_event_manager.subscribe("plan_process", plan_id, append_create_plan_local)
-                plan_report_event_manager.subscribe("plan_result", plan_id, append_create_plan_local)
-                plan_report_event_manager.subscribe("tool_event", plan_id, append_create_plan_local)
-                logger.info(f"Event subscription completed for plan_id: {plan_id}")
-
-                # 初始化CoSight并传入plan_id和运行时agent配置
-                logger.info(f"llm is {llm_for_plan.model}, {llm_for_plan.base_url}, {llm_for_plan.api_key}")
-                # 从请求参数中提取 agent_run_config（前端发送）
-                agent_run_config = params.get("agentRunConfig", None)
-                if agent_run_config:
-                    logger.info(f"Using agent_run_config: {agent_run_config}")
-                cosight = CoSight(
-                    llm_for_plan,
-                    llm_for_act,
-                    llm_for_tool,
-                    llm_for_vision,
-                    work_space_path=work_space_path_time,
-                    message_uuid = plan_id,
-                    agent_run_config=agent_run_config
+        if is_existing_approval_followup:
+            expected_session = existing_plan_session or {}
+            runtime = TaskManager.get_runtime(plan_id)
+            if not runtime and isinstance(incoming_draft_snapshot, dict):
+                runtime = _rehydrate_runtime_from_draft_snapshot(
+                    plan_id=plan_id,
+                    plan_session_id=plan_session_id,
+                    draft_plan_snapshot=incoming_draft_snapshot,
+                    workspace_path_value=work_space_path_time,
+                    agent_run_config=params.get("agentRunConfig") if isinstance(params.get("agentRunConfig"), dict) else None,
                 )
-                result = cosight.execute(query_content)
-                logger.info(f"final result is {result}")
+                if runtime:
+                    TaskManager.set_runtime(plan_id, runtime)
+                    if not isinstance(expected_session, dict) or not expected_session:
+                        TaskManager.set_plan_session(
+                            plan_id,
+                            _build_plan_session_snapshot(
+                                plan_id=plan_id,
+                                thread_id=thread_id,
+                                workspace_id=workspace_id,
+                                workspace_path_value=work_space_path_time,
+                                query_content=query_content,
+                                plan_session_id=plan_session_id,
+                                approval_state="approved",
+                                plan_version=int(incoming_draft_snapshot.get("planVersion") or 1),
+                                latest_revision_prompt=str(incoming_draft_snapshot.get("latestRevisionPrompt") or ""),
+                                draft_plan_snapshot=incoming_draft_snapshot,
+                                agent_run_config=params.get("agentRunConfig") if isinstance(params.get("agentRunConfig"), dict) else None,
+                            )
+                        )
+                        expected_session = TaskManager.get_plan_session(plan_id) or {}
 
-            except Exception as e:
-                logger.error(f"CoSight执行错误: {e}", exc_info=True)
-            finally:
-                # 执行完成后取消订阅
-                plan_report_event_manager.unsubscribe("plan_created", plan_id, append_create_plan_local)
-                plan_report_event_manager.unsubscribe("plan_updated", plan_id, append_create_plan_local)
-                plan_report_event_manager.unsubscribe("plan_process", plan_id, append_create_plan_local)
-                plan_report_event_manager.unsubscribe("plan_result", plan_id, append_create_plan_local)
-                plan_report_event_manager.unsubscribe("tool_event", plan_id, append_create_plan_local)
-                # 清理TaskManager中的映射与运行态
-                TaskManager.mark_completed(plan_id)
-                TaskManager.remove_plan(plan_id)
-                # 任务结束后由后端落会话状态，避免前端离线导致状态脏数据
+            session_id_mismatch = bool(
+                isinstance(expected_session, dict)
+                and expected_session.get("plan_session_id")
+                and expected_session.get("plan_session_id") != plan_session_id
+            )
+            if not runtime or session_id_mismatch:
+                emit_plan_state_event(
+                    "plan_approval_state",
+                    "failed",
+                    plan_snapshot=expected_session.get("draft_plan_snapshot") if isinstance(expected_session, dict) else None,
+                    error_message="该计划已失效，请重新生成计划。",
+                )
+                push_queue({"eventType": "plan_stream_end", "mode": "approval"})
+            elif TaskManager.is_running(plan_id):
+                logger.info(f"Task already running for plan_id: {plan_id}, subscribing to events")
+                subscribe_plan_events()
+            else:
                 try:
                     if thread_id and not is_replay_request:
-                        set_thread_execution_status(thread_id, False)
+                        set_thread_execution_status(thread_id, True)
                 except Exception as status_err:
-                    logger.warning(f"后端落会话结束状态失败: thread_id={thread_id}, err={status_err}")
+                    logger.warning(f"后端落会话开始状态失败: thread_id={thread_id}, err={status_err}")
+                TaskManager.mark_running(plan_id)
 
-        # 幂等：若已在运行，仅订阅并复用已有执行；否则启动新执行
-        if TaskManager.is_running(plan_id):
-            # 仅订阅，将当前请求的队列作为新的监听者
-            logger.info(f"Task already running for plan_id: {plan_id}, subscribing to events")
-            plan_report_event_manager.subscribe("plan_created", plan_id, append_create_plan_local)
-            plan_report_event_manager.subscribe("plan_updated", plan_id, append_create_plan_local)
-            plan_report_event_manager.subscribe("plan_process", plan_id, append_create_plan_local)
-            plan_report_event_manager.subscribe("plan_result", plan_id, append_create_plan_local)
-            plan_report_event_manager.subscribe("tool_event", plan_id, append_create_plan_local)
-        else:
-            # 新任务启动前由后端落会话执行中状态
-            try:
-                if thread_id and not is_replay_request:
-                    set_thread_execution_status(thread_id, True)
-            except Exception as status_err:
-                logger.warning(f"后端落会话开始状态失败: thread_id={thread_id}, err={status_err}")
-            TaskManager.mark_running(plan_id)
-            logger.info(f"Starting new task for plan_id: {plan_id}")
+                def run_approval_flow():
+                    latest_revision = revision_prompt
+                    revise_only_mode = plan_action == "plan_revise_execute"
+                    try:
+                        if work_space_path_time:
+                            os.environ['WORKSPACE_PATH'] = work_space_path_time
+                        subscribe_plan_events()
+                        if revise_only_mode:
+                            build_and_persist_session(runtime, "revising", latest_revision)
+                            emit_plan_state_event("plan_approval_state", "revising")
+                            runtime.revise_draft_plan(query_content, latest_revision)
+                            _, revised_snapshot = build_and_persist_session(runtime, "awaiting_user_approval", latest_revision)
+                            if isinstance(revised_snapshot, dict):
+                                push_queue(revised_snapshot)
+                            emit_plan_state_event("plan_revision_applied", "awaiting_user_approval", plan_snapshot=revised_snapshot)
+                            push_queue({"eventType": "plan_stream_end", "mode": "approval"})
+                            return
+                        else:
+                            _, approved_snapshot = build_and_persist_session(runtime, "approved")
+                            emit_plan_state_event("plan_approval_state", "approved", plan_snapshot=approved_snapshot)
+
+                        _, executing_snapshot = build_and_persist_session(runtime, "executing", latest_revision)
+                        emit_plan_state_event("plan_execution_started", "executing", plan_snapshot=executing_snapshot)
+                        runtime.execute_approved_plan(query_content)
+                        build_and_persist_session(runtime, "completed", latest_revision)
+                    except Exception as exc:
+                        logger.error(f"CoSight审批执行错误: {exc}", exc_info=True)
+                        _, failed_snapshot = build_and_persist_session(runtime, "failed", latest_revision)
+                        emit_plan_state_event(
+                            "plan_approval_state",
+                            "failed",
+                            plan_snapshot=failed_snapshot,
+                            error_message=str(exc),
+                        )
+                    finally:
+                        unsubscribe_plan_events()
+                        TaskManager.mark_completed(plan_id)
+                        if not revise_only_mode:
+                            TaskManager.remove_plan(plan_id)
+                        try:
+                            if thread_id and not is_replay_request:
+                                set_thread_execution_status(thread_id, False)
+                        except Exception as status_err:
+                            logger.warning(f"后端落会话结束状态失败: thread_id={thread_id}, err={status_err}")
+
+                import threading
+                thread = threading.Thread(target=run_approval_flow)
+                thread.daemon = True
+                thread.start()
+        elif approval_only_mode:
+            def run_plan_draft():
+                runtime = None
+                draft_success = False
+                try:
+                    if work_space_path_time:
+                        os.environ['WORKSPACE_PATH'] = work_space_path_time
+                    logger.info(f"llm is {llm_for_plan.model}, {llm_for_plan.base_url}, {llm_for_plan.api_key}")
+                    subscribe_plan_events()
+                    runtime = CoSight(
+                        llm_for_plan,
+                        llm_for_act,
+                        llm_for_tool,
+                        llm_for_vision,
+                        work_space_path=work_space_path_time,
+                        message_uuid=plan_id,
+                        agent_run_config=agent_run_config,
+                    )
+                    TaskManager.set_runtime(plan_id, runtime)
+                    build_and_persist_session(runtime, "drafting")
+                    runtime.create_draft_plan(query_content, plan_session_id=plan_session_id)
+                    draft_success = True
+                    _, draft_snapshot = build_and_persist_session(runtime, "awaiting_user_approval")
+                    if isinstance(draft_snapshot, dict):
+                        push_queue(draft_snapshot)
+                    emit_plan_state_event("plan_approval_state", "awaiting_user_approval", plan_snapshot=draft_snapshot)
+                except Exception as exc:
+                    logger.error(f"CoSight生成计划草案错误: {exc}", exc_info=True)
+                    failed_snapshot = None
+                    if runtime:
+                        _, failed_snapshot = build_and_persist_session(runtime, "failed")
+                    emit_plan_state_event(
+                        "plan_approval_state",
+                        "failed",
+                        plan_snapshot=failed_snapshot,
+                        error_message=str(exc),
+                    )
+                    TaskManager.remove_plan(plan_id)
+                finally:
+                    unsubscribe_plan_events()
+                    if not draft_success:
+                        TaskManager.remove_plan(plan_id)
+                    try:
+                        if thread_id and not is_replay_request:
+                            set_thread_execution_status(thread_id, False)
+                    except Exception as status_err:
+                        logger.warning(f"后端落会话草案状态失败: thread_id={thread_id}, err={status_err}")
+                    push_queue({"eventType": "plan_stream_end", "mode": "approval"})
+
             import threading
-            thread = threading.Thread(target=run_manus)
+            thread = threading.Thread(target=run_plan_draft)
             thread.daemon = True
             thread.start()
+        else:
+            def run_manus():
+                try:
+                    if work_space_path_time:
+                        os.environ['WORKSPACE_PATH'] = work_space_path_time
+                    subscribe_plan_events()
+                    logger.info(f"llm is {llm_for_plan.model}, {llm_for_plan.base_url}, {llm_for_plan.api_key}")
+                    cosight = CoSight(
+                        llm_for_plan,
+                        llm_for_act,
+                        llm_for_tool,
+                        llm_for_vision,
+                        work_space_path=work_space_path_time,
+                        message_uuid=plan_id,
+                        agent_run_config=agent_run_config,
+                    )
+                    TaskManager.set_runtime(plan_id, cosight)
+                    build_and_persist_session(cosight, "executing")
+                    result = cosight.execute(query_content)
+                    logger.info(f"final result is {result}")
+                    build_and_persist_session(cosight, "completed")
+                except Exception as exc:
+                    logger.error(f"CoSight执行错误: {exc}", exc_info=True)
+                    runtime = TaskManager.get_runtime(plan_id)
+                    if runtime:
+                        _, failed_snapshot = build_and_persist_session(runtime, "failed")
+                        emit_plan_state_event(
+                            "plan_approval_state",
+                            "failed",
+                            plan_snapshot=failed_snapshot,
+                            error_message=str(exc),
+                        )
+                finally:
+                    unsubscribe_plan_events()
+                    TaskManager.mark_completed(plan_id)
+                    TaskManager.remove_plan(plan_id)
+                    try:
+                        if thread_id and not is_replay_request:
+                            set_thread_execution_status(thread_id, False)
+                    except Exception as status_err:
+                        logger.warning(f"后端落会话结束状态失败: thread_id={thread_id}, err={status_err}")
+
+            if TaskManager.is_running(plan_id):
+                logger.info(f"Task already running for plan_id: {plan_id}, subscribing to events")
+                subscribe_plan_events()
+            else:
+                try:
+                    if thread_id and not is_replay_request:
+                        set_thread_execution_status(thread_id, True)
+                except Exception as status_err:
+                    logger.warning(f"后端落会话开始状态失败: thread_id={thread_id}, err={status_err}")
+                TaskManager.mark_running(plan_id)
+                logger.info(f"Starting new task for plan_id: {plan_id}")
+                import threading
+                thread = threading.Thread(target=run_manus)
+                thread.daemon = True
+                thread.start()
 
         # 持续从队列获取数据并产生响应
         last_plan_fingerprint = None  # 避免相同计划重复发送
@@ -859,6 +1302,17 @@ async def search(request: Request, params: Any = Body(None)):
                 timeout = 5.0 if plan_completed else 60.0
                 data = await asyncio.wait_for(plan_queue.get(), timeout=timeout)
                 # logger.info(f"queue_data:{data}")
+
+                if isinstance(data, dict) and data.get("eventType") == "plan_stream_end":
+                    break
+
+                if isinstance(data, dict) and data.get("eventType") in {
+                    "plan_approval_state",
+                    "plan_execution_started",
+                    "plan_revision_applied",
+                }:
+                    yield data
+                    continue
 
                 # 若为可信分析事件，直接透传，避免被包装为 plan
                 if isinstance(data, dict) and data.get("type") in ("credibility-analysis", "lui-message-credibility-analysis"):
@@ -891,7 +1345,10 @@ async def search(request: Request, params: Any = Body(None)):
                 if isinstance(data, dict) and "result" in data and data['result']:
                     latest_plan = data
                     completed_plan = dict(latest_plan)
-                    completed_plan["statusText"] = "执行完成"
+                    completed_plan["statusText"] = _build_plan_status_text(
+                        completed_plan.get("approvalState"),
+                        "执行完成",
+                    )
                     yield {"plan": completed_plan}
                     # 标记为已完成，记录完成时间，后续在一个尾部时间窗口内继续收集可信分析等事件
                     import time as _time
@@ -903,7 +1360,10 @@ async def search(request: Request, params: Any = Body(None)):
                 latest_plan = data
                 running_plan = dict(latest_plan) if isinstance(latest_plan, dict) else latest_plan
                 if isinstance(running_plan, dict):
-                    running_plan["statusText"] = "正在执行中"
+                    running_plan["statusText"] = running_plan.get("statusText") or _build_plan_status_text(
+                        running_plan.get("approvalState"),
+                        "正在执行中",
+                    )
                 # 发送完整的plan（去重）
                 try:
                     import hashlib as _hashlib
@@ -915,6 +1375,8 @@ async def search(request: Request, params: Any = Body(None)):
                     yield {"plan": running_plan}
 
             except asyncio.TimeoutError:
+                if approval_only_mode:
+                    break
                 # 若计划已完成，则进入“尾部等待窗口”：在限定时间内即使暂时超时也继续等待，
                 # 给异步可信分析等任务留出足够时间将结果推入队列
                 if plan_completed:
@@ -933,7 +1395,13 @@ async def search(request: Request, params: Any = Body(None)):
                 # 计划未完成时的超时：仅发送保活状态。若有最新非工具计划，则基于其发送；否则发送默认等待计划
                 if latest_plan and isinstance(latest_plan, dict):
                     waiting_plan = dict(latest_plan)
-                    waiting_plan["statusText"] = "等待计划更新..."
+                    step_statuses = list((waiting_plan.get("step_statuses") or {}).values())
+                    if "awaiting_code_run_approval" in step_statuses:
+                        waiting_plan["statusText"] = "等待代码运行审批..."
+                    elif "code_running" in step_statuses:
+                        waiting_plan["statusText"] = "代码运行中..."
+                    else:
+                        waiting_plan["statusText"] = "等待计划更新..."
                     try:
                         import hashlib as _hashlib
                         plan_fp = _hashlib.md5(json.dumps(waiting_plan, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
@@ -1020,6 +1488,30 @@ async def search(request: Request, params: Any = Body(None)):
                         "changeType": "append",
                         "content": response_data["plan"]
                     }
+                elif isinstance(response_data, dict) and response_data.get("eventType") in {
+                    "plan_approval_state",
+                    "plan_execution_started",
+                    "plan_revision_applied",
+                }:
+                    response_json = {
+                        "contentType": response_data.get("eventType"),
+                        "sessionInfo": params.get("sessionInfo", {}),
+                        "code": 0,
+                        "message": "ok",
+                        "task": "plan_approval",
+                        "changeType": "replace",
+                        "content": response_data
+                    }
+                elif isinstance(response_data, dict) and response_data.get("eventType") == "coder_run_request":
+                    response_json = {
+                        "contentType": "coder_run_request",
+                        "sessionInfo": params.get("sessionInfo", {}),
+                        "code": 0,
+                        "message": "ok",
+                        "task": "coder_run_request",
+                        "changeType": "replace",
+                        "content": response_data
+                    }
                 elif isinstance(response_data, dict) and "plan" in response_data:
                     # 计划事件使用原有的contentType
                     try:
@@ -1054,23 +1546,23 @@ async def search(request: Request, params: Any = Body(None)):
                 yield json.dumps(response_json, ensure_ascii=False).encode('utf-8') + b'\n'
                 await asyncio.sleep(0)
 
-            # 任务完成后发送完成信号
-            logger.info(f"任务完成，发送完成信号 plan_id={plan_id}")
-            completion_response = json.dumps({
-                "contentType": "lui-message-manus-step-completed",
-                "sessionInfo": params.get("sessionInfo", {}),
-                "code": 0,
-                "message": "ok",
-                "task": "chat",
-                "changeType": "replace",
-                "content": {
-                    "status": "completed",
-                    "title": "任务已完成",
-                    "steps": [],
-                    "statusText": "任务执行完成"
-                }
-            }, ensure_ascii=False).encode('utf-8') + b'\n'
-            yield completion_response
+            if plan_action == "message":
+                logger.info(f"任务完成，发送完成信号 plan_id={plan_id}")
+                completion_response = json.dumps({
+                    "contentType": "lui-message-manus-step-completed",
+                    "sessionInfo": params.get("sessionInfo", {}),
+                    "code": 0,
+                    "message": "ok",
+                    "task": "chat",
+                    "changeType": "replace",
+                    "content": {
+                        "status": "completed",
+                        "title": "任务已完成",
+                        "steps": [],
+                        "statusText": "任务执行完成"
+                    }
+                }, ensure_ascii=False).encode('utf-8') + b'\n'
+                yield completion_response
 
         except Exception as exc:
             error_msg = "生成回复时发生错误。"
