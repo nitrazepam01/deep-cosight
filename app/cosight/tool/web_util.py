@@ -15,6 +15,8 @@
 
 import asyncio
 import os
+import shutil
+import tempfile
 import threading
 from typing import Any, Coroutine, Optional, TypeVar
 from urllib.parse import quote, urlparse, urlunparse
@@ -31,6 +33,13 @@ _browser_loop_thread: Optional[threading.Thread] = None
 _browser_loop_ready = threading.Event()
 _browser_loop_lock = threading.Lock()
 _T = TypeVar("_T")
+
+
+def _format_exception_message(error: BaseException) -> str:
+    message = str(error or "").strip()
+    if message:
+        return message
+    return type(error).__name__
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -90,7 +99,10 @@ def _ensure_browser_loop() -> asyncio.AbstractEventLoop:
         if _browser_loop and _browser_loop.is_running():
             return _browser_loop
 
-        loop = asyncio.new_event_loop()
+        if os.name == "nt" and hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
+            loop = asyncio.WindowsProactorEventLoopPolicy().new_event_loop()
+        else:
+            loop = asyncio.new_event_loop()
         thread = threading.Thread(
             target=_run_loop,
             name="WebToolkitBrowserLoop",
@@ -114,10 +126,13 @@ def _run_in_browser_loop(coro: Coroutine[Any, Any, _T]) -> _T:
     return future.result()
 
 
-async def create_browser_session():
+async def create_browser_session(user_data_dir: Optional[str] = None):
     # 获取共享的browser session
-    logger.info("Creating new shared browser session for multi-agent use")
-    user_data_dir = os.path.expanduser("~/.cosight/browser_profiles/shared")
+    if not user_data_dir:
+        logger.info("Creating new shared browser session for multi-agent use")
+        user_data_dir = os.path.expanduser("~/.cosight/browser_profiles/shared")
+    else:
+        logger.info("Creating new transient browser session with user_data_dir=%s", user_data_dir)
     os.makedirs(user_data_dir, exist_ok=True)
 
     # 创建browser profile配置
@@ -209,6 +224,10 @@ class WebToolkit:
 
         return cls._shared_browser_session
 
+    @staticmethod
+    def _should_share_browser_session() -> bool:
+        return _env_bool("FORCE_KEEP_BROWSER_ALIVE", True)
+
     @classmethod
     async def _reset_browser_session(cls) -> None:
         if cls._shared_browser_session:
@@ -218,6 +237,13 @@ class WebToolkit:
                 logger.exception("Failed to close shared browser session during reset")
             finally:
                 cls._shared_browser_session = None
+
+    async def _acquire_browser_session(self) -> tuple[BrowserSession, bool, Optional[str]]:
+        if self._should_share_browser_session():
+            return await self._get_shared_browser_session(), True, None
+        temp_user_data_dir = tempfile.mkdtemp(prefix="browseruse-session-")
+        session = await create_browser_session(user_data_dir=temp_user_data_dir)
+        return session, False, temp_user_data_dir
 
     def browser_use(self, task_prompt: str):
         r"""A powerful toolkit which can simulate the browser interaction to solve the task which needs multi-step actions.
@@ -236,16 +262,24 @@ class WebToolkit:
         """
         logger.info(f"start browser_use, task_prompt is {task_prompt}")
         try:
-            return _run_in_browser_loop(self.inner_browser_use(task_prompt))
+            result = _run_in_browser_loop(self.inner_browser_use(task_prompt))
+            logger.info(
+                "browser_use finished, result_preview=%s",
+                str(result)[:200] if result is not None else "None",
+            )
+            return result
         except Exception as e:
-            logger.error(f"browser_use error {str(e)}", exc_info=True)
+            error_message = _format_exception_message(e)
+            logger.error(f"browser_use error {error_message}", exc_info=True)
             # 确保返回的是字符串而不是协程
-            return f"browser_use error: {str(e)}"
+            return f"browser_use error: {error_message}"
 
     async def inner_browser_use(self, task_prompt):
         browser_session: Optional[BrowserSession] = None
+        uses_shared_session = False
+        temp_user_data_dir: Optional[str] = None
         try:
-            browser_session = await self._get_shared_browser_session()
+            browser_session, uses_shared_session, temp_user_data_dir = await self._acquire_browser_session()
             if self._llm is None:
                 llm_kwargs = {**self.llm_config}
                 llm_kwargs.setdefault("temperature", 0.0)
@@ -279,13 +313,33 @@ ADDITIONAL INSTRUCTIONS:
             # 运行agent
             result = await agent.run()
             final_result = result.final_result()
+            if final_result is None or not str(final_result).strip():
+                raise RuntimeError("browser_use completed without a final result")
             logger.info("Task completed successfully with shared browser session")
             return final_result
 
         except Exception as e:
-            logger.error(f"failed to use browser: {str(e)}", exc_info=True)
-            if browser_session:
+            error_message = _format_exception_message(e)
+            logger.error(
+                "failed to use browser: %s (%s), task_prompt=%s",
+                error_message,
+                type(e).__name__,
+                task_prompt,
+                exc_info=True,
+            )
+            if browser_session and uses_shared_session:
                 await self._reset_browser_session()
-            return f"fail, because: {str(e)}"
-        # 注意：不要在这里关闭browser_session，因为它是共享的
-        # browser session会通过keep_alive=True保持活跃，供后续agent复用
+            elif browser_session:
+                try:
+                    await browser_session.kill()
+                except Exception:
+                    logger.exception("Failed to close transient browser session after browser_use error")
+            return f"fail, because: {error_message}"
+        finally:
+            if browser_session and not uses_shared_session:
+                try:
+                    await browser_session.kill()
+                except Exception:
+                    logger.exception("Failed to close transient browser session after browser_use run")
+            if temp_user_data_dir:
+                shutil.rmtree(temp_user_data_dir, ignore_errors=True)

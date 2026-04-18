@@ -87,6 +87,11 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "生成包含图表的 HTML 可视化报告",
         "needs_workspace": False,
     },
+    "browser_use": {
+        "display_name_zh": "浏览器交互模拟",
+        "description_zh": "通过浏览器自动化执行需要多步页面操作的任务",
+        "needs_workspace": False,
+    },
     "fetch_website_content": {
         "display_name_zh": "网页内容抓取",
         "description_zh": "获取网页的文字内容",
@@ -181,7 +186,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         search_wiki_skill, mark_step_skill, file_saver_skill,
         file_read_skill, file_str_replace_skill, file_find_in_content_skill,
         ask_question_about_image_skill, ask_question_about_video_skill,
-        audio_recognition_skill, extract_document_content_skill,
+        audio_recognition_skill, extract_document_content_skill, browser_use_skill,
         create_html_report_skill, fetch_website_content_skill,
         fetch_website_content_with_images_skill, fetch_website_images_only_skill,
         coder_list_files_skill, coder_read_file_skill, coder_write_file_skill,
@@ -204,6 +209,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "audio_recognition": audio_recognition_skill,
         "extract_document_content": extract_document_content_skill,
         "create_html_report": create_html_report_skill,
+        "browser_use": browser_use_skill,
         "fetch_website_content": fetch_website_content_skill,
         "fetch_website_content_with_images": fetch_website_content_with_images_skill,
         "fetch_website_images_only": fetch_website_images_only_skill,

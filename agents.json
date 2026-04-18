@@ -41,6 +41,7 @@
         "ask_question_about_video",
         "extract_document_content",
         "create_html_report",
+        "browser_use",
         "fetch_website_content",
         "fetch_website_content_with_images",
         "fetch_website_images_only"

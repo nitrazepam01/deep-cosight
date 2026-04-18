@@ -110,7 +110,7 @@ class TaskActorAgent(BaseAgent):
                          "file_read": file_toolkit.file_read,
                          "file_str_replace": file_toolkit.file_str_replace,
                          "file_find_in_content": file_toolkit.file_find_in_content,
-                        #  "browser_use": web_toolkit.browser_use,
+                         "browser_use": web_toolkit.browser_use,
                          "ask_question_about_image": image_toolkit.ask_question_about_image,
                          "ask_question_about_video": video_toolkit.ask_question_about_video,
                          "fetch_website_content": fetch_website_content,
