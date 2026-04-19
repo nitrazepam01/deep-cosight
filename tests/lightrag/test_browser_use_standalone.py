@@ -47,14 +47,18 @@ async def test_native_browser_use():
     await browser_session.start()
 
     # 3. Create the Agent
-    task_prompt = "Go to https://www.bing.com, search for 'Hello World', and return the title of the first search result."
+    task_prompt = (
+        "Go to https://www.bing.com/search?q=Hello+World. "
+        "Do not open a new tab. Do not navigate away from the search results page. "
+        "Read the title of the first organic search result and return only that title."
+    )
     print(f"\nTask: {task_prompt}")
     
     agent = Agent(
         task=task_prompt,
         llm=llm,
         browser_session=browser_session,
-        use_vision=False,
+        use_vision=True,
         flash_mode=True
     )
 
