@@ -88,6 +88,97 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'step_status': ['status'],
             'step_notes': ['notes', 'summary', 'result'],
         }
+    },
+    'wiki_revision_at': {
+        'required': ['title', 'cutoff_timestamp'],
+        'aliases': {
+            'title': ['page', 'page_title', 'article', 'entity'],
+            'cutoff_timestamp': ['cutoff', 'as_of', 'as_of_timestamp', 'date', 'timestamp', 'end_time'],
+            'language': ['lang'],
+        }
+    },
+    'wiki_rail_connection_count': {
+        'required': ['title', 'cutoff_timestamp'],
+        'aliases': {
+            'title': ['page', 'page_title', 'article', 'entity'],
+            'cutoff_timestamp': ['cutoff', 'as_of', 'as_of_timestamp', 'date', 'timestamp', 'end_time'],
+            'section_keyword': ['section', 'section_title', 'table', 'table_keyword'],
+            'language': ['lang'],
+        }
+    },
+    'wiki_revision_size_delta_find': {
+        'required': ['title', 'target_delta'],
+        'aliases': {
+            'title': ['page', 'page_title', 'article', 'entity'],
+            'target_delta': ['delta', 'bytes', 'byte_delta', 'n', 'N', 'street_number', 'target_bytes'],
+            'year': ['calendar_year'],
+            'start_timestamp': ['start', 'start_time', 'rvend'],
+            'end_timestamp': ['end', 'end_time', 'rvstart'],
+            'language': ['lang'],
+        }
+    },
+    'wiki_infobox_field_lookup': {
+        'required': ['title', 'field_name'],
+        'aliases': {
+            'title': ['page', 'page_title', 'article', 'entity'],
+            'field_name': ['field', 'infobox_field', 'property', 'parameter', 'param'],
+            'oldid': ['revision_id', 'revid', 'revision', 'historical_revision'],
+            'language': ['lang'],
+            'link_mode': ['mode', 'selection_mode'],
+            'clean_templates': ['clean', 'clean_wikitext'],
+        }
+    },
+    'taxon_binomial_verify': {
+        'required': ['candidate_words'],
+        'aliases': {
+            'candidate_words': ['word', 'root_word', 'candidate', 'candidates', 'terms', 'synonyms'],
+            'suffixes': ['suffix', 'suffix_list', 'letters', 'two_letters'],
+            'expected_common_name_keyword': ['common_keyword', 'common_name_keyword', 'species_keyword'],
+            'expected_family': ['family', 'taxonomic_family'],
+            'wikipedia_language': ['language', 'lang'],
+        }
+    },
+    'place_street_number_resolve': {
+        'required': ['query'],
+        'aliases': {
+            'query': ['place', 'place_name', 'location', 'address', 'entity', 'name'],
+            'region': ['city', 'area'],
+            'baidu_ak': ['ak', 'api_key', 'baidu_key'],
+            'max_results': ['limit', 'num_results'],
+        }
+    },
+    'function_graph_letter_probe': {
+        'required': ['equations'],
+        'aliases': {
+            'equations': ['equation', 'functions', 'function_list', 'formulas', 'expressions'],
+            'plot_range': ['range', 'x_range', 'domain', 'window'],
+            'output_image_path': ['image_path', 'output_path', 'plot_path', 'save_path'],
+        }
+    },
+    'google_books_volume_search': {
+        'required': ['query'],
+        'aliases': {
+            'query': ['keyword', 'term', 'search_query', 'q'],
+            'book_id': ['volume_id', 'google_book_id', 'id'],
+            'book_url': ['url', 'google_books_url', 'volume_url'],
+            'book_title': ['title', 'book', 'volume_title'],
+            'target_phrase': ['target', 'target_text', 'reference_phrase', 'phrase'],
+            'max_results': ['limit', 'num_results'],
+            'max_evidence_pages': ['evidence_limit', 'page_limit', 'top_pages'],
+            'snippet_chars': ['snippet_length', 'max_snippet_chars', 'context_chars'],
+            'max_reference_candidates': ['reference_limit', 'top_references'],
+            'detail_level': ['detail', 'mode'],
+        }
+    },
+    'document_abstract_year_count': {
+        'required': ['document_path'],
+        'aliases': {
+            'document_path': ['file', 'file_path', 'path', 'filepath', 'document', 'document_path_or_url', 'url'],
+            'publication_year': ['year', 'target_year', 'book_year'],
+            'book_title': ['title', 'paper_title', 'article_title'],
+            'abstract_end_markers': ['end_markers', 'markers', 'end_marker'],
+            'abstract_start_markers': ['start_markers', 'start_marker'],
+        }
     }
 }
 

@@ -40,6 +40,11 @@ from app.cosight.tool.audio_toolkit import AudioTool
 from app.cosight.tool.video_analysis_toolkit import VideoTool
 from app.cosight.tool.html_visualization_toolkit import HtmlVisualizationToolkit
 from app.cosight.tool.coder_lite_toolkit import CoderLiteToolkit
+from app.cosight.tool.wikipedia_toolkit import WikipediaToolkit
+from app.cosight.tool.taxonomy_toolkit import TaxonomyToolkit
+from app.cosight.tool.location_toolkit import LocationToolkit
+from app.cosight.tool.math_graph_toolkit import MathGraphToolkit
+from app.cosight.tool.google_books_toolkit import GoogleBooksToolkit
 from config.config import get_tavily_config
 from app.common.logger_util import logger
 
@@ -96,12 +101,28 @@ class TaskActorAgent(BaseAgent):
         html_toolkit = HtmlVisualizationToolkit(workspace_path=work_space_path, tool_llm=tool_llm)
         coder_lite_toolkit = CoderLiteToolkit(plan_id=plan_id, work_space_path=work_space_path)
         code_toolkit = CodeToolkit(sandbox="subprocess", work_space_path=self.work_space_path)
+        wikipedia_toolkit = WikipediaToolkit()
+        taxonomy_toolkit = TaxonomyToolkit()
+        location_toolkit = LocationToolkit()
+        math_graph_toolkit = MathGraphToolkit()
+        google_books_toolkit = GoogleBooksToolkit()
         all_functions = {"mark_step": act_toolkit.mark_step,
                          # "deep_search": deep_search_toolkit.deep_search,
                         #  "search_baidu": search_baidu,
                          "search_google": search_toolkit.search_google,
                          "search_wiki": search_toolkit.search_wiki,
                          "tavily_search": search_toolkit.tavily_search,
+                         "wiki_first_revision": wikipedia_toolkit.wiki_first_revision,
+                         "wiki_revision_at": wikipedia_toolkit.wiki_revision_at,
+                         "wiki_reference_count": wikipedia_toolkit.wiki_reference_count,
+                         "wiki_revision_reference_delta": wikipedia_toolkit.wiki_revision_reference_delta,
+                         "wiki_infobox_field_lookup": wikipedia_toolkit.wiki_infobox_field_lookup,
+                         "wiki_revision_size_delta_find": wikipedia_toolkit.wiki_revision_size_delta_find,
+                         "wiki_rail_connection_count": wikipedia_toolkit.wiki_rail_connection_count,
+                         "taxon_binomial_verify": taxonomy_toolkit.taxon_binomial_verify,
+                         "place_street_number_resolve": location_toolkit.place_street_number_resolve,
+                         "function_graph_letter_probe": math_graph_toolkit.function_graph_letter_probe,
+                         "google_books_volume_search": google_books_toolkit.google_books_volume_search,
                         #  "image_search": tavily_search.search,
                          "audio_recognition": audio_toolkit.speech_to_text,
                          # "search_duckgo": search_toolkit.search_duckduckgo,
@@ -117,6 +138,7 @@ class TaskActorAgent(BaseAgent):
                          "fetch_website_content_with_images": fetch_website_content_with_images,
                          "fetch_website_images_only": fetch_website_images_only,
                          "extract_document_content": doc_toolkit.extract_document_content,
+                         "document_abstract_year_count": doc_toolkit.document_abstract_year_count,
                          "create_html_report": lambda title=None, include_charts=True, chart_types=['all'], output_filename=None: html_toolkit.create_html_report(
                               title=title,
                               include_charts=include_charts,

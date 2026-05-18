@@ -505,10 +505,26 @@ class ToolResultProcessor:
             # 根据工具名称精确匹配选择处理方式
             if tool_name in ['search_baidu', 'search_google', 'search_wiki', 'tavily_search', 'image_search']:
                 return ToolResultProcessor._process_search_result(tool_name, tool_args, tool_result, task_title)
+            elif tool_name in [
+                'wiki_first_revision', 'wiki_revision_at', 'wiki_reference_count',
+                'wiki_revision_reference_delta', 'wiki_revision_size_delta_find',
+                'wiki_rail_connection_count', 'wiki_infobox_field_lookup'
+            ]:
+                return ToolResultProcessor._process_wikipedia_result(tool_name, tool_args, tool_result, task_title)
+            elif tool_name == 'taxon_binomial_verify':
+                return ToolResultProcessor._process_taxonomy_result(tool_name, tool_args, tool_result, task_title)
+            elif tool_name == 'place_street_number_resolve':
+                return ToolResultProcessor._process_location_result(tool_name, tool_args, tool_result, task_title)
+            elif tool_name == 'function_graph_letter_probe':
+                return ToolResultProcessor._process_math_graph_result(tool_name, tool_args, tool_result, task_title)
+            elif tool_name == 'google_books_volume_search':
+                return ToolResultProcessor._process_google_books_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'execute_code':
                 return ToolResultProcessor._process_code_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name in ['file_saver', 'file_read', 'file_str_replace', 'file_find_in_content','create_html_report']:
                 return ToolResultProcessor._process_file_result(tool_name, tool_args, tool_result, task_title)
+            elif tool_name == 'document_abstract_year_count':
+                return ToolResultProcessor._process_document_count_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'browser_use':
                 return ToolResultProcessor._process_web_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'fetch_website_content':
@@ -651,6 +667,280 @@ class ToolResultProcessor:
                 ),
                 "error": str(e)
             }
+
+    @staticmethod
+    def _process_wikipedia_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
+        """处理 Wikipedia revision 工具结果"""
+        try:
+            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+            if not isinstance(parsed_result, dict):
+                raise ValueError("Wikipedia tool did not return a JSON object")
+
+            urls = []
+            for candidate in [
+                parsed_result.get("url"),
+                (parsed_result.get("revision") or {}).get("url"),
+                (parsed_result.get("matched_revision") or {}).get("url"),
+                (parsed_result.get("earlier_revision") or {}).get("url"),
+                (parsed_result.get("later_revision") or {}).get("url"),
+                (parsed_result.get("earlier_count_details") or {}).get("url"),
+                (parsed_result.get("later_count_details") or {}).get("url"),
+                parsed_result.get("url"),
+            ]:
+                if candidate and candidate not in urls:
+                    urls.append(candidate)
+            for match in parsed_result.get("matches") or []:
+                candidate = match.get("url")
+                if candidate and candidate not in urls:
+                    urls.append(candidate)
+            url = urls[0] if urls else None
+            summary_parts = []
+
+            if tool_name == "wiki_first_revision":
+                summary_parts.append(
+                    f"Wikipedia first revision found: oldid {parsed_result.get('oldid')} at {parsed_result.get('timestamp')}"
+                )
+            elif tool_name == "wiki_revision_at":
+                summary_parts.append(
+                    f"Wikipedia revision found: oldid {parsed_result.get('oldid')} at {parsed_result.get('timestamp')}"
+                )
+            elif tool_name == "wiki_reference_count":
+                summary_parts.append(
+                    f"Reference count for oldid {parsed_result.get('oldid')}: {parsed_result.get('recommended_count')} "
+                    f"({parsed_result.get('recommended_count_method')})"
+                )
+            elif tool_name == "wiki_revision_reference_delta":
+                summary_parts.append(
+                    f"Reference delta for {parsed_result.get('title')}: {parsed_result.get('calculation')}"
+                )
+            elif tool_name == "wiki_revision_size_delta_find":
+                matched = parsed_result.get("matched_revision") or {}
+                if matched:
+                    summary_parts.append(
+                        f"Size-delta match for {parsed_result.get('title')}: "
+                        f"{matched.get('calculation')} at {matched.get('formatted_date')}"
+                    )
+                else:
+                    summary_parts.append(
+                        f"No size-delta match for {parsed_result.get('title')} target_delta={parsed_result.get('target_delta')}"
+                    )
+            elif tool_name == "wiki_rail_connection_count":
+                revision = parsed_result.get("revision") or {}
+                summary_parts.append(
+                    f"Rail connection count for {parsed_result.get('title')} oldid {revision.get('oldid')}: "
+                    f"{parsed_result.get('connection_count')} ({parsed_result.get('calculation')})"
+                )
+            elif tool_name == "wiki_infobox_field_lookup":
+                summary_parts.append(
+                    f"Infobox field {parsed_result.get('matched_field_name')} for {parsed_result.get('title')}: "
+                    f"{parsed_result.get('selected_value')}"
+                )
+
+            if parsed_result.get("warnings"):
+                summary_parts.append("; ".join(parsed_result["warnings"]))
+
+            return {
+                "tool_type": "search",
+                "summary": ToolResultProcessor._get_localized_summary(
+                    "；".join(summary_parts),
+                    " ; ".join(summary_parts),
+                    task_title
+                ),
+                "first_url": url or ToolResultProcessor._generate_search_results_page_url(tool_name, tool_args, urls),
+                "urls": urls,
+                "result_count": 1 if url else 0,
+                "has_content": bool(parsed_result),
+                "parsed_result": parsed_result,
+            }
+        except Exception as e:
+            logger.error(f"Error processing wikipedia result: {e}")
+            return {
+                "tool_type": "search",
+                "summary": ToolResultProcessor._get_localized_summary(
+                    "Wikipedia 版本工具执行完成",
+                    "Wikipedia revision tool completed",
+                    task_title
+                ),
+                "error": str(e)
+            }
+
+    @staticmethod
+    def _process_document_count_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
+        """处理文档摘要计数工具结果"""
+        try:
+            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+            if not isinstance(parsed_result, dict):
+                raise ValueError("Document count tool did not return a JSON object")
+            summary = (
+                f"Abstract count for year {parsed_result.get('publication_year')}: "
+                f"{parsed_result.get('abstract_count')} "
+                f"(full document audit count: {parsed_result.get('full_document_count')})"
+            )
+            return {
+                "tool_type": "document",
+                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
+                "result_count": 1,
+                "has_content": bool(parsed_result),
+                "parsed_result": parsed_result,
+            }
+        except Exception as e:
+            logger.error(f"Error processing document count result: {e}")
+            return {
+                "tool_type": "document",
+                "summary": ToolResultProcessor._get_localized_summary(
+                    "文档摘要计数工具执行完成",
+                    "Document abstract count completed",
+                    task_title
+                ),
+                "error": str(e)
+            }
+
+    @staticmethod
+    def _process_taxonomy_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
+        """处理物种双名法验证工具结果"""
+        try:
+            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+            if not isinstance(parsed_result, dict):
+                raise ValueError("Taxonomy tool did not return a JSON object")
+
+            urls = []
+            for candidate in parsed_result.get("checked_candidates", []):
+                wikipedia = (candidate.get("source_checks") or {}).get("wikipedia") or {}
+                for item in wikipedia.get("results", []):
+                    url = item.get("url")
+                    if url and url not in urls:
+                        urls.append(url)
+
+            if parsed_result.get("verified"):
+                summary = (
+                    f"Taxon binomial verified: {parsed_result.get('root_word')} + "
+                    f"{parsed_result.get('suffix')} -> {parsed_result.get('scientific_name')} "
+                    f"({parsed_result.get('common_name')}); answer {parsed_result.get('answer')}"
+                )
+            else:
+                summary = (
+                    "Taxon binomial verification did not find a verified answer; "
+                    f"checked {parsed_result.get('checked_count', 0)} candidates"
+                )
+
+            return {
+                "tool_type": "search",
+                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
+                "first_url": urls[0] if urls else None,
+                "urls": urls,
+                "result_count": 1 if parsed_result.get("verified") else 0,
+                "has_content": bool(parsed_result),
+                "parsed_result": parsed_result,
+            }
+        except Exception as e:
+            logger.error(f"Error processing taxonomy result: {e}")
+            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
+
+    @staticmethod
+    def _process_location_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
+        """处理地点门牌号解析工具结果"""
+        try:
+            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+            if not isinstance(parsed_result, dict):
+                raise ValueError("Location tool did not return a JSON object")
+
+            urls = []
+            for candidate in parsed_result.get("candidates") or []:
+                url = candidate.get("source_url")
+                if url and url not in urls:
+                    urls.append(url)
+
+            if parsed_result.get("street_number") is not None:
+                summary = (
+                    f"Street number resolved: {parsed_result.get('street_number')} "
+                    f"from {parsed_result.get('address') or parsed_result.get('place_name')}"
+                )
+            else:
+                summary = f"No street number resolved for {parsed_result.get('query')}"
+
+            return {
+                "tool_type": "search",
+                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
+                "first_url": urls[0] if urls else None,
+                "urls": urls,
+                "result_count": 1 if parsed_result.get("street_number") is not None else 0,
+                "has_content": bool(parsed_result),
+                "parsed_result": parsed_result,
+            }
+        except Exception as e:
+            logger.error(f"Error processing location result: {e}")
+            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
+
+    @staticmethod
+    def _process_math_graph_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
+        """处理函数图形字母识别工具结果"""
+        try:
+            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+            if not isinstance(parsed_result, dict):
+                raise ValueError("Math graph tool did not return a JSON object")
+
+            image_path = parsed_result.get("rendered_image_path")
+            urls = [image_path] if image_path else []
+            summary = (
+                f"Function graph letters: {parsed_result.get('letters')} -> "
+                f"{parsed_result.get('acronym')}"
+            )
+            if parsed_result.get("warnings"):
+                summary += "; " + "; ".join(parsed_result["warnings"])
+
+            return {
+                "tool_type": "analysis",
+                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
+                "first_url": image_path,
+                "urls": urls,
+                "result_count": len(parsed_result.get("letters") or []),
+                "has_content": bool(parsed_result),
+                "parsed_result": parsed_result,
+            }
+        except Exception as e:
+            logger.error(f"Error processing math graph result: {e}")
+            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
+
+    @staticmethod
+    def _process_google_books_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
+        """处理 Google Books 书内搜索工具结果"""
+        try:
+            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+            if not isinstance(parsed_result, dict):
+                raise ValueError("Google Books tool did not return a JSON object")
+
+            urls = []
+            if parsed_result.get("search_url"):
+                urls.append(parsed_result["search_url"])
+            for candidate in parsed_result.get("volume_candidates") or []:
+                url = candidate.get("info_link")
+                if url and url not in urls:
+                    urls.append(url)
+
+            best = parsed_result.get("best_page_reference") or {}
+            if best:
+                summary = (
+                    f"Google Books search for {parsed_result.get('query')} in {parsed_result.get('book_id')}: "
+                    f"best page reference {best.get('page_number')} from {best.get('source_page_id')}"
+                )
+            else:
+                summary = (
+                    f"Google Books search for {parsed_result.get('query')} in {parsed_result.get('book_id')}: "
+                    f"{parsed_result.get('matched_page_count', 0)} matched pages"
+                )
+
+            return {
+                "tool_type": "search",
+                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
+                "first_url": urls[0] if urls else None,
+                "urls": urls,
+                "result_count": parsed_result.get("matched_page_count", 0),
+                "has_content": bool(parsed_result),
+                "parsed_result": parsed_result,
+            }
+        except Exception as e:
+            logger.error(f"Error processing Google Books result: {e}")
+            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
     
     @staticmethod
     def _process_code_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:

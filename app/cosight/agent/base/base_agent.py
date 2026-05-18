@@ -289,6 +289,17 @@ class BaseAgent:
             "search_google": "谷歌搜索", 
             "tavily_search": "Tavily搜索",
             "search_wiki": "维基百科搜索",
+            "wiki_first_revision": "维基百科首个历史版本",
+            "wiki_revision_at": "维基百科指定时间历史版本",
+            "wiki_reference_count": "维基百科历史版本引用计数",
+            "wiki_revision_reference_delta": "维基百科历史版本引用增量",
+            "wiki_infobox_field_lookup": "维基百科 Infobox 字段抽取",
+            "wiki_revision_size_delta_find": "维基百科修订字节增量查找",
+            "wiki_rail_connection_count": "维基百科历史铁路连接计数",
+            "taxon_binomial_verify": "物种双名法验证器",
+            "place_street_number_resolve": "地点门牌号解析",
+            "function_graph_letter_probe": "函数图形字母识别器",
+            "google_books_volume_search": "Google Books书内搜索",
             "image_search": "图片搜索",
             "audio_recognition": "音频识别",
             
@@ -334,6 +345,7 @@ class BaseAgent:
             "word_processor": "Word处理",
             "excel_processor": "Excel处理",
             "extract_document_content": "抽取文档内容",
+            "document_abstract_year_count": "文档摘要年份计数",
             
             # 数据库类工具
             "database_query": "数据库查询",
@@ -373,7 +385,15 @@ class BaseAgent:
         name = (tool_name or "").lower()
         
         # 搜索类：支持交叉验证
-        if name in ("search_baidu", "search_google", "tavily_search", "search_wiki", "image_search"):
+        if name in (
+            "search_baidu", "search_google", "tavily_search", "search_wiki", "image_search",
+            "wiki_first_revision", "wiki_revision_at", "wiki_reference_count",
+            "wiki_revision_reference_delta", "wiki_infobox_field_lookup",
+            "wiki_revision_size_delta_find",
+            "wiki_rail_connection_count", "taxon_binomial_verify",
+            "place_street_number_resolve", "function_graph_letter_probe",
+            "google_books_volume_search",
+        ):
             return ["source_trace", "rule_assist", "self_consistency"]
         
         # 保存类
@@ -393,8 +413,8 @@ class BaseAgent:
             return ["source_trace", "rule_assist"]
         
         # 文档抽取
-        if name in ("extract_document_content",):
-            return ["rule_assist"]
+        if name in ("extract_document_content", "document_abstract_year_count"):
+            return ["source_trace", "rule_assist", "self_consistency"]
         
         # 多模态/音频
         if name in ("ask_question_about_image", "ask_question_about_video", "audio_recognition"):

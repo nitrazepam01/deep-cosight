@@ -18,6 +18,7 @@ import openai
 import requests
 import mimetypes
 import json
+import re
 from retry import retry
 from typing import List, Dict, Any, Optional, Tuple, Literal
 from PIL import Image
@@ -46,9 +47,238 @@ class DocumentProcessingToolkit:
         self.cache_dir = "tmp/"
         if cache_dir:
             self.cache_dir = cache_dir
+        os.makedirs(self.cache_dir, exist_ok=True)
 
         proxy = os.environ.get("PROXY")
         self.proxies = {"http": proxy, "https": proxy} if proxy else None
+
+    @staticmethod
+    def _json(data: Dict[str, Any]) -> str:
+        return json.dumps(data, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        text = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
+        text = re.sub(r"[ \t\f\v]+", " ", text)
+        text = re.sub(r" *\n *", "\n", text)
+        return text.strip()
+
+    @staticmethod
+    def _count_whole_year(text: str, year: str) -> int:
+        if not year:
+            return 0
+        return len(re.findall(rf"(?<!\d){re.escape(str(year))}(?!\d)", text or ""))
+
+    @staticmethod
+    def _parse_marker_list(value: Any, default: List[str]) -> List[str]:
+        if value is None:
+            return default
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        value = str(value).strip()
+        if not value:
+            return default
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, list):
+                return [str(item).strip() for item in parsed if str(item).strip()]
+        except Exception:
+            pass
+        return [item.strip() for item in re.split(r"[|,;]", value) if item.strip()]
+
+    @staticmethod
+    def _find_marker(text: str, markers: List[str], start: int = 0) -> Tuple[int, str]:
+        lowered = text.lower()
+        best_index = -1
+        best_marker = ""
+        for marker in markers:
+            marker = str(marker or "").strip()
+            if not marker:
+                continue
+            idx = lowered.find(marker.lower(), max(0, start))
+            if idx != -1 and (best_index == -1 or idx < best_index):
+                best_index = idx
+                best_marker = marker
+        return best_index, best_marker
+
+    def _extract_text_for_counting(self, document_path: str) -> str:
+        parsed_url = urlparse(document_path)
+        is_url = all([parsed_url.scheme, parsed_url.netloc])
+        local_path = document_path
+        if is_url and document_path.lower().endswith(".pdf"):
+            local_path = self._download_file(document_path)
+        if local_path and str(local_path).lower().endswith(".pdf"):
+            try:
+                import fitz
+                with fitz.open(local_path) as doc:
+                    return "\n".join(page.get_text() for page in doc)
+            except Exception as exc:
+                logger.warning(f"PyMuPDF PDF extraction failed: {exc}")
+            try:
+                from pypdf import PdfReader
+                with open(local_path, "rb") as f:
+                    reader = PdfReader(f)
+                    return "\n".join(page.extract_text() or "" for page in reader.pages)
+            except Exception as exc:
+                logger.warning(f"pypdf PDF extraction failed: {exc}")
+        extracted = self.extract_document_content(document_path)
+        return extracted if isinstance(extracted, str) else str(extracted)
+
+    def _resolve_publication_year(self, book_title: str) -> Tuple[str, str]:
+        if not book_title:
+            return "", ""
+        try:
+            api = "https://en.wikipedia.org/w/api.php"
+            headers = {"User-Agent": "Cosight document abstract counter/1.0"}
+            params = {
+                "action": "parse",
+                "page": book_title,
+                "prop": "wikitext",
+                "format": "json",
+                "formatversion": "2",
+            }
+            response = requests.get(api, params=params, headers=headers, timeout=20, proxies=self.proxies)
+            response.raise_for_status()
+            data = response.json()
+            wikitext = ((data.get("parse") or {}).get("wikitext") or "")
+            for pattern in [
+                r"\|\s*(?:pub(?:lication)?_date|published|release_date)\s*=\s*([^\n|]+)",
+                r"\|\s*(?:date)\s*=\s*([^\n|]+)",
+            ]:
+                match = re.search(pattern, wikitext, flags=re.IGNORECASE)
+                if match:
+                    year_match = re.search(r"(19|20)\d{2}", match.group(1))
+                    if year_match:
+                        return year_match.group(0), "en.wikipedia.org parse wikitext"
+            year_match = re.search(r"(?:published|publication date|released)[^\n.]{0,80}\b((?:19|20)\d{2})\b", wikitext, flags=re.IGNORECASE)
+            if year_match:
+                return year_match.group(1), "en.wikipedia.org parse wikitext"
+        except Exception as exc:
+            logger.warning(f"Publication year lookup failed for {book_title}: {exc}")
+        return "", ""
+
+    def _extract_abstract_segment(
+        self,
+        text: str,
+        abstract_start_markers: List[str],
+        abstract_end_markers: List[str],
+    ) -> Dict[str, Any]:
+        text = self._normalize_text(text)
+        end_index, end_marker = self._find_marker(text, abstract_end_markers)
+        if end_index == -1:
+            raise ValueError(f"Could not find abstract end marker from: {abstract_end_markers}")
+
+        start_index = 0
+        start_marker = ""
+        for marker in abstract_start_markers:
+            idx = text.lower().find(str(marker).lower())
+            if idx != -1 and idx < end_index:
+                marker_end = idx + len(str(marker))
+                next_break = text.find("\n", marker_end)
+                if next_break != -1 and next_break < end_index:
+                    start_index = next_break + 1
+                else:
+                    start_index = marker_end
+                start_marker = str(marker)
+
+        segment = text[start_index:end_index].strip()
+
+        # Remove journal/title/author header noise when no explicit abstract label exists.
+        lines = [line.strip() for line in segment.splitlines() if line.strip()]
+        if len(lines) > 1:
+            first_sentence_line = 0
+            for i, line in enumerate(lines):
+                normalized_line = line.lower()
+                if "@" in line and i <= 2:
+                    continue
+                if re.search(r"\b(straipsnyje|the article|this article|abstract|santrauka)\b", normalized_line):
+                    first_sentence_line = i
+                    break
+                if re.search(r"[.!?。]", line) and len(line) > 40:
+                    first_sentence_line = i
+                    break
+            lines = lines[first_sentence_line:]
+            segment = "\n".join(lines).strip()
+
+        return {
+            "abstract_text": segment,
+            "abstract_start_marker": start_marker,
+            "abstract_end_marker": end_marker,
+            "abstract_start_index": start_index,
+            "abstract_end_index": end_index,
+        }
+
+    def document_abstract_year_count(
+        self,
+        document_path: str,
+        publication_year: str = "",
+        book_title: str = "",
+        abstract_end_markers: Any = None,
+        abstract_start_markers: Any = None,
+    ) -> str:
+        """Count a publication year only inside a document abstract."""
+        try:
+            end_markers = self._parse_marker_list(
+                abstract_end_markers,
+                ["Raktažodžiai", "Keywords", "Key words", "ĮVADAS", "Introduction"],
+            )
+            start_markers = self._parse_marker_list(
+                abstract_start_markers,
+                ["Abstract", "Santrauka", "Ingrida LUKOŠIUTĖ"],
+            )
+            resolved_year_source = "provided"
+            if not publication_year:
+                publication_year, resolved_year_source = self._resolve_publication_year(book_title)
+            publication_year = str(publication_year or "").strip()
+            if not publication_year:
+                raise ValueError("publication_year is required when it cannot be resolved from book_title")
+
+            text = self._extract_text_for_counting(document_path)
+            normalized_text = self._normalize_text(text)
+            abstract_result = self._extract_abstract_segment(
+                normalized_text,
+                abstract_start_markers=start_markers,
+                abstract_end_markers=end_markers,
+            )
+            abstract_text = abstract_result["abstract_text"]
+            abstract_count = self._count_whole_year(abstract_text, publication_year)
+            full_document_count = self._count_whole_year(normalized_text, publication_year)
+
+            introduction_index, introduction_marker = self._find_marker(
+                normalized_text,
+                ["ĮVADAS", "Introduction"],
+                abstract_result["abstract_end_index"],
+            )
+
+            return self._json(
+                {
+                    "document_path": document_path,
+                    "book_title": book_title,
+                    "publication_year": publication_year,
+                    "publication_year_source": resolved_year_source,
+                    "abstract_count": abstract_count,
+                    "answer": str(abstract_count),
+                    "full_document_count": full_document_count,
+                    "abstract_end_marker": abstract_result["abstract_end_marker"],
+                    "abstract_start_marker": abstract_result["abstract_start_marker"],
+                    "excluded_following_section": introduction_marker,
+                    "abstract_text": abstract_text,
+                    "counting_rule": (
+                        "Count the publication year only in the abstract segment before the "
+                        "abstract end marker; do not count introduction/body text."
+                    ),
+                }
+            )
+        except Exception as exc:
+            logger.error(f"document_abstract_year_count failed: {exc}", exc_info=True)
+            return self._json(
+                {
+                    "error": str(exc),
+                    "document_path": document_path,
+                    "book_title": book_title,
+                    "publication_year": publication_year,
+                }
+            )
 
     @retry((requests.RequestException))
     def extract_document_content(self, document_path: str) -> Tuple[bool, str]:

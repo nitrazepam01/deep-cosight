@@ -170,6 +170,442 @@ def search_wiki_skill():
     }
 
 
+def wiki_first_revision_skill():
+    return {
+        'skill_name': 'wiki_first_revision',
+        'skill_type': "function",
+        'display_name_zh': '维基百科首个历史版本',
+        'display_name_en': 'Wikipedia First Revision',
+        'description_zh': '使用 MediaWiki API 查询指定 Wikipedia 页面在某一日历年的第一个修订版本，返回 oldid、时间戳和页面链接',
+        'description_en': 'Use the MediaWiki API to find the first revision of a Wikipedia page in a calendar year, returning oldid, timestamp, and URL',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f01',
+            name='app.cosight.wikipedia_toolkit.wiki_first_revision',
+            description_zh='查询指定年份首个 Wikipedia revision',
+            description_en='Find the first Wikipedia revision in a given year',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 页面标题，例如 ZTE",
+                        "description_en": "Wikipedia page title, for example ZTE"
+                    },
+                    "year": {
+                        "type": "integer",
+                        "description_zh": "日历年，例如 2025",
+                        "description_en": "Calendar year, for example 2025"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 语言代码，默认 en",
+                        "description_en": "Wikipedia language code, default en"
+                    }
+                },
+                "required": ["title", "year"]
+            }
+        )
+    }
+
+
+def wiki_revision_at_skill():
+    return {
+        'skill_name': 'wiki_revision_at',
+        'skill_type': "function",
+        'display_name_zh': '维基百科指定时间历史版本',
+        'display_name_en': 'Wikipedia Revision At Cutoff',
+        'description_zh': '使用 MediaWiki API 查询指定 Wikipedia 页面在某个 UTC 截止时间之前的最后一个修订版本，返回 oldid、时间戳和页面链接',
+        'description_en': 'Use the MediaWiki API to find the last revision of a Wikipedia page before a UTC cutoff timestamp, returning oldid, timestamp, and URL',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f04',
+            name='app.cosight.wikipedia_toolkit.wiki_revision_at',
+            description_zh='查询指定 UTC 截止时间前的 Wikipedia revision',
+            description_en='Find the Wikipedia revision immediately before a UTC cutoff',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 页面标题，例如 Adirondack (train)",
+                        "description_en": "Wikipedia page title, for example Adirondack (train)"
+                    },
+                    "cutoff_timestamp": {
+                        "type": "string",
+                        "description_zh": "UTC 截止时间，例如 2023-08-01T00:00:00Z",
+                        "description_en": "UTC cutoff timestamp, for example 2023-08-01T00:00:00Z"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 语言代码，默认 en",
+                        "description_en": "Wikipedia language code, default en"
+                    },
+                    "inclusive": {
+                        "type": "boolean",
+                        "description_zh": "是否允许返回时间戳等于截止时间的 revision，默认 false",
+                        "description_en": "Whether to allow a revision exactly at the cutoff timestamp, default false"
+                    }
+                },
+                "required": ["title", "cutoff_timestamp"]
+            }
+        )
+    }
+
+
+def wiki_reference_count_skill():
+    return {
+        'skill_name': 'wiki_reference_count',
+        'skill_type': "function",
+        'display_name_zh': '维基百科历史版本引用计数',
+        'display_name_en': 'Wikipedia Revision Reference Count',
+        'description_zh': '统计指定 Wikipedia oldid 的唯一参考文献条目数；会把正文引用上标次数作为交叉检查，避免把复用引用重复计数',
+        'description_en': 'Count unique reference-list entries for a historical Wikipedia oldid; citation callouts are returned only as a cross-check to avoid double-counting reused references',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f02',
+            name='app.cosight.wikipedia_toolkit.wiki_reference_count',
+            description_zh='按唯一参考文献条目统计 Wikipedia oldid 的引用数',
+            description_en='Count unique references for a Wikipedia oldid',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "oldid": {
+                        "type": "integer",
+                        "description_zh": "Wikipedia revision id / oldid",
+                        "description_en": "Wikipedia revision id / oldid"
+                    },
+                    "title": {
+                        "type": "string",
+                        "description_zh": "页面标题，可选；例如 ZTE",
+                        "description_en": "Optional page title, for example ZTE"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 语言代码，默认 en",
+                        "description_en": "Wikipedia language code, default en"
+                    },
+                    "include_raw_ref_check": {
+                        "type": "boolean",
+                        "description_zh": "是否同时检查 raw wikitext 中的 <ref> 定义，默认 true",
+                        "description_en": "Whether to also check raw wikitext <ref> definitions, default true"
+                    }
+                },
+                "required": ["oldid"]
+            }
+        )
+    }
+
+
+def wiki_revision_reference_delta_skill():
+    return {
+        'skill_name': 'wiki_revision_reference_delta',
+        'skill_type': "function",
+        'display_name_zh': '维基百科历史版本引用增量',
+        'display_name_en': 'Wikipedia Revision Reference Delta',
+        'description_zh': '比较同一 Wikipedia 页面两个年份首个版本的唯一参考文献条目数，直接返回增量和计算式；适合 “reference count between first revisions” 类题目',
+        'description_en': 'Compare unique reference-list counts between the first revisions of two years for one Wikipedia page, returning the delta and calculation; use for reference-count-between-first-revisions tasks',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f03',
+            name='app.cosight.wikipedia_toolkit.wiki_revision_reference_delta',
+            description_zh='比较两个年份首个 Wikipedia revision 的引用数增量',
+            description_en='Compare reference-count delta between first Wikipedia revisions for two years',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 页面标题，例如 ZTE",
+                        "description_en": "Wikipedia page title, for example ZTE"
+                    },
+                    "earlier_year": {
+                        "type": "integer",
+                        "description_zh": "较早年份/基准年份，例如 2025",
+                        "description_en": "Earlier or baseline year, for example 2025"
+                    },
+                    "later_year": {
+                        "type": "integer",
+                        "description_zh": "较晚年份/比较年份，例如 2026",
+                        "description_en": "Later or comparison year, for example 2026"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 语言代码，默认 en",
+                        "description_en": "Wikipedia language code, default en"
+                    }
+                },
+                "required": ["title", "earlier_year", "later_year"]
+            }
+        )
+    }
+
+
+def wiki_infobox_field_lookup_skill():
+    return {
+        'skill_name': 'wiki_infobox_field_lookup',
+        'skill_type': "function",
+        'display_name_zh': '维基百科 Infobox 字段抽取',
+        'display_name_en': 'Wikipedia Infobox Field Lookup',
+        'description_zh': '从 Wikipedia 当前页或历史 oldid 的 infobox 字段或同名章节中抽取内容，返回原始值、清洗文本、链接和首个链接',
+        'description_en': 'Extract a named infobox field or matching section from a current or historical Wikipedia page, returning raw value, cleaned text, links, and selected first link',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f09',
+            name='app.cosight.wikipedia_toolkit.wiki_infobox_field_lookup',
+            description_zh='抽取 Wikipedia infobox 字段/同名章节及其中链接',
+            description_en='Extract a Wikipedia infobox field or matching section and links inside it',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 页面标题，例如 ZTE 或 Indonesia",
+                        "description_en": "Wikipedia page title, for example ZTE or Indonesia"
+                    },
+                    "field_name": {
+                        "type": "string",
+                        "description_zh": "Infobox 字段名，例如 subsidiaries 或 national_motto",
+                        "description_en": "Infobox field name, for example subsidiaries or national_motto"
+                    },
+                    "oldid": {
+                        "type": "integer",
+                        "description_zh": "可选；历史 revision id。不提供时读取当前页面",
+                        "description_en": "Optional historical revision id. If omitted, read the current page"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 语言代码，默认 en",
+                        "description_en": "Wikipedia language code, default en"
+                    },
+                    "link_mode": {
+                        "type": "string",
+                        "description_zh": "输出选择模式：raw_text、first_link 或 all_links",
+                        "description_en": "Selection mode: raw_text, first_link, or all_links"
+                    },
+                    "clean_templates": {
+                        "type": "boolean",
+                        "description_zh": "是否清洗常见模板和 wiki 标记，默认 true",
+                        "description_en": "Whether to clean common templates and wiki markup, default true"
+                    }
+                },
+                "required": ["title", "field_name"]
+            }
+        )
+    }
+
+
+def wiki_rail_connection_count_skill():
+    return {
+        'skill_name': 'wiki_rail_connection_count',
+        'skill_type': "function",
+        'display_name_zh': '维基百科历史铁路连接计数',
+        'display_name_en': 'Wikipedia Historical Rail Connection Count',
+        'description_zh': '解析 Wikipedia 历史版本中的车站/连接表格，按通勤铁路和重轨线路去重计数，排除地铁、轻轨、公交、轮渡和 Amtrak Thruway',
+        'description_en': 'Parse a historical Wikipedia station/connection table and count unique commuter/heavy rail lines, excluding subway, light rail, bus, ferry, and Amtrak Thruway',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f05',
+            name='app.cosight.wikipedia_toolkit.wiki_rail_connection_count',
+            description_zh='统计历史 Wikipedia 表格中的唯一通勤/重轨铁路连接',
+            description_en='Count unique commuter/heavy rail connections in a historical Wikipedia table',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 页面标题，例如 Adirondack (train)",
+                        "description_en": "Wikipedia page title, for example Adirondack (train)"
+                    },
+                    "cutoff_timestamp": {
+                        "type": "string",
+                        "description_zh": "UTC 截止时间；例如 2023 年 7 月底使用 2023-08-01T00:00:00Z",
+                        "description_en": "UTC cutoff timestamp; for end of July 2023 use 2023-08-01T00:00:00Z"
+                    },
+                    "section_keyword": {
+                        "type": "string",
+                        "description_zh": "包含目标表格的章节关键词，默认 Station stops",
+                        "description_en": "Section keyword containing the target table, default Station stops"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 语言代码，默认 en",
+                        "description_en": "Wikipedia language code, default en"
+                    },
+                    "oldid": {
+                        "type": "integer",
+                        "description_zh": "可选；如果已知历史 revision id，可直接传入 oldid",
+                        "description_en": "Optional; pass a known historical revision id directly"
+                    }
+                },
+                "required": ["title", "cutoff_timestamp"]
+            }
+        )
+    }
+
+
+def wiki_revision_size_delta_find_skill():
+    return {
+        'skill_name': 'wiki_revision_size_delta_find',
+        'skill_type': "function",
+        'display_name_zh': '维基百科修订字节增量查找',
+        'display_name_en': 'Wikipedia Revision Size Delta Finder',
+        'description_zh': '查询指定 Wikipedia 页面在某年或时间区间内的 revisions，按时间顺序计算相邻版本 size 差值，并查找恰好增加指定字节数的编辑',
+        'description_en': 'Query revisions for a Wikipedia page in a year or interval, compute chronological adjacent size deltas, and find edits that added exactly the target number of bytes',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f08',
+            name='app.cosight.wikipedia_toolkit.wiki_revision_size_delta_find',
+            description_zh='按页面大小差值查找 Wikipedia revision',
+            description_en='Find Wikipedia revisions by page-size byte delta',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 页面标题",
+                        "description_en": "Wikipedia page title"
+                    },
+                    "target_delta": {
+                        "type": "integer",
+                        "description_zh": "目标 size 增量字节数，例如由其他步骤解析出的门牌号",
+                        "description_en": "Target size delta in bytes, for example a number resolved by a prior step"
+                    },
+                    "year": {
+                        "type": "integer",
+                        "description_zh": "日历年；若提供，则自动使用该年的 UTC 半开区间",
+                        "description_en": "Calendar year; if provided, the tool uses that UTC half-open year interval"
+                    },
+                    "start_timestamp": {
+                        "type": "string",
+                        "description_zh": "可选 UTC 起始时间，例如 2025-01-01T00:00:00Z",
+                        "description_en": "Optional UTC start timestamp, for example 2025-01-01T00:00:00Z"
+                    },
+                    "end_timestamp": {
+                        "type": "string",
+                        "description_zh": "可选 UTC 结束时间，例如 2026-01-01T00:00:00Z",
+                        "description_en": "Optional UTC end timestamp, for example 2026-01-01T00:00:00Z"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 语言代码，默认 en",
+                        "description_en": "Wikipedia language code, default en"
+                    },
+                    "output_date_format": {
+                        "type": "string",
+                        "description_zh": "输出日期格式，默认 %Y/%m/%d",
+                        "description_en": "Output date format, default %Y/%m/%d"
+                    }
+                },
+                "required": ["title", "target_delta"]
+            }
+        )
+    }
+
+
+def taxon_binomial_verify_skill():
+    return {
+        'skill_name': 'taxon_binomial_verify',
+        'skill_type': "function",
+        'display_name_zh': '物种双名法验证器',
+        'display_name_en': 'Taxonomic Binomial Verifier',
+        'description_zh': '把候选词追加两字母后缀并重复成 Genus species 形式，调用 GBIF/Wikipedia 验证是否为指定类型的物种；适合 “dramatic/theatrical + two letters + duplicated forms a species of duck” 类词谜',
+        'description_en': 'Append two-letter suffixes to candidate words, duplicate as Genus species, and verify with GBIF/Wikipedia whether the binomial is the expected species type; useful for word puzzles where a word plus two letters forms a duck species',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f06',
+            name='app.cosight.taxonomy_toolkit.taxon_binomial_verify',
+            description_zh='验证候选词追加两字母后缀后是否构成指定物种的双名法学名',
+            description_en='Verify whether candidate words plus two-letter suffixes form a taxonomic binomial species name',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "candidate_words": {
+                        "type": "string",
+                        "description_zh": "候选词，可用 |、逗号或换行分隔；例如 histrionic 或 dramatic|theatrical|histrionic",
+                        "description_en": "Candidate words separated by |, commas, or newlines; for example histrionic or dramatic|theatrical|histrionic"
+                    },
+                    "suffixes": {
+                        "type": "string",
+                        "description_zh": "两字母后缀列表，可用 | 分隔；默认优先 us",
+                        "description_en": "Two-letter suffixes separated by |; default prioritizes us"
+                    },
+                    "expected_common_name_keyword": {
+                        "type": "string",
+                        "description_zh": "期望 common name 中出现的关键词，默认 duck",
+                        "description_en": "Keyword expected in the common name, default duck"
+                    },
+                    "expected_family": {
+                        "type": "string",
+                        "description_zh": "期望分类科名，默认 Anatidae",
+                        "description_en": "Expected taxonomic family, default Anatidae"
+                    },
+                    "wikipedia_language": {
+                        "type": "string",
+                        "description_zh": "Wikipedia 语言代码，默认 en",
+                        "description_en": "Wikipedia language code, default en"
+                    },
+                    "use_wikipedia": {
+                        "type": "boolean",
+                        "description_zh": "是否用 Wikipedia 搜索作为 common name 审计，默认 true",
+                        "description_en": "Whether to use Wikipedia search as a common-name audit, default true"
+                    }
+                },
+                "required": ["candidate_words"]
+            }
+        )
+    }
+
+
+def place_street_number_resolve_skill():
+    return {
+        'skill_name': 'place_street_number_resolve',
+        'skill_type': "function",
+        'display_name_zh': '地点门牌号解析',
+        'display_name_en': 'Place Street Number Resolver',
+        'description_zh': '查询地点或解析地址文本，提取地址中的数字门牌号；适合先从地点得到 N，再把 N 用于后续计算的题目',
+        'description_en': 'Resolve a place or parse address text to extract a numeric street number; useful when a later calculation depends on a number derived from a place address',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f07',
+            name='app.cosight.location_toolkit.place_street_number_resolve',
+            description_zh='解析地点地址中的数字门牌号',
+            description_en='Resolve a numeric street number from a place address',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description_zh": "地点名或地址文本",
+                        "description_en": "Place name or address text"
+                    },
+                    "region": {
+                        "type": "string",
+                        "description_zh": "检索区域，可选",
+                        "description_en": "Search region, optional"
+                    },
+                    "baidu_ak": {
+                        "type": "string",
+                        "description_zh": "可选 Baidu Maps AK；也可通过环境变量 BAIDU_MAP_AK 提供",
+                        "description_en": "Optional Baidu Maps AK; can also be provided with BAIDU_MAP_AK"
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description_zh": "最多检查的候选结果数，默认 5",
+                        "description_en": "Maximum candidate results to inspect, default 5"
+                    },
+                    "use_search_fallback": {
+                        "type": "boolean",
+                        "description_zh": "没有地图 AK 或地图查询无结果时是否尝试搜索 fallback，默认 true",
+                        "description_en": "Whether to try search fallback when no map key is available or no map result is found, default true"
+                    }
+                },
+                "required": ["query"]
+            }
+        )
+    }
+
+
 def search_image_skill():
     return {
         'skill_name': 'image_search',
@@ -875,6 +1311,125 @@ def audio_recognition_skill():
     }
 
 
+def function_graph_letter_probe_skill():
+    return {
+        'skill_name': 'function_graph_letter_probe',
+        'skill_type': "function",
+        'display_name_zh': '函数图形字母识别器',
+        'display_name_en': 'Function Graph Letter Probe',
+        'description_zh': '解析简单二次函数图像，保存 Matplotlib 图，并根据开口方向给出类似字母和 acronym；适合函数图形拼字母类题目',
+        'description_en': 'Parse simple quadratic function graphs, save a Matplotlib plot, and infer letter-like shapes/acronym from opening direction; useful for function-graph letter clues',
+        'semantic_apis': ["api_code_execution"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f10',
+            name='app.cosight.math_graph_toolkit.function_graph_letter_probe',
+            description_zh='根据简单二次函数图形推断字母形状',
+            description_en='Infer letter-like shapes from simple quadratic function graphs',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "equations": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description_zh": "函数方程列表，例如 y = 6x^2 + 4x + 4",
+                        "description_en": "List of function equations, for example y = 6x^2 + 4x + 4"
+                    },
+                    "plot_range": {
+                        "description_zh": "可选绘图区间，例如 [-2, 2]；也可传数字 2 表示 -2 到 2",
+                        "description_en": "Optional plotting range, for example [-2, 2]; a number 2 means -2 to 2"
+                    },
+                    "output_image_path": {
+                        "type": "string",
+                        "description_zh": "可选输出图片路径；相对路径会保存到当前工作区",
+                        "description_en": "Optional output image path; relative paths are saved under the current workspace"
+                    }
+                },
+                "required": ["equations"]
+            }
+        )
+    }
+
+
+def google_books_volume_search_skill():
+    return {
+        'skill_name': 'google_books_volume_search',
+        'skill_type': "function",
+        'display_name_zh': 'Google Books 书内搜索',
+        'display_name_en': 'Google Books Volume Search',
+        'description_zh': '在 Google Books 指定书籍/卷内搜索关键词，默认返回少量精确 page_id、OCR snippet 和页码引用；适合书内页码定位题',
+        'description_en': 'Search inside a Google Books volume, returning concise page_id, OCR snippet, and page-number evidence by default; useful for book page-number lookup tasks',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f11',
+            name='app.cosight.google_books_toolkit.google_books_volume_search',
+            description_zh='使用 Google Books SearchWithinVolume2 进行书内搜索；默认输出精简证据，避免长结果拖慢模型',
+            description_en='Use Google Books SearchWithinVolume2 to search within a volume; returns concise evidence by default to avoid long model context',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description_zh": "书内搜索关键词，例如 raccoon",
+                        "description_en": "Search keyword inside the book, for example raccoon"
+                    },
+                    "book_id": {
+                        "type": "string",
+                        "description_zh": "Google Books volume id；已知时优先传入",
+                        "description_en": "Google Books volume id; pass this when known"
+                    },
+                    "book_url": {
+                        "type": "string",
+                        "description_zh": "Google Books 链接；工具会从 id 参数中解析 volume id",
+                        "description_en": "Google Books URL; the tool parses the volume id from the id parameter"
+                    },
+                    "book_title": {
+                        "type": "string",
+                        "description_zh": "书名或检索词；未提供 book_id/book_url 时用于解析 volume id",
+                        "description_en": "Book title or search query; used to resolve volume id when book_id/book_url is missing"
+                    },
+                    "target_phrase": {
+                        "type": "string",
+                        "description_zh": "可选目标短语，用于给 snippet 中页码引用排序，例如 Sweet Potato and Apple Dressing",
+                        "description_en": "Optional target phrase used to rank page references in snippets"
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description_zh": "最多检查的书内搜索结果数，默认 10；默认只返回其中最强的少量证据页",
+                        "description_en": "Maximum in-volume search results to inspect, default 10; concise output returns only the strongest evidence pages"
+                    },
+                    "max_volume_candidates": {
+                        "type": "integer",
+                        "description_zh": "通过书名解析 volume id 时最多检查的候选数，默认 5",
+                        "description_en": "Maximum volume candidates to inspect when resolving from title, default 5"
+                    },
+                    "detail_level": {
+                        "type": "string",
+                        "enum": ["concise", "full"],
+                        "description_zh": "返回详细程度，默认 concise；只有调试时才用 full",
+                        "description_en": "Output detail level, default concise; use full only for debugging"
+                    },
+                    "max_evidence_pages": {
+                        "type": "integer",
+                        "description_zh": "精简输出中最多返回的证据页数，默认 3",
+                        "description_en": "Maximum evidence pages in concise output, default 3"
+                    },
+                    "snippet_chars": {
+                        "type": "integer",
+                        "description_zh": "每条 OCR snippet 的最大字符数，默认 220",
+                        "description_en": "Maximum characters per OCR snippet, default 220"
+                    },
+                    "max_reference_candidates": {
+                        "type": "integer",
+                        "description_zh": "精简输出中最多返回的页码引用候选数，默认 3",
+                        "description_en": "Maximum page-reference candidates in concise output, default 3"
+                    }
+                },
+                "required": ["query"]
+            }
+        )
+    }
+
+
 def ask_question_about_image_skill():
     return {
         'skill_name': 'ask_question_about_image',
@@ -938,6 +1493,56 @@ def extract_document_content_skill():
             }
         )
     }
+
+
+def document_abstract_year_count_skill():
+    return {
+        'skill_name': 'document_abstract_year_count',
+        'skill_type': "function",
+        'display_name_zh': '文档摘要年份计数',
+        'display_name_en': 'Document Abstract Year Count',
+        'description_zh': '读取 PDF/文档文本，先定位摘要边界，再只在摘要内统计指定出版年份；全文计数仅作为审计，适合 abstract 中年份/词频统计题',
+        'description_en': 'Read PDF/document text, locate the abstract boundary, and count a publication year only inside the abstract; full-document count is returned only for audit',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='8d5e7f3b-a4c2-4d1b-9f6e-2c8b9d7e5678',
+            name='app.cosight.document_processing_toolkit.document_abstract_year_count',
+            description_zh='只在文档摘要中统计指定年份出现次数',
+            description_en='Count occurrences of a target year only within a document abstract',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "document_path": {
+                        "type": "string",
+                        "description_zh": "本地文件路径或 PDF URL，例如 G:\\Cosight\\Ans\\ques4.pdf",
+                        "description_en": "Local file path or PDF URL, for example G:\\Cosight\\Ans\\ques4.pdf"
+                    },
+                    "publication_year": {
+                        "type": "string",
+                        "description_zh": "要统计的出版年份，例如 2008；如果留空，可尝试根据 book_title 从 Wikipedia 解析",
+                        "description_en": "Publication year to count, for example 2008; if empty, the tool can try resolving it from book_title via Wikipedia"
+                    },
+                    "book_title": {
+                        "type": "string",
+                        "description_zh": "书名，例如 The Propitious Esculent，用于说明或解析出版年",
+                        "description_en": "Book title, for example The Propitious Esculent, used for context or publication-year lookup"
+                    },
+                    "abstract_end_markers": {
+                        "type": "string",
+                        "description_zh": "摘要结束标记，可用 | 分隔；默认 Raktažodžiai|Keywords|Key words|ĮVADAS|Introduction",
+                        "description_en": "Abstract end markers separated by |; default Raktažodžiai|Keywords|Key words|ĮVADAS|Introduction"
+                    },
+                    "abstract_start_markers": {
+                        "type": "string",
+                        "description_zh": "摘要开始提示，可用 | 分隔；默认 Abstract|Santrauka|Ingrida LUKOŠIUTĖ",
+                        "description_en": "Abstract start hints separated by |; default Abstract|Santrauka|Ingrida LUKOŠIUTĖ"
+                    }
+                },
+                "required": ["document_path"]
+            }
+        )
+    }
+
 
 def create_html_report_skill():
     """为Agent框架提供的HTML报告生成技能定义
