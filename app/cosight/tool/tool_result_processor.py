@@ -758,8 +758,8 @@ class ToolResultProcessor:
             return {
                 "tool_type": "search",
                 "summary": ToolResultProcessor._get_localized_summary(
-                    "MediaWiki 证据查询完成",
-                    "MediaWiki evidence query completed",
+                    "Wiki 词条解析完成",
+                    "Wiki entry parsing completed",
                     task_title
                 ),
                 "error": str(e)

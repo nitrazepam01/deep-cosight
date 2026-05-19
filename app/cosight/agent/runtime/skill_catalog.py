@@ -38,8 +38,8 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "needs_workspace": False,
     },
     "mediawiki_evidence_query": {
-        "display_name_zh": "MediaWiki 证据查询",
-        "description_zh": "通用查询 MediaWiki 页面版本、历史记录、页面源码、结构化字段、章节、表格和审计指标",
+        "display_name_zh": "Wiki 词条解析",
+        "description_zh": "对 Wiki 词条进行详细解析，返回版本、历史、源码、字段、章节和表格等结构化信息",
         "needs_workspace": False,
     },
     "taxon_binomial_verify": {

@@ -174,16 +174,16 @@ def mediawiki_evidence_query_skill():
     return {
         'skill_name': 'mediawiki_evidence_query',
         'skill_type': "function",
-        'display_name_zh': 'MediaWiki 证据查询器',
-        'display_name_en': 'MediaWiki Evidence Query',
-        'description_zh': '通用 MediaWiki API 取证工具：选择页面版本，返回历史、源码、渲染内容、结构化字段、章节、表格和可计量审计信息',
-        'description_en': 'General MediaWiki API evidence tool: select page revisions and return history, source, rendered content, structured fields, sections, tables, and measurable audit data',
+        'display_name_zh': 'Wiki 词条解析',
+        'display_name_en': 'Wiki Entry Parser',
+        'description_zh': '对 Wiki 词条进行详细解析，返回版本、历史、源码、字段、章节和表格等结构化信息',
+        'description_en': 'Parse a Wiki entry in detail and return structured revision, history, source, field, section, and table data',
         'semantic_apis': ["api_search"],
         'function': SkillFunction(
             id='9d0794bb-c4f2-478e-9f49-39bbd2385f14',
             name='app.cosight.wikipedia_toolkit.mediawiki_evidence_query',
-            description_zh='查询 MediaWiki 页面、版本和页面结构证据',
-            description_en='Query MediaWiki page, revision, and page-structure evidence',
+            description_zh='解析 Wiki 词条的版本、源码和页面结构',
+            description_en='Parse Wiki entry revisions, source, and page structure',
             parameters={
                 "type": "object",
                 "properties": {

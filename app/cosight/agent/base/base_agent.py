@@ -289,7 +289,7 @@ class BaseAgent:
             "search_google": "谷歌搜索", 
             "tavily_search": "Tavily搜索",
             "search_wiki": "维基百科搜索",
-            "mediawiki_evidence_query": "MediaWiki证据查询",
+            "mediawiki_evidence_query": "Wiki词条解析",
             "taxon_binomial_verify": "物种双名法验证器",
             "place_street_number_resolve": "地点门牌号解析",
             "function_graph_letter_probe": "函数图形字母识别器",
