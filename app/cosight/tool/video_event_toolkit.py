@@ -19,7 +19,6 @@ import os
 import re
 import shutil
 import subprocess
-import unicodedata
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -330,7 +329,7 @@ class VideoEventToolkit:
         path.mkdir(parents=True, exist_ok=True)
         return path
 
-    def online_video_event_clip_extract(
+    def media_clip_extract(
         self,
         video_url: str,
         subtitle_keywords: Optional[List[str]] = None,
@@ -348,9 +347,9 @@ class VideoEventToolkit:
         subtitle_language: str = "en.*",
         max_subtitle_cues: int = 5,
     ) -> str:
-        """Locate a short online-video segment and extract frame/audio evidence."""
+        """Extract a short online-media segment with frame and audio artifacts."""
         logger.info(
-            "Using online_video_event_clip_extract, video_url=%s, event_description=%s",
+            "Using media_clip_extract, video_url=%s, event_description=%s",
             video_url,
             event_description,
         )
@@ -632,59 +631,5 @@ class VideoEventToolkit:
                 }
             )
         except Exception as exc:
-            logger.error("online_video_event_clip_extract failed: %s", exc, exc_info=True)
-            return self._json({"ok": False, "error": str(exc)})
-
-    @staticmethod
-    def _ascii_artist(value: str) -> str:
-        normalized = unicodedata.normalize("NFKD", value or "")
-        ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
-        ascii_text = re.sub(r"[^A-Za-z0-9 '&.-]+", " ", ascii_text)
-        return re.sub(r"\s+", " ", ascii_text).strip(" ,")
-
-    def music_credit_normalize(
-        self,
-        raw_title: str,
-        raw_artist: str,
-        title_romanization: str = "",
-        artist_romanization: str = "",
-        title_translation: str = "",
-        artist_translation: str = "",
-        strip_special_artist_chars: bool = True,
-    ) -> str:
-        """Normalize recognized song credits without guessing the credits."""
-        try:
-            song_name = (
-                str(title_translation or "").strip()
-                or str(title_romanization or "").strip()
-                or str(raw_title or "").strip()
-            )
-            artist_name = (
-                str(artist_translation or "").strip()
-                or str(artist_romanization or "").strip()
-                or str(raw_artist or "").strip()
-            )
-            warnings = []
-            if strip_special_artist_chars:
-                cleaned_artist = self._ascii_artist(artist_name)
-                if cleaned_artist:
-                    artist_name = cleaned_artist
-                else:
-                    warnings.append("artist_name_needs_manual_romanization")
-
-            song_name = re.sub(r"\s+", " ", song_name).strip(" ,")
-            artist_name = re.sub(r"\s+", " ", artist_name).strip(" ,")
-            return self._json(
-                {
-                    "ok": bool(song_name and artist_name),
-                    "raw_title": raw_title,
-                    "raw_artist": raw_artist,
-                    "song_name": song_name,
-                    "artist_name": artist_name,
-                    "formatted_answer": f"{song_name}, {artist_name}" if song_name and artist_name else "",
-                    "warnings": warnings,
-                }
-            )
-        except Exception as exc:
-            logger.error("music_credit_normalize failed: %s", exc, exc_info=True)
+            logger.error("media_clip_extract failed: %s", exc, exc_info=True)
             return self._json({"ok": False, "error": str(exc)})

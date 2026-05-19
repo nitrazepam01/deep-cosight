@@ -51,7 +51,7 @@ here are the smiling cloud blocks
     assert VideoEventToolkit._score_cue(cues[1]["text"], ["2000", "level", "cloud"]) == 1
 
 
-def test_online_video_event_clip_extract_uses_subtitles_and_writes_artifacts(tmp_path):
+def test_media_clip_extract_uses_subtitles_and_writes_artifacts(tmp_path):
     class FakeToolkit(VideoEventToolkit):
         def _resolve_dependencies(self):
             return {
@@ -100,7 +100,7 @@ this is it level 2000 coming at you hot
             raise AssertionError(f"unexpected command: {args}")
 
     result = json.loads(
-        FakeToolkit(workspace_path=str(tmp_path)).online_video_event_clip_extract(
+        FakeToolkit(workspace_path=str(tmp_path)).media_clip_extract(
             video_url="https://example.test/watch?v=abc123",
             subtitle_keywords=["2000", "level"],
             event_description="first jump onto a visual platform",
@@ -115,17 +115,3 @@ this is it level 2000 coming at you hot
     assert Path(result["artifacts"]["contact_sheet_path"]).exists()
     assert Path(result["artifacts"]["audio_path"]).exists()
     assert len(result["commands"]) == 5
-
-
-def test_music_credit_normalize_uses_verified_romanization_without_hardcoding():
-    result = json.loads(
-        VideoEventToolkit().music_credit_normalize(
-            raw_title="recognized title",
-            raw_artist="recognized artist",
-            title_translation="Example Song",
-            artist_romanization="Composer Name♪",
-        )
-    )
-
-    assert result["ok"] is True
-    assert result["formatted_answer"] == "Example Song, Composer Name"

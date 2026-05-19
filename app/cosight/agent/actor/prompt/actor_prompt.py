@@ -136,9 +136,8 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
    - If a question asks which page in a specific book contains or is referenced by an entry, prefer google_books_volume_search with the Google Books volume id or URL and the search term. Use page_id/snippet_text evidence and distinguish book page numbers from PDF physical pages.
    - For recipe cross-reference snippets such as "Stuff ... with: Recipe Name, 374", report the referenced page number and keep PDF extraction only as an audit fallback when available.
 12. For long online-video evidence tasks:
-   - If a question depends on a moment inside a long YouTube or online video, first use online_video_event_clip_extract with subtitle keywords and a narrow candidate window, then inspect the contact sheet before finalizing the event timestamp.
+   - If a question depends on a moment inside a long YouTube or online video, use media_clip_extract with subtitle keywords or a narrow candidate window, then inspect the contact sheet before finalizing the relevant timestamp.
    - Use the extracted clip and event audio instead of feeding the entire video to ask_question_about_video; keep the clip window short and the output concise.
-   - After identifying the track from the event audio, use music_credit_normalize to standardize the final SONG NAME, ARTIST NAME format and strip special characters from the artist name.
 
 # HTML Report Optimization Rules:
 10. When generating HTML reports, follow these optimization requirements:
@@ -425,9 +424,8 @@ def actor_system_prompt_zh(work_space_path):
    - 如果题目询问某本书中某条目/配方引用的是哪一页，优先使用 google_books_volume_search，传入 Google Books volume id 或 URL 和关键词。依据 page_id/snippet_text，不要把书内页码和 PDF 物理页混淆。
    - 遇到 "Stuff ... with: Recipe Name, 374" 这类配方交叉引用片段时，报告引用的书内页码；本地 PDF 抽取只作为辅助核验。
 12. 处理长在线视频证据题时：
-   - 如果题目依赖长 YouTube/在线视频中的某个时刻，先用 online_video_event_clip_extract 结合字幕关键词和窄时间窗抽取短片段，然后检查 contact sheet 再确定事件时间。
+   - 如果题目依赖长 YouTube/在线视频中的某个时刻，使用 media_clip_extract 结合字幕关键词或窄时间窗抽取短片段，然后检查 contact sheet 再确定相关时间。
    - 不要直接把整段视频喂给 ask_question_about_video；应先缩短片段、再取事件后音频，保持输出简洁。
-   - 识别出曲目后，使用 music_credit_normalize 统一成 SONG NAME, ARTIST NAME，并去掉 artist name 中的特殊字符。
 
 # HTML报告优化规则：
 10. 生成HTML报告时的优化要求：

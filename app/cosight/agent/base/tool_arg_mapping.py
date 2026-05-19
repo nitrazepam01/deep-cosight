@@ -144,7 +144,7 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'detail_level': ['detail', 'mode'],
         }
     },
-    'online_video_event_clip_extract': {
+    'media_clip_extract': {
         'required': ['video_url'],
         'aliases': {
             'video_url': ['url', 'youtube_url', 'link', 'video_link'],
@@ -159,18 +159,6 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'download_height': ['height', 'max_height'],
             'frame_rate': ['fps', 'sample_rate'],
             'output_dir': ['output_path', 'save_dir', 'artifact_dir'],
-        }
-    },
-    'music_credit_normalize': {
-        'required': ['raw_title', 'raw_artist'],
-        'aliases': {
-            'raw_title': ['title', 'song_title', 'recognized_title'],
-            'raw_artist': ['artist', 'composer', 'recognized_artist'],
-            'title_romanization': ['romanized_title', 'title_romaji'],
-            'artist_romanization': ['romanized_artist', 'artist_romaji'],
-            'title_translation': ['english_title', 'translated_title'],
-            'artist_translation': ['english_artist', 'translated_artist'],
-            'strip_special_artist_chars': ['strip_special_chars', 'ascii_artist'],
         }
     },
     'document_abstract_year_count': {

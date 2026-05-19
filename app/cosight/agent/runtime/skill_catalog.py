@@ -62,15 +62,10 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "在 Google Books 指定书籍内搜索关键词，默认返回少量精确页标识、OCR 片段和页码引用",
         "needs_workspace": False,
     },
-    "online_video_event_clip_extract": {
-        "display_name_zh": "在线视频事件片段抽取",
-        "description_zh": "从在线视频中按字幕和时间窗抽取短片段、截图总览和事件后音频证据",
+    "media_clip_extract": {
+        "display_name_zh": "媒体片段提取",
+        "description_zh": "从在线视频中按字幕或时间窗提取短片段、截图总览和音频片段",
         "needs_workspace": True,
-    },
-    "music_credit_normalize": {
-        "display_name_zh": "音乐署名标准化",
-        "description_zh": "将识别出的曲名和作者按要求清洗、罗马字/翻译字段优先，并生成提交格式",
-        "needs_workspace": False,
     },
     "mark_step": {
         "display_name_zh": "标记步骤",
@@ -226,7 +221,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         search_wiki_skill, mediawiki_evidence_query_skill,
         taxon_binomial_verify_skill, place_street_number_resolve_skill,
         function_graph_letter_probe_skill, google_books_volume_search_skill,
-        online_video_event_clip_extract_skill, music_credit_normalize_skill,
+        media_clip_extract_skill,
         mark_step_skill, file_saver_skill,
         file_read_skill, file_str_replace_skill, file_find_in_content_skill,
         ask_question_about_image_skill, ask_question_about_video_skill,
@@ -249,8 +244,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "place_street_number_resolve": place_street_number_resolve_skill,
         "function_graph_letter_probe": function_graph_letter_probe_skill,
         "google_books_volume_search": google_books_volume_search_skill,
-        "online_video_event_clip_extract": online_video_event_clip_extract_skill,
-        "music_credit_normalize": music_credit_normalize_skill,
+        "media_clip_extract": media_clip_extract_skill,
         "mark_step": mark_step_skill,
         "file_saver": file_saver_skill,
         "file_read": file_read_skill,

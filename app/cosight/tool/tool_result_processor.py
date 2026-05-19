@@ -515,7 +515,7 @@ class ToolResultProcessor:
                 return ToolResultProcessor._process_math_graph_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'google_books_volume_search':
                 return ToolResultProcessor._process_google_books_result(tool_name, tool_args, tool_result, task_title)
-            elif tool_name in ['online_video_event_clip_extract', 'music_credit_normalize']:
+            elif tool_name == 'media_clip_extract':
                 return ToolResultProcessor._process_video_event_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'execute_code':
                 return ToolResultProcessor._process_code_result(tool_name, tool_args, tool_result, task_title)
@@ -945,7 +945,7 @@ class ToolResultProcessor:
 
     @staticmethod
     def _process_video_event_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
-        """处理在线视频事件片段/音乐署名工具结果"""
+        """处理在线视频片段工具结果"""
         try:
             parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
             if not isinstance(parsed_result, dict):
@@ -958,24 +958,17 @@ class ToolResultProcessor:
                 if value:
                     urls.append(value)
 
-            if tool_name == "music_credit_normalize":
-                summary = (
-                    f"Music credit normalized: {parsed_result.get('formatted_answer')}"
-                    if parsed_result.get("formatted_answer")
-                    else "Music credit normalization completed"
-                )
-                result_count = 1 if parsed_result.get("formatted_answer") else 0
-            elif parsed_result.get("ok"):
+            if parsed_result.get("ok"):
                 metadata = parsed_result.get("metadata") or {}
                 clip_window = parsed_result.get("clip_window") or {}
                 summary = (
-                    f"Extracted video event evidence for {metadata.get('title')}: "
+                    f"Extracted media clip for {metadata.get('title')}: "
                     f"{clip_window.get('start')} to {clip_window.get('end')}"
                 )
                 result_count = len([value for value in artifacts.values() if value])
             else:
                 summary = (
-                    f"Video event extraction failed: {parsed_result.get('error')}; "
+                    f"Media clip extraction failed: {parsed_result.get('error')}; "
                     f"missing={((parsed_result.get('dependency_status') or {}).get('missing') or [])}"
                 )
                 result_count = 0

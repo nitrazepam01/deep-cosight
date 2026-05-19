@@ -1162,20 +1162,20 @@ def google_books_volume_search_skill():
     }
 
 
-def online_video_event_clip_extract_skill():
+def media_clip_extract_skill():
     return {
-        'skill_name': 'online_video_event_clip_extract',
+        'skill_name': 'media_clip_extract',
         'skill_type': "function",
-        'display_name_zh': '在线视频事件片段抽取器',
-        'display_name_en': 'Online Video Event Clip Extractor',
-        'description_zh': '从在线视频中按字幕关键词或时间窗定位事件附近短片段，生成截图总览和事件后音频，默认从 conda base 调用 yt-dlp/ffmpeg',
-        'description_en': 'Locate an event in an online video with subtitle keywords or a time window, then extract a short clip, contact sheet, and event audio using conda-base yt-dlp/ffmpeg',
+        'display_name_zh': '媒体片段提取',
+        'display_name_en': 'Media Clip Extract',
+        'description_zh': '从在线视频中按字幕关键词或时间窗提取短片段、截图总览和音频片段',
+        'description_en': 'Extract a short online-media clip, contact sheet, and audio segment using subtitle keywords or a time window',
         'semantic_apis': ["api_search", "api_code_execution"],
         'function': SkillFunction(
             id='9d0794bb-c4f2-478e-9f49-39bbd2385f12',
-            name='app.cosight.video_event_toolkit.online_video_event_clip_extract',
-            description_zh='定位在线视频事件附近的片段、关键帧总览和音频证据',
-            description_en='Extract concise video/audio evidence around an online-video event',
+            name='app.cosight.video_event_toolkit.media_clip_extract',
+            description_zh='提取在线视频短片段、关键帧总览和音频片段',
+            description_en='Extract a short online-video clip, frame overview, and audio segment',
             parameters={
                 "type": "object",
                 "properties": {
@@ -1187,8 +1187,8 @@ def online_video_event_clip_extract_skill():
                     "subtitle_keywords": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description_zh": "用于搜索字幕 cue 的关键词列表，例如 ['2000','level','cloud']",
-                        "description_en": "Keywords used to search subtitle cues, for example ['2000','level','cloud']"
+                        "description_zh": "用于搜索字幕 cue 的关键词列表",
+                        "description_en": "Keywords used to search subtitle cues"
                     },
                     "event_description": {
                         "type": "string",
@@ -1239,65 +1239,6 @@ def online_video_event_clip_extract_skill():
                     }
                 },
                 "required": ["video_url"]
-            }
-        )
-    }
-
-
-def music_credit_normalize_skill():
-    return {
-        'skill_name': 'music_credit_normalize',
-        'skill_type': "function",
-        'display_name_zh': '音乐署名标准化器',
-        'display_name_en': 'Music Credit Normalizer',
-        'description_zh': '将音乐识别得到的曲名和作者按提交要求标准化；可传入检索得到的罗马字/翻译字段，不内置答案',
-        'description_en': 'Normalize recognized song title and artist credits for answer formatting; accepts externally verified romanization/translation fields',
-        'semantic_apis': ["api_search"],
-        'function': SkillFunction(
-            id='9d0794bb-c4f2-478e-9f49-39bbd2385f13',
-            name='app.cosight.video_event_toolkit.music_credit_normalize',
-            description_zh='清洗音乐识别结果并生成 SONG NAME, ARTIST NAME 格式',
-            description_en='Clean music recognition results and format as SONG NAME, ARTIST NAME',
-            parameters={
-                "type": "object",
-                "properties": {
-                    "raw_title": {
-                        "type": "string",
-                        "description_zh": "音频识别得到的原始曲名",
-                        "description_en": "Raw recognized song title"
-                    },
-                    "raw_artist": {
-                        "type": "string",
-                        "description_zh": "音频识别得到的原始作者/艺术家",
-                        "description_en": "Raw recognized artist or composer"
-                    },
-                    "title_romanization": {
-                        "type": "string",
-                        "description_zh": "可选曲名罗马字",
-                        "description_en": "Optional romanized song title"
-                    },
-                    "artist_romanization": {
-                        "type": "string",
-                        "description_zh": "可选作者罗马字",
-                        "description_en": "Optional romanized artist name"
-                    },
-                    "title_translation": {
-                        "type": "string",
-                        "description_zh": "可选英文曲名/译名；优先于罗马字",
-                        "description_en": "Optional English title or translation; preferred over romanization"
-                    },
-                    "artist_translation": {
-                        "type": "string",
-                        "description_zh": "可选英文作者名/译名；优先于罗马字",
-                        "description_en": "Optional English artist name or translation; preferred over romanization"
-                    },
-                    "strip_special_artist_chars": {
-                        "type": "boolean",
-                        "description_zh": "是否去掉 artist name 中的特殊字符，默认 true",
-                        "description_en": "Whether to strip special characters from artist name, default true"
-                    }
-                },
-                "required": ["raw_title", "raw_artist"]
             }
         )
     }

@@ -294,8 +294,7 @@ class BaseAgent:
             "place_street_number_resolve": "地点门牌号解析",
             "function_graph_letter_probe": "函数图形字母识别器",
             "google_books_volume_search": "Google Books书内搜索",
-            "online_video_event_clip_extract": "在线视频事件片段抽取",
-            "music_credit_normalize": "音乐署名标准化",
+            "media_clip_extract": "媒体片段提取",
             "image_search": "图片搜索",
             "audio_recognition": "音频识别",
             
@@ -385,8 +384,7 @@ class BaseAgent:
             "search_baidu", "search_google", "tavily_search", "search_wiki", "image_search",
             "mediawiki_evidence_query", "taxon_binomial_verify",
             "place_street_number_resolve", "function_graph_letter_probe",
-            "google_books_volume_search", "online_video_event_clip_extract",
-            "music_credit_normalize",
+            "google_books_volume_search", "media_clip_extract",
         ):
             return ["source_trace", "rule_assist", "self_consistency"]
         
