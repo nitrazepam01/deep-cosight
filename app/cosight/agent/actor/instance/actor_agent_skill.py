@@ -199,29 +199,29 @@ def mediawiki_evidence_query_skill():
                     },
                     "revision": {
                         "type": "object",
-                        "description_zh": "版本选择规则。可按当前版本、oldid、时间点前版本、时间区间首个版本或完整历史区间取证",
-                        "description_en": "Revision selector. Supports current revision, oldid, revision before a timestamp, first revision in an interval, or full revision history for an interval"
+                        "description_zh": "包含：mode、oldid、start_timestamp、end_timestamp、cutoff_timestamp、year、inclusive",
+                        "description_en": "Keys: mode, oldid, start_timestamp, end_timestamp, cutoff_timestamp, year, inclusive"
                     },
                     "include": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description_zh": "要返回的证据类型，如 metadata、revision_history、wikitext、rendered_html、references、infobox、sections、tables",
-                        "description_en": "Evidence types to return, such as metadata, revision_history, wikitext, rendered_html, references, infobox, sections, tables"
+                        "description_zh": "可选值：metadata、revision_history、wikitext、rendered_html、references、infobox、sections、tables",
+                        "description_en": "Values: metadata, revision_history, wikitext, rendered_html, references, infobox, sections, tables"
                     },
                     "extract": {
                         "type": "object",
-                        "description_zh": "内容抽取参数，如 field_names、section_keywords、table_keywords、include_links、clean_wikitext",
-                        "description_en": "Content extraction options such as field_names, section_keywords, table_keywords, include_links, clean_wikitext"
+                        "description_zh": "包含：field_names、section_keywords、table_keywords、include_links、clean_wikitext、link_mode",
+                        "description_en": "Keys: field_names, section_keywords, table_keywords, include_links, clean_wikitext, link_mode"
                     },
                     "history_metrics": {
                         "type": "object",
-                        "description_zh": "历史记录审计参数，如是否计算相邻版本 size 差、是否筛选指定差值、日期格式",
-                        "description_en": "Revision-history audit options, such as adjacent size deltas, filtering by a specific delta, and date formatting"
+                        "description_zh": "包含：with_size_deltas、match_delta、output_date_format",
+                        "description_en": "Keys: with_size_deltas, match_delta, output_date_format"
                     },
                     "counting": {
                         "type": "object",
-                        "description_zh": "通用候选项计数参数，如按链接/文本去重，以及 include/exclude 正则或关键词",
-                        "description_en": "Generic candidate counting options, such as link/text deduplication and include/exclude regex or keyword filters"
+                        "description_zh": "包含：dedupe_by、pattern_scope、include_patterns、exclude_patterns",
+                        "description_en": "Keys: dedupe_by, pattern_scope, include_patterns, exclude_patterns"
                     },
                     "language": {
                         "type": "string",
