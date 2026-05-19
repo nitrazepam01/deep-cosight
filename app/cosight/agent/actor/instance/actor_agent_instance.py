@@ -72,7 +72,7 @@ def create_actor_template(template_name, work_space_path):
                    place_street_number_resolve_skill(),
                    function_graph_letter_probe_skill(),
                    google_books_volume_search_skill(),
-                   media_clip_extract_skill(),
+                    media_timeline_parse_skill(),
                    audio_recognition_skill(),
                    ask_question_about_video_skill()],
         # , terminate_skill(), browser_use_skill()

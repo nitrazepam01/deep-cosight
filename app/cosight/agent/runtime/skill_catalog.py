@@ -62,9 +62,9 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "在 Google Books 指定书籍内搜索关键词，默认返回少量精确页标识、OCR 片段和页码引用",
         "needs_workspace": False,
     },
-    "media_clip_extract": {
-        "display_name_zh": "媒体片段提取",
-        "description_zh": "从在线视频中按字幕或时间窗提取短片段、截图总览和音频片段",
+    "media_timeline_parse": {
+        "display_name_zh": "媒体时间轴解析",
+        "description_zh": "获取在线视频的字幕文本与时间对照，并可按时间窗导出短片段、截图总览和音频片段",
         "needs_workspace": True,
     },
     "mark_step": {
@@ -221,7 +221,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         search_wiki_skill, mediawiki_evidence_query_skill,
         taxon_binomial_verify_skill, place_street_number_resolve_skill,
         function_graph_letter_probe_skill, google_books_volume_search_skill,
-        media_clip_extract_skill,
+        media_timeline_parse_skill,
         mark_step_skill, file_saver_skill,
         file_read_skill, file_str_replace_skill, file_find_in_content_skill,
         ask_question_about_image_skill, ask_question_about_video_skill,
@@ -244,7 +244,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "place_street_number_resolve": place_street_number_resolve_skill,
         "function_graph_letter_probe": function_graph_letter_probe_skill,
         "google_books_volume_search": google_books_volume_search_skill,
-        "media_clip_extract": media_clip_extract_skill,
+        "media_timeline_parse": media_timeline_parse_skill,
         "mark_step": mark_step_skill,
         "file_saver": file_saver_skill,
         "file_read": file_read_skill,

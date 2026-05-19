@@ -119,7 +119,7 @@ class TaskActorAgent(BaseAgent):
                          "place_street_number_resolve": location_toolkit.place_street_number_resolve,
                          "function_graph_letter_probe": math_graph_toolkit.function_graph_letter_probe,
                          "google_books_volume_search": google_books_toolkit.google_books_volume_search,
-                         "media_clip_extract": video_event_toolkit.media_clip_extract,
+                         "media_timeline_parse": video_event_toolkit.media_timeline_parse,
                         #  "image_search": tavily_search.search,
                          "audio_recognition": audio_toolkit.speech_to_text,
                          # "search_duckgo": search_toolkit.search_duckduckgo,

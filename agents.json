@@ -41,7 +41,7 @@
         "place_street_number_resolve",
         "function_graph_letter_probe",
         "google_books_volume_search",
-        "media_clip_extract",
+        "media_timeline_parse",
         "audio_recognition",
         "ask_question_about_image",
         "ask_question_about_video",

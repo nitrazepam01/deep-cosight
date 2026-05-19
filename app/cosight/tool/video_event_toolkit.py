@@ -303,6 +303,35 @@ class VideoEventToolkit:
         candidates.sort(key=lambda cue: (-cue["score"], cue["start_seconds"] or 0))
         return candidates[: max(1, int(max_cues or 5))]
 
+    def _collect_subtitle_time_map(
+        self,
+        subtitle_files: Sequence[Path],
+        terms: Sequence[str],
+        max_entries: int,
+    ) -> List[Dict[str, Any]]:
+        entries: List[Dict[str, Any]] = []
+        normalized_terms = [str(term or "").strip() for term in terms if str(term or "").strip()]
+        for subtitle_file in subtitle_files:
+            try:
+                cues = self._parse_vtt_cues(subtitle_file.read_text(encoding="utf-8", errors="replace"))
+            except Exception as exc:
+                logger.warning("Failed to parse subtitle file %s: %s", subtitle_file, exc)
+                continue
+            for cue in cues:
+                score = self._score_cue(cue["text"], normalized_terms) if normalized_terms else 0
+                if normalized_terms and score <= 0:
+                    continue
+                entry = dict(cue)
+                entry["score"] = score
+                entry["subtitle_file"] = str(subtitle_file)
+                entries.append(entry)
+
+        if normalized_terms:
+            entries.sort(key=lambda cue: (-cue["score"], cue["start_seconds"] or 0))
+        else:
+            entries.sort(key=lambda cue: cue["start_seconds"] or 0)
+        return entries[: max(1, int(max_entries or 5))]
+
     @staticmethod
     def _safe_int(value: Any, default: int, minimum: int, maximum: int) -> int:
         try:
@@ -329,10 +358,10 @@ class VideoEventToolkit:
         path.mkdir(parents=True, exist_ok=True)
         return path
 
-    def media_clip_extract(
+    def media_timeline_parse(
         self,
         video_url: str,
-        subtitle_keywords: Optional[List[str]] = None,
+        timeline_terms: Optional[List[str]] = None,
         event_description: str = "",
         candidate_window: Optional[Any] = None,
         event_timestamp: Optional[Any] = None,
@@ -346,10 +375,12 @@ class VideoEventToolkit:
         output_dir: Optional[str] = None,
         subtitle_language: str = "en.*",
         max_subtitle_cues: int = 5,
+        max_timeline_entries: Optional[int] = None,
+        subtitles_only: bool = False,
     ) -> str:
-        """Extract a short online-media segment with frame and audio artifacts."""
+        """Parse online-media subtitles and optionally extract a short clip."""
         logger.info(
-            "Using media_clip_extract, video_url=%s, event_description=%s",
+            "Using media_timeline_parse, video_url=%s, event_description=%s",
             video_url,
             event_description,
         )
@@ -367,7 +398,12 @@ class VideoEventToolkit:
                 "missing": dependencies.get("missing", []),
                 "install_hint": dependencies.get("install_hint"),
             }
-            if dependencies["missing"]:
+            required_missing = dependencies["missing"]
+            if subtitles_only:
+                required_missing = [item for item in required_missing if item == "yt-dlp"]
+                dependency_status["missing_for_requested_mode"] = required_missing
+                dependency_status["missing"] = required_missing
+            if required_missing:
                 return self._json(
                     {
                         "ok": False,
@@ -440,8 +476,32 @@ class VideoEventToolkit:
                 if path not in before_subtitles or path.stem.startswith(video_id)
             ]
 
-            keywords = subtitle_keywords or []
-            subtitle_cues = self._find_subtitle_cues(subtitle_files, keywords, max_subtitle_cues)
+            terms = timeline_terms or []
+            timeline_limit = max_timeline_entries if max_timeline_entries is not None else max_subtitle_cues
+            subtitle_time_map = self._collect_subtitle_time_map(subtitle_files, terms, timeline_limit)
+            subtitle_cues = subtitle_time_map
+
+            if subtitles_only:
+                return self._json(
+                    {
+                        "ok": True,
+                        "metadata": {
+                            "title": title,
+                            "channel": channel,
+                            "duration_seconds": duration,
+                            "video_id": video_id,
+                            "webpage_url": metadata.get("webpage_url") or video_url,
+                        },
+                        "dependency_status": dependency_status,
+                        "subtitle_files": [str(path) for path in subtitle_files],
+                        "timeline_terms": terms,
+                        "subtitle_time_map": subtitle_time_map,
+                        "subtitle_cues": subtitle_cues,
+                        "artifacts": {},
+                        "commands": commands,
+                        "next_step": "Use subtitle_time_map to choose a narrow source-video time window before extracting media artifacts.",
+                    }
+                )
 
             window_start, window_end = self._parse_window(candidate_window)
             selected_cue = subtitle_cues[0] if subtitle_cues else None
@@ -452,7 +512,7 @@ class VideoEventToolkit:
                     return self._json(
                         {
                             "ok": False,
-                            "error": "no_subtitle_cue_or_candidate_window",
+                            "error": "no_subtitle_time_map_or_candidate_window",
                             "metadata": {
                                 "title": title,
                                 "channel": channel,
@@ -461,6 +521,8 @@ class VideoEventToolkit:
                             },
                             "dependency_status": dependency_status,
                             "subtitle_files": [str(path) for path in subtitle_files],
+                            "timeline_terms": terms,
+                            "subtitle_time_map": subtitle_time_map,
                             "commands": commands,
                         }
                     )
@@ -608,6 +670,8 @@ class VideoEventToolkit:
                     "event_description": event_description,
                     "dependency_status": dependency_status,
                     "subtitle_files": [str(path) for path in subtitle_files],
+                    "timeline_terms": terms,
+                    "subtitle_time_map": subtitle_time_map,
                     "subtitle_cues": subtitle_cues,
                     "selected_cue": selected_cue,
                     "clip_window": {
@@ -631,5 +695,5 @@ class VideoEventToolkit:
                 }
             )
         except Exception as exc:
-            logger.error("media_clip_extract failed: %s", exc, exc_info=True)
+            logger.error("media_timeline_parse failed: %s", exc, exc_info=True)
             return self._json({"ok": False, "error": str(exc)})

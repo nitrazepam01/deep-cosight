@@ -1162,20 +1162,20 @@ def google_books_volume_search_skill():
     }
 
 
-def media_clip_extract_skill():
+def media_timeline_parse_skill():
     return {
-        'skill_name': 'media_clip_extract',
+        'skill_name': 'media_timeline_parse',
         'skill_type': "function",
-        'display_name_zh': '媒体片段提取',
-        'display_name_en': 'Media Clip Extract',
-        'description_zh': '从在线视频中按字幕关键词或时间窗提取短片段、截图总览和音频片段',
-        'description_en': 'Extract a short online-media clip, contact sheet, and audio segment using subtitle keywords or a time window',
+        'display_name_zh': '媒体时间轴解析',
+        'display_name_en': 'Media Timeline Parser',
+        'description_zh': '获取在线视频的字幕文本与时间对照，并可按时间窗导出短片段、截图总览和音频片段',
+        'description_en': 'Build an online-media subtitle time map and optionally export a short clip, contact sheet, and audio segment',
         'semantic_apis': ["api_search", "api_code_execution"],
         'function': SkillFunction(
             id='9d0794bb-c4f2-478e-9f49-39bbd2385f12',
-            name='app.cosight.video_event_toolkit.media_clip_extract',
-            description_zh='提取在线视频短片段、关键帧总览和音频片段',
-            description_en='Extract a short online-video clip, frame overview, and audio segment',
+            name='app.cosight.video_event_toolkit.media_timeline_parse',
+            description_zh='解析在线视频字幕时间轴，并按需要导出媒体片段',
+            description_en='Parse an online-video subtitle timeline and export media artifacts when needed',
             parameters={
                 "type": "object",
                 "properties": {
@@ -1184,11 +1184,11 @@ def media_clip_extract_skill():
                         "description_zh": "在线视频 URL，例如 YouTube 链接",
                         "description_en": "Online video URL, such as a YouTube link"
                     },
-                    "subtitle_keywords": {
+                    "timeline_terms": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description_zh": "用于搜索字幕 cue 的关键词列表",
-                        "description_en": "Keywords used to search subtitle cues"
+                        "description_zh": "需要在字幕时间对照中优先返回的相关词条",
+                        "description_en": "Terms to prioritize in the subtitle time map"
                     },
                     "event_description": {
                         "type": "string",
@@ -1204,18 +1204,18 @@ def media_clip_extract_skill():
                         "description_en": "Optional source-video timestamp of the event, for example '00:32:31.5'; used for event audio"
                     },
                     "audio_start_timestamp": {
-                        "description_zh": "可选音频截取开始时间；未提供时使用 event_timestamp 或字幕 cue 时间",
+                        "description_zh": "可选音频截取开始时间；未提供时使用 event_timestamp 或候选时间点",
                         "description_en": "Optional source-video timestamp where audio extraction starts"
                     },
                     "pre_roll_seconds": {
                         "type": "integer",
-                        "description_zh": "字幕 cue 前保留秒数，默认 10",
-                        "description_en": "Seconds before the subtitle cue to keep, default 10"
+                        "description_zh": "候选时间点前保留秒数，默认 10",
+                        "description_en": "Seconds before the candidate timestamp to keep, default 10"
                     },
                     "post_roll_seconds": {
                         "type": "integer",
-                        "description_zh": "字幕 cue 后保留秒数，默认 45",
-                        "description_en": "Seconds after the subtitle cue to keep, default 45"
+                        "description_zh": "候选时间点后保留秒数，默认 45",
+                        "description_en": "Seconds after the candidate timestamp to keep, default 45"
                     },
                     "audio_duration_seconds": {
                         "type": "integer",
@@ -1231,6 +1231,11 @@ def media_clip_extract_skill():
                         "type": "number",
                         "description_zh": "contact sheet 抽帧帧率，默认每秒 1 帧",
                         "description_en": "Frame sampling rate for the contact sheet, default 1 fps"
+                    },
+                    "subtitles_only": {
+                        "type": "boolean",
+                        "description_zh": "只返回字幕文本与时间对照，不下载视频片段",
+                        "description_en": "Only return subtitle text with timestamps, without downloading a video clip"
                     },
                     "output_dir": {
                         "type": "string",

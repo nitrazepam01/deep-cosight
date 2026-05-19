@@ -144,11 +144,11 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'detail_level': ['detail', 'mode'],
         }
     },
-    'media_clip_extract': {
+    'media_timeline_parse': {
         'required': ['video_url'],
         'aliases': {
             'video_url': ['url', 'youtube_url', 'link', 'video_link'],
-            'subtitle_keywords': ['keywords', 'cue_keywords', 'search_terms'],
+            'timeline_terms': ['subtitle_terms', 'caption_terms', 'keywords', 'search_terms'],
             'event_description': ['event', 'visual_event', 'description'],
             'candidate_window': ['time_window', 'window', 'clip_window', 'section'],
             'event_timestamp': ['event_time', 'timestamp', 'visual_event_time'],

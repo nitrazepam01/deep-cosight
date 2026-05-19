@@ -515,7 +515,7 @@ class ToolResultProcessor:
                 return ToolResultProcessor._process_math_graph_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'google_books_volume_search':
                 return ToolResultProcessor._process_google_books_result(tool_name, tool_args, tool_result, task_title)
-            elif tool_name == 'media_clip_extract':
+            elif tool_name == 'media_timeline_parse':
                 return ToolResultProcessor._process_video_event_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'execute_code':
                 return ToolResultProcessor._process_code_result(tool_name, tool_args, tool_result, task_title)
@@ -961,14 +961,21 @@ class ToolResultProcessor:
             if parsed_result.get("ok"):
                 metadata = parsed_result.get("metadata") or {}
                 clip_window = parsed_result.get("clip_window") or {}
-                summary = (
-                    f"Extracted media clip for {metadata.get('title')}: "
-                    f"{clip_window.get('start')} to {clip_window.get('end')}"
-                )
+                subtitle_time_map = parsed_result.get("subtitle_time_map") or []
+                if clip_window:
+                    summary = (
+                        f"Parsed media timeline for {metadata.get('title')} and exported "
+                        f"{clip_window.get('start')} to {clip_window.get('end')}"
+                    )
+                else:
+                    summary = (
+                        f"Parsed media subtitle timeline for {metadata.get('title')}: "
+                        f"{len(subtitle_time_map)} entries"
+                    )
                 result_count = len([value for value in artifacts.values() if value])
             else:
                 summary = (
-                    f"Media clip extraction failed: {parsed_result.get('error')}; "
+                    f"Media timeline parsing failed: {parsed_result.get('error')}; "
                     f"missing={((parsed_result.get('dependency_status') or {}).get('missing') or [])}"
                 )
                 result_count = 0

@@ -51,7 +51,7 @@ here are the smiling cloud blocks
     assert VideoEventToolkit._score_cue(cues[1]["text"], ["2000", "level", "cloud"]) == 1
 
 
-def test_media_clip_extract_uses_subtitles_and_writes_artifacts(tmp_path):
+def test_media_timeline_parse_uses_subtitles_and_writes_artifacts(tmp_path):
     class FakeToolkit(VideoEventToolkit):
         def _resolve_dependencies(self):
             return {
@@ -100,18 +100,80 @@ this is it level 2000 coming at you hot
             raise AssertionError(f"unexpected command: {args}")
 
     result = json.loads(
-        FakeToolkit(workspace_path=str(tmp_path)).media_clip_extract(
+        FakeToolkit(workspace_path=str(tmp_path)).media_timeline_parse(
             video_url="https://example.test/watch?v=abc123",
-            subtitle_keywords=["2000", "level"],
+            timeline_terms=["2000", "level"],
             event_description="first jump onto a visual platform",
             output_dir=str(tmp_path / "out"),
         )
     )
 
     assert result["ok"] is True
+    assert result["timeline_terms"] == ["2000", "level"]
+    assert result["subtitle_time_map"][0]["text"] == "this is it level 2000 coming at you hot"
     assert result["selected_cue"]["text"] == "this is it level 2000 coming at you hot"
     assert result["clip_window"]["start"] == "00:32:02.600"
     assert result["artifacts"]["clip_path"].endswith("event_clip.mp4")
     assert Path(result["artifacts"]["contact_sheet_path"]).exists()
     assert Path(result["artifacts"]["audio_path"]).exists()
     assert len(result["commands"]) == 5
+
+
+def test_media_timeline_parse_can_return_subtitle_time_map_only(tmp_path):
+    class FakeToolkit(VideoEventToolkit):
+        def _resolve_dependencies(self):
+            return {
+                "conda_base": "D:\\Miniconda",
+                "yt_dlp": {"command": ["yt-dlp"], "display": "D:\\Miniconda\\Scripts\\yt-dlp.exe"},
+                "ffmpeg": None,
+                "ffprobe": None,
+                "missing": ["ffmpeg", "ffprobe"],
+                "install_hint": self.INSTALL_HINT,
+            }
+
+        def _run_command(self, args, timeout=None, cwd=None):
+            cwd = Path(cwd or tmp_path)
+            if "-J" in args:
+                return subprocess.CompletedProcess(
+                    args,
+                    0,
+                    stdout=json.dumps(
+                        {
+                            "id": "abc123",
+                            "title": "Example long video",
+                            "channel": "ExampleChannel",
+                            "duration": 2200,
+                            "webpage_url": "https://example.test/watch?v=abc123",
+                        }
+                    ),
+                    stderr="",
+                )
+            if "--write-auto-subs" in args:
+                (cwd / "abc123.en.vtt").write_text(
+                    """WEBVTT
+
+00:32:12.600 --> 00:32:15.000
+this is it level 2000 coming at you hot
+
+00:32:27.000 --> 00:32:29.000
+here are the smiling cloud blocks
+""",
+                    encoding="utf-8",
+                )
+                return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+            raise AssertionError(f"unexpected command: {args}")
+
+    result = json.loads(
+        FakeToolkit(workspace_path=str(tmp_path)).media_timeline_parse(
+            video_url="https://example.test/watch?v=abc123",
+            timeline_terms=["cloud"],
+            subtitles_only=True,
+            output_dir=str(tmp_path / "out"),
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["dependency_status"]["missing"] == []
+    assert result["artifacts"] == {}
+    assert result["subtitle_time_map"][0]["start"] == "00:32:27.000"
+    assert result["subtitle_time_map"][0]["text"] == "here are the smiling cloud blocks"
