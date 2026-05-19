@@ -505,11 +505,7 @@ class ToolResultProcessor:
             # 根据工具名称精确匹配选择处理方式
             if tool_name in ['search_baidu', 'search_google', 'search_wiki', 'tavily_search', 'image_search']:
                 return ToolResultProcessor._process_search_result(tool_name, tool_args, tool_result, task_title)
-            elif tool_name in [
-                'wiki_first_revision', 'wiki_revision_at', 'wiki_reference_count',
-                'wiki_revision_reference_delta', 'wiki_revision_size_delta_find',
-                'wiki_rail_connection_count', 'wiki_infobox_field_lookup'
-            ]:
+            elif tool_name == 'mediawiki_evidence_query':
                 return ToolResultProcessor._process_wikipedia_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'taxon_binomial_verify':
                 return ToolResultProcessor._process_taxonomy_result(tool_name, tool_args, tool_result, task_title)
@@ -519,6 +515,8 @@ class ToolResultProcessor:
                 return ToolResultProcessor._process_math_graph_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'google_books_volume_search':
                 return ToolResultProcessor._process_google_books_result(tool_name, tool_args, tool_result, task_title)
+            elif tool_name in ['online_video_event_clip_extract', 'music_credit_normalize']:
+                return ToolResultProcessor._process_video_event_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'execute_code':
                 return ToolResultProcessor._process_code_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name in ['file_saver', 'file_read', 'file_str_replace', 'file_find_in_content','create_html_report']:
@@ -670,74 +668,77 @@ class ToolResultProcessor:
 
     @staticmethod
     def _process_wikipedia_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
-        """处理 Wikipedia revision 工具结果"""
+        """处理 MediaWiki evidence 工具结果"""
         try:
             parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
             if not isinstance(parsed_result, dict):
                 raise ValueError("Wikipedia tool did not return a JSON object")
 
             urls = []
+            for candidate in parsed_result.get("source_urls") or []:
+                if candidate and candidate not in urls:
+                    urls.append(candidate)
             for candidate in [
-                parsed_result.get("url"),
                 (parsed_result.get("revision") or {}).get("url"),
-                (parsed_result.get("matched_revision") or {}).get("url"),
-                (parsed_result.get("earlier_revision") or {}).get("url"),
-                (parsed_result.get("later_revision") or {}).get("url"),
-                (parsed_result.get("earlier_count_details") or {}).get("url"),
-                (parsed_result.get("later_count_details") or {}).get("url"),
-                parsed_result.get("url"),
+                (parsed_result.get("references") or {}).get("url"),
+                ((parsed_result.get("revision_history") or {}).get("matched_revision") or {}).get("url"),
             ]:
                 if candidate and candidate not in urls:
                     urls.append(candidate)
-            for match in parsed_result.get("matches") or []:
+            for match in (parsed_result.get("revision_history") or {}).get("matches") or []:
                 candidate = match.get("url")
                 if candidate and candidate not in urls:
                     urls.append(candidate)
             url = urls[0] if urls else None
             summary_parts = []
 
-            if tool_name == "wiki_first_revision":
+            page = parsed_result.get("page") or {}
+            revision = parsed_result.get("revision") or {}
+            counts = parsed_result.get("counts") or {}
+            title = page.get("title") or revision.get("title") or parsed_result.get("title")
+            if title:
                 summary_parts.append(
-                    f"Wikipedia first revision found: oldid {parsed_result.get('oldid')} at {parsed_result.get('timestamp')}"
+                    f"MediaWiki evidence returned for {title}"
                 )
-            elif tool_name == "wiki_revision_at":
+            if revision:
                 summary_parts.append(
-                    f"Wikipedia revision found: oldid {parsed_result.get('oldid')} at {parsed_result.get('timestamp')}"
+                    f"revision oldid {revision.get('oldid')} at {revision.get('timestamp')}"
                 )
-            elif tool_name == "wiki_reference_count":
+            if counts.get("reference_count") is not None:
                 summary_parts.append(
-                    f"Reference count for oldid {parsed_result.get('oldid')}: {parsed_result.get('recommended_count')} "
-                    f"({parsed_result.get('recommended_count_method')})"
+                    f"reference_count={counts.get('reference_count')}"
                 )
-            elif tool_name == "wiki_revision_reference_delta":
+            if counts.get("revision_count") is not None:
                 summary_parts.append(
-                    f"Reference delta for {parsed_result.get('title')}: {parsed_result.get('calculation')}"
+                    f"revision_count={counts.get('revision_count')}"
                 )
-            elif tool_name == "wiki_revision_size_delta_find":
-                matched = parsed_result.get("matched_revision") or {}
-                if matched:
-                    summary_parts.append(
-                        f"Size-delta match for {parsed_result.get('title')}: "
-                        f"{matched.get('calculation')} at {matched.get('formatted_date')}"
-                    )
-                else:
-                    summary_parts.append(
-                        f"No size-delta match for {parsed_result.get('title')} target_delta={parsed_result.get('target_delta')}"
-                    )
-            elif tool_name == "wiki_rail_connection_count":
-                revision = parsed_result.get("revision") or {}
+            if counts.get("matched_item_count") is not None:
                 summary_parts.append(
-                    f"Rail connection count for {parsed_result.get('title')} oldid {revision.get('oldid')}: "
-                    f"{parsed_result.get('connection_count')} ({parsed_result.get('calculation')})"
+                    f"matched_item_count={counts.get('matched_item_count')}"
                 )
-            elif tool_name == "wiki_infobox_field_lookup":
+            if counts.get("history_delta_match_count") is not None:
                 summary_parts.append(
-                    f"Infobox field {parsed_result.get('matched_field_name')} for {parsed_result.get('title')}: "
-                    f"{parsed_result.get('selected_value')}"
+                    f"history_delta_match_count={counts.get('history_delta_match_count')}"
                 )
+            matched_revision = (parsed_result.get("revision_history") or {}).get("matched_revision") or {}
+            if matched_revision:
+                summary_parts.append(
+                    f"first history metric match oldid {matched_revision.get('oldid')} at {matched_revision.get('timestamp')}"
+                )
+            fields = parsed_result.get("fields") or []
+            matched_fields = [
+                field.get("matched_field_name") or field.get("requested_field")
+                for field in fields
+                if not field.get("error")
+            ]
+            if matched_fields:
+                summary_parts.append(f"fields={', '.join(str(item) for item in matched_fields[:3])}")
 
-            if parsed_result.get("warnings"):
-                summary_parts.append("; ".join(parsed_result["warnings"]))
+            if not summary_parts:
+                summary_parts.append("MediaWiki evidence query completed")
+            for warning in parsed_result.get("audit") or []:
+                if len(summary_parts) < 6:
+                    summary_parts.append(str(warning))
 
             return {
                 "tool_type": "search",
@@ -757,8 +758,8 @@ class ToolResultProcessor:
             return {
                 "tool_type": "search",
                 "summary": ToolResultProcessor._get_localized_summary(
-                    "Wikipedia 版本工具执行完成",
-                    "Wikipedia revision tool completed",
+                    "MediaWiki 证据查询完成",
+                    "MediaWiki evidence query completed",
                     task_title
                 ),
                 "error": str(e)
@@ -940,6 +941,56 @@ class ToolResultProcessor:
             }
         except Exception as e:
             logger.error(f"Error processing Google Books result: {e}")
+            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
+
+    @staticmethod
+    def _process_video_event_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
+        """处理在线视频事件片段/音乐署名工具结果"""
+        try:
+            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+            if not isinstance(parsed_result, dict):
+                raise ValueError("Video event tool did not return a JSON object")
+
+            urls = []
+            artifacts = parsed_result.get("artifacts") or {}
+            for key in ("contact_sheet_path", "clip_path", "audio_path"):
+                value = artifacts.get(key)
+                if value:
+                    urls.append(value)
+
+            if tool_name == "music_credit_normalize":
+                summary = (
+                    f"Music credit normalized: {parsed_result.get('formatted_answer')}"
+                    if parsed_result.get("formatted_answer")
+                    else "Music credit normalization completed"
+                )
+                result_count = 1 if parsed_result.get("formatted_answer") else 0
+            elif parsed_result.get("ok"):
+                metadata = parsed_result.get("metadata") or {}
+                clip_window = parsed_result.get("clip_window") or {}
+                summary = (
+                    f"Extracted video event evidence for {metadata.get('title')}: "
+                    f"{clip_window.get('start')} to {clip_window.get('end')}"
+                )
+                result_count = len([value for value in artifacts.values() if value])
+            else:
+                summary = (
+                    f"Video event extraction failed: {parsed_result.get('error')}; "
+                    f"missing={((parsed_result.get('dependency_status') or {}).get('missing') or [])}"
+                )
+                result_count = 0
+
+            return {
+                "tool_type": "analysis",
+                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
+                "first_url": urls[0] if urls else None,
+                "urls": urls,
+                "result_count": result_count,
+                "has_content": bool(parsed_result),
+                "parsed_result": parsed_result,
+            }
+        except Exception as e:
+            logger.error(f"Error processing video event result: {e}")
             return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
     
     @staticmethod

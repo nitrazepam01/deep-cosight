@@ -33,6 +33,7 @@ setup(
                         "lagent==0.2.4",
                         "docx2markdown==0.1.1",
                         "ffmpeg-python==0.2.0",
+                        "yt-dlp>=2024.8.6",
                         "baidusearch==1.0.3",
                         "retry==0.9.2",
                         "loguru==0.7.3",

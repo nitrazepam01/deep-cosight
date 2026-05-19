@@ -170,334 +170,66 @@ def search_wiki_skill():
     }
 
 
-def wiki_first_revision_skill():
+def mediawiki_evidence_query_skill():
     return {
-        'skill_name': 'wiki_first_revision',
+        'skill_name': 'mediawiki_evidence_query',
         'skill_type': "function",
-        'display_name_zh': '维基百科首个历史版本',
-        'display_name_en': 'Wikipedia First Revision',
-        'description_zh': '使用 MediaWiki API 查询指定 Wikipedia 页面在某一日历年的第一个修订版本，返回 oldid、时间戳和页面链接',
-        'description_en': 'Use the MediaWiki API to find the first revision of a Wikipedia page in a calendar year, returning oldid, timestamp, and URL',
+        'display_name_zh': 'MediaWiki 证据查询器',
+        'display_name_en': 'MediaWiki Evidence Query',
+        'description_zh': '通用 MediaWiki API 取证工具：选择页面版本，返回历史、源码、渲染内容、结构化字段、章节、表格和可计量审计信息',
+        'description_en': 'General MediaWiki API evidence tool: select page revisions and return history, source, rendered content, structured fields, sections, tables, and measurable audit data',
         'semantic_apis': ["api_search"],
         'function': SkillFunction(
-            id='9d0794bb-c4f2-478e-9f49-39bbd2385f01',
-            name='app.cosight.wikipedia_toolkit.wiki_first_revision',
-            description_zh='查询指定年份首个 Wikipedia revision',
-            description_en='Find the first Wikipedia revision in a given year',
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f14',
+            name='app.cosight.wikipedia_toolkit.mediawiki_evidence_query',
+            description_zh='查询 MediaWiki 页面、版本和页面结构证据',
+            description_en='Query MediaWiki page, revision, and page-structure evidence',
             parameters={
                 "type": "object",
                 "properties": {
-                    "title": {
+                    "site": {
                         "type": "string",
-                        "description_zh": "Wikipedia 页面标题，例如 ZTE",
-                        "description_en": "Wikipedia page title, for example ZTE"
-                    },
-                    "year": {
-                        "type": "integer",
-                        "description_zh": "日历年，例如 2025",
-                        "description_en": "Calendar year, for example 2025"
-                    },
-                    "language": {
-                        "type": "string",
-                        "description_zh": "Wikipedia 语言代码，默认 en",
-                        "description_en": "Wikipedia language code, default en"
-                    }
-                },
-                "required": ["title", "year"]
-            }
-        )
-    }
-
-
-def wiki_revision_at_skill():
-    return {
-        'skill_name': 'wiki_revision_at',
-        'skill_type': "function",
-        'display_name_zh': '维基百科指定时间历史版本',
-        'display_name_en': 'Wikipedia Revision At Cutoff',
-        'description_zh': '使用 MediaWiki API 查询指定 Wikipedia 页面在某个 UTC 截止时间之前的最后一个修订版本，返回 oldid、时间戳和页面链接',
-        'description_en': 'Use the MediaWiki API to find the last revision of a Wikipedia page before a UTC cutoff timestamp, returning oldid, timestamp, and URL',
-        'semantic_apis': ["api_search"],
-        'function': SkillFunction(
-            id='9d0794bb-c4f2-478e-9f49-39bbd2385f04',
-            name='app.cosight.wikipedia_toolkit.wiki_revision_at',
-            description_zh='查询指定 UTC 截止时间前的 Wikipedia revision',
-            description_en='Find the Wikipedia revision immediately before a UTC cutoff',
-            parameters={
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description_zh": "Wikipedia 页面标题，例如 Adirondack (train)",
-                        "description_en": "Wikipedia page title, for example Adirondack (train)"
-                    },
-                    "cutoff_timestamp": {
-                        "type": "string",
-                        "description_zh": "UTC 截止时间，例如 2023-08-01T00:00:00Z",
-                        "description_en": "UTC cutoff timestamp, for example 2023-08-01T00:00:00Z"
-                    },
-                    "language": {
-                        "type": "string",
-                        "description_zh": "Wikipedia 语言代码，默认 en",
-                        "description_en": "Wikipedia language code, default en"
-                    },
-                    "inclusive": {
-                        "type": "boolean",
-                        "description_zh": "是否允许返回时间戳等于截止时间的 revision，默认 false",
-                        "description_en": "Whether to allow a revision exactly at the cutoff timestamp, default false"
-                    }
-                },
-                "required": ["title", "cutoff_timestamp"]
-            }
-        )
-    }
-
-
-def wiki_reference_count_skill():
-    return {
-        'skill_name': 'wiki_reference_count',
-        'skill_type': "function",
-        'display_name_zh': '维基百科历史版本引用计数',
-        'display_name_en': 'Wikipedia Revision Reference Count',
-        'description_zh': '统计指定 Wikipedia oldid 的唯一参考文献条目数；会把正文引用上标次数作为交叉检查，避免把复用引用重复计数',
-        'description_en': 'Count unique reference-list entries for a historical Wikipedia oldid; citation callouts are returned only as a cross-check to avoid double-counting reused references',
-        'semantic_apis': ["api_search"],
-        'function': SkillFunction(
-            id='9d0794bb-c4f2-478e-9f49-39bbd2385f02',
-            name='app.cosight.wikipedia_toolkit.wiki_reference_count',
-            description_zh='按唯一参考文献条目统计 Wikipedia oldid 的引用数',
-            description_en='Count unique references for a Wikipedia oldid',
-            parameters={
-                "type": "object",
-                "properties": {
-                    "oldid": {
-                        "type": "integer",
-                        "description_zh": "Wikipedia revision id / oldid",
-                        "description_en": "Wikipedia revision id / oldid"
+                        "description_zh": "MediaWiki 站点域名，默认 en.wikipedia.org",
+                        "description_en": "MediaWiki site domain, default en.wikipedia.org"
                     },
                     "title": {
                         "type": "string",
-                        "description_zh": "页面标题，可选；例如 ZTE",
-                        "description_en": "Optional page title, for example ZTE"
+                        "description_zh": "页面标题",
+                        "description_en": "Page title"
+                    },
+                    "revision": {
+                        "type": "object",
+                        "description_zh": "版本选择规则。可按当前版本、oldid、时间点前版本、时间区间首个版本或完整历史区间取证",
+                        "description_en": "Revision selector. Supports current revision, oldid, revision before a timestamp, first revision in an interval, or full revision history for an interval"
+                    },
+                    "include": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description_zh": "要返回的证据类型，如 metadata、revision_history、wikitext、rendered_html、references、infobox、sections、tables",
+                        "description_en": "Evidence types to return, such as metadata, revision_history, wikitext, rendered_html, references, infobox, sections, tables"
+                    },
+                    "extract": {
+                        "type": "object",
+                        "description_zh": "内容抽取参数，如 field_names、section_keywords、table_keywords、include_links、clean_wikitext",
+                        "description_en": "Content extraction options such as field_names, section_keywords, table_keywords, include_links, clean_wikitext"
+                    },
+                    "history_metrics": {
+                        "type": "object",
+                        "description_zh": "历史记录审计参数，如是否计算相邻版本 size 差、是否筛选指定差值、日期格式",
+                        "description_en": "Revision-history audit options, such as adjacent size deltas, filtering by a specific delta, and date formatting"
+                    },
+                    "counting": {
+                        "type": "object",
+                        "description_zh": "通用候选项计数参数，如按链接/文本去重，以及 include/exclude 正则或关键词",
+                        "description_en": "Generic candidate counting options, such as link/text deduplication and include/exclude regex or keyword filters"
                     },
                     "language": {
                         "type": "string",
-                        "description_zh": "Wikipedia 语言代码，默认 en",
-                        "description_en": "Wikipedia language code, default en"
-                    },
-                    "include_raw_ref_check": {
-                        "type": "boolean",
-                        "description_zh": "是否同时检查 raw wikitext 中的 <ref> 定义，默认 true",
-                        "description_en": "Whether to also check raw wikitext <ref> definitions, default true"
+                        "description_zh": "可选语言代码；不提供时从 site 推断",
+                        "description_en": "Optional language code; inferred from site when omitted"
                     }
                 },
-                "required": ["oldid"]
-            }
-        )
-    }
-
-
-def wiki_revision_reference_delta_skill():
-    return {
-        'skill_name': 'wiki_revision_reference_delta',
-        'skill_type': "function",
-        'display_name_zh': '维基百科历史版本引用增量',
-        'display_name_en': 'Wikipedia Revision Reference Delta',
-        'description_zh': '比较同一 Wikipedia 页面两个年份首个版本的唯一参考文献条目数，直接返回增量和计算式；适合 “reference count between first revisions” 类题目',
-        'description_en': 'Compare unique reference-list counts between the first revisions of two years for one Wikipedia page, returning the delta and calculation; use for reference-count-between-first-revisions tasks',
-        'semantic_apis': ["api_search"],
-        'function': SkillFunction(
-            id='9d0794bb-c4f2-478e-9f49-39bbd2385f03',
-            name='app.cosight.wikipedia_toolkit.wiki_revision_reference_delta',
-            description_zh='比较两个年份首个 Wikipedia revision 的引用数增量',
-            description_en='Compare reference-count delta between first Wikipedia revisions for two years',
-            parameters={
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description_zh": "Wikipedia 页面标题，例如 ZTE",
-                        "description_en": "Wikipedia page title, for example ZTE"
-                    },
-                    "earlier_year": {
-                        "type": "integer",
-                        "description_zh": "较早年份/基准年份，例如 2025",
-                        "description_en": "Earlier or baseline year, for example 2025"
-                    },
-                    "later_year": {
-                        "type": "integer",
-                        "description_zh": "较晚年份/比较年份，例如 2026",
-                        "description_en": "Later or comparison year, for example 2026"
-                    },
-                    "language": {
-                        "type": "string",
-                        "description_zh": "Wikipedia 语言代码，默认 en",
-                        "description_en": "Wikipedia language code, default en"
-                    }
-                },
-                "required": ["title", "earlier_year", "later_year"]
-            }
-        )
-    }
-
-
-def wiki_infobox_field_lookup_skill():
-    return {
-        'skill_name': 'wiki_infobox_field_lookup',
-        'skill_type': "function",
-        'display_name_zh': '维基百科 Infobox 字段抽取',
-        'display_name_en': 'Wikipedia Infobox Field Lookup',
-        'description_zh': '从 Wikipedia 当前页或历史 oldid 的 infobox 字段或同名章节中抽取内容，返回原始值、清洗文本、链接和首个链接',
-        'description_en': 'Extract a named infobox field or matching section from a current or historical Wikipedia page, returning raw value, cleaned text, links, and selected first link',
-        'semantic_apis': ["api_search"],
-        'function': SkillFunction(
-            id='9d0794bb-c4f2-478e-9f49-39bbd2385f09',
-            name='app.cosight.wikipedia_toolkit.wiki_infobox_field_lookup',
-            description_zh='抽取 Wikipedia infobox 字段/同名章节及其中链接',
-            description_en='Extract a Wikipedia infobox field or matching section and links inside it',
-            parameters={
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description_zh": "Wikipedia 页面标题，例如 ZTE 或 Indonesia",
-                        "description_en": "Wikipedia page title, for example ZTE or Indonesia"
-                    },
-                    "field_name": {
-                        "type": "string",
-                        "description_zh": "Infobox 字段名，例如 subsidiaries 或 national_motto",
-                        "description_en": "Infobox field name, for example subsidiaries or national_motto"
-                    },
-                    "oldid": {
-                        "type": "integer",
-                        "description_zh": "可选；历史 revision id。不提供时读取当前页面",
-                        "description_en": "Optional historical revision id. If omitted, read the current page"
-                    },
-                    "language": {
-                        "type": "string",
-                        "description_zh": "Wikipedia 语言代码，默认 en",
-                        "description_en": "Wikipedia language code, default en"
-                    },
-                    "link_mode": {
-                        "type": "string",
-                        "description_zh": "输出选择模式：raw_text、first_link 或 all_links",
-                        "description_en": "Selection mode: raw_text, first_link, or all_links"
-                    },
-                    "clean_templates": {
-                        "type": "boolean",
-                        "description_zh": "是否清洗常见模板和 wiki 标记，默认 true",
-                        "description_en": "Whether to clean common templates and wiki markup, default true"
-                    }
-                },
-                "required": ["title", "field_name"]
-            }
-        )
-    }
-
-
-def wiki_rail_connection_count_skill():
-    return {
-        'skill_name': 'wiki_rail_connection_count',
-        'skill_type': "function",
-        'display_name_zh': '维基百科历史铁路连接计数',
-        'display_name_en': 'Wikipedia Historical Rail Connection Count',
-        'description_zh': '解析 Wikipedia 历史版本中的车站/连接表格，按通勤铁路和重轨线路去重计数，排除地铁、轻轨、公交、轮渡和 Amtrak Thruway',
-        'description_en': 'Parse a historical Wikipedia station/connection table and count unique commuter/heavy rail lines, excluding subway, light rail, bus, ferry, and Amtrak Thruway',
-        'semantic_apis': ["api_search"],
-        'function': SkillFunction(
-            id='9d0794bb-c4f2-478e-9f49-39bbd2385f05',
-            name='app.cosight.wikipedia_toolkit.wiki_rail_connection_count',
-            description_zh='统计历史 Wikipedia 表格中的唯一通勤/重轨铁路连接',
-            description_en='Count unique commuter/heavy rail connections in a historical Wikipedia table',
-            parameters={
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description_zh": "Wikipedia 页面标题，例如 Adirondack (train)",
-                        "description_en": "Wikipedia page title, for example Adirondack (train)"
-                    },
-                    "cutoff_timestamp": {
-                        "type": "string",
-                        "description_zh": "UTC 截止时间；例如 2023 年 7 月底使用 2023-08-01T00:00:00Z",
-                        "description_en": "UTC cutoff timestamp; for end of July 2023 use 2023-08-01T00:00:00Z"
-                    },
-                    "section_keyword": {
-                        "type": "string",
-                        "description_zh": "包含目标表格的章节关键词，默认 Station stops",
-                        "description_en": "Section keyword containing the target table, default Station stops"
-                    },
-                    "language": {
-                        "type": "string",
-                        "description_zh": "Wikipedia 语言代码，默认 en",
-                        "description_en": "Wikipedia language code, default en"
-                    },
-                    "oldid": {
-                        "type": "integer",
-                        "description_zh": "可选；如果已知历史 revision id，可直接传入 oldid",
-                        "description_en": "Optional; pass a known historical revision id directly"
-                    }
-                },
-                "required": ["title", "cutoff_timestamp"]
-            }
-        )
-    }
-
-
-def wiki_revision_size_delta_find_skill():
-    return {
-        'skill_name': 'wiki_revision_size_delta_find',
-        'skill_type': "function",
-        'display_name_zh': '维基百科修订字节增量查找',
-        'display_name_en': 'Wikipedia Revision Size Delta Finder',
-        'description_zh': '查询指定 Wikipedia 页面在某年或时间区间内的 revisions，按时间顺序计算相邻版本 size 差值，并查找恰好增加指定字节数的编辑',
-        'description_en': 'Query revisions for a Wikipedia page in a year or interval, compute chronological adjacent size deltas, and find edits that added exactly the target number of bytes',
-        'semantic_apis': ["api_search"],
-        'function': SkillFunction(
-            id='9d0794bb-c4f2-478e-9f49-39bbd2385f08',
-            name='app.cosight.wikipedia_toolkit.wiki_revision_size_delta_find',
-            description_zh='按页面大小差值查找 Wikipedia revision',
-            description_en='Find Wikipedia revisions by page-size byte delta',
-            parameters={
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description_zh": "Wikipedia 页面标题",
-                        "description_en": "Wikipedia page title"
-                    },
-                    "target_delta": {
-                        "type": "integer",
-                        "description_zh": "目标 size 增量字节数，例如由其他步骤解析出的门牌号",
-                        "description_en": "Target size delta in bytes, for example a number resolved by a prior step"
-                    },
-                    "year": {
-                        "type": "integer",
-                        "description_zh": "日历年；若提供，则自动使用该年的 UTC 半开区间",
-                        "description_en": "Calendar year; if provided, the tool uses that UTC half-open year interval"
-                    },
-                    "start_timestamp": {
-                        "type": "string",
-                        "description_zh": "可选 UTC 起始时间，例如 2025-01-01T00:00:00Z",
-                        "description_en": "Optional UTC start timestamp, for example 2025-01-01T00:00:00Z"
-                    },
-                    "end_timestamp": {
-                        "type": "string",
-                        "description_zh": "可选 UTC 结束时间，例如 2026-01-01T00:00:00Z",
-                        "description_en": "Optional UTC end timestamp, for example 2026-01-01T00:00:00Z"
-                    },
-                    "language": {
-                        "type": "string",
-                        "description_zh": "Wikipedia 语言代码，默认 en",
-                        "description_en": "Wikipedia language code, default en"
-                    },
-                    "output_date_format": {
-                        "type": "string",
-                        "description_zh": "输出日期格式，默认 %Y/%m/%d",
-                        "description_en": "Output date format, default %Y/%m/%d"
-                    }
-                },
-                "required": ["title", "target_delta"]
+                "required": ["title"]
             }
         )
     }
@@ -1425,6 +1157,147 @@ def google_books_volume_search_skill():
                     }
                 },
                 "required": ["query"]
+            }
+        )
+    }
+
+
+def online_video_event_clip_extract_skill():
+    return {
+        'skill_name': 'online_video_event_clip_extract',
+        'skill_type': "function",
+        'display_name_zh': '在线视频事件片段抽取器',
+        'display_name_en': 'Online Video Event Clip Extractor',
+        'description_zh': '从在线视频中按字幕关键词或时间窗定位事件附近短片段，生成截图总览和事件后音频，默认从 conda base 调用 yt-dlp/ffmpeg',
+        'description_en': 'Locate an event in an online video with subtitle keywords or a time window, then extract a short clip, contact sheet, and event audio using conda-base yt-dlp/ffmpeg',
+        'semantic_apis': ["api_search", "api_code_execution"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f12',
+            name='app.cosight.video_event_toolkit.online_video_event_clip_extract',
+            description_zh='定位在线视频事件附近的片段、关键帧总览和音频证据',
+            description_en='Extract concise video/audio evidence around an online-video event',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "video_url": {
+                        "type": "string",
+                        "description_zh": "在线视频 URL，例如 YouTube 链接",
+                        "description_en": "Online video URL, such as a YouTube link"
+                    },
+                    "subtitle_keywords": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description_zh": "用于搜索字幕 cue 的关键词列表，例如 ['2000','level','cloud']",
+                        "description_en": "Keywords used to search subtitle cues, for example ['2000','level','cloud']"
+                    },
+                    "event_description": {
+                        "type": "string",
+                        "description_zh": "要定位的视觉/声音事件描述",
+                        "description_en": "Description of the visual or audio event to locate"
+                    },
+                    "candidate_window": {
+                        "description_zh": "可选候选时间窗，例如 '00:32:12-00:33:05'；提供后优先使用",
+                        "description_en": "Optional candidate window, for example '00:32:12-00:33:05'; preferred when provided"
+                    },
+                    "event_timestamp": {
+                        "description_zh": "可选事件在原视频中的时间点，例如 '00:32:31.5'；用于截取事件后的音频",
+                        "description_en": "Optional source-video timestamp of the event, for example '00:32:31.5'; used for event audio"
+                    },
+                    "audio_start_timestamp": {
+                        "description_zh": "可选音频截取开始时间；未提供时使用 event_timestamp 或字幕 cue 时间",
+                        "description_en": "Optional source-video timestamp where audio extraction starts"
+                    },
+                    "pre_roll_seconds": {
+                        "type": "integer",
+                        "description_zh": "字幕 cue 前保留秒数，默认 10",
+                        "description_en": "Seconds before the subtitle cue to keep, default 10"
+                    },
+                    "post_roll_seconds": {
+                        "type": "integer",
+                        "description_zh": "字幕 cue 后保留秒数，默认 45",
+                        "description_en": "Seconds after the subtitle cue to keep, default 45"
+                    },
+                    "audio_duration_seconds": {
+                        "type": "integer",
+                        "description_zh": "截取音频长度，默认 20 秒",
+                        "description_en": "Length of extracted audio, default 20 seconds"
+                    },
+                    "download_height": {
+                        "type": "integer",
+                        "description_zh": "下载视频最大高度，默认 360",
+                        "description_en": "Maximum downloaded video height, default 360"
+                    },
+                    "frame_rate": {
+                        "type": "number",
+                        "description_zh": "contact sheet 抽帧帧率，默认每秒 1 帧",
+                        "description_en": "Frame sampling rate for the contact sheet, default 1 fps"
+                    },
+                    "output_dir": {
+                        "type": "string",
+                        "description_zh": "可选输出目录；相对路径会保存到当前 workspace",
+                        "description_en": "Optional output directory; relative paths are saved under the current workspace"
+                    }
+                },
+                "required": ["video_url"]
+            }
+        )
+    }
+
+
+def music_credit_normalize_skill():
+    return {
+        'skill_name': 'music_credit_normalize',
+        'skill_type': "function",
+        'display_name_zh': '音乐署名标准化器',
+        'display_name_en': 'Music Credit Normalizer',
+        'description_zh': '将音乐识别得到的曲名和作者按提交要求标准化；可传入检索得到的罗马字/翻译字段，不内置答案',
+        'description_en': 'Normalize recognized song title and artist credits for answer formatting; accepts externally verified romanization/translation fields',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f13',
+            name='app.cosight.video_event_toolkit.music_credit_normalize',
+            description_zh='清洗音乐识别结果并生成 SONG NAME, ARTIST NAME 格式',
+            description_en='Clean music recognition results and format as SONG NAME, ARTIST NAME',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "raw_title": {
+                        "type": "string",
+                        "description_zh": "音频识别得到的原始曲名",
+                        "description_en": "Raw recognized song title"
+                    },
+                    "raw_artist": {
+                        "type": "string",
+                        "description_zh": "音频识别得到的原始作者/艺术家",
+                        "description_en": "Raw recognized artist or composer"
+                    },
+                    "title_romanization": {
+                        "type": "string",
+                        "description_zh": "可选曲名罗马字",
+                        "description_en": "Optional romanized song title"
+                    },
+                    "artist_romanization": {
+                        "type": "string",
+                        "description_zh": "可选作者罗马字",
+                        "description_en": "Optional romanized artist name"
+                    },
+                    "title_translation": {
+                        "type": "string",
+                        "description_zh": "可选英文曲名/译名；优先于罗马字",
+                        "description_en": "Optional English title or translation; preferred over romanization"
+                    },
+                    "artist_translation": {
+                        "type": "string",
+                        "description_zh": "可选英文作者名/译名；优先于罗马字",
+                        "description_en": "Optional English artist name or translation; preferred over romanization"
+                    },
+                    "strip_special_artist_chars": {
+                        "type": "boolean",
+                        "description_zh": "是否去掉 artist name 中的特殊字符，默认 true",
+                        "description_en": "Whether to strip special characters from artist name, default true"
+                    }
+                },
+                "required": ["raw_title", "raw_artist"]
             }
         )
     }

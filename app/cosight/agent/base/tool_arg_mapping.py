@@ -89,43 +89,17 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'step_notes': ['notes', 'summary', 'result'],
         }
     },
-    'wiki_revision_at': {
-        'required': ['title', 'cutoff_timestamp'],
+    'mediawiki_evidence_query': {
+        'required': ['title'],
         'aliases': {
+            'site': ['domain', 'wiki_site', 'mediawiki_site'],
             'title': ['page', 'page_title', 'article', 'entity'],
-            'cutoff_timestamp': ['cutoff', 'as_of', 'as_of_timestamp', 'date', 'timestamp', 'end_time'],
+            'revision': ['revision_selector', 'revision_spec', 'history', 'oldid', 'revid'],
+            'include': ['includes', 'evidence', 'props'],
+            'extract': ['extract_options', 'fields', 'sections', 'tables'],
+            'history_metrics': ['metrics', 'revision_metrics', 'audit_metrics'],
+            'counting': ['count', 'counting_options', 'filters'],
             'language': ['lang'],
-        }
-    },
-    'wiki_rail_connection_count': {
-        'required': ['title', 'cutoff_timestamp'],
-        'aliases': {
-            'title': ['page', 'page_title', 'article', 'entity'],
-            'cutoff_timestamp': ['cutoff', 'as_of', 'as_of_timestamp', 'date', 'timestamp', 'end_time'],
-            'section_keyword': ['section', 'section_title', 'table', 'table_keyword'],
-            'language': ['lang'],
-        }
-    },
-    'wiki_revision_size_delta_find': {
-        'required': ['title', 'target_delta'],
-        'aliases': {
-            'title': ['page', 'page_title', 'article', 'entity'],
-            'target_delta': ['delta', 'bytes', 'byte_delta', 'n', 'N', 'street_number', 'target_bytes'],
-            'year': ['calendar_year'],
-            'start_timestamp': ['start', 'start_time', 'rvend'],
-            'end_timestamp': ['end', 'end_time', 'rvstart'],
-            'language': ['lang'],
-        }
-    },
-    'wiki_infobox_field_lookup': {
-        'required': ['title', 'field_name'],
-        'aliases': {
-            'title': ['page', 'page_title', 'article', 'entity'],
-            'field_name': ['field', 'infobox_field', 'property', 'parameter', 'param'],
-            'oldid': ['revision_id', 'revid', 'revision', 'historical_revision'],
-            'language': ['lang'],
-            'link_mode': ['mode', 'selection_mode'],
-            'clean_templates': ['clean', 'clean_wikitext'],
         }
     },
     'taxon_binomial_verify': {
@@ -168,6 +142,35 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'snippet_chars': ['snippet_length', 'max_snippet_chars', 'context_chars'],
             'max_reference_candidates': ['reference_limit', 'top_references'],
             'detail_level': ['detail', 'mode'],
+        }
+    },
+    'online_video_event_clip_extract': {
+        'required': ['video_url'],
+        'aliases': {
+            'video_url': ['url', 'youtube_url', 'link', 'video_link'],
+            'subtitle_keywords': ['keywords', 'cue_keywords', 'search_terms'],
+            'event_description': ['event', 'visual_event', 'description'],
+            'candidate_window': ['time_window', 'window', 'clip_window', 'section'],
+            'event_timestamp': ['event_time', 'timestamp', 'visual_event_time'],
+            'audio_start_timestamp': ['audio_start', 'music_start_time', 'start_audio_at'],
+            'pre_roll_seconds': ['pre_roll', 'before_seconds'],
+            'post_roll_seconds': ['post_roll', 'after_seconds'],
+            'audio_duration_seconds': ['audio_duration', 'music_clip_seconds'],
+            'download_height': ['height', 'max_height'],
+            'frame_rate': ['fps', 'sample_rate'],
+            'output_dir': ['output_path', 'save_dir', 'artifact_dir'],
+        }
+    },
+    'music_credit_normalize': {
+        'required': ['raw_title', 'raw_artist'],
+        'aliases': {
+            'raw_title': ['title', 'song_title', 'recognized_title'],
+            'raw_artist': ['artist', 'composer', 'recognized_artist'],
+            'title_romanization': ['romanized_title', 'title_romaji'],
+            'artist_romanization': ['romanized_artist', 'artist_romaji'],
+            'title_translation': ['english_title', 'translated_title'],
+            'artist_translation': ['english_artist', 'translated_artist'],
+            'strip_special_artist_chars': ['strip_special_chars', 'ascii_artist'],
         }
     },
     'document_abstract_year_count': {

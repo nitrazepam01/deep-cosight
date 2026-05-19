@@ -45,10 +45,10 @@ def test_raw_ref_counter_subtracts_named_self_closing_reuses():
 
 def test_reference_count_prefers_unique_rendered_items_over_callouts():
     class FakeToolkit(WikipediaToolkit):
-        def _parse_html(self, oldid, language):
+        def _parse_html(self, oldid, language, section=None, site=""):
             return '<p><sup class="reference">[1]</sup><sup class="reference">[1]</sup></p>'
 
-        def _render_html(self, oldid, title, language):
+        def _render_html(self, oldid, title, language, site=""):
             return """
             <ol class="references">
               <li id="cite_note-a-1"><span class="mw-reference-text">A</span></li>
@@ -56,7 +56,7 @@ def test_reference_count_prefers_unique_rendered_items_over_callouts():
             <p><sup class="reference">[1]</sup><sup class="reference">[1]</sup></p>
             """
 
-        def _raw_revision_dict(self, oldid, language):
+        def _raw_revision_dict(self, oldid, language, site=""):
             return {
                 "title": "Example",
                 "timestamp": "2026-01-01T00:00:00Z",
@@ -72,87 +72,95 @@ def test_reference_count_prefers_unique_rendered_items_over_callouts():
     assert any("citation_callouts" in warning for warning in result["warnings"])
 
 
-def test_zte_reference_delta_shape_uses_unique_counts():
+def test_mediawiki_query_can_select_interval_revisions_and_return_reference_evidence():
     class FakeToolkit(WikipediaToolkit):
-        def _first_revision_dict(self, title, year, language):
+        def _first_revision_in_interval_dict(self, title, start_timestamp, end_timestamp, language, site=""):
+            is_2025 = start_timestamp.startswith("2025-")
             return {
                 "title": title,
-                "year": year,
-                "oldid": 1272009703 if year == 2025 else 1333650803,
-                "timestamp": "2025-01-26T19:21:08Z" if year == 2025 else "2026-01-19T00:12:33Z",
-                "url": f"https://en.wikipedia.org/w/index.php?title={title}&oldid={year}",
+                "pageid": 12345,
+                "start_timestamp": start_timestamp,
+                "end_timestamp": end_timestamp,
+                "oldid": 1001 if is_2025 else 2001,
+                "timestamp": "2025-01-26T19:21:08Z" if is_2025 else "2026-01-19T00:12:33Z",
+                "size": 80487 if is_2025 else 82330,
+                "url": f"https://en.wikipedia.org/w/index.php?title={title}&oldid={'1001' if is_2025 else '2001'}",
             }
 
-        def _reference_count_dict(self, oldid, title, language, include_raw_ref_check=True):
-            if int(oldid) == 1272009703:
-                return {
-                    "oldid": oldid,
-                    "recommended_count": 121,
-                    "recommended_count_method": "rendered_reference_list_items",
-                    "citation_callouts": 136,
-                }
+        def _reference_count_dict(self, oldid, title, language, include_raw_ref_check=True, site=""):
             return {
                 "oldid": oldid,
-                "recommended_count": 125,
+                "title": title,
+                "recommended_count": 12 if int(oldid) == 1001 else 16,
                 "recommended_count_method": "rendered_reference_list_items",
-                "citation_callouts": 142,
+                "citation_callouts": 14 if int(oldid) == 1001 else 18,
             }
 
-    result = json.loads(
-        FakeToolkit().wiki_revision_reference_delta(
-            title="ZTE",
-            earlier_year=2025,
-            later_year=2026,
+    toolkit = FakeToolkit()
+    earlier = json.loads(
+        toolkit.mediawiki_evidence_query(
+            title="Example Page",
+            revision={
+                "mode": "first_in_interval",
+                "start_timestamp": "2025-01-01T00:00:00Z",
+                "end_timestamp": "2026-01-01T00:00:00Z",
+            },
+            include=["metadata", "references"],
+        )
+    )
+    later = json.loads(
+        toolkit.mediawiki_evidence_query(
+            title="Example Page",
+            revision={
+                "mode": "first_in_interval",
+                "start_timestamp": "2026-01-01T00:00:00Z",
+                "end_timestamp": "2027-01-01T00:00:00Z",
+            },
+            include=["metadata", "references"],
         )
     )
 
-    assert result["earlier_reference_count"] == 121
-    assert result["later_reference_count"] == 125
-    assert result["increase"] == 4
-    assert result["calculation"] == "125 - 121 = 4"
+    assert earlier["revision"]["oldid"] == 1001
+    assert later["revision"]["oldid"] == 2001
+    assert earlier["counts"]["reference_count"] == 12
+    assert later["counts"]["reference_count"] == 16
+    assert later["counts"]["reference_count"] - earlier["counts"]["reference_count"] == 4
 
 
-def test_revision_at_picks_last_revision_before_cutoff():
+def test_mediawiki_query_picks_last_revision_before_cutoff():
     class FakeToolkit(WikipediaToolkit):
-        def _get_json(self, language, params):
+        def _get_json(self, language, params, site=""):
             assert params["rvdir"] == "older"
             return {
                 "query": {
                     "pages": [
                         {
-                            "title": "Adirondack (train)",
+                            "title": "Example",
                             "pageid": 123,
                             "revisions": [
-                                {
-                                    "revid": 200,
-                                    "timestamp": "2023-08-01T00:00:00Z",
-                                    "size": 10,
-                                },
-                                {
-                                    "revid": 199,
-                                    "timestamp": "2023-07-24T11:28:06Z",
-                                    "size": 9,
-                                },
+                                {"revid": 200, "timestamp": "2023-08-01T00:00:00Z", "size": 10},
+                                {"revid": 199, "timestamp": "2023-07-24T11:28:06Z", "size": 9},
                             ],
                         }
                     ]
                 }
             }
 
-    result = FakeToolkit()._revision_at_dict(
-        title="Adirondack (train)",
-        cutoff_timestamp="2023-08-01T00:00:00Z",
-        language="en",
-        inclusive=False,
+    result = json.loads(
+        FakeToolkit().mediawiki_evidence_query(
+            title="Example",
+            revision={"mode": "last_before", "cutoff_timestamp": "2023-08-01T00:00:00Z"},
+            include=["metadata"],
+        )
     )
 
-    assert result["oldid"] == 199
-    assert result["timestamp"] == "2023-07-24T11:28:06Z"
+    assert result["revision"]["oldid"] == 199
+    assert result["revision"]["timestamp"] == "2023-07-24T11:28:06Z"
 
 
-def test_revision_size_delta_find_uses_adjacent_chronological_sizes():
+def test_mediawiki_query_history_interval_can_annotate_adjacent_size_deltas():
     class FakeToolkit(WikipediaToolkit):
-        def _revision_size_history(self, title, start_timestamp, end_timestamp, language):
+        def _revision_size_history(self, title, start_timestamp, end_timestamp, language, site=""):
             return {
                 "page": {"title": title, "pageid": 123},
                 "revisions": [
@@ -164,26 +172,27 @@ def test_revision_size_delta_find_uses_adjacent_chronological_sizes():
             }
 
     result = json.loads(
-        FakeToolkit().wiki_revision_size_delta_find(
+        FakeToolkit().mediawiki_evidence_query(
             title="Example",
-            year=2025,
-            target_delta=889,
+            revision={"mode": "history_interval", "year": 2025},
+            include=["revision_history"],
+            history_metrics={"with_size_deltas": True, "match_delta": 889},
         )
     )
 
-    assert result["target_delta"] == 889
-    assert result["revision_count"] == 4
-    assert result["match_count"] == 1
-    assert result["matched_revision"]["oldid"] == 12
-    assert result["matched_revision"]["parent_oldid"] == 11
-    assert result["matched_revision"]["calculation"] == "1989 - 1100 = 889"
-    assert result["formatted_date"] == "2025/03/01"
+    history = result["revision_history"]
+    assert result["counts"]["revision_count"] == 4
+    assert result["counts"]["history_delta_match_count"] == 1
+    assert history["matched_revision"]["oldid"] == 12
+    assert history["matched_revision"]["parent_oldid"] == 11
+    assert history["matched_revision"]["calculation"] == "1989 - 1100 = 889"
+    assert history["matched_revision"]["formatted_date"] == "2025/03/01"
 
 
 def test_revision_table_parser_preserves_links():
     html = """
     <table class="wikitable">
-      <tr><th>Station</th><th>Connections</th></tr>
+      <tr><th>Place</th><th>Related items</th></tr>
       <tr>
         <td>New York</td>
         <td><a href="/wiki/Maple_Leaf_(train)" title="Maple Leaf (train)">Maple Leaf</a></td>
@@ -198,11 +207,11 @@ def test_revision_table_parser_preserves_links():
     assert tables[0]["rows"][1][1]["links"][0]["title"] == "Maple Leaf (train)"
 
 
-def test_rail_connection_count_deduplicates_adirondack_style_table():
+def test_mediawiki_query_table_counting_is_pattern_driven_and_deduplicated():
     class FakeToolkit(WikipediaToolkit):
-        def _raw_revision_dict(self, oldid, language):
+        def _raw_revision_dict(self, oldid, language, site=""):
             return {
-                "title": "Adirondack (train)",
+                "title": "Example",
                 "pageid": 456,
                 "oldid": int(oldid),
                 "timestamp": "2023-07-24T11:28:06Z",
@@ -210,185 +219,145 @@ def test_rail_connection_count_deduplicates_adirondack_style_table():
                 "wikitext": "",
             }
 
-        def _section_index_for_keyword(self, oldid, language, section_keyword):
+        def _section_index_for_keyword(self, oldid, language, section_keyword, site=""):
             return "3"
 
-        def _parse_html(self, oldid, language, section=None):
+        def _parse_html(self, oldid, language, section=None, site=""):
             return """
             <table class="wikitable">
-              <tr><th>Station</th><th>Connections/Notes</th></tr>
+              <tr><th>Place</th><th>Related items</th></tr>
               <tr>
-                <td>Montreal</td>
+                <td>A</td>
                 <td>
-                  <a title="Quebec City-Windsor Corridor">Corridor</a>;
-                  <a title="Ocean (train)">Ocean</a>;
-                  <a title="Montreal-Jonquiere train">Montreal-Jonquiere</a>;
-                  <a title="Montreal-Senneterre train">Montreal-Senneterre</a>;
-                  <a title="Mont-Saint-Hilaire line">Mont-Saint-Hilaire line</a>;
-                  <a title="Mascouche line">Mascouche line</a>;
-                  Montreal Metro; bus
-                </td>
-              </tr>
-              <tr>
-                <td>Albany-Rensselaer</td>
-                <td>
-                  <a title="Ethan Allen Express">Ethan Allen Express</a>;
-                  <a title="Empire Service">Empire Service</a>;
+                  <a title="Maple Leaf (train)">Maple Leaf</a>;
                   <a title="Lake Shore Limited">Lake Shore Limited</a>;
                   <a title="Maple Leaf (train)">Maple Leaf</a>;
-                  <a title="Berkshire Flyer">Berkshire Flyer</a>;
-                  Amtrak Thruway
-                </td>
-              </tr>
-              <tr>
-                <td>Croton-Harmon</td>
-                <td>
-                  <a title="Hudson Line (Metro-North)">Hudson Line</a>;
-                  <a title="Maple Leaf (train)">Maple Leaf</a>
-                </td>
-              </tr>
-              <tr>
-                <td>New York Penn Station</td>
-                <td>
-                  <a title="Cardinal (train)">Cardinal</a>;
-                  <a title="Crescent (train)">Crescent</a>;
-                  <a title="Palmetto (train)">Palmetto</a>;
-                  <a title="Pennsylvanian (train)">Pennsylvanian</a>;
-                  <a title="Silver Meteor">Silver Meteor</a>;
-                  <a title="Silver Star">Silver Star</a>;
-                  <a title="Acela">Acela</a>;
-                  <a title="Carolinian (train)">Carolinian</a>;
-                  <a title="Keystone Service">Keystone Service</a>;
-                  <a title="Northeast Regional">Northeast Regional</a>;
-                  <a title="Vermonter (train)">Vermonter</a>;
-                  <a title="Main Line (Long Island Rail Road)">Main Line</a>;
-                  <a title="Port Washington Branch">Port Washington Branch</a>;
-                  <a title="North Jersey Coast Line">North Jersey Coast Line</a>;
-                  <a title="Northeast Corridor Line">Northeast Corridor Line</a>;
-                  <a title="Gladstone Branch">Gladstone Branch</a>;
-                  <a title="Montclair-Boonton Line">Montclair-Boonton Line</a>;
-                  <a title="Morristown Line">Morristown Line</a>;
-                  New York City Subway
+                  <a title="Metro Subway">Metro Subway</a>
                 </td>
               </tr>
             </table>
             """
 
     result = json.loads(
-        FakeToolkit().wiki_rail_connection_count(
-            title="Adirondack (train)",
-            cutoff_timestamp="2023-08-01T00:00:00Z",
-            oldid=1166890780,
+        FakeToolkit().mediawiki_evidence_query(
+            title="Example",
+            revision={"mode": "oldid", "oldid": 1166890780},
+            include=["tables"],
+            extract={"section_keywords": ["Route"], "table_keywords": ["Related items"]},
+            counting={
+                "dedupe_by": "link_title",
+                "include_patterns": ["Maple|Lake|Subway"],
+                "exclude_patterns": ["Subway"],
+            },
         )
     )
 
     assert result["revision"]["oldid"] == 1166890780
-    assert result["connection_count"] == 30
-    assert result["group_counts"] == {
-        "VIA Rail / Exo": 6,
-        "Amtrak": 16,
-        "Commuter rail": 8,
-    }
-    assert result["calculation"] == "6 + 16 + 8 = 30"
-    assert any(item["term"] == "subway" for item in result["excluded_detected_terms"])
-    assert any(line["name"] == "Amtrak: Maple Leaf" for line in result["counted_lines"])
+    assert result["counts"]["matched_item_count"] == 2
+    assert [item["link_title"] for item in result["matched_items"]] == [
+        "Maple Leaf (train)",
+        "Lake Shore Limited",
+    ]
 
 
-def test_infobox_field_lookup_extracts_first_link_from_historical_field():
+def test_mediawiki_query_extracts_first_link_from_historical_field():
     class FakeToolkit(WikipediaToolkit):
-        def _raw_revision_dict(self, oldid, language):
+        def _raw_revision_dict(self, oldid, language, site=""):
             return {
-                "title": "ZTE",
+                "title": "ExampleOrg",
                 "pageid": 1785141,
                 "oldid": int(oldid),
                 "timestamp": "2025-01-26T19:21:08Z",
                 "size": 100,
                 "wikitext": """
                 {{Infobox company
-                | name = ZTE
-                | subsidiaries = {{ubl|[[Indonesia]]|[[Australia]]}}
+                | name = ExampleOrg
+                | markets = {{ubl|[[Country A]]|[[Country B]]}}
                 }}
                 """,
             }
 
     result = json.loads(
-        FakeToolkit().wiki_infobox_field_lookup(
-            title="ZTE",
-            oldid=1272009703,
-            field_name="subsidiaries",
-            link_mode="first_link",
+        FakeToolkit().mediawiki_evidence_query(
+            title="ExampleOrg",
+            revision={"mode": "oldid", "oldid": 1001},
+            include=["infobox"],
+            extract={"field_names": ["markets"], "link_mode": "first_link"},
         )
     )
 
-    assert result["oldid"] == 1272009703
-    assert result["matched_field_name"] == "subsidiaries"
-    assert result["selected_link"]["target"] == "Indonesia"
-    assert result["selected_value"] == "Indonesia"
-    assert "Australia" in result["cleaned_text"]
+    field = result["fields"][0]
+    assert result["revision"]["oldid"] == 1001
+    assert field["matched_field_name"] == "markets"
+    assert field["selected_link"]["target"] == "Country A"
+    assert field["selected_value"] == "Country A"
+    assert "Country B" in field["cleaned_text"]
 
 
-def test_infobox_field_lookup_prefers_exact_section_over_partial_infobox_field():
+def test_mediawiki_query_prefers_exact_section_over_partial_infobox_field():
     class FakeToolkit(WikipediaToolkit):
-        def _raw_revision_dict(self, oldid, language):
+        def _raw_revision_dict(self, oldid, language, site=""):
             return {
-                "title": "ZTE",
+                "title": "ExampleOrg",
                 "pageid": 1785141,
                 "oldid": int(oldid),
                 "timestamp": "2025-01-26T19:21:08Z",
                 "size": 100,
                 "wikitext": """
                 {{Infobox company
-                | name = ZTE
-                | subsid = [[Nubia Technology]]
+                | name = ExampleOrg
+                | market = [[Partial Field]]
                 }}
 
-                ==Subsidiaries==
-                [[File:ZTE.jpg|thumb|ZTE]]
-                ZTE has subsidiaries in countries including [[Indonesia]], [[Australia]].
+                ==Markets==
+                ExampleOrg operates in [[Country A]] and [[Country B]].
                 """,
             }
 
     result = json.loads(
-        FakeToolkit().wiki_infobox_field_lookup(
-            title="ZTE",
-            oldid=1272009703,
-            field_name="subsidiaries",
-            link_mode="first_link",
+        FakeToolkit().mediawiki_evidence_query(
+            title="ExampleOrg",
+            revision={"mode": "oldid", "oldid": 1001},
+            include=["infobox", "sections"],
+            extract={"field_names": ["markets"], "link_mode": "first_link"},
         )
     )
 
-    assert result["source_type"] == "section"
-    assert result["matched_field_name"] == "Subsidiaries"
-    assert result["selected_value"] == "Indonesia"
-    assert result["selected_link"]["target"] == "Indonesia"
+    field = result["fields"][0]
+    assert field["source_type"] == "section"
+    assert field["matched_field_name"] == "Markets"
+    assert field["selected_value"] == "Country A"
+    assert field["selected_link"]["target"] == "Country A"
 
 
-def test_infobox_field_lookup_cleans_native_phrase_template():
+def test_mediawiki_query_cleans_native_phrase_template_from_current_page():
     class FakeToolkit(WikipediaToolkit):
-        def _page_wikitext_dict(self, title, language):
+        def _page_wikitext_dict(self, title, language, site=""):
             return {
-                "title": "Indonesia",
+                "title": "Example Country",
                 "pageid": 14579,
                 "oldid": 999,
                 "timestamp": "2026-01-01T00:00:00Z",
                 "size": 100,
                 "wikitext": """
                 {{Infobox country
-                | common_name = Indonesia
-                | national_motto = {{native phrase|kaw|[[Bhinneka Tunggal Ika]]|paren=omit}} ([[Old Javanese]])<br />"Unity in Diversity"
+                | common_name = Example Country
+                | motto = {{native phrase|xx|[[Example Motto]]|paren=omit}} ([[Example language]])<br />"Plain translation"
                 }}
                 """,
             }
 
     result = json.loads(
-        FakeToolkit().wiki_infobox_field_lookup(
-            title="Indonesia",
-            field_name="national_motto",
-            link_mode="raw_text",
+        FakeToolkit().mediawiki_evidence_query(
+            title="Example Country",
+            revision={"mode": "current"},
+            include=["infobox"],
+            extract={"field_names": ["motto"], "link_mode": "raw_text"},
         )
     )
 
-    assert result["matched_field_name"] == "national_motto"
-    assert result["selected_link"]["target"] == "Bhinneka Tunggal Ika"
-    assert result["selected_value"].startswith("Bhinneka Tunggal Ika")
-    assert "Unity in Diversity" in result["cleaned_text"]
+    field = result["fields"][0]
+    assert field["matched_field_name"] == "motto"
+    assert field["selected_link"]["target"] == "Example Motto"
+    assert field["selected_value"].startswith("Example Motto")
+    assert "Plain translation" in field["cleaned_text"]

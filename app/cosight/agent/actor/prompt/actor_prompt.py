@@ -115,13 +115,12 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
    - Include precise references to sources for all extracted information
    - IMPORTANT: Extracted information must be 100% faithful to the original sources
    - OPTIMIZATION: Only use file_saver ONCE per step to save all collected information
-6. For Wikipedia historical revision tasks:
-   - Prefer the dedicated wiki_first_revision, wiki_revision_at, wiki_reference_count, wiki_revision_reference_delta, wiki_infobox_field_lookup, wiki_revision_size_delta_find, and wiki_rail_connection_count tools over generic search or ad hoc execute_code.
-   - For "reference count" questions, count unique rendered reference-list entries such as ol.references li[id^="cite_note"]; do not use <sup class="reference"> citation callouts as the primary count because named reference reuses are then double-counted.
-   - For historical railway/table questions such as "as of the end of July 2023, how many other commuter/heavy rail lines did a train connect to", use wiki_rail_connection_count with the cutoff timestamp, then report the oldid/timestamp, counted unique lines, exclusions, and calculation.
-   - For page-size byte-delta questions, first derive the target integer if needed, then use wiki_revision_size_delta_find with the page title, year or interval, and target_delta; compare adjacent revisions in chronological order.
-   - For questions that ask for a value under a Wikipedia infobox field or same-named section such as Subsidiaries, motto, national_motto, or a field in a historical oldid, use wiki_infobox_field_lookup to extract the raw field/section, cleaned text, and links.
-   - In final notes, report the revision oldid/timestamp, both unique reference counts, the calculation, and mention citation callouts only as a cross-check if useful.
+6. For MediaWiki/Wikipedia evidence tasks:
+   - Use mediawiki_evidence_query for page revisions, revision history, wikitext/rendered HTML, reference lists, infobox fields, sections, tables, and simple revision-history metrics.
+   - Treat the tool as an evidence API, not an answer engine: choose revision selectors and extraction options from the question, then do comparison, filtering, arithmetic, and final interpretation yourself.
+   - For reference counts, use unique rendered reference-list entries when available; citation callouts are useful audit evidence but can double-count reused named references.
+   - For table questions, request the relevant historical revision and table/section candidates, then apply the include/exclude and deduplication rules stated by the question. Do not assume a built-in domain catalog.
+   - In final notes, cite the page/revision URL, oldid/timestamp when relevant, the evidence fields used, and the calculation or filtering rule you applied.
 7. For document abstract counting tasks:
    - If the question asks how many times a year or term appears in an abstract, use document_abstract_year_count before answering.
    - Count only the abstract segment before end markers such as Raktažodžiai, Keywords, Key words, ĮVADAS, or Introduction. Do not count introduction/body/full-document occurrences.
@@ -136,6 +135,10 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
 11. For Google Books page-snippet tasks:
    - If a question asks which page in a specific book contains or is referenced by an entry, prefer google_books_volume_search with the Google Books volume id or URL and the search term. Use page_id/snippet_text evidence and distinguish book page numbers from PDF physical pages.
    - For recipe cross-reference snippets such as "Stuff ... with: Recipe Name, 374", report the referenced page number and keep PDF extraction only as an audit fallback when available.
+12. For long online-video evidence tasks:
+   - If a question depends on a moment inside a long YouTube or online video, first use online_video_event_clip_extract with subtitle keywords and a narrow candidate window, then inspect the contact sheet before finalizing the event timestamp.
+   - Use the extracted clip and event audio instead of feeding the entire video to ask_question_about_video; keep the clip window short and the output concise.
+   - After identifying the track from the event audio, use music_credit_normalize to standardize the final SONG NAME, ARTIST NAME format and strip special characters from the artist name.
 
 # HTML Report Optimization Rules:
 10. When generating HTML reports, follow these optimization requirements:
@@ -401,13 +404,12 @@ def actor_system_prompt_zh(work_space_path):
    - 所有提取的信息需包含精确的来源引用
    - 重要提示：提取的信息必须完全忠实于原始来源
    - 优化提示：每个步骤只使用一次 file_saver 来保存所有收集的信息
-6. 处理 Wikipedia 历史版本任务时：
-   - 优先使用 wiki_first_revision、wiki_revision_at、wiki_reference_count、wiki_revision_reference_delta、wiki_infobox_field_lookup、wiki_revision_size_delta_find、wiki_rail_connection_count 专用工具，不要优先依赖通用搜索或临时 execute_code 脚本。
-   - 遇到 "reference count" 问题时，统计唯一参考文献列表条目，例如 ol.references li[id^="cite_note"]；不要把 <sup class="reference"> 正文引用上标次数作为主计数，因为命名引用复用会被重复计算。
-   - 遇到历史铁路/表格题，例如“截至 2023 年 7 月底某列车连接多少条其他 commuter/heavy rail lines”，使用 wiki_rail_connection_count 并传入 UTC 截止时间；最终说明 oldid/时间戳、唯一线路明细、排除项和计算式。
-   - 遇到页面 size/bytes 增量题，先推导目标整数，再用 wiki_revision_size_delta_find 传入页面标题、年份或时间区间、target_delta；按时间正序比较相邻版本 size 差值。
-   - 遇到需要读取 Wikipedia infobox 字段或同名章节的问题，例如 Subsidiaries、motto、national_motto 或历史 oldid 中某字段，使用 wiki_infobox_field_lookup 抽取原始字段/章节、清洗文本和链接。
-   - 最终说明中应写明 revision oldid/时间戳、两个唯一引用数、计算式；正文引用上标次数只可作为交叉检查。
+6. 处理 MediaWiki/Wikipedia 证据任务时：
+   - 使用 mediawiki_evidence_query 获取页面版本、历史记录、源码/渲染 HTML、参考文献列表、infobox 字段、章节、表格和简单历史指标。
+   - 把这个工具当作取证 API，而不是答案引擎：根据题目选择版本范围和抽取选项，比较、筛选、计算和最终判断由你完成。
+   - 统计引用时，优先使用渲染后的唯一参考文献列表条目；正文引用上标可作为审计证据，但命名引用复用时可能重复计数。
+   - 处理表格题时，先取相关历史版本和候选表格/章节，再按题目给出的 include/exclude 和去重规则筛选；不要假设工具内置了某个领域词表。
+   - 最终说明中写明页面/版本 URL、必要的 oldid/时间戳、使用的证据字段，以及你实际采用的计算或筛选规则。
 7. 处理文档摘要计数任务时：
    - 如果题目要求统计某年份或词语在 abstract/摘要中出现几次，回答前优先使用 document_abstract_year_count。
    - 只统计摘要边界内文本；遇到 Raktažodžiai、Keywords、Key words、ĮVADAS、Introduction 等摘要结束/正文开始标记后，不得继续计入。
@@ -422,6 +424,10 @@ def actor_system_prompt_zh(work_space_path):
 11. 处理 Google Books 页码片段题时：
    - 如果题目询问某本书中某条目/配方引用的是哪一页，优先使用 google_books_volume_search，传入 Google Books volume id 或 URL 和关键词。依据 page_id/snippet_text，不要把书内页码和 PDF 物理页混淆。
    - 遇到 "Stuff ... with: Recipe Name, 374" 这类配方交叉引用片段时，报告引用的书内页码；本地 PDF 抽取只作为辅助核验。
+12. 处理长在线视频证据题时：
+   - 如果题目依赖长 YouTube/在线视频中的某个时刻，先用 online_video_event_clip_extract 结合字幕关键词和窄时间窗抽取短片段，然后检查 contact sheet 再确定事件时间。
+   - 不要直接把整段视频喂给 ask_question_about_video；应先缩短片段、再取事件后音频，保持输出简洁。
+   - 识别出曲目后，使用 music_credit_normalize 统一成 SONG NAME, ARTIST NAME，并去掉 artist name 中的特殊字符。
 
 # HTML报告优化规则：
 10. 生成HTML报告时的优化要求：

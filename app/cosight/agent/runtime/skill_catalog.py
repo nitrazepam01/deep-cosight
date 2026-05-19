@@ -37,39 +37,9 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "搜索维基百科获取知识信息",
         "needs_workspace": False,
     },
-    "wiki_first_revision": {
-        "display_name_zh": "维基百科首个历史版本",
-        "description_zh": "使用 MediaWiki API 查询页面在指定年份的第一个修订版本",
-        "needs_workspace": False,
-    },
-    "wiki_revision_at": {
-        "display_name_zh": "维基百科指定时间历史版本",
-        "description_zh": "使用 MediaWiki API 查询页面在某个 UTC 截止时间前的最后一个修订版本",
-        "needs_workspace": False,
-    },
-    "wiki_reference_count": {
-        "display_name_zh": "维基百科历史版本引用计数",
-        "description_zh": "按唯一参考文献条目统计指定 Wikipedia oldid 的引用数，并区分正文引用上标次数",
-        "needs_workspace": False,
-    },
-    "wiki_revision_reference_delta": {
-        "display_name_zh": "维基百科历史版本引用增量",
-        "description_zh": "比较同一页面两个年份首个历史版本的唯一参考文献条目数增量",
-        "needs_workspace": False,
-    },
-    "wiki_infobox_field_lookup": {
-        "display_name_zh": "维基百科 Infobox 字段抽取",
-        "description_zh": "从 Wikipedia 当前页或历史版本 infobox 字段/同名章节中抽取内容、清洗文本并返回链接",
-        "needs_workspace": False,
-    },
-    "wiki_revision_size_delta_find": {
-        "display_name_zh": "维基百科修订字节增量查找",
-        "description_zh": "按时间顺序计算 Wikipedia revisions 的页面 size 差值，并查找指定字节增量的编辑",
-        "needs_workspace": False,
-    },
-    "wiki_rail_connection_count": {
-        "display_name_zh": "维基百科历史铁路连接计数",
-        "description_zh": "解析历史 Wikipedia 车站连接表格，按通勤铁路和重轨线路去重计数并排除非 rail 项",
+    "mediawiki_evidence_query": {
+        "display_name_zh": "MediaWiki 证据查询",
+        "description_zh": "通用查询 MediaWiki 页面版本、历史记录、页面源码、结构化字段、章节、表格和审计指标",
         "needs_workspace": False,
     },
     "taxon_binomial_verify": {
@@ -90,6 +60,16 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
     "google_books_volume_search": {
         "display_name_zh": "Google Books 书内搜索",
         "description_zh": "在 Google Books 指定书籍内搜索关键词，默认返回少量精确页标识、OCR 片段和页码引用",
+        "needs_workspace": False,
+    },
+    "online_video_event_clip_extract": {
+        "display_name_zh": "在线视频事件片段抽取",
+        "description_zh": "从在线视频中按字幕和时间窗抽取短片段、截图总览和事件后音频证据",
+        "needs_workspace": True,
+    },
+    "music_credit_normalize": {
+        "display_name_zh": "音乐署名标准化",
+        "description_zh": "将识别出的曲名和作者按要求清洗、罗马字/翻译字段优先，并生成提交格式",
         "needs_workspace": False,
     },
     "mark_step": {
@@ -243,12 +223,10 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
     """
     from app.cosight.agent.actor.instance.actor_agent_skill import (
         execute_code_skill, search_google_skill, tavily_search_skill,
-        search_wiki_skill, wiki_first_revision_skill, wiki_reference_count_skill,
-        wiki_revision_at_skill, wiki_revision_reference_delta_skill,
-        wiki_infobox_field_lookup_skill,
-        wiki_revision_size_delta_find_skill, wiki_rail_connection_count_skill,
+        search_wiki_skill, mediawiki_evidence_query_skill,
         taxon_binomial_verify_skill, place_street_number_resolve_skill,
         function_graph_letter_probe_skill, google_books_volume_search_skill,
+        online_video_event_clip_extract_skill, music_credit_normalize_skill,
         mark_step_skill, file_saver_skill,
         file_read_skill, file_str_replace_skill, file_find_in_content_skill,
         ask_question_about_image_skill, ask_question_about_video_skill,
@@ -266,17 +244,13 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "search_google": search_google_skill,
         "tavily_search": tavily_search_skill,
         "search_wiki": search_wiki_skill,
-        "wiki_first_revision": wiki_first_revision_skill,
-        "wiki_revision_at": wiki_revision_at_skill,
-        "wiki_reference_count": wiki_reference_count_skill,
-        "wiki_revision_reference_delta": wiki_revision_reference_delta_skill,
-        "wiki_infobox_field_lookup": wiki_infobox_field_lookup_skill,
-        "wiki_revision_size_delta_find": wiki_revision_size_delta_find_skill,
-        "wiki_rail_connection_count": wiki_rail_connection_count_skill,
+        "mediawiki_evidence_query": mediawiki_evidence_query_skill,
         "taxon_binomial_verify": taxon_binomial_verify_skill,
         "place_street_number_resolve": place_street_number_resolve_skill,
         "function_graph_letter_probe": function_graph_letter_probe_skill,
         "google_books_volume_search": google_books_volume_search_skill,
+        "online_video_event_clip_extract": online_video_event_clip_extract_skill,
+        "music_credit_normalize": music_credit_normalize_skill,
         "mark_step": mark_step_skill,
         "file_saver": file_saver_skill,
         "file_read": file_read_skill,

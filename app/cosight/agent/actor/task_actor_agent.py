@@ -45,6 +45,7 @@ from app.cosight.tool.taxonomy_toolkit import TaxonomyToolkit
 from app.cosight.tool.location_toolkit import LocationToolkit
 from app.cosight.tool.math_graph_toolkit import MathGraphToolkit
 from app.cosight.tool.google_books_toolkit import GoogleBooksToolkit
+from app.cosight.tool.video_event_toolkit import VideoEventToolkit
 from config.config import get_tavily_config
 from app.common.logger_util import logger
 
@@ -106,23 +107,20 @@ class TaskActorAgent(BaseAgent):
         location_toolkit = LocationToolkit()
         math_graph_toolkit = MathGraphToolkit()
         google_books_toolkit = GoogleBooksToolkit()
+        video_event_toolkit = VideoEventToolkit(workspace_path=self.work_space_path)
         all_functions = {"mark_step": act_toolkit.mark_step,
                          # "deep_search": deep_search_toolkit.deep_search,
                         #  "search_baidu": search_baidu,
                          "search_google": search_toolkit.search_google,
                          "search_wiki": search_toolkit.search_wiki,
                          "tavily_search": search_toolkit.tavily_search,
-                         "wiki_first_revision": wikipedia_toolkit.wiki_first_revision,
-                         "wiki_revision_at": wikipedia_toolkit.wiki_revision_at,
-                         "wiki_reference_count": wikipedia_toolkit.wiki_reference_count,
-                         "wiki_revision_reference_delta": wikipedia_toolkit.wiki_revision_reference_delta,
-                         "wiki_infobox_field_lookup": wikipedia_toolkit.wiki_infobox_field_lookup,
-                         "wiki_revision_size_delta_find": wikipedia_toolkit.wiki_revision_size_delta_find,
-                         "wiki_rail_connection_count": wikipedia_toolkit.wiki_rail_connection_count,
+                         "mediawiki_evidence_query": wikipedia_toolkit.mediawiki_evidence_query,
                          "taxon_binomial_verify": taxonomy_toolkit.taxon_binomial_verify,
                          "place_street_number_resolve": location_toolkit.place_street_number_resolve,
                          "function_graph_letter_probe": math_graph_toolkit.function_graph_letter_probe,
                          "google_books_volume_search": google_books_toolkit.google_books_volume_search,
+                         "online_video_event_clip_extract": video_event_toolkit.online_video_event_clip_extract,
+                         "music_credit_normalize": video_event_toolkit.music_credit_normalize,
                         #  "image_search": tavily_search.search,
                          "audio_recognition": audio_toolkit.speech_to_text,
                          # "search_duckgo": search_toolkit.search_duckduckgo,

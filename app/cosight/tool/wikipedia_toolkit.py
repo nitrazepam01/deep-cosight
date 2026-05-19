@@ -361,177 +361,14 @@ class _RevisionTableParser(HTMLParser):
 
 
 class WikipediaToolkit:
-    """Deterministic helpers for MediaWiki revision and reference-count tasks."""
+    """Deterministic helpers for MediaWiki page, revision, and evidence queries."""
 
-    USER_AGENT = "Cosight Wikipedia revision toolkit/1.0"
+    USER_AGENT = "Cosight MediaWiki evidence toolkit/1.0"
     _REF_OPEN_RE = re.compile(r"<\s*ref\b", re.IGNORECASE)
     _NAMED_SELF_CLOSING_REF_RE = re.compile(
         r"<\s*ref\b(?=[^>]*\bname\s*=)[^>]*?/\s*>",
         re.IGNORECASE | re.DOTALL,
     )
-    _RAIL_CONNECTION_CATALOG = [
-        {
-            "name": "VIA Rail: Quebec City-Windsor Corridor",
-            "group": "VIA Rail / Exo",
-            "patterns": ["quebec city windsor corridor", "quebec windsor corridor"],
-        },
-        {
-            "name": "VIA Rail: Ocean",
-            "group": "VIA Rail / Exo",
-            "patterns": ["ocean train", "via rail ocean", " ocean "],
-        },
-        {
-            "name": "VIA Rail: Montreal-Jonquiere",
-            "group": "VIA Rail / Exo",
-            "patterns": ["montreal jonquiere", "jonquiere"],
-        },
-        {
-            "name": "VIA Rail: Montreal-Senneterre",
-            "group": "VIA Rail / Exo",
-            "patterns": ["montreal senneterre", "senneterre"],
-        },
-        {
-            "name": "Exo: Mont-Saint-Hilaire line",
-            "group": "VIA Rail / Exo",
-            "patterns": ["mont saint hilaire line", "mont saint hilaire"],
-        },
-        {
-            "name": "Exo: Mascouche line",
-            "group": "VIA Rail / Exo",
-            "patterns": ["mascouche line", "mascouche"],
-        },
-        {
-            "name": "Amtrak: Ethan Allen Express",
-            "group": "Amtrak",
-            "patterns": ["ethan allen express"],
-        },
-        {
-            "name": "Amtrak: Empire Service",
-            "group": "Amtrak",
-            "patterns": ["empire service"],
-        },
-        {
-            "name": "Amtrak: Lake Shore Limited",
-            "group": "Amtrak",
-            "patterns": ["lake shore limited"],
-        },
-        {
-            "name": "Amtrak: Maple Leaf",
-            "group": "Amtrak",
-            "patterns": ["maple leaf train", "amtrak maple leaf", "maple leaf"],
-        },
-        {
-            "name": "Amtrak: Berkshire Flyer",
-            "group": "Amtrak",
-            "patterns": ["berkshire flyer"],
-        },
-        {
-            "name": "Metro-North: Hudson Line",
-            "group": "Commuter rail",
-            "patterns": ["hudson line metro north", "metro north hudson line", "hudson line"],
-        },
-        {
-            "name": "Amtrak: Cardinal",
-            "group": "Amtrak",
-            "patterns": ["cardinal train", "amtrak cardinal", "cardinal"],
-        },
-        {
-            "name": "Amtrak: Crescent",
-            "group": "Amtrak",
-            "patterns": ["crescent train", "amtrak crescent", "crescent"],
-        },
-        {
-            "name": "Amtrak: Palmetto",
-            "group": "Amtrak",
-            "patterns": ["palmetto train", "amtrak palmetto", "palmetto"],
-        },
-        {
-            "name": "Amtrak: Pennsylvanian",
-            "group": "Amtrak",
-            "patterns": ["pennsylvanian train", "amtrak pennsylvanian", "pennsylvanian"],
-        },
-        {
-            "name": "Amtrak: Silver Meteor",
-            "group": "Amtrak",
-            "patterns": ["silver meteor"],
-        },
-        {
-            "name": "Amtrak: Silver Star",
-            "group": "Amtrak",
-            "patterns": ["silver star"],
-        },
-        {
-            "name": "Amtrak: Acela",
-            "group": "Amtrak",
-            "patterns": ["acela"],
-        },
-        {
-            "name": "Amtrak: Carolinian",
-            "group": "Amtrak",
-            "patterns": ["carolinian train", "amtrak carolinian", "carolinian"],
-        },
-        {
-            "name": "Amtrak: Keystone Service",
-            "group": "Amtrak",
-            "patterns": ["keystone service"],
-        },
-        {
-            "name": "Amtrak: Northeast Regional",
-            "group": "Amtrak",
-            "patterns": ["northeast regional"],
-        },
-        {
-            "name": "Amtrak: Vermonter",
-            "group": "Amtrak",
-            "patterns": ["vermonter train", "amtrak vermonter", "vermonter"],
-        },
-        {
-            "name": "LIRR: Main Line",
-            "group": "Commuter rail",
-            "patterns": ["long island rail road main line", "main line long island rail road"],
-        },
-        {
-            "name": "LIRR: Port Washington Branch",
-            "group": "Commuter rail",
-            "patterns": ["port washington branch"],
-        },
-        {
-            "name": "NJ Transit: North Jersey Coast Line",
-            "group": "Commuter rail",
-            "patterns": ["north jersey coast line"],
-        },
-        {
-            "name": "NJ Transit: Northeast Corridor Line",
-            "group": "Commuter rail",
-            "patterns": ["northeast corridor line"],
-        },
-        {
-            "name": "NJ Transit: Gladstone Branch",
-            "group": "Commuter rail",
-            "patterns": ["gladstone branch"],
-        },
-        {
-            "name": "NJ Transit: Montclair-Boonton Line",
-            "group": "Commuter rail",
-            "patterns": ["montclair boonton line"],
-        },
-        {
-            "name": "NJ Transit: Morristown Line",
-            "group": "Commuter rail",
-            "patterns": ["morristown line"],
-        },
-    ]
-    _RAIL_EXCLUDE_PATTERNS = [
-        "subway",
-        "metro",
-        "light rail",
-        "bus",
-        "ferry",
-        "amtrak thruway",
-        "thruway motorcoach",
-        "taxi",
-        "rideshare",
-    ]
 
     def __init__(self, timeout: int = 30):
         self.timeout = timeout
@@ -542,25 +379,29 @@ class WikipediaToolkit:
         self.session.headers.update({"User-Agent": self.USER_AGENT})
 
     @staticmethod
-    def _api_url(language: str) -> str:
-        return f"https://{language}.wikipedia.org/w/api.php"
+    def _site_domain(language: str, site: str = "") -> str:
+        return str(site or f"{language}.wikipedia.org").strip().replace("https://", "").replace("http://", "").strip("/")
 
     @staticmethod
-    def _index_url(language: str) -> str:
-        return f"https://{language}.wikipedia.org/w/index.php"
+    def _api_url(language: str, site: str = "") -> str:
+        return f"https://{WikipediaToolkit._site_domain(language, site)}/w/api.php"
+
+    @staticmethod
+    def _index_url(language: str, site: str = "") -> str:
+        return f"https://{WikipediaToolkit._site_domain(language, site)}/w/index.php"
 
     @staticmethod
     def _json(data: Dict[str, Any]) -> str:
         return json.dumps(data, ensure_ascii=False, indent=2)
 
-    def _get_json(self, language: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_json(self, language: str, params: Dict[str, Any], site: str = "") -> Dict[str, Any]:
         base_params = {
             "format": "json",
             "formatversion": "2",
         }
         merged = {**base_params, **params}
         response = self.session.get(
-            self._api_url(language),
+            self._api_url(language, site),
             params=merged,
             timeout=self.timeout,
         )
@@ -572,51 +413,13 @@ class WikipediaToolkit:
         response.raise_for_status()
         return response.text
 
-    def _first_revision_dict(self, title: str, year: int, language: str) -> Dict[str, Any]:
-        start = f"{year:04d}-01-01T00:00:00Z"
-        end = f"{year + 1:04d}-01-01T00:00:00Z"
-        data = self._get_json(
-            language,
-            {
-                "action": "query",
-                "prop": "revisions",
-                "titles": title,
-                "rvprop": "ids|timestamp|size",
-                "rvlimit": "1",
-                "rvdir": "newer",
-                "rvstart": start,
-                "rvend": end,
-            },
-        )
-
-        pages = data.get("query", {}).get("pages", [])
-        if not pages:
-            raise ValueError(f"No Wikipedia page found for title: {title}")
-        page = pages[0]
-        revisions = page.get("revisions") or []
-        if not revisions:
-            raise ValueError(f"No revisions found for {title} in {year}")
-
-        revision = revisions[0]
-        return {
-            "title": page.get("title", title),
-            "pageid": page.get("pageid"),
-            "year": year,
-            "oldid": revision.get("revid"),
-            "timestamp": revision.get("timestamp"),
-            "size": revision.get("size"),
-            "url": (
-                f"https://{language}.wikipedia.org/w/index.php?"
-                f"{urlencode({'title': page.get('title', title), 'oldid': revision.get('revid')})}"
-            ),
-        }
-
     def _revision_at_dict(
         self,
         title: str,
         cutoff_timestamp: str,
         language: str,
         inclusive: bool = False,
+        site: str = "",
     ) -> Dict[str, Any]:
         data = self._get_json(
             language,
@@ -629,6 +432,7 @@ class WikipediaToolkit:
                 "rvdir": "older",
                 "rvstart": cutoff_timestamp,
             },
+            site=site,
         )
 
         pages = data.get("query", {}).get("pages", [])
@@ -646,50 +450,12 @@ class WikipediaToolkit:
                     "oldid": revision.get("revid"),
                     "timestamp": timestamp,
                     "size": revision.get("size"),
-                    "url": (
-                        f"https://{language}.wikipedia.org/w/index.php?"
-                        f"{urlencode({'title': page.get('title', title), 'oldid': revision.get('revid')})}"
-                    ),
+                    "url": self._revision_url(page.get("title", title), revision.get("revid"), language, site),
                 }
 
         raise ValueError(f"No revision found before cutoff {cutoff_timestamp} for {title}")
 
-    def wiki_first_revision(self, title: str, year: int, language: str = "en") -> str:
-        """Return the first revision of a Wikipedia page in a calendar year."""
-        try:
-            return self._json(self._first_revision_dict(title, int(year), language))
-        except Exception as exc:
-            logger.error("wiki_first_revision failed: %s", exc, exc_info=True)
-            return self._json({"error": str(exc), "title": title, "year": year})
-
-    def wiki_revision_at(
-        self,
-        title: str,
-        cutoff_timestamp: str,
-        language: str = "en",
-        inclusive: bool = False,
-    ) -> str:
-        """Return the revision at or immediately before a UTC cutoff timestamp."""
-        try:
-            return self._json(
-                self._revision_at_dict(
-                    title=title,
-                    cutoff_timestamp=cutoff_timestamp,
-                    language=language,
-                    inclusive=bool(inclusive),
-                )
-            )
-        except Exception as exc:
-            logger.error("wiki_revision_at failed: %s", exc, exc_info=True)
-            return self._json(
-                {
-                    "error": str(exc),
-                    "title": title,
-                    "cutoff_timestamp": cutoff_timestamp,
-                }
-            )
-
-    def _raw_revision_dict(self, oldid: int, language: str) -> Dict[str, Any]:
+    def _raw_revision_dict(self, oldid: int, language: str, site: str = "") -> Dict[str, Any]:
         data = self._get_json(
             language,
             {
@@ -699,6 +465,7 @@ class WikipediaToolkit:
                 "rvprop": "ids|timestamp|size|content",
                 "rvslots": "main",
             },
+            site=site,
         )
         pages = data.get("query", {}).get("pages", [])
         if not pages:
@@ -718,7 +485,7 @@ class WikipediaToolkit:
             "wikitext": slot.get("content", ""),
         }
 
-    def _page_wikitext_dict(self, title: str, language: str) -> Dict[str, Any]:
+    def _page_wikitext_dict(self, title: str, language: str, site: str = "") -> Dict[str, Any]:
         data = self._get_json(
             language,
             {
@@ -729,6 +496,7 @@ class WikipediaToolkit:
                 "rvslots": "main",
                 "rvlimit": "1",
             },
+            site=site,
         )
         pages = data.get("query", {}).get("pages", [])
         if not pages:
@@ -750,13 +518,605 @@ class WikipediaToolkit:
         }
 
     @staticmethod
-    def _revision_url(title: str, oldid: Any, language: str) -> str:
+    def _revision_url(title: str, oldid: Any, language: str, site: str = "") -> str:
+        domain = WikipediaToolkit._site_domain(language, site)
         if oldid:
             return (
-                f"https://{language}.wikipedia.org/w/index.php?"
+                f"https://{domain}/w/index.php?"
                 f"{urlencode({'title': title, 'oldid': oldid})}"
             )
-        return f"https://{language}.wikipedia.org/wiki/{title.replace(' ', '_')}"
+        return f"https://{domain}/wiki/{title.replace(' ', '_')}"
+
+    @staticmethod
+    def _language_from_site(site: str, language: str = "") -> str:
+        if language:
+            return language
+        site = str(site or "en.wikipedia.org").strip().lower()
+        if site.endswith(".wikipedia.org") and "." in site:
+            prefix = site.split(".", 1)[0]
+            if prefix:
+                return prefix
+        return "en"
+
+    @staticmethod
+    def _as_dict(value: Any) -> Dict[str, Any]:
+        if value is None:
+            return {}
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return {}
+            try:
+                parsed = json.loads(value)
+                return parsed if isinstance(parsed, dict) else {}
+            except Exception:
+                return {}
+        return {}
+
+    @staticmethod
+    def _as_list(value: Any) -> List[Any]:
+        if value is None or value == "":
+            return []
+        if isinstance(value, list):
+            return value
+        if isinstance(value, tuple):
+            return list(value)
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return []
+            try:
+                parsed = json.loads(stripped)
+                if isinstance(parsed, list):
+                    return parsed
+            except Exception:
+                pass
+            return [item.strip() for item in re.split(r"[,;]", stripped) if item.strip()]
+        return [value]
+
+    def _first_revision_in_interval_dict(
+        self,
+        title: str,
+        start_timestamp: str,
+        end_timestamp: str,
+        language: str,
+        site: str = "",
+    ) -> Dict[str, Any]:
+        data = self._get_json(
+            language,
+            {
+                "action": "query",
+                "prop": "revisions",
+                "titles": title,
+                "rvprop": "ids|timestamp|size",
+                "rvlimit": "1",
+                "rvdir": "newer",
+                "rvstart": start_timestamp,
+                "rvend": end_timestamp,
+            },
+            site=site,
+        )
+        pages = data.get("query", {}).get("pages", [])
+        if not pages:
+            raise ValueError(f"No Wikipedia page found for title: {title}")
+        page = pages[0]
+        revisions = page.get("revisions") or []
+        if not revisions:
+            raise ValueError(f"No revisions found for {title} in interval")
+        revision = revisions[0]
+        return {
+            "title": page.get("title", title),
+            "pageid": page.get("pageid"),
+            "start_timestamp": start_timestamp,
+            "end_timestamp": end_timestamp,
+            "oldid": revision.get("revid"),
+            "timestamp": revision.get("timestamp"),
+            "size": revision.get("size"),
+            "url": self._revision_url(page.get("title", title), revision.get("revid"), language, site),
+        }
+
+    @staticmethod
+    def _interval_from_revision_spec(revision: Dict[str, Any]) -> tuple[str, str]:
+        start_timestamp = str(revision.get("start_timestamp") or "").strip()
+        end_timestamp = str(revision.get("end_timestamp") or "").strip()
+        year = revision.get("year")
+        if year is not None and (not start_timestamp or not end_timestamp):
+            interval = WikipediaToolkit._year_interval(int(year))
+            start_timestamp = start_timestamp or interval["start_timestamp"]
+            end_timestamp = end_timestamp or interval["end_timestamp"]
+        return start_timestamp, end_timestamp
+
+    def _history_with_metrics(
+        self,
+        title: str,
+        start_timestamp: str,
+        end_timestamp: str,
+        language: str,
+        history_metrics: Dict[str, Any],
+        site: str = "",
+    ) -> Dict[str, Any]:
+        history = self._revision_size_history(title, start_timestamp, end_timestamp, language, site=site)
+        revisions = history.get("revisions") or []
+        with_size_deltas = bool(history_metrics.get("with_size_deltas"))
+        match_delta = history_metrics.get("match_delta")
+        output_date_format = str(history_metrics.get("output_date_format") or "%Y/%m/%d")
+        matches = []
+        annotated = []
+        for index, revision in enumerate(revisions):
+            item = {
+                "oldid": revision.get("revid"),
+                "timestamp": revision.get("timestamp"),
+                "size": revision.get("size"),
+                "url": self._revision_url(history.get("page", {}).get("title") or title, revision.get("revid"), language, site),
+            }
+            if with_size_deltas and index > 0:
+                previous = revisions[index - 1]
+                if previous.get("size") is not None and revision.get("size") is not None:
+                    delta = int(revision["size"]) - int(previous["size"])
+                    item.update(
+                        {
+                            "parent_oldid": previous.get("revid"),
+                            "previous_timestamp": previous.get("timestamp"),
+                            "previous_size": previous.get("size"),
+                            "delta": delta,
+                            "calculation": f"{revision.get('size')} - {previous.get('size')} = {delta}",
+                        }
+                    )
+                    if match_delta is not None and delta == int(match_delta):
+                        match = {
+                            **item,
+                            "formatted_date": self._format_revision_date(
+                                str(revision.get("timestamp") or ""),
+                                output_date_format,
+                            ),
+                        }
+                        matches.append(match)
+            annotated.append(item)
+
+        result = {
+            "page": history.get("page"),
+            "start_timestamp": start_timestamp,
+            "end_timestamp": end_timestamp,
+            "revision_count": len(revisions),
+            "revisions": annotated if with_size_deltas else [
+                {
+                    "oldid": revision.get("revid"),
+                    "timestamp": revision.get("timestamp"),
+                    "size": revision.get("size"),
+                    "url": self._revision_url(history.get("page", {}).get("title") or title, revision.get("revid"), language, site),
+                }
+                for revision in revisions
+            ],
+        }
+        if match_delta is not None:
+            result.update(
+                {
+                    "match_delta": int(match_delta),
+                    "match_count": len(matches),
+                    "matches": matches,
+                    "matched_revision": matches[0] if matches else None,
+                }
+            )
+        return result
+
+    def _resolve_mediawiki_revision(
+        self,
+        title: str,
+        revision_spec: Dict[str, Any],
+        language: str,
+        site: str = "",
+    ) -> tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        mode = str(revision_spec.get("mode") or "current").strip().lower()
+        if mode == "oldid":
+            oldid = revision_spec.get("oldid")
+            if oldid is None:
+                raise ValueError("revision.oldid is required when mode is oldid")
+            raw = self._raw_revision_dict(int(oldid), language, site=site)
+            revision = {
+                "title": raw.get("title") or title,
+                "pageid": raw.get("pageid"),
+                "oldid": raw.get("oldid"),
+                "timestamp": raw.get("timestamp"),
+                "size": raw.get("size"),
+                "url": self._revision_url(raw.get("title") or title, raw.get("oldid"), language, site),
+            }
+            return revision, raw
+        if mode == "current":
+            raw = self._page_wikitext_dict(title, language, site=site)
+            revision = {
+                "title": raw.get("title") or title,
+                "pageid": raw.get("pageid"),
+                "oldid": raw.get("oldid"),
+                "timestamp": raw.get("timestamp"),
+                "size": raw.get("size"),
+                "url": self._revision_url(raw.get("title") or title, raw.get("oldid"), language, site),
+            }
+            return revision, raw
+        if mode == "first_in_interval":
+            start_timestamp, end_timestamp = self._interval_from_revision_spec(revision_spec)
+            if not start_timestamp or not end_timestamp:
+                raise ValueError("revision.start_timestamp and revision.end_timestamp are required for first_in_interval")
+            return self._first_revision_in_interval_dict(title, start_timestamp, end_timestamp, language, site=site), None
+        if mode == "last_before":
+            cutoff = str(revision_spec.get("cutoff_timestamp") or "").strip()
+            if not cutoff:
+                raise ValueError("revision.cutoff_timestamp is required for last_before")
+            inclusive = bool(revision_spec.get("inclusive", False))
+            return self._revision_at_dict(title, cutoff, language, inclusive=inclusive, site=site), None
+        if mode == "history_interval":
+            return None, None
+        raise ValueError(f"Unsupported revision mode: {mode}")
+
+    def _extract_mediawiki_fields(
+        self,
+        page: Dict[str, Any],
+        field_names: List[Any],
+        language: str,
+        site: str = "",
+        clean_templates: bool = True,
+        link_mode: str = "raw_text",
+    ) -> List[Dict[str, Any]]:
+        fields = []
+        wikitext = page.get("wikitext", "")
+        for field_name in field_names:
+            field_name = str(field_name)
+            try:
+                try:
+                    field = self._find_infobox_field(wikitext, field_name, allow_partial=False)
+                except ValueError:
+                    try:
+                        field = self._find_section_field(wikitext, field_name)
+                    except ValueError:
+                        field = self._find_infobox_field(wikitext, field_name, allow_partial=True)
+                raw_value = field.get("value", "")
+                links = self._extract_wiki_links(raw_value, language, site=site)
+                cleaned_text = _clean_wikitext_value(raw_value) if clean_templates else _strip_wiki_markup(raw_value)
+                selected_link = links[0] if links else None
+                normalized_link_mode = (link_mode or "raw_text").lower().strip()
+                if normalized_link_mode == "first_link":
+                    selected_value: Any = selected_link.get("target") if selected_link else cleaned_text
+                elif normalized_link_mode == "all_links":
+                    selected_value = [link.get("target") for link in links]
+                else:
+                    normalized_link_mode = "raw_text"
+                    selected_value = cleaned_text
+                fields.append(
+                    {
+                        "requested_field": field_name,
+                        "matched_field_name": field.get("name"),
+                        "matched_field_normalized": field.get("normalized_name"),
+                        "match_type": field.get("match_type"),
+                        "source_type": field.get("source_type"),
+                        "raw_value": raw_value,
+                        "cleaned_text": cleaned_text,
+                        "links": links,
+                        "selected_link": selected_link,
+                        "link_mode": normalized_link_mode,
+                        "selected_value": selected_value,
+                    }
+                )
+            except Exception as exc:
+                fields.append({"requested_field": field_name, "error": str(exc)})
+        return fields
+
+    def _extract_mediawiki_sections(
+        self,
+        page: Dict[str, Any],
+        section_keywords: List[Any],
+        language: str,
+        site: str = "",
+        clean_templates: bool = True,
+    ) -> List[Dict[str, Any]]:
+        sections = []
+        for keyword in section_keywords:
+            keyword = str(keyword)
+            try:
+                field = self._find_section_field(page.get("wikitext", ""), keyword)
+                raw_value = field.get("value", "")
+                sections.append(
+                    {
+                        "requested_section": keyword,
+                        "matched_heading": field.get("name"),
+                        "match_type": field.get("match_type"),
+                        "raw_value": raw_value,
+                        "cleaned_text": _clean_wikitext_value(raw_value) if clean_templates else _strip_wiki_markup(raw_value),
+                        "links": self._extract_wiki_links(raw_value, language, site=site),
+                    }
+                )
+            except Exception as exc:
+                sections.append({"requested_section": keyword, "error": str(exc)})
+        return sections
+
+    def _extract_mediawiki_tables(
+        self,
+        oldid: int,
+        language: str,
+        section_keywords: List[Any],
+        table_keywords: List[Any],
+        site: str = "",
+    ) -> Dict[str, Any]:
+        selected_tables = []
+        warnings = []
+        section_values = [str(item) for item in section_keywords] or [""]
+        table_values = [str(item) for item in table_keywords] or [""]
+        for section_keyword in section_values:
+            for table_keyword in table_values:
+                try:
+                    table_result = self._extract_revision_table(
+                        oldid=oldid,
+                        language=language,
+                        site=site,
+                        section_keyword=section_keyword,
+                        table_keyword=table_keyword,
+                    )
+                    selected_tables.append(table_result)
+                except Exception as exc:
+                    warnings.append(
+                        {
+                            "section_keyword": section_keyword,
+                            "table_keyword": table_keyword,
+                            "error": str(exc),
+                        }
+                    )
+        return {
+            "selected_tables": selected_tables,
+            "selected_table_count": len(selected_tables),
+            "warnings": warnings,
+        }
+
+    @staticmethod
+    def _pattern_matches(patterns: List[Any], text: str, default: bool) -> bool:
+        normalized_text = text or ""
+        normalized_for_simple = _normalize_for_match(normalized_text)
+        if not patterns:
+            return default
+        for pattern in patterns:
+            raw_pattern = str(pattern or "")
+            if not raw_pattern:
+                continue
+            try:
+                if re.search(raw_pattern, normalized_text, flags=re.I):
+                    return True
+            except re.error:
+                pass
+            if _normalize_for_match(raw_pattern) in normalized_for_simple:
+                return True
+        return False
+
+    def _count_table_items(
+        self,
+        tables_result: Dict[str, Any],
+        counting: Dict[str, Any],
+    ) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
+        dedupe_by = str(counting.get("dedupe_by") or "link_title").strip().lower()
+        pattern_scope = str(counting.get("pattern_scope") or "candidate").strip().lower()
+        include_patterns = self._as_list(counting.get("include_patterns"))
+        exclude_patterns = self._as_list(counting.get("exclude_patterns"))
+        matched: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+
+        for table_index, table_result in enumerate(tables_result.get("selected_tables") or []):
+            table = table_result.get("selected_table") or {}
+            for row_index, row in enumerate(table.get("rows") or []):
+                for cell_index, cell in enumerate(row):
+                    candidates = []
+                    for link in cell.get("links") or []:
+                        candidates.append(
+                            {
+                                "type": "link",
+                                "text": link.get("text") or link.get("title") or "",
+                                "link_title": link.get("title") or link.get("text") or "",
+                                "href": link.get("href"),
+                                "cell_text": cell.get("text", ""),
+                            }
+                        )
+                    if not candidates and cell.get("text"):
+                        candidates.append(
+                            {
+                                "type": "cell_text",
+                                "text": cell.get("text", ""),
+                                "link_title": "",
+                                "href": "",
+                                "cell_text": cell.get("text", ""),
+                            }
+                        )
+                    for candidate in candidates:
+                        candidate_blob = " ".join(
+                            str(candidate.get(key, ""))
+                            for key in ("text", "link_title", "href")
+                        )
+                        blob = candidate_blob
+                        if pattern_scope in {"cell", "context", "cell_text"}:
+                            blob = f"{candidate_blob} {candidate.get('cell_text', '')}"
+                        if not self._pattern_matches(include_patterns, blob, default=True):
+                            continue
+                        if self._pattern_matches(exclude_patterns, blob, default=False):
+                            continue
+                        if dedupe_by == "cleaned_text":
+                            key = _normalize_for_match(candidate.get("text") or candidate.get("cell_text"))
+                        elif dedupe_by == "reference_id":
+                            key = str(candidate.get("href") or candidate.get("link_title") or candidate.get("text"))
+                        else:
+                            key = _normalize_for_match(candidate.get("link_title") or candidate.get("text"))
+                        if not key or key in seen:
+                            continue
+                        seen.add(key)
+                        matched.append(
+                            {
+                                **candidate,
+                                "dedupe_key": key,
+                                "table_index": table_index,
+                                "row_index": row_index,
+                                "cell_index": cell_index,
+                            }
+                        )
+        return (
+            {
+                "dedupe_by": dedupe_by,
+                "pattern_scope": pattern_scope,
+                "matched_item_count": len(matched),
+                "include_patterns": include_patterns,
+                "exclude_patterns": exclude_patterns,
+            },
+            matched,
+        )
+
+    def mediawiki_evidence_query(
+        self,
+        site: str = "en.wikipedia.org",
+        title: str = "",
+        revision: Optional[Any] = None,
+        include: Optional[Any] = None,
+        extract: Optional[Any] = None,
+        history_metrics: Optional[Any] = None,
+        counting: Optional[Any] = None,
+        language: str = "",
+    ) -> str:
+        """General MediaWiki evidence query for revisions, content, tables, fields, and counts."""
+        try:
+            revision_spec = self._as_dict(revision)
+            extract_spec = self._as_dict(extract)
+            history_metric_spec = self._as_dict(history_metrics)
+            counting_spec = self._as_dict(counting)
+            include_items = set(str(item).strip().lower() for item in self._as_list(include))
+            if not include_items:
+                include_items = {"metadata"}
+            language = self._language_from_site(site, language)
+            site = str(site or f"{language}.wikipedia.org")
+            mode = str(revision_spec.get("mode") or "current").strip().lower()
+            result: Dict[str, Any] = {
+                "site": site,
+                "language": language,
+                "query": {
+                    "title": title,
+                    "revision": revision_spec,
+                    "include": sorted(include_items),
+                    "extract": extract_spec,
+                    "history_metrics": history_metric_spec,
+                    "counting": counting_spec,
+                },
+                "page": {},
+                "revision": None,
+                "revision_history": None,
+                "references": None,
+                "fields": [],
+                "sections": [],
+                "tables": None,
+                "counts": {},
+                "matched_items": [],
+                "audit": [],
+                "source_urls": [],
+            }
+
+            if mode == "history_interval" or "revision_history" in include_items:
+                start_timestamp, end_timestamp = self._interval_from_revision_spec(revision_spec)
+                if not start_timestamp or not end_timestamp:
+                    raise ValueError("revision.start_timestamp and revision.end_timestamp are required for history_interval/revision_history")
+                history = self._history_with_metrics(
+                    title=title,
+                    start_timestamp=start_timestamp,
+                    end_timestamp=end_timestamp,
+                    language=language,
+                    history_metrics=history_metric_spec,
+                    site=site,
+                )
+                result["revision_history"] = history
+                result["page"] = history.get("page") or {}
+                result["counts"]["revision_count"] = history.get("revision_count", 0)
+                if history.get("match_delta") is not None:
+                    result["counts"]["history_delta_match_count"] = history.get("match_count", 0)
+                for revision_item in history.get("revisions") or []:
+                    if revision_item.get("url"):
+                        result["source_urls"].append(revision_item["url"])
+
+            revision_info, raw_page = self._resolve_mediawiki_revision(title, revision_spec, language, site=site)
+            if revision_info:
+                result["revision"] = revision_info
+                result["page"] = {
+                    "title": revision_info.get("title"),
+                    "pageid": revision_info.get("pageid"),
+                }
+                if revision_info.get("url"):
+                    result["source_urls"].append(revision_info["url"])
+
+            content_needed = bool(
+                {"wikitext", "infobox", "sections", "tables"}.intersection(include_items)
+                or extract_spec.get("field_names")
+                or extract_spec.get("section_keywords")
+            )
+            if content_needed and raw_page is None and revision_info and revision_info.get("oldid"):
+                raw_page = self._raw_revision_dict(int(revision_info["oldid"]), language, site=site)
+            if raw_page and "wikitext" in include_items:
+                result["wikitext"] = raw_page.get("wikitext", "")
+
+            if revision_info and "rendered_html" in include_items:
+                result["rendered_html"] = self._parse_html(int(revision_info["oldid"]), language, site=site)
+
+            if revision_info and "references" in include_items:
+                references = self._reference_count_dict(
+                    oldid=int(revision_info["oldid"]),
+                    title=revision_info.get("title") or title,
+                    language=language,
+                    include_raw_ref_check=True,
+                    site=site,
+                )
+                result["references"] = references
+                result["counts"]["reference_count"] = references.get("recommended_count")
+                result["audit"].append("Reference count uses unique rendered reference-list entries when available; citation callouts are audit-only.")
+
+            clean_templates = bool(extract_spec.get("clean_wikitext", True))
+            link_mode = str(extract_spec.get("link_mode") or "raw_text")
+            field_names = self._as_list(extract_spec.get("field_names"))
+            if raw_page and ("infobox" in include_items or field_names):
+                result["fields"] = self._extract_mediawiki_fields(
+                    raw_page,
+                    field_names,
+                    language=language,
+                    site=site,
+                    clean_templates=clean_templates,
+                    link_mode=link_mode,
+                )
+
+            section_keywords = self._as_list(extract_spec.get("section_keywords"))
+            if raw_page and ("sections" in include_items or section_keywords):
+                result["sections"] = self._extract_mediawiki_sections(
+                    raw_page,
+                    section_keywords,
+                    language=language,
+                    site=site,
+                    clean_templates=clean_templates,
+                )
+
+            table_keywords = self._as_list(extract_spec.get("table_keywords"))
+            if revision_info and ("tables" in include_items or table_keywords):
+                tables = self._extract_mediawiki_tables(
+                    oldid=int(revision_info["oldid"]),
+                    language=language,
+                    section_keywords=section_keywords,
+                    table_keywords=table_keywords,
+                    site=site,
+                )
+                result["tables"] = tables
+                result["counts"]["selected_table_count"] = tables.get("selected_table_count", 0)
+                if counting_spec:
+                    count_result, matched_items = self._count_table_items(tables, counting_spec)
+                    result["counts"].update(count_result)
+                    result["matched_items"] = matched_items
+
+            result["source_urls"] = list(dict.fromkeys(result["source_urls"]))
+            return self._json(result)
+        except Exception as exc:
+            logger.error("mediawiki_evidence_query failed: %s", exc, exc_info=True)
+            return self._json(
+                {
+                    "error": str(exc),
+                    "site": site,
+                    "title": title,
+                    "revision": self._as_dict(revision),
+                }
+            )
 
     @classmethod
     def _extract_infobox_templates(cls, wikitext: str) -> List[str]:
@@ -807,9 +1167,10 @@ class WikipediaToolkit:
         return fields
 
     @staticmethod
-    def _extract_wiki_links(value: str, language: str) -> List[Dict[str, str]]:
+    def _extract_wiki_links(value: str, language: str, site: str = "") -> List[Dict[str, str]]:
         links: List[Dict[str, str]] = []
         seen: set[str] = set()
+        domain = WikipediaToolkit._site_domain(language, site)
         for match in re.finditer(r"\[\[([^\]]+)\]\]", value or ""):
             raw = match.group(1).strip()
             if not raw:
@@ -828,7 +1189,7 @@ class WikipediaToolkit:
                 {
                     "target": normalized_target,
                     "text": _strip_wiki_markup(display),
-                    "href": f"https://{language}.wikipedia.org/wiki/{target.replace(' ', '_')}",
+                    "href": f"https://{domain}/wiki/{target.replace(' ', '_')}",
                 }
             )
         return links
@@ -892,84 +1253,7 @@ class WikipediaToolkit:
             }
         raise ValueError(f"Section not found: {field_name}")
 
-    def wiki_infobox_field_lookup(
-        self,
-        title: str,
-        field_name: str,
-        oldid: Optional[int] = None,
-        language: str = "en",
-        link_mode: str = "raw_text",
-        clean_templates: bool = True,
-    ) -> str:
-        """Extract a field from a Wikipedia infobox, optionally from a historical oldid."""
-        try:
-            if oldid is None:
-                page = self._page_wikitext_dict(title, language)
-            else:
-                page = self._raw_revision_dict(int(oldid), language)
-
-            page_title = page.get("title") or title
-            wikitext = page.get("wikitext", "")
-            try:
-                field = self._find_infobox_field(wikitext, field_name, allow_partial=False)
-            except ValueError:
-                try:
-                    field = self._find_section_field(wikitext, field_name)
-                except ValueError:
-                    field = self._find_infobox_field(wikitext, field_name, allow_partial=True)
-            raw_value = field.get("value", "")
-            links = self._extract_wiki_links(raw_value, language)
-            cleaned_text = _clean_wikitext_value(raw_value) if clean_templates else _strip_wiki_markup(raw_value)
-
-            normalized_link_mode = (link_mode or "raw_text").lower().strip()
-            selected_link = links[0] if links else None
-            if normalized_link_mode == "first_link":
-                selected_value: Any = selected_link.get("target") if selected_link else cleaned_text
-            elif normalized_link_mode == "all_links":
-                selected_value = [link.get("target") for link in links]
-            else:
-                normalized_link_mode = "raw_text"
-                selected_value = cleaned_text
-
-            result = {
-                "title": page_title,
-                "pageid": page.get("pageid"),
-                "language": language,
-                "oldid": page.get("oldid"),
-                "timestamp": page.get("timestamp"),
-                "url": self._revision_url(page_title, page.get("oldid"), language),
-                "requested_field": field_name,
-                "matched_field_name": field.get("name"),
-                "matched_field_normalized": field.get("normalized_name"),
-                "match_type": field.get("match_type"),
-                "source_type": field.get("source_type"),
-                "raw_field_value": raw_value,
-                "extracted_wiki_links": links,
-                "selected_link": selected_link,
-                "cleaned_text": cleaned_text,
-                "link_mode": normalized_link_mode,
-                "selected_value": selected_value,
-                "counting_rule": (
-                    "Parse the page wikitext, select the matching infobox field, "
-                    "extract wiki links from that field, and clean common templates for readable text."
-                ),
-            }
-            if not links and normalized_link_mode in {"first_link", "all_links"}:
-                result["warnings"] = [f"No wiki links were found in field {field.get('name')}"]
-            return self._json(result)
-        except Exception as exc:
-            logger.error("wiki_infobox_field_lookup failed: %s", exc, exc_info=True)
-            return self._json(
-                {
-                    "error": str(exc),
-                    "title": title,
-                    "oldid": oldid,
-                    "field_name": field_name,
-                    "link_mode": link_mode,
-                }
-            )
-
-    def _parse_html(self, oldid: int, language: str, section: Optional[str] = None) -> str:
+    def _parse_html(self, oldid: int, language: str, section: Optional[str] = None, site: str = "") -> str:
         params: Dict[str, Any] = {
             "action": "parse",
             "oldid": int(oldid),
@@ -977,16 +1261,16 @@ class WikipediaToolkit:
         }
         if section is not None:
             params["section"] = str(section)
-        data = self._get_json(language, params)
+        data = self._get_json(language, params, site=site)
         return (data.get("parse") or {}).get("text", "")
 
-    def _render_html(self, oldid: int, title: Optional[str], language: str) -> str:
+    def _render_html(self, oldid: int, title: Optional[str], language: str, site: str = "") -> str:
         params: Dict[str, Any] = {"oldid": int(oldid), "action": "render"}
         if title:
             params["title"] = title
-        return self._get_text(self._index_url(language), params)
+        return self._get_text(self._index_url(language, site), params)
 
-    def _section_index_for_keyword(self, oldid: int, language: str, section_keyword: str) -> Optional[str]:
+    def _section_index_for_keyword(self, oldid: int, language: str, section_keyword: str, site: str = "") -> Optional[str]:
         if not section_keyword:
             return None
         data = self._get_json(
@@ -996,6 +1280,7 @@ class WikipediaToolkit:
                 "oldid": int(oldid),
                 "prop": "sections",
             },
+            site=site,
         )
         target = _normalize_for_match(section_keyword)
         for section in (data.get("parse") or {}).get("sections") or []:
@@ -1034,15 +1319,10 @@ class WikipediaToolkit:
             score = 0
             if target and target in normalized:
                 score += 20
-            if "station" in normalized:
-                score += 4
-            if "connections" in normalized:
-                score += 6
-            if "notes" in normalized:
-                score += 1
-            if "miles" in normalized or "km" in normalized:
-                score += 1
-            score += min(len(table.get("rows") or []), 20) / 100
+            row_count = len(table.get("rows") or [])
+            cell_count = sum(len(row) for row in table.get("rows") or [])
+            score += min(row_count, 50) / 100
+            score += min(cell_count, 200) / 1000
             if score > best_score:
                 best_score = score
                 best_table = table
@@ -1052,6 +1332,7 @@ class WikipediaToolkit:
         self,
         oldid: int,
         language: str,
+        site: str = "",
         section_keyword: str = "",
         table_keyword: str = "",
     ) -> Dict[str, Any]:
@@ -1060,11 +1341,11 @@ class WikipediaToolkit:
         tables: List[Dict[str, Any]] = []
 
         if section_keyword:
-            section_index = self._section_index_for_keyword(oldid, language, section_keyword)
+            section_index = self._section_index_for_keyword(oldid, language, section_keyword, site=site)
             if section_index is not None:
                 try:
                     tables = _RevisionTableParser.parse(
-                        self._parse_html(int(oldid), language, section=section_index)
+                        self._parse_html(int(oldid), language, section=section_index, site=site)
                     )
                 except Exception as exc:
                     warnings.append(f"section table parse failed: {exc}")
@@ -1072,7 +1353,7 @@ class WikipediaToolkit:
         if not tables:
             if section_keyword and section_index is None:
                 warnings.append(f"section not found for keyword: {section_keyword}")
-            tables = _RevisionTableParser.parse(self._parse_html(int(oldid), language))
+            tables = _RevisionTableParser.parse(self._parse_html(int(oldid), language, site=site))
 
         selected = self._select_table(tables, table_keyword or section_keyword)
         return {
@@ -1082,78 +1363,6 @@ class WikipediaToolkit:
             "table_count": len(tables),
             "selected_table": selected,
             "warnings": warnings,
-        }
-
-    @classmethod
-    def _match_rail_connections(cls, table: Dict[str, Any]) -> Dict[str, Any]:
-        normalized_catalog = []
-        for entry in cls._RAIL_CONNECTION_CATALOG:
-            normalized_catalog.append(
-                {
-                    **entry,
-                    "patterns": [_normalize_for_match(pattern) for pattern in entry["patterns"]],
-                }
-            )
-
-        matched: Dict[str, Dict[str, Any]] = {}
-        detected_exclusions: Dict[str, Dict[str, Any]] = {}
-        rows = table.get("rows") or []
-        for row_index, row in enumerate(rows):
-            row_text = _clean_text([cell.get("text", "") for cell in row])
-            row_blob = cls._row_blob(row)
-            normalized = f" {_normalize_for_match(row_blob)} "
-            if not normalized.strip():
-                continue
-
-            for entry in normalized_catalog:
-                if any(f" {pattern} " in normalized for pattern in entry["patterns"] if pattern):
-                    line = matched.setdefault(
-                        entry["name"],
-                        {
-                            "name": entry["name"],
-                            "group": entry["group"],
-                            "evidence_rows": [],
-                        },
-                    )
-                    if len(line["evidence_rows"]) < 5:
-                        line["evidence_rows"].append(
-                            {
-                                "row_index": row_index,
-                                "row_text": row_text[:500],
-                            }
-                        )
-
-            for pattern in cls._RAIL_EXCLUDE_PATTERNS:
-                normalized_pattern = _normalize_for_match(pattern)
-                if f" {normalized_pattern} " in normalized:
-                    detected_exclusions.setdefault(
-                        pattern,
-                        {
-                            "term": pattern,
-                            "reason": "excluded non commuter/heavy rail connection",
-                            "sample_row": row_text[:300],
-                        },
-                    )
-
-        counted_lines = [
-            matched[entry["name"]]
-            for entry in cls._RAIL_CONNECTION_CATALOG
-            if entry["name"] in matched
-        ]
-        groups: Dict[str, int] = {}
-        for line in counted_lines:
-            groups[line["group"]] = groups.get(line["group"], 0) + 1
-
-        return {
-            "connection_count": len(counted_lines),
-            "counted_lines": counted_lines,
-            "group_counts": groups,
-            "excluded_detected_terms": list(detected_exclusions.values()),
-            "counting_rule": (
-                "Count unique commuter/heavy rail line names linked or named in the historical "
-                "Station stops table. Deduplicate repeated lines across stations. Exclude subway, "
-                "metro, light rail, bus, ferry, taxi/rideshare, and Amtrak Thruway/motorcoach items."
-            ),
         }
 
     @classmethod
@@ -1172,6 +1381,7 @@ class WikipediaToolkit:
         title: Optional[str],
         language: str,
         include_raw_ref_check: bool = True,
+        site: str = "",
     ) -> Dict[str, Any]:
         parse_counts: Dict[str, Any] = {}
         render_counts: Dict[str, Any] = {}
@@ -1180,19 +1390,19 @@ class WikipediaToolkit:
         warnings: List[str] = []
 
         try:
-            parse_counts = _RenderedReferenceCounter.count(self._parse_html(int(oldid), language))
+            parse_counts = _RenderedReferenceCounter.count(self._parse_html(int(oldid), language, site=site))
         except Exception as exc:
             warnings.append(f"action=parse count failed: {exc}")
 
         if parse_counts.get("reference_list_items", 0) == 0:
             try:
-                render_counts = _RenderedReferenceCounter.count(self._render_html(int(oldid), title, language))
+                render_counts = _RenderedReferenceCounter.count(self._render_html(int(oldid), title, language, site=site))
             except Exception as exc:
                 warnings.append(f"action=render count failed: {exc}")
 
         if include_raw_ref_check:
             try:
-                raw_revision = self._raw_revision_dict(int(oldid), language)
+                raw_revision = self._raw_revision_dict(int(oldid), language, site=site)
                 raw_counts = self._count_raw_ref_tags(raw_revision.get("wikitext", ""))
             except Exception as exc:
                 warnings.append(f"raw wikitext check failed: {exc}")
@@ -1218,14 +1428,14 @@ class WikipediaToolkit:
         if callouts and recommended_count and callouts != recommended_count:
             warnings.append(
                 "citation_callouts counts in-text reference markers and can double-count named "
-                "reference reuses; use recommended_count for Wikipedia reference-count tasks."
+                "reference reuses; use recommended_count when the task asks for unique references."
             )
 
         return {
             "oldid": int(oldid),
             "title": raw_revision.get("title") or title,
             "timestamp": raw_revision.get("timestamp"),
-            "url": f"https://{language}.wikipedia.org/w/index.php?oldid={int(oldid)}",
+            "url": self._revision_url(raw_revision.get("title") or title or "", int(oldid), language, site),
             "recommended_count": recommended_count,
             "recommended_count_method": primary_method,
             "rendered_reference_list_items": rendered_items,
@@ -1235,81 +1445,6 @@ class WikipediaToolkit:
             "render_action_counts": render_counts,
             "warnings": warnings,
         }
-
-    def wiki_reference_count(
-        self,
-        oldid: int,
-        title: str = "",
-        language: str = "en",
-        include_raw_ref_check: bool = True,
-    ) -> str:
-        """Count unique rendered references for a historical Wikipedia revision."""
-        try:
-            result = self._reference_count_dict(
-                oldid=int(oldid),
-                title=title or None,
-                language=language,
-                include_raw_ref_check=include_raw_ref_check,
-            )
-            return self._json(result)
-        except Exception as exc:
-            logger.error("wiki_reference_count failed: %s", exc, exc_info=True)
-            return self._json({"error": str(exc), "oldid": oldid, "title": title})
-
-    def wiki_revision_reference_delta(
-        self,
-        title: str,
-        earlier_year: int,
-        later_year: int,
-        language: str = "en",
-    ) -> str:
-        """Compare first-revision reference counts between two calendar years."""
-        try:
-            earlier_revision = self._first_revision_dict(title, int(earlier_year), language)
-            later_revision = self._first_revision_dict(title, int(later_year), language)
-            earlier_counts = self._reference_count_dict(
-                earlier_revision["oldid"],
-                earlier_revision["title"],
-                language,
-            )
-            later_counts = self._reference_count_dict(
-                later_revision["oldid"],
-                later_revision["title"],
-                language,
-            )
-            earlier_count = int(earlier_counts["recommended_count"])
-            later_count = int(later_counts["recommended_count"])
-            delta = later_count - earlier_count
-            result = {
-                "title": title,
-                "language": language,
-                "earlier_year": int(earlier_year),
-                "later_year": int(later_year),
-                "earlier_revision": earlier_revision,
-                "later_revision": later_revision,
-                "earlier_reference_count": earlier_count,
-                "later_reference_count": later_count,
-                "increase": delta,
-                "calculation": f"{later_count} - {earlier_count} = {delta}",
-                "counting_rule": (
-                    "Use unique reference-list entries under ol.references li[id^='cite_note'] "
-                    "when available; fall back to raw <ref> definitions after subtracting named "
-                    "self-closing reuses. Do not use citation callouts as the primary reference count."
-                ),
-                "earlier_count_details": earlier_counts,
-                "later_count_details": later_counts,
-            }
-            return self._json(result)
-        except Exception as exc:
-            logger.error("wiki_revision_reference_delta failed: %s", exc, exc_info=True)
-            return self._json(
-                {
-                    "error": str(exc),
-                    "title": title,
-                    "earlier_year": earlier_year,
-                    "later_year": later_year,
-                }
-            )
 
     @staticmethod
     def _year_interval(year: int) -> Dict[str, str]:
@@ -1331,6 +1466,7 @@ class WikipediaToolkit:
         start_timestamp: str,
         end_timestamp: str,
         language: str,
+        site: str = "",
     ) -> Dict[str, Any]:
         params = {
             "action": "query",
@@ -1347,7 +1483,7 @@ class WikipediaToolkit:
         continuation: Dict[str, Any] = {}
 
         while True:
-            data = self._get_json(language, {**params, **continuation})
+            data = self._get_json(language, {**params, **continuation}, site=site)
             pages = (data.get("query") or {}).get("pages") or []
             if not pages:
                 raise ValueError(f"No page found for title: {title}")
@@ -1373,187 +1509,3 @@ class WikipediaToolkit:
             },
             "revisions": chronological,
         }
-
-    def _find_size_delta_matches(
-        self,
-        title: str,
-        start_timestamp: str,
-        end_timestamp: str,
-        target_delta: int,
-        language: str,
-        output_date_format: str,
-    ) -> Dict[str, Any]:
-        history = self._revision_size_history(
-            title=title,
-            start_timestamp=start_timestamp,
-            end_timestamp=end_timestamp,
-            language=language,
-        )
-        revisions = history["revisions"]
-        page = history["page"]
-        matches = []
-        for index in range(1, len(revisions)):
-            previous = revisions[index - 1]
-            current = revisions[index]
-            if previous.get("size") is None or current.get("size") is None:
-                continue
-            delta = int(current["size"]) - int(previous["size"])
-            if delta != int(target_delta):
-                continue
-            timestamp = current.get("timestamp", "")
-            match = {
-                "oldid": current.get("revid"),
-                "parent_oldid": previous.get("revid"),
-                "timestamp": timestamp,
-                "formatted_date": self._format_revision_date(timestamp, output_date_format),
-                "previous_timestamp": previous.get("timestamp"),
-                "previous_size": previous.get("size"),
-                "size": current.get("size"),
-                "delta": delta,
-                "calculation": f"{current.get('size')} - {previous.get('size')} = {delta}",
-                "url": (
-                    f"https://{language}.wikipedia.org/w/index.php?"
-                    f"{urlencode({'title': page.get('title') or title, 'oldid': current.get('revid')})}"
-                ),
-            }
-            matches.append(match)
-
-        matched = matches[0] if matches else None
-        return {
-            "title": page.get("title") or title,
-            "pageid": page.get("pageid"),
-            "language": language,
-            "target_delta": int(target_delta),
-            "start_timestamp": start_timestamp,
-            "end_timestamp": end_timestamp,
-            "revision_count": len(revisions),
-            "match_count": len(matches),
-            "matched_revision": matched,
-            "matches": matches,
-            "formatted_date": matched.get("formatted_date") if matched else None,
-            "calculation": matched.get("calculation") if matched else None,
-            "counting_rule": (
-                "Retrieve revisions in the requested time interval, sort them chronologically, "
-                "and compare each revision size against the immediately preceding revision size."
-            ),
-        }
-
-    def wiki_revision_size_delta_find(
-        self,
-        title: str,
-        target_delta: int,
-        year: Optional[int] = None,
-        start_timestamp: str = "",
-        end_timestamp: str = "",
-        language: str = "en",
-        output_date_format: str = "%Y/%m/%d",
-    ) -> str:
-        """Find revisions where page size increased by a specific byte delta."""
-        try:
-            if year is not None and (not start_timestamp or not end_timestamp):
-                interval = self._year_interval(int(year))
-                start_timestamp = start_timestamp or interval["start_timestamp"]
-                end_timestamp = end_timestamp or interval["end_timestamp"]
-            if not start_timestamp or not end_timestamp:
-                raise ValueError("Provide either year or both start_timestamp and end_timestamp")
-
-            result = self._find_size_delta_matches(
-                title=title,
-                start_timestamp=start_timestamp,
-                end_timestamp=end_timestamp,
-                target_delta=int(target_delta),
-                language=language,
-                output_date_format=output_date_format,
-            )
-            if year is not None:
-                result["year"] = int(year)
-            if not result["matched_revision"]:
-                result["warnings"] = [
-                    f"No revision in the interval matched target_delta={int(target_delta)}."
-                ]
-            return self._json(result)
-        except Exception as exc:
-            logger.error("wiki_revision_size_delta_find failed: %s", exc, exc_info=True)
-            return self._json(
-                {
-                    "error": str(exc),
-                    "title": title,
-                    "target_delta": target_delta,
-                    "year": year,
-                    "start_timestamp": start_timestamp,
-                    "end_timestamp": end_timestamp,
-                }
-            )
-
-    def wiki_rail_connection_count(
-        self,
-        title: str,
-        cutoff_timestamp: str,
-        section_keyword: str = "Station stops",
-        language: str = "en",
-        oldid: Optional[int] = None,
-    ) -> str:
-        """Count unique commuter/heavy rail connections in a historical Wikipedia table."""
-        try:
-            if oldid is None:
-                revision = self._revision_at_dict(
-                    title=title,
-                    cutoff_timestamp=cutoff_timestamp,
-                    language=language,
-                    inclusive=False,
-                )
-            else:
-                raw_revision = self._raw_revision_dict(int(oldid), language)
-                revision = {
-                    "title": raw_revision.get("title") or title,
-                    "pageid": raw_revision.get("pageid"),
-                    "cutoff_timestamp": cutoff_timestamp,
-                    "oldid": int(oldid),
-                    "timestamp": raw_revision.get("timestamp"),
-                    "size": raw_revision.get("size"),
-                    "url": (
-                        f"https://{language}.wikipedia.org/w/index.php?"
-                        f"{urlencode({'title': raw_revision.get('title') or title, 'oldid': int(oldid)})}"
-                    ),
-                }
-
-            table_result = self._extract_revision_table(
-                oldid=int(revision["oldid"]),
-                language=language,
-                section_keyword=section_keyword,
-                table_keyword=section_keyword,
-            )
-            count_result = self._match_rail_connections(table_result["selected_table"])
-            group_counts = count_result["group_counts"]
-            calculation = " + ".join(str(value) for value in group_counts.values())
-            if calculation:
-                calculation = f"{calculation} = {count_result['connection_count']}"
-            else:
-                calculation = f"0 = {count_result['connection_count']}"
-
-            selected_table = table_result["selected_table"]
-            result = {
-                "title": title,
-                "language": language,
-                "revision": revision,
-                "section_keyword": section_keyword,
-                "table_rows": len(selected_table.get("rows") or []),
-                "connection_count": count_result["connection_count"],
-                "calculation": calculation,
-                "group_counts": group_counts,
-                "counted_lines": count_result["counted_lines"],
-                "excluded_detected_terms": count_result["excluded_detected_terms"],
-                "counting_rule": count_result["counting_rule"],
-                "warnings": table_result["warnings"],
-            }
-            return self._json(result)
-        except Exception as exc:
-            logger.error("wiki_rail_connection_count failed: %s", exc, exc_info=True)
-            return self._json(
-                {
-                    "error": str(exc),
-                    "title": title,
-                    "cutoff_timestamp": cutoff_timestamp,
-                    "section_keyword": section_keyword,
-                }
-            )
