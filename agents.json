@@ -38,8 +38,6 @@
         "tavily_search",
         "mediawiki_evidence_query",
         "taxon_binomial_verify",
-        "place_street_number_resolve",
-        "function_graph_letter_probe",
         "google_books_volume_search",
         "media_timeline_parse",
         "audio_recognition",

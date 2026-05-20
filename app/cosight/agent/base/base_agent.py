@@ -291,8 +291,6 @@ class BaseAgent:
             "search_wiki": "维基百科搜索",
             "mediawiki_evidence_query": "Wiki词条解析",
             "taxon_binomial_verify": "物种双名法验证器",
-            "place_street_number_resolve": "地点门牌号解析",
-            "function_graph_letter_probe": "函数图形字母识别器",
             "google_books_volume_search": "Google Books书内搜索",
             "media_timeline_parse": "媒体时间轴解析",
             "image_search": "图片搜索",
@@ -383,7 +381,6 @@ class BaseAgent:
         if name in (
             "search_baidu", "search_google", "tavily_search", "search_wiki", "image_search",
             "mediawiki_evidence_query", "taxon_binomial_verify",
-            "place_street_number_resolve", "function_graph_letter_probe",
             "google_books_volume_search", "media_timeline_parse",
         ):
             return ["source_trace", "rule_assist", "self_consistency"]

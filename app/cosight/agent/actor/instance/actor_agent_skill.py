@@ -289,55 +289,6 @@ def taxon_binomial_verify_skill():
     }
 
 
-def place_street_number_resolve_skill():
-    return {
-        'skill_name': 'place_street_number_resolve',
-        'skill_type': "function",
-        'display_name_zh': '地点门牌号解析',
-        'display_name_en': 'Place Street Number Resolver',
-        'description_zh': '查询地点或解析地址文本，提取地址中的数字门牌号；适合先从地点得到 N，再把 N 用于后续计算的题目',
-        'description_en': 'Resolve a place or parse address text to extract a numeric street number; useful when a later calculation depends on a number derived from a place address',
-        'semantic_apis': ["api_search"],
-        'function': SkillFunction(
-            id='9d0794bb-c4f2-478e-9f49-39bbd2385f07',
-            name='app.cosight.location_toolkit.place_street_number_resolve',
-            description_zh='解析地点地址中的数字门牌号',
-            description_en='Resolve a numeric street number from a place address',
-            parameters={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description_zh": "地点名或地址文本",
-                        "description_en": "Place name or address text"
-                    },
-                    "region": {
-                        "type": "string",
-                        "description_zh": "检索区域，可选",
-                        "description_en": "Search region, optional"
-                    },
-                    "baidu_ak": {
-                        "type": "string",
-                        "description_zh": "可选 Baidu Maps AK；也可通过环境变量 BAIDU_MAP_AK 提供",
-                        "description_en": "Optional Baidu Maps AK; can also be provided with BAIDU_MAP_AK"
-                    },
-                    "max_results": {
-                        "type": "integer",
-                        "description_zh": "最多检查的候选结果数，默认 5",
-                        "description_en": "Maximum candidate results to inspect, default 5"
-                    },
-                    "use_search_fallback": {
-                        "type": "boolean",
-                        "description_zh": "没有地图 AK 或地图查询无结果时是否尝试搜索 fallback，默认 true",
-                        "description_en": "Whether to try search fallback when no map key is available or no map result is found, default true"
-                    }
-                },
-                "required": ["query"]
-            }
-        )
-    }
-
-
 def search_image_skill():
     return {
         'skill_name': 'image_search',
@@ -1038,45 +989,6 @@ def audio_recognition_skill():
                 },
 
                 "required": ["audio_path", "task_prompt"]
-            }
-        )
-    }
-
-
-def function_graph_letter_probe_skill():
-    return {
-        'skill_name': 'function_graph_letter_probe',
-        'skill_type': "function",
-        'display_name_zh': '函数图形字母识别器',
-        'display_name_en': 'Function Graph Letter Probe',
-        'description_zh': '解析简单二次函数图像，保存 Matplotlib 图，并根据开口方向给出类似字母和 acronym；适合函数图形拼字母类题目',
-        'description_en': 'Parse simple quadratic function graphs, save a Matplotlib plot, and infer letter-like shapes/acronym from opening direction; useful for function-graph letter clues',
-        'semantic_apis': ["api_code_execution"],
-        'function': SkillFunction(
-            id='9d0794bb-c4f2-478e-9f49-39bbd2385f10',
-            name='app.cosight.math_graph_toolkit.function_graph_letter_probe',
-            description_zh='根据简单二次函数图形推断字母形状',
-            description_en='Infer letter-like shapes from simple quadratic function graphs',
-            parameters={
-                "type": "object",
-                "properties": {
-                    "equations": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description_zh": "函数方程列表，例如 y = 6x^2 + 4x + 4",
-                        "description_en": "List of function equations, for example y = 6x^2 + 4x + 4"
-                    },
-                    "plot_range": {
-                        "description_zh": "可选绘图区间，例如 [-2, 2]；也可传数字 2 表示 -2 到 2",
-                        "description_en": "Optional plotting range, for example [-2, 2]; a number 2 means -2 to 2"
-                    },
-                    "output_image_path": {
-                        "type": "string",
-                        "description_zh": "可选输出图片路径；相对路径会保存到当前工作区",
-                        "description_en": "Optional output image path; relative paths are saved under the current workspace"
-                    }
-                },
-                "required": ["equations"]
             }
         )
     }

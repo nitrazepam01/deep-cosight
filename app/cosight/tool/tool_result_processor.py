@@ -509,10 +509,6 @@ class ToolResultProcessor:
                 return ToolResultProcessor._process_wikipedia_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'taxon_binomial_verify':
                 return ToolResultProcessor._process_taxonomy_result(tool_name, tool_args, tool_result, task_title)
-            elif tool_name == 'place_street_number_resolve':
-                return ToolResultProcessor._process_location_result(tool_name, tool_args, tool_result, task_title)
-            elif tool_name == 'function_graph_letter_probe':
-                return ToolResultProcessor._process_math_graph_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'google_books_volume_search':
                 return ToolResultProcessor._process_google_books_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'media_timeline_parse':
@@ -835,71 +831,6 @@ class ToolResultProcessor:
             }
         except Exception as e:
             logger.error(f"Error processing taxonomy result: {e}")
-            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
-
-    @staticmethod
-    def _process_location_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
-        """处理地点门牌号解析工具结果"""
-        try:
-            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
-            if not isinstance(parsed_result, dict):
-                raise ValueError("Location tool did not return a JSON object")
-
-            urls = []
-            for candidate in parsed_result.get("candidates") or []:
-                url = candidate.get("source_url")
-                if url and url not in urls:
-                    urls.append(url)
-
-            if parsed_result.get("street_number") is not None:
-                summary = (
-                    f"Street number resolved: {parsed_result.get('street_number')} "
-                    f"from {parsed_result.get('address') or parsed_result.get('place_name')}"
-                )
-            else:
-                summary = f"No street number resolved for {parsed_result.get('query')}"
-
-            return {
-                "tool_type": "search",
-                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
-                "first_url": urls[0] if urls else None,
-                "urls": urls,
-                "result_count": 1 if parsed_result.get("street_number") is not None else 0,
-                "has_content": bool(parsed_result),
-                "parsed_result": parsed_result,
-            }
-        except Exception as e:
-            logger.error(f"Error processing location result: {e}")
-            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
-
-    @staticmethod
-    def _process_math_graph_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
-        """处理函数图形字母识别工具结果"""
-        try:
-            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
-            if not isinstance(parsed_result, dict):
-                raise ValueError("Math graph tool did not return a JSON object")
-
-            image_path = parsed_result.get("rendered_image_path")
-            urls = [image_path] if image_path else []
-            summary = (
-                f"Function graph letters: {parsed_result.get('letters')} -> "
-                f"{parsed_result.get('acronym')}"
-            )
-            if parsed_result.get("warnings"):
-                summary += "; " + "; ".join(parsed_result["warnings"])
-
-            return {
-                "tool_type": "analysis",
-                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
-                "first_url": image_path,
-                "urls": urls,
-                "result_count": len(parsed_result.get("letters") or []),
-                "has_content": bool(parsed_result),
-                "parsed_result": parsed_result,
-            }
-        except Exception as e:
-            logger.error(f"Error processing math graph result: {e}")
             return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
 
     @staticmethod

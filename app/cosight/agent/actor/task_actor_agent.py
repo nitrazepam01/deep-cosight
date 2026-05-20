@@ -42,8 +42,6 @@ from app.cosight.tool.html_visualization_toolkit import HtmlVisualizationToolkit
 from app.cosight.tool.coder_lite_toolkit import CoderLiteToolkit
 from app.cosight.tool.wikipedia_toolkit import WikipediaToolkit
 from app.cosight.tool.taxonomy_toolkit import TaxonomyToolkit
-from app.cosight.tool.location_toolkit import LocationToolkit
-from app.cosight.tool.math_graph_toolkit import MathGraphToolkit
 from app.cosight.tool.google_books_toolkit import GoogleBooksToolkit
 from app.cosight.tool.video_event_toolkit import VideoEventToolkit
 from config.config import get_tavily_config
@@ -104,8 +102,6 @@ class TaskActorAgent(BaseAgent):
         code_toolkit = CodeToolkit(sandbox="subprocess", work_space_path=self.work_space_path)
         wikipedia_toolkit = WikipediaToolkit()
         taxonomy_toolkit = TaxonomyToolkit()
-        location_toolkit = LocationToolkit()
-        math_graph_toolkit = MathGraphToolkit()
         google_books_toolkit = GoogleBooksToolkit()
         video_event_toolkit = VideoEventToolkit(workspace_path=self.work_space_path)
         all_functions = {"mark_step": act_toolkit.mark_step,
@@ -116,8 +112,6 @@ class TaskActorAgent(BaseAgent):
                          "tavily_search": search_toolkit.tavily_search,
                          "mediawiki_evidence_query": wikipedia_toolkit.mediawiki_evidence_query,
                          "taxon_binomial_verify": taxonomy_toolkit.taxon_binomial_verify,
-                         "place_street_number_resolve": location_toolkit.place_street_number_resolve,
-                         "function_graph_letter_probe": math_graph_toolkit.function_graph_letter_probe,
                          "google_books_volume_search": google_books_toolkit.google_books_volume_search,
                          "media_timeline_parse": video_event_toolkit.media_timeline_parse,
                         #  "image_search": tavily_search.search,

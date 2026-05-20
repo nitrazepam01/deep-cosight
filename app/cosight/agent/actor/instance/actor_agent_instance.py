@@ -69,8 +69,6 @@ def create_actor_template(template_name, work_space_path):
                    search_wiki_skill(),
                    mediawiki_evidence_query_skill(),
                    taxon_binomial_verify_skill(),
-                   place_street_number_resolve_skill(),
-                   function_graph_letter_probe_skill(),
                    google_books_volume_search_skill(),
                    media_timeline_parse_skill(),
                    audio_recognition_skill(),

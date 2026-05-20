@@ -47,16 +47,6 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "将候选词追加两字母后缀并重复成双名法学名，验证是否为指定类型物种",
         "needs_workspace": False,
     },
-    "place_street_number_resolve": {
-        "display_name_zh": "地点门牌号解析",
-        "description_zh": "查询地点或解析地址文本，提取地址中的数字门牌号",
-        "needs_workspace": False,
-    },
-    "function_graph_letter_probe": {
-        "display_name_zh": "函数图形字母识别器",
-        "description_zh": "解析简单二次函数图形，保存图像并根据开口方向推断字母串",
-        "needs_workspace": True,
-    },
     "google_books_volume_search": {
         "display_name_zh": "Google Books 书内搜索",
         "description_zh": "在 Google Books 指定书籍内搜索关键词，默认返回少量精确页标识、OCR 片段和页码引用",
@@ -219,8 +209,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
     from app.cosight.agent.actor.instance.actor_agent_skill import (
         execute_code_skill, search_google_skill, tavily_search_skill,
         search_wiki_skill, mediawiki_evidence_query_skill,
-        taxon_binomial_verify_skill, place_street_number_resolve_skill,
-        function_graph_letter_probe_skill, google_books_volume_search_skill,
+        taxon_binomial_verify_skill, google_books_volume_search_skill,
         media_timeline_parse_skill,
         mark_step_skill, file_saver_skill,
         file_read_skill, file_str_replace_skill, file_find_in_content_skill,
@@ -241,8 +230,6 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "search_wiki": search_wiki_skill,
         "mediawiki_evidence_query": mediawiki_evidence_query_skill,
         "taxon_binomial_verify": taxon_binomial_verify_skill,
-        "place_street_number_resolve": place_street_number_resolve_skill,
-        "function_graph_letter_probe": function_graph_letter_probe_skill,
         "google_books_volume_search": google_books_volume_search_skill,
         "media_timeline_parse": media_timeline_parse_skill,
         "mark_step": mark_step_skill,

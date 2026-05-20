@@ -112,23 +112,6 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'wikipedia_language': ['language', 'lang'],
         }
     },
-    'place_street_number_resolve': {
-        'required': ['query'],
-        'aliases': {
-            'query': ['place', 'place_name', 'location', 'address', 'entity', 'name'],
-            'region': ['city', 'area'],
-            'baidu_ak': ['ak', 'api_key', 'baidu_key'],
-            'max_results': ['limit', 'num_results'],
-        }
-    },
-    'function_graph_letter_probe': {
-        'required': ['equations'],
-        'aliases': {
-            'equations': ['equation', 'functions', 'function_list', 'formulas', 'expressions'],
-            'plot_range': ['range', 'x_range', 'domain', 'window'],
-            'output_image_path': ['image_path', 'output_path', 'plot_path', 'save_path'],
-        }
-    },
     'google_books_volume_search': {
         'required': ['query'],
         'aliases': {
