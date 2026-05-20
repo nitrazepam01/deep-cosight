@@ -29,6 +29,7 @@ from app.cosight.task.task_manager import TaskManager
 from llm import llm_for_plan, llm_for_act, llm_for_tool, llm_for_vision
 from cosight_server.deep_research.services.i18n_service import i18n
 from cosight_server.deep_research.services.credibility_analyzer import credibility_analyzer
+from cosight_server.deep_research.services.result_exporter import write_result_jsonl
 from app.common.logger_util import logger
 
 # 引入CoSight所需的依赖
@@ -1026,6 +1027,17 @@ async def search(request: Request, params: Any = Body(None)):
 
                         with open(plan_final_path, mode='w', encoding='utf-8') as ff:
                             ff.write(json.dumps(payload_to_save, ensure_ascii=False, indent=2))
+                        try:
+                            result_path = write_result_jsonl(
+                                workspace_path=work_space_path_time,
+                                plan_data=payload_to_save,
+                                question=query_content,
+                                task_id=plan_id or workspace_id,
+                            )
+                            if result_path:
+                                logger.info(f"result.jsonl 已生成: {result_path}")
+                        except Exception as result_err:
+                            logger.warning(f"生成 result.jsonl 失败: {result_err}", exc_info=True)
                 except Exception as _:
                     pass
 
