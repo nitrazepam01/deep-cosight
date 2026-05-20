@@ -116,7 +116,7 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
    - IMPORTANT: Extracted information must be 100% faithful to the original sources
    - OPTIMIZATION: Only use file_saver ONCE per step to save all collected information
 6. For MediaWiki/Wikipedia evidence tasks:
-   - Use mediawiki_evidence_query for page revisions, revision history, wikitext/rendered HTML, reference lists, infobox fields, sections, tables, and simple revision-history metrics.
+   - Use wiki_entry_parse to parse Wiki pages in detail; choose the revision, history, content, and page-structure options needed by the question.
    - Treat the tool as an evidence API, not an answer engine: choose revision selectors and extraction options from the question, then do comparison, filtering, arithmetic, and final interpretation yourself.
    - For reference counts, use unique rendered reference-list entries when available; citation callouts are useful audit evidence but can double-count reused named references.
    - For table questions, request the relevant historical revision and table/section candidates, then apply the include/exclude and deduplication rules stated by the question. Do not assume a built-in domain catalog.
@@ -400,7 +400,7 @@ def actor_system_prompt_zh(work_space_path):
    - 重要提示：提取的信息必须完全忠实于原始来源
    - 优化提示：每个步骤只使用一次 file_saver 来保存所有收集的信息
 6. 处理 MediaWiki/Wikipedia 证据任务时：
-   - 使用 mediawiki_evidence_query 获取页面版本、历史记录、源码/渲染 HTML、参考文献列表、infobox 字段、章节、表格和简单历史指标。
+   - 使用 wiki_entry_parse 对 Wiki 词条做详细解析；根据题目需要选择版本、历史、正文内容和页面结构等选项。
    - 把这个工具当作取证 API，而不是答案引擎：根据题目选择版本范围和抽取选项，比较、筛选、计算和最终判断由你完成。
    - 统计引用时，优先使用渲染后的唯一参考文献列表条目；正文引用上标可作为审计证据，但命名引用复用时可能重复计数。
    - 处理表格题时，先取相关历史版本和候选表格/章节，再按题目给出的 include/exclude 和去重规则筛选；不要假设工具内置了某个领域词表。

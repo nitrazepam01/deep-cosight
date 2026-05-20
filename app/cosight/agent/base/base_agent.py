@@ -289,7 +289,7 @@ class BaseAgent:
             "search_google": "谷歌搜索", 
             "tavily_search": "Tavily搜索",
             "search_wiki": "维基百科搜索",
-            "mediawiki_evidence_query": "Wiki词条解析",
+            "wiki_entry_parse": "Wiki词条解析",
             "taxon_binomial_verify": "物种双名法验证器",
             "google_books_volume_search": "Google Books书内搜索",
             "media_timeline_parse": "媒体时间轴解析",
@@ -380,7 +380,7 @@ class BaseAgent:
         # 搜索类：支持交叉验证
         if name in (
             "search_baidu", "search_google", "tavily_search", "search_wiki", "image_search",
-            "mediawiki_evidence_query", "taxon_binomial_verify",
+            "wiki_entry_parse", "taxon_binomial_verify",
             "google_books_volume_search", "media_timeline_parse",
         ):
             return ["source_trace", "rule_assist", "self_consistency"]

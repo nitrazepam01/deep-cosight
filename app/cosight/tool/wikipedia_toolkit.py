@@ -361,9 +361,9 @@ class _RevisionTableParser(HTMLParser):
 
 
 class WikipediaToolkit:
-    """Deterministic helpers for MediaWiki page, revision, and evidence queries."""
+    """Deterministic helpers for Wiki page and revision parsing."""
 
-    USER_AGENT = "Cosight MediaWiki evidence toolkit/1.0"
+    USER_AGENT = "Cosight Wiki entry parser/1.0"
     _REF_OPEN_RE = re.compile(r"<\s*ref\b", re.IGNORECASE)
     _NAMED_SELF_CLOSING_REF_RE = re.compile(
         r"<\s*ref\b(?=[^>]*\bname\s*=)[^>]*?/\s*>",
@@ -963,7 +963,7 @@ class WikipediaToolkit:
             matched,
         )
 
-    def mediawiki_evidence_query(
+    def wiki_entry_parse(
         self,
         site: str = "en.wikipedia.org",
         title: str = "",
@@ -974,7 +974,7 @@ class WikipediaToolkit:
         counting: Optional[Any] = None,
         language: str = "",
     ) -> str:
-        """General MediaWiki evidence query for revisions, content, tables, fields, and counts."""
+        """Parse Wiki entries for revisions, content, tables, fields, and counts."""
         try:
             revision_spec = self._as_dict(revision)
             extract_spec = self._as_dict(extract)
@@ -1108,7 +1108,7 @@ class WikipediaToolkit:
             result["source_urls"] = list(dict.fromkeys(result["source_urls"]))
             return self._json(result)
         except Exception as exc:
-            logger.error("mediawiki_evidence_query failed: %s", exc, exc_info=True)
+            logger.error("wiki_entry_parse failed: %s", exc, exc_info=True)
             return self._json(
                 {
                     "error": str(exc),

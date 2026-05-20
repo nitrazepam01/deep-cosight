@@ -36,7 +36,7 @@
         "file_str_replace",
         "file_find_in_content",
         "tavily_search",
-        "mediawiki_evidence_query",
+        "wiki_entry_parse",
         "taxon_binomial_verify",
         "google_books_volume_search",
         "media_timeline_parse",

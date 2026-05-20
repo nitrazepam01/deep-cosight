@@ -110,7 +110,7 @@ class TaskActorAgent(BaseAgent):
                          "search_google": search_toolkit.search_google,
                          "search_wiki": search_toolkit.search_wiki,
                          "tavily_search": search_toolkit.tavily_search,
-                         "mediawiki_evidence_query": wikipedia_toolkit.mediawiki_evidence_query,
+                         "wiki_entry_parse": wikipedia_toolkit.wiki_entry_parse,
                          "taxon_binomial_verify": taxonomy_toolkit.taxon_binomial_verify,
                          "google_books_volume_search": google_books_toolkit.google_books_volume_search,
                          "media_timeline_parse": video_event_toolkit.media_timeline_parse,

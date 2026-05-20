@@ -37,7 +37,7 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "搜索维基百科获取知识信息",
         "needs_workspace": False,
     },
-    "mediawiki_evidence_query": {
+    "wiki_entry_parse": {
         "display_name_zh": "Wiki 词条解析",
         "description_zh": "对 Wiki 词条进行详细解析，返回版本、历史、源码、字段、章节和表格等结构化信息",
         "needs_workspace": False,
@@ -208,7 +208,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
     """
     from app.cosight.agent.actor.instance.actor_agent_skill import (
         execute_code_skill, search_google_skill, tavily_search_skill,
-        search_wiki_skill, mediawiki_evidence_query_skill,
+        search_wiki_skill, wiki_entry_parse_skill,
         taxon_binomial_verify_skill, google_books_volume_search_skill,
         media_timeline_parse_skill,
         mark_step_skill, file_saver_skill,
@@ -228,7 +228,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "search_google": search_google_skill,
         "tavily_search": tavily_search_skill,
         "search_wiki": search_wiki_skill,
-        "mediawiki_evidence_query": mediawiki_evidence_query_skill,
+        "wiki_entry_parse": wiki_entry_parse_skill,
         "taxon_binomial_verify": taxon_binomial_verify_skill,
         "google_books_volume_search": google_books_volume_search_skill,
         "media_timeline_parse": media_timeline_parse_skill,

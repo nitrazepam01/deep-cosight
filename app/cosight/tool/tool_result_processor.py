@@ -505,7 +505,7 @@ class ToolResultProcessor:
             # 根据工具名称精确匹配选择处理方式
             if tool_name in ['search_baidu', 'search_google', 'search_wiki', 'tavily_search', 'image_search']:
                 return ToolResultProcessor._process_search_result(tool_name, tool_args, tool_result, task_title)
-            elif tool_name == 'mediawiki_evidence_query':
+            elif tool_name == 'wiki_entry_parse':
                 return ToolResultProcessor._process_wikipedia_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'taxon_binomial_verify':
                 return ToolResultProcessor._process_taxonomy_result(tool_name, tool_args, tool_result, task_title)
@@ -664,7 +664,7 @@ class ToolResultProcessor:
 
     @staticmethod
     def _process_wikipedia_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
-        """处理 MediaWiki evidence 工具结果"""
+        """处理 Wiki 词条解析工具结果"""
         try:
             parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
             if not isinstance(parsed_result, dict):
@@ -694,7 +694,7 @@ class ToolResultProcessor:
             title = page.get("title") or revision.get("title") or parsed_result.get("title")
             if title:
                 summary_parts.append(
-                    f"MediaWiki evidence returned for {title}"
+                    f"Wiki entry parsed for {title}"
                 )
             if revision:
                 summary_parts.append(
@@ -731,7 +731,7 @@ class ToolResultProcessor:
                 summary_parts.append(f"fields={', '.join(str(item) for item in matched_fields[:3])}")
 
             if not summary_parts:
-                summary_parts.append("MediaWiki evidence query completed")
+                summary_parts.append("Wiki entry parsing completed")
             for warning in parsed_result.get("audit") or []:
                 if len(summary_parts) < 6:
                     summary_parts.append(str(warning))

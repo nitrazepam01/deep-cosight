@@ -98,7 +98,7 @@ def test_mediawiki_query_can_select_interval_revisions_and_return_reference_evid
 
     toolkit = FakeToolkit()
     earlier = json.loads(
-        toolkit.mediawiki_evidence_query(
+        toolkit.wiki_entry_parse(
             title="Example Page",
             revision={
                 "mode": "first_in_interval",
@@ -109,7 +109,7 @@ def test_mediawiki_query_can_select_interval_revisions_and_return_reference_evid
         )
     )
     later = json.loads(
-        toolkit.mediawiki_evidence_query(
+        toolkit.wiki_entry_parse(
             title="Example Page",
             revision={
                 "mode": "first_in_interval",
@@ -147,7 +147,7 @@ def test_mediawiki_query_picks_last_revision_before_cutoff():
             }
 
     result = json.loads(
-        FakeToolkit().mediawiki_evidence_query(
+        FakeToolkit().wiki_entry_parse(
             title="Example",
             revision={"mode": "last_before", "cutoff_timestamp": "2023-08-01T00:00:00Z"},
             include=["metadata"],
@@ -172,7 +172,7 @@ def test_mediawiki_query_history_interval_can_annotate_adjacent_size_deltas():
             }
 
     result = json.loads(
-        FakeToolkit().mediawiki_evidence_query(
+        FakeToolkit().wiki_entry_parse(
             title="Example",
             revision={"mode": "history_interval", "year": 2025},
             include=["revision_history"],
@@ -239,7 +239,7 @@ def test_mediawiki_query_table_counting_is_pattern_driven_and_deduplicated():
             """
 
     result = json.loads(
-        FakeToolkit().mediawiki_evidence_query(
+        FakeToolkit().wiki_entry_parse(
             title="Example",
             revision={"mode": "oldid", "oldid": 1166890780},
             include=["tables"],
@@ -278,7 +278,7 @@ def test_mediawiki_query_extracts_first_link_from_historical_field():
             }
 
     result = json.loads(
-        FakeToolkit().mediawiki_evidence_query(
+        FakeToolkit().wiki_entry_parse(
             title="ExampleOrg",
             revision={"mode": "oldid", "oldid": 1001},
             include=["infobox"],
@@ -315,7 +315,7 @@ def test_mediawiki_query_prefers_exact_section_over_partial_infobox_field():
             }
 
     result = json.loads(
-        FakeToolkit().mediawiki_evidence_query(
+        FakeToolkit().wiki_entry_parse(
             title="ExampleOrg",
             revision={"mode": "oldid", "oldid": 1001},
             include=["infobox", "sections"],
@@ -348,7 +348,7 @@ def test_mediawiki_query_cleans_native_phrase_template_from_current_page():
             }
 
     result = json.loads(
-        FakeToolkit().mediawiki_evidence_query(
+        FakeToolkit().wiki_entry_parse(
             title="Example Country",
             revision={"mode": "current"},
             include=["infobox"],

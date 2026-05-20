@@ -89,7 +89,7 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'step_notes': ['notes', 'summary', 'result'],
         }
     },
-    'mediawiki_evidence_query': {
+    'wiki_entry_parse': {
         'required': ['title'],
         'aliases': {
             'site': ['domain', 'wiki_site', 'mediawiki_site'],

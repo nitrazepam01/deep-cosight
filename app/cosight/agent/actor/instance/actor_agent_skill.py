@@ -170,9 +170,9 @@ def search_wiki_skill():
     }
 
 
-def mediawiki_evidence_query_skill():
+def wiki_entry_parse_skill():
     return {
-        'skill_name': 'mediawiki_evidence_query',
+        'skill_name': 'wiki_entry_parse',
         'skill_type': "function",
         'display_name_zh': 'Wiki 词条解析',
         'display_name_en': 'Wiki Entry Parser',
@@ -181,7 +181,7 @@ def mediawiki_evidence_query_skill():
         'semantic_apis': ["api_search"],
         'function': SkillFunction(
             id='9d0794bb-c4f2-478e-9f49-39bbd2385f14',
-            name='app.cosight.wikipedia_toolkit.mediawiki_evidence_query',
+            name='app.cosight.wikipedia_toolkit.wiki_entry_parse',
             description_zh='解析 Wiki 词条的版本、源码和页面结构',
             description_en='Parse Wiki entry revisions, source, and page structure',
             parameters={
