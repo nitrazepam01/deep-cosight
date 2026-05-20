@@ -2,6 +2,27 @@
 
 本指南将帮助你完成 Cosight 的构建过程，包括前端构建和可执行文件打包。
 
+## CLI 调试入口
+
+服务启动后，可以用轻量 CLI 直接向后端提问，跳过浏览器前端：
+
+```bash
+python cosight_server/deep_research/main.py
+python tools/cosight_cli.py ask "你的问题"
+```
+
+常用参数：
+
+```bash
+python tools/cosight_cli.py ask -f question.txt
+python tools/cosight_cli.py ask "问题" --out result.jsonl
+python tools/cosight_cli.py ask "问题" --raw
+python tools/cosight_cli.py ask "继续执行" --plan-action plan_approve --workspace-id work_space_xxx
+python tools/cosight_cli.py ask "问题" --agent-run-config agent_run_config.json
+```
+
+CLI 会调用已启动服务的 `/api/nae-deep-research/v1/deep-research/search` NDJSON 接口。默认地址是 `http://127.0.0.1:7788`，如需调整可传 `--host` 和 `--port`。
+
 ## 环境准备
 
 ### 1. Python 环境
