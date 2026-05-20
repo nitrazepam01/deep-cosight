@@ -1172,55 +1172,6 @@ def extract_document_content_skill():
     }
 
 
-def document_abstract_year_count_skill():
-    return {
-        'skill_name': 'document_abstract_year_count',
-        'skill_type': "function",
-        'display_name_zh': '文档摘要年份计数',
-        'display_name_en': 'Document Abstract Year Count',
-        'description_zh': '读取 PDF/文档文本，先定位摘要边界，再只在摘要内统计指定出版年份；全文计数仅作为审计，适合 abstract 中年份/词频统计题',
-        'description_en': 'Read PDF/document text, locate the abstract boundary, and count a publication year only inside the abstract; full-document count is returned only for audit',
-        'semantic_apis': ["api_search"],
-        'function': SkillFunction(
-            id='8d5e7f3b-a4c2-4d1b-9f6e-2c8b9d7e5678',
-            name='app.cosight.document_processing_toolkit.document_abstract_year_count',
-            description_zh='只在文档摘要中统计指定年份出现次数',
-            description_en='Count occurrences of a target year only within a document abstract',
-            parameters={
-                "type": "object",
-                "properties": {
-                    "document_path": {
-                        "type": "string",
-                        "description_zh": "本地文件路径或 PDF URL，例如 G:\\Cosight\\Ans\\ques4.pdf",
-                        "description_en": "Local file path or PDF URL, for example G:\\Cosight\\Ans\\ques4.pdf"
-                    },
-                    "publication_year": {
-                        "type": "string",
-                        "description_zh": "要统计的出版年份，例如 2008；如果留空，可尝试根据 book_title 从 Wikipedia 解析",
-                        "description_en": "Publication year to count, for example 2008; if empty, the tool can try resolving it from book_title via Wikipedia"
-                    },
-                    "book_title": {
-                        "type": "string",
-                        "description_zh": "书名，例如 The Propitious Esculent，用于说明或解析出版年",
-                        "description_en": "Book title, for example The Propitious Esculent, used for context or publication-year lookup"
-                    },
-                    "abstract_end_markers": {
-                        "type": "string",
-                        "description_zh": "摘要结束标记，可用 | 分隔；默认 Raktažodžiai|Keywords|Key words|ĮVADAS|Introduction",
-                        "description_en": "Abstract end markers separated by |; default Raktažodžiai|Keywords|Key words|ĮVADAS|Introduction"
-                    },
-                    "abstract_start_markers": {
-                        "type": "string",
-                        "description_zh": "摘要开始提示，可用 | 分隔；默认 Abstract|Santrauka|Ingrida LUKOŠIUTĖ",
-                        "description_en": "Abstract start hints separated by |; default Abstract|Santrauka|Ingrida LUKOŠIUTĖ"
-                    }
-                },
-                "required": ["document_path"]
-            }
-        )
-    }
-
-
 def create_html_report_skill():
     """为Agent框架提供的HTML报告生成技能定义
     大模型只需选择此函数，不需要传入参数

@@ -515,8 +515,6 @@ class ToolResultProcessor:
                 return ToolResultProcessor._process_code_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name in ['file_saver', 'file_read', 'file_str_replace', 'file_find_in_content','create_html_report']:
                 return ToolResultProcessor._process_file_result(tool_name, tool_args, tool_result, task_title)
-            elif tool_name == 'document_abstract_year_count':
-                return ToolResultProcessor._process_document_count_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'browser_use':
                 return ToolResultProcessor._process_web_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'fetch_website_content':
@@ -760,36 +758,6 @@ class ToolResultProcessor:
             }
 
     @staticmethod
-    def _process_document_count_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
-        """处理文档摘要计数工具结果"""
-        try:
-            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
-            if not isinstance(parsed_result, dict):
-                raise ValueError("Document count tool did not return a JSON object")
-            summary = (
-                f"Abstract count for year {parsed_result.get('publication_year')}: "
-                f"{parsed_result.get('abstract_count')} "
-                f"(full document audit count: {parsed_result.get('full_document_count')})"
-            )
-            return {
-                "tool_type": "document",
-                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
-                "result_count": 1,
-                "has_content": bool(parsed_result),
-                "parsed_result": parsed_result,
-            }
-        except Exception as e:
-            logger.error(f"Error processing document count result: {e}")
-            return {
-                "tool_type": "document",
-                "summary": ToolResultProcessor._get_localized_summary(
-                    "文档摘要计数工具执行完成",
-                    "Document abstract count completed",
-                    task_title
-                ),
-                "error": str(e)
-            }
-
     def _process_google_books_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
         """处理 Google Books 书内搜索工具结果"""
         try:

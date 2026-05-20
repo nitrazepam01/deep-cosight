@@ -126,7 +126,6 @@ class TaskActorAgent(BaseAgent):
                          "fetch_website_content_with_images": fetch_website_content_with_images,
                          "fetch_website_images_only": fetch_website_images_only,
                          "extract_document_content": doc_toolkit.extract_document_content,
-                         "document_abstract_year_count": doc_toolkit.document_abstract_year_count,
                          "create_html_report": lambda title=None, include_charts=True, chart_types=['all'], output_filename=None: html_toolkit.create_html_report(
                               title=title,
                               include_charts=include_charts,

@@ -337,7 +337,6 @@ class BaseAgent:
             "word_processor": "Word处理",
             "excel_processor": "Excel处理",
             "extract_document_content": "抽取文档内容",
-            "document_abstract_year_count": "文档摘要年份计数",
             
             # 数据库类工具
             "database_query": "数据库查询",
@@ -400,7 +399,7 @@ class BaseAgent:
             return ["source_trace", "rule_assist"]
         
         # 文档抽取
-        if name in ("extract_document_content", "document_abstract_year_count"):
+        if name in ("extract_document_content",):
             return ["source_trace", "rule_assist", "self_consistency"]
         
         # 多模态/音频

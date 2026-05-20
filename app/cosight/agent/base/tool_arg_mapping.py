@@ -133,16 +133,6 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'frame_rate': ['fps', 'sample_rate'],
             'output_dir': ['output_path', 'save_dir', 'artifact_dir'],
         }
-    },
-    'document_abstract_year_count': {
-        'required': ['document_path'],
-        'aliases': {
-            'document_path': ['file', 'file_path', 'path', 'filepath', 'document', 'document_path_or_url', 'url'],
-            'publication_year': ['year', 'target_year', 'book_year'],
-            'book_title': ['title', 'paper_title', 'article_title'],
-            'abstract_end_markers': ['end_markers', 'markers', 'end_marker'],
-            'abstract_start_markers': ['start_markers', 'start_marker'],
-        }
     }
 }
 

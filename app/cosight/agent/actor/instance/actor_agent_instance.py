@@ -60,7 +60,6 @@ def create_actor_template(template_name, work_space_path):
                    file_find_in_content_skill(),
                    ask_question_about_image_skill(),
                    extract_document_content_skill(),
-                   document_abstract_year_count_skill(),
                    create_html_report_skill(),
                    fetch_website_content_skill(),
                    fetch_website_content_with_images_skill(),
