@@ -507,8 +507,6 @@ class ToolResultProcessor:
                 return ToolResultProcessor._process_search_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'wiki_entry_parse':
                 return ToolResultProcessor._process_wikipedia_result(tool_name, tool_args, tool_result, task_title)
-            elif tool_name == 'taxon_binomial_verify':
-                return ToolResultProcessor._process_taxonomy_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'google_books_volume_search':
                 return ToolResultProcessor._process_google_books_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'media_timeline_parse':
@@ -792,48 +790,6 @@ class ToolResultProcessor:
                 "error": str(e)
             }
 
-    @staticmethod
-    def _process_taxonomy_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
-        """处理物种双名法验证工具结果"""
-        try:
-            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
-            if not isinstance(parsed_result, dict):
-                raise ValueError("Taxonomy tool did not return a JSON object")
-
-            urls = []
-            for candidate in parsed_result.get("checked_candidates", []):
-                wikipedia = (candidate.get("source_checks") or {}).get("wikipedia") or {}
-                for item in wikipedia.get("results", []):
-                    url = item.get("url")
-                    if url and url not in urls:
-                        urls.append(url)
-
-            if parsed_result.get("verified"):
-                summary = (
-                    f"Taxon binomial verified: {parsed_result.get('root_word')} + "
-                    f"{parsed_result.get('suffix')} -> {parsed_result.get('scientific_name')} "
-                    f"({parsed_result.get('common_name')}); answer {parsed_result.get('answer')}"
-                )
-            else:
-                summary = (
-                    "Taxon binomial verification did not find a verified answer; "
-                    f"checked {parsed_result.get('checked_count', 0)} candidates"
-                )
-
-            return {
-                "tool_type": "search",
-                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
-                "first_url": urls[0] if urls else None,
-                "urls": urls,
-                "result_count": 1 if parsed_result.get("verified") else 0,
-                "has_content": bool(parsed_result),
-                "parsed_result": parsed_result,
-            }
-        except Exception as e:
-            logger.error(f"Error processing taxonomy result: {e}")
-            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
-
-    @staticmethod
     def _process_google_books_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
         """处理 Google Books 书内搜索工具结果"""
         try:

@@ -235,60 +235,6 @@ def wiki_entry_parse_skill():
     }
 
 
-def taxon_binomial_verify_skill():
-    return {
-        'skill_name': 'taxon_binomial_verify',
-        'skill_type': "function",
-        'display_name_zh': '物种双名法验证器',
-        'display_name_en': 'Taxonomic Binomial Verifier',
-        'description_zh': '把候选词追加两字母后缀并重复成 Genus species 形式，调用 GBIF/Wikipedia 验证是否为指定类型的物种；适合 “dramatic/theatrical + two letters + duplicated forms a species of duck” 类词谜',
-        'description_en': 'Append two-letter suffixes to candidate words, duplicate as Genus species, and verify with GBIF/Wikipedia whether the binomial is the expected species type; useful for word puzzles where a word plus two letters forms a duck species',
-        'semantic_apis': ["api_search"],
-        'function': SkillFunction(
-            id='9d0794bb-c4f2-478e-9f49-39bbd2385f06',
-            name='app.cosight.taxonomy_toolkit.taxon_binomial_verify',
-            description_zh='验证候选词追加两字母后缀后是否构成指定物种的双名法学名',
-            description_en='Verify whether candidate words plus two-letter suffixes form a taxonomic binomial species name',
-            parameters={
-                "type": "object",
-                "properties": {
-                    "candidate_words": {
-                        "type": "string",
-                        "description_zh": "候选词，可用 |、逗号或换行分隔；例如 histrionic 或 dramatic|theatrical|histrionic",
-                        "description_en": "Candidate words separated by |, commas, or newlines; for example histrionic or dramatic|theatrical|histrionic"
-                    },
-                    "suffixes": {
-                        "type": "string",
-                        "description_zh": "两字母后缀列表，可用 | 分隔；默认优先 us",
-                        "description_en": "Two-letter suffixes separated by |; default prioritizes us"
-                    },
-                    "expected_common_name_keyword": {
-                        "type": "string",
-                        "description_zh": "期望 common name 中出现的关键词，默认 duck",
-                        "description_en": "Keyword expected in the common name, default duck"
-                    },
-                    "expected_family": {
-                        "type": "string",
-                        "description_zh": "期望分类科名，默认 Anatidae",
-                        "description_en": "Expected taxonomic family, default Anatidae"
-                    },
-                    "wikipedia_language": {
-                        "type": "string",
-                        "description_zh": "Wikipedia 语言代码，默认 en",
-                        "description_en": "Wikipedia language code, default en"
-                    },
-                    "use_wikipedia": {
-                        "type": "boolean",
-                        "description_zh": "是否用 Wikipedia 搜索作为 common name 审计，默认 true",
-                        "description_en": "Whether to use Wikipedia search as a common-name audit, default true"
-                    }
-                },
-                "required": ["candidate_words"]
-            }
-        )
-    }
-
-
 def search_image_skill():
     return {
         'skill_name': 'image_search',

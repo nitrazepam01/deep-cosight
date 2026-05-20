@@ -41,7 +41,6 @@ from app.cosight.tool.video_analysis_toolkit import VideoTool
 from app.cosight.tool.html_visualization_toolkit import HtmlVisualizationToolkit
 from app.cosight.tool.coder_lite_toolkit import CoderLiteToolkit
 from app.cosight.tool.wikipedia_toolkit import WikipediaToolkit
-from app.cosight.tool.taxonomy_toolkit import TaxonomyToolkit
 from app.cosight.tool.google_books_toolkit import GoogleBooksToolkit
 from app.cosight.tool.video_event_toolkit import VideoEventToolkit
 from config.config import get_tavily_config
@@ -101,7 +100,6 @@ class TaskActorAgent(BaseAgent):
         coder_lite_toolkit = CoderLiteToolkit(plan_id=plan_id, work_space_path=work_space_path)
         code_toolkit = CodeToolkit(sandbox="subprocess", work_space_path=self.work_space_path)
         wikipedia_toolkit = WikipediaToolkit()
-        taxonomy_toolkit = TaxonomyToolkit()
         google_books_toolkit = GoogleBooksToolkit()
         video_event_toolkit = VideoEventToolkit(workspace_path=self.work_space_path)
         all_functions = {"mark_step": act_toolkit.mark_step,
@@ -111,7 +109,6 @@ class TaskActorAgent(BaseAgent):
                          "search_wiki": search_toolkit.search_wiki,
                          "tavily_search": search_toolkit.tavily_search,
                          "wiki_entry_parse": wikipedia_toolkit.wiki_entry_parse,
-                         "taxon_binomial_verify": taxonomy_toolkit.taxon_binomial_verify,
                          "google_books_volume_search": google_books_toolkit.google_books_volume_search,
                          "media_timeline_parse": video_event_toolkit.media_timeline_parse,
                         #  "image_search": tavily_search.search,

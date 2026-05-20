@@ -42,11 +42,6 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "对 Wiki 词条进行详细解析，返回版本、历史、源码、字段、章节和表格等结构化信息",
         "needs_workspace": False,
     },
-    "taxon_binomial_verify": {
-        "display_name_zh": "物种双名法验证器",
-        "description_zh": "将候选词追加两字母后缀并重复成双名法学名，验证是否为指定类型物种",
-        "needs_workspace": False,
-    },
     "google_books_volume_search": {
         "display_name_zh": "Google Books 书内搜索",
         "description_zh": "在 Google Books 指定书籍内搜索关键词，默认返回少量精确页标识、OCR 片段和页码引用",
@@ -209,8 +204,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
     from app.cosight.agent.actor.instance.actor_agent_skill import (
         execute_code_skill, search_google_skill, tavily_search_skill,
         search_wiki_skill, wiki_entry_parse_skill,
-        taxon_binomial_verify_skill, google_books_volume_search_skill,
-        media_timeline_parse_skill,
+        google_books_volume_search_skill, media_timeline_parse_skill,
         mark_step_skill, file_saver_skill,
         file_read_skill, file_str_replace_skill, file_find_in_content_skill,
         ask_question_about_image_skill, ask_question_about_video_skill,
@@ -229,7 +223,6 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "tavily_search": tavily_search_skill,
         "search_wiki": search_wiki_skill,
         "wiki_entry_parse": wiki_entry_parse_skill,
-        "taxon_binomial_verify": taxon_binomial_verify_skill,
         "google_books_volume_search": google_books_volume_search_skill,
         "media_timeline_parse": media_timeline_parse_skill,
         "mark_step": mark_step_skill,

@@ -102,16 +102,6 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'language': ['lang'],
         }
     },
-    'taxon_binomial_verify': {
-        'required': ['candidate_words'],
-        'aliases': {
-            'candidate_words': ['word', 'root_word', 'candidate', 'candidates', 'terms', 'synonyms'],
-            'suffixes': ['suffix', 'suffix_list', 'letters', 'two_letters'],
-            'expected_common_name_keyword': ['common_keyword', 'common_name_keyword', 'species_keyword'],
-            'expected_family': ['family', 'taxonomic_family'],
-            'wikipedia_language': ['language', 'lang'],
-        }
-    },
     'google_books_volume_search': {
         'required': ['query'],
         'aliases': {
