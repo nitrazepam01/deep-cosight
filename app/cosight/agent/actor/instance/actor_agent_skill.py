@@ -1020,20 +1020,20 @@ def google_books_volume_search_skill():
     }
 
 
-def media_timeline_parse_skill():
+def youtobe_tool_skill():
     return {
-        'skill_name': 'media_timeline_parse',
+        'skill_name': 'youtobe_tool',
         'skill_type': "function",
-        'display_name_zh': '媒体时间轴解析',
-        'display_name_en': 'Media Timeline Parser',
-        'description_zh': '获取在线视频的字幕文本与时间对照，并可按时间窗导出短片段、截图总览和音频片段',
-        'description_en': 'Build an online-media subtitle time map and optionally export a short clip, contact sheet, and audio segment',
+        'display_name_zh': 'YouTube 工具',
+        'display_name_en': 'YouTube Tool',
+        'description_zh': '获取在线视频的字幕与时间对照，并可按时间窗导出短片段、截图总览和音频片段',
+        'description_en': 'Get online-video subtitles with timestamps, and optionally export a short clip, contact sheet, and audio segment',
         'semantic_apis': ["api_search", "api_code_execution"],
         'function': SkillFunction(
             id='9d0794bb-c4f2-478e-9f49-39bbd2385f12',
-            name='app.cosight.video_event_toolkit.media_timeline_parse',
-            description_zh='解析在线视频字幕时间轴，并按需要导出媒体片段',
-            description_en='Parse an online-video subtitle timeline and export media artifacts when needed',
+            name='app.cosight.video_event_toolkit.youtobe_tool',
+            description_zh='解析在线视频，优先返回字幕和时间对照，必要时导出短片段、截图和音频线索',
+            description_en='Analyze an online video by first returning subtitle timestamps, and export clip, frame, or audio clues when needed',
             parameters={
                 "type": "object",
                 "properties": {

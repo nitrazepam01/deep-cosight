@@ -430,7 +430,7 @@ class VideoEventToolkit:
     ) -> str:
         """Parse online-media subtitles and optionally extract a short clip."""
         logger.info(
-            "Using media_timeline_parse, video_url=%s, event_description=%s",
+            "Using youtobe_tool, video_url=%s, event_description=%s",
             video_url,
             event_description,
         )
@@ -753,5 +753,45 @@ class VideoEventToolkit:
                 }
             )
         except Exception as exc:
-            logger.error("media_timeline_parse failed: %s", exc, exc_info=True)
+            logger.error("youtobe_tool failed: %s", exc, exc_info=True)
             return self._json({"ok": False, "error": str(exc)})
+
+    def youtobe_tool(
+        self,
+        video_url: str,
+        timeline_terms: Optional[List[str]] = None,
+        event_description: str = "",
+        candidate_window: Optional[Any] = None,
+        event_timestamp: Optional[Any] = None,
+        audio_start_timestamp: Optional[Any] = None,
+        pre_roll_seconds: int = 10,
+        post_roll_seconds: int = 45,
+        audio_duration_seconds: int = 20,
+        download_height: int = 360,
+        frame_rate: float = 1.0,
+        max_frames: int = 60,
+        output_dir: Optional[str] = None,
+        subtitle_language: str = "en.*",
+        max_subtitle_cues: int = 5,
+        max_timeline_entries: Optional[int] = None,
+        subtitles_only: bool = False,
+    ) -> str:
+        return self.media_timeline_parse(
+            video_url=video_url,
+            timeline_terms=timeline_terms,
+            event_description=event_description,
+            candidate_window=candidate_window,
+            event_timestamp=event_timestamp,
+            audio_start_timestamp=audio_start_timestamp,
+            pre_roll_seconds=pre_roll_seconds,
+            post_roll_seconds=post_roll_seconds,
+            audio_duration_seconds=audio_duration_seconds,
+            download_height=download_height,
+            frame_rate=frame_rate,
+            max_frames=max_frames,
+            output_dir=output_dir,
+            subtitle_language=subtitle_language,
+            max_subtitle_cues=max_subtitle_cues,
+            max_timeline_entries=max_timeline_entries,
+            subtitles_only=subtitles_only,
+        )

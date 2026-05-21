@@ -509,7 +509,7 @@ class ToolResultProcessor:
                 return ToolResultProcessor._process_wikipedia_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'google_books_volume_search':
                 return ToolResultProcessor._process_google_books_result(tool_name, tool_args, tool_result, task_title)
-            elif tool_name == 'media_timeline_parse':
+            elif tool_name == 'youtobe_tool':
                 return ToolResultProcessor._process_video_event_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'execute_code':
                 return ToolResultProcessor._process_code_result(tool_name, tool_args, tool_result, task_title)

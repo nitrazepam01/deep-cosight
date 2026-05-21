@@ -110,7 +110,7 @@ class TaskActorAgent(BaseAgent):
                          "tavily_search": search_toolkit.tavily_search,
                          "wiki_entry_parse": wikipedia_toolkit.wiki_entry_parse,
                          "google_books_volume_search": google_books_toolkit.google_books_volume_search,
-                         "media_timeline_parse": video_event_toolkit.media_timeline_parse,
+                         "youtobe_tool": video_event_toolkit.youtobe_tool,
                         #  "image_search": tavily_search.search,
                          "audio_recognition": audio_toolkit.speech_to_text,
                          # "search_duckgo": search_toolkit.search_duckduckgo,

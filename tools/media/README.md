@@ -1,6 +1,6 @@
 # Local Media Utilities
 
-`media_timeline_parse` can use project-local media utilities before falling back
+`youtobe_tool` can use project-local media utilities before falling back
 to the host environment. Put optional executables here:
 
 ```text

@@ -83,7 +83,7 @@ here are the smiling cloud blocks
     assert VideoEventToolkit._score_cue(cues[1]["text"], ["2000", "level", "cloud"]) == 1
 
 
-def test_media_timeline_parse_uses_subtitles_and_writes_artifacts(tmp_path):
+def test_youtobe_tool_uses_subtitles_and_writes_artifacts(tmp_path):
     class FakeToolkit(VideoEventToolkit):
         def _resolve_dependencies(self):
             return {
@@ -132,7 +132,7 @@ this is it level 2000 coming at you hot
             raise AssertionError(f"unexpected command: {args}")
 
     result = json.loads(
-        FakeToolkit(workspace_path=str(tmp_path)).media_timeline_parse(
+        FakeToolkit(workspace_path=str(tmp_path)).youtobe_tool(
             video_url="https://example.test/watch?v=abc123",
             timeline_terms=["2000", "level"],
             event_description="first jump onto a visual platform",
@@ -151,7 +151,7 @@ this is it level 2000 coming at you hot
     assert len(result["commands"]) == 5
 
 
-def test_media_timeline_parse_can_return_subtitle_time_map_only(tmp_path):
+def test_youtobe_tool_can_return_subtitle_time_map_only(tmp_path):
     class FakeToolkit(VideoEventToolkit):
         def _resolve_dependencies(self):
             return {
@@ -196,7 +196,7 @@ here are the smiling cloud blocks
             raise AssertionError(f"unexpected command: {args}")
 
     result = json.loads(
-        FakeToolkit(workspace_path=str(tmp_path)).media_timeline_parse(
+        FakeToolkit(workspace_path=str(tmp_path)).youtobe_tool(
             video_url="https://example.test/watch?v=abc123",
             timeline_terms=["cloud"],
             subtitles_only=True,

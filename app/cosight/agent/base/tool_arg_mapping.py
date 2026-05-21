@@ -117,7 +117,7 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'detail_level': ['detail', 'mode'],
         }
     },
-    'media_timeline_parse': {
+    'youtobe_tool': {
         'required': ['video_url'],
         'aliases': {
             'video_url': ['url', 'youtube_url', 'link', 'video_link'],

@@ -47,8 +47,8 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "在 Google Books 指定书籍内搜索关键词，默认返回少量精确页标识、OCR 片段和页码引用",
         "needs_workspace": False,
     },
-    "media_timeline_parse": {
-        "display_name_zh": "媒体时间轴解析",
+    "youtobe_tool": {
+        "display_name_zh": "YouTube 工具",
         "description_zh": "获取在线视频的字幕文本与时间对照，并可按时间窗导出短片段、截图总览和音频片段",
         "needs_workspace": True,
     },
@@ -199,7 +199,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
     from app.cosight.agent.actor.instance.actor_agent_skill import (
         execute_code_skill, search_google_skill, tavily_search_skill,
         search_wiki_skill, wiki_entry_parse_skill,
-        google_books_volume_search_skill, media_timeline_parse_skill,
+        google_books_volume_search_skill, youtobe_tool_skill,
         mark_step_skill, file_saver_skill,
         file_read_skill, file_str_replace_skill, file_find_in_content_skill,
         ask_question_about_image_skill, ask_question_about_video_skill,
@@ -218,7 +218,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "search_wiki": search_wiki_skill,
         "wiki_entry_parse": wiki_entry_parse_skill,
         "google_books_volume_search": google_books_volume_search_skill,
-        "media_timeline_parse": media_timeline_parse_skill,
+        "youtobe_tool": youtobe_tool_skill,
         "mark_step": mark_step_skill,
         "file_saver": file_saver_skill,
         "file_read": file_read_skill,

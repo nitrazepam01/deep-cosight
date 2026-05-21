@@ -125,8 +125,8 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
    - If a question asks which page in a specific book contains or is referenced by an entry, prefer google_books_volume_search with the Google Books volume id or URL and the search term. Use page_id/snippet_text evidence and distinguish book page numbers from PDF physical pages.
    - For recipe cross-reference snippets such as "Stuff ... with: Recipe Name, 374", report the referenced page number and keep PDF extraction only as an audit fallback when available.
 8. For long online-video evidence tasks:
-   - If a question depends on a moment inside a long YouTube or online video, use media_timeline_parse to get a subtitle-to-time map first; then use a narrow candidate window to export a short clip/contact sheet/audio when visual or audio verification is needed.
-   - Prefer a short extracted clip and event audio over feeding the entire video to ask_question_about_video; keep the output concise.
+   - Parsing a long video directly is difficult. Prefer youtobe_tool to first obtain subtitles and timestamp mappings as clues; then use a narrow candidate window to export a short clip, contact sheet, or audio segment when visual or sound verification is needed.
+   - Prefer short extracted evidence over feeding the entire video to ask_question_about_video; keep the output concise.
 
 # HTML Report Optimization Rules:
 10. When generating HTML reports, follow these optimization requirements:
@@ -402,8 +402,8 @@ def actor_system_prompt_zh(work_space_path):
    - 如果题目询问某本书中某条目/配方引用的是哪一页，优先使用 google_books_volume_search，传入 Google Books volume id 或 URL 和关键词。依据 page_id/snippet_text，不要把书内页码和 PDF 物理页混淆。
    - 遇到 "Stuff ... with: Recipe Name, 374" 这类配方交叉引用片段时，报告引用的书内页码；本地 PDF 抽取只作为辅助核验。
 8. 处理长在线视频证据题时：
-   - 如果题目依赖长 YouTube/在线视频中的某个时刻，先用 media_timeline_parse 获取字幕文本和时间对照；需要视觉或声音核验时，再用较窄时间窗导出短片段、contact sheet 和音频。
-   - 优先使用短片段和事件附近音频，不要直接把整段视频喂给 ask_question_about_video；保持输出简洁。
+   - 直接解析长视频难度较大，优先用 youtobe_tool 获取字幕文本和时间对照，把字幕命中和时间点当作线索；需要视觉或声音核验时，再用较窄时间窗导出短片段、截图总览和音频。
+   - 优先使用短片段、截图线索和事件附近音频，不要直接把整段视频喂给 ask_question_about_video；保持输出简洁。
 
 # HTML报告优化规则：
 10. 生成HTML报告时的优化要求：

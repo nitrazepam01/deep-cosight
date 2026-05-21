@@ -38,7 +38,7 @@
         "tavily_search",
         "wiki_entry_parse",
         "google_books_volume_search",
-        "media_timeline_parse",
+        "youtobe_tool",
         "audio_recognition",
         "ask_question_about_image",
         "ask_question_about_video",
