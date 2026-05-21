@@ -38,6 +38,7 @@ else:
 def set_model(model_config: dict[str, Optional[str | int | float]]):
     # 从环境变量读取超时配置（秒），默认180秒（3分钟）
     timeout_seconds = float(os.environ.get("LLM_TIMEOUT", "180"))
+    max_retries = int(os.environ.get("LLM_MAX_RETRIES", "0"))
     
     http_client_kwargs = {
         "headers": {
@@ -60,7 +61,8 @@ def set_model(model_config: dict[str, Optional[str | int | float]]):
     openai_llm = OpenAI(
         base_url=model_config['base_url'],
         api_key=model_config['api_key'],
-        http_client=httpx.Client(**http_client_kwargs)
+        http_client=httpx.Client(**http_client_kwargs),
+        max_retries=max_retries,
     )
 
     chat_llm_kwargs = {

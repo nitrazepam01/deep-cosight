@@ -17,8 +17,8 @@ import json
 import math
 import os
 import re
-import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -28,7 +28,10 @@ from app.common.logger_util import logger
 class VideoEventToolkit:
     """Extract concise evidence clips around events in long online videos."""
 
-    INSTALL_HINT = "conda install -n base -c conda-forge ffmpeg yt-dlp"
+    INSTALL_HINT = (
+        "Place yt-dlp, ffmpeg, and ffprobe under tools/media/bin, "
+        "or install them in conda base with: conda install -n base -c conda-forge ffmpeg yt-dlp"
+    )
 
     def __init__(
         self,
@@ -39,6 +42,7 @@ class VideoEventToolkit:
         self.workspace_path = Path(workspace_path or os.environ.get("WORKSPACE_PATH") or os.getcwd())
         self.conda_base = Path(conda_base).expanduser() if conda_base else None
         self.timeout = timeout
+        self.project_root = Path(__file__).resolve().parents[3]
 
     @staticmethod
     def _json(data: Dict[str, Any]) -> str:
@@ -164,7 +168,34 @@ class VideoEventToolkit:
                 return candidate
         return None
 
-    def _resolve_ytdlp(self, conda_base: Path) -> Tuple[Optional[List[str]], Optional[str]]:
+    def _project_tool_dirs(self) -> List[Path]:
+        roots = [
+            self.project_root / "tools" / "media" / "bin",
+            self.project_root / "tools" / "bin",
+            self.project_root / "bin",
+        ]
+        env_home = os.environ.get("COSIGHT_MEDIA_BIN")
+        if env_home:
+            roots.insert(0, Path(env_home).expanduser())
+        return roots
+
+    def _resolve_project_ytdlp(self) -> Tuple[Optional[List[str]], Optional[str]]:
+        executable_names = ["yt-dlp.exe", "yt-dlp"] if os.name == "nt" else ["yt-dlp", "yt-dlp.exe"]
+        for directory in self._project_tool_dirs():
+            script = directory / "yt-dlp-script.py"
+            if script.exists():
+                return [sys.executable, str(script)], str(script)
+
+            for name in executable_names:
+                candidate = directory / name
+                if candidate.exists():
+                    return [str(candidate)], str(candidate)
+
+        return None, None
+
+    def _resolve_conda_ytdlp(self, conda_base: Optional[Path]) -> Tuple[Optional[List[str]], Optional[str]]:
+        if not conda_base:
+            return None, None
         scripts = conda_base / "Scripts"
         python_exe = conda_base / ("python.exe" if os.name == "nt" else "bin/python")
 
@@ -186,6 +217,11 @@ class VideoEventToolkit:
 
         return None, None
 
+    def _resolve_project_binary(self, stem: str) -> Optional[str]:
+        names = [f"{stem}.exe", stem] if os.name == "nt" else [stem, f"{stem}.exe"]
+        candidates = [directory / name for directory in self._project_tool_dirs() for name in names]
+        return self._first_existing(candidates)
+
     @staticmethod
     def _first_existing(paths: Sequence[Path]) -> Optional[str]:
         for path in paths:
@@ -194,29 +230,42 @@ class VideoEventToolkit:
         return None
 
     def _resolve_dependencies(self) -> Dict[str, Any]:
-        conda_base = self._discover_conda_base()
         result: Dict[str, Any] = {
-            "conda_base": str(conda_base) if conda_base else None,
+            "project_root": str(self.project_root),
+            "project_tool_dirs": [str(path) for path in self._project_tool_dirs()],
+            "conda_base": None,
             "yt_dlp": None,
             "ffmpeg": None,
             "ffprobe": None,
             "missing": [],
             "install_hint": self.INSTALL_HINT,
         }
-        if not conda_base:
-            result["missing"].append("conda_base")
-            return result
 
-        ytdlp_command, ytdlp_display = self._resolve_ytdlp(conda_base)
+        ytdlp_command, ytdlp_display = self._resolve_project_ytdlp()
         if ytdlp_command:
             result["yt_dlp"] = {"command": ytdlp_command, "display": ytdlp_display}
-        else:
-            result["missing"].append("yt-dlp")
+        result["ffmpeg"] = self._resolve_project_binary("ffmpeg")
+        result["ffprobe"] = self._resolve_project_binary("ffprobe")
 
-        library_bin = conda_base / "Library" / "bin"
-        scripts = conda_base / "Scripts"
-        result["ffmpeg"] = self._first_existing([library_bin / "ffmpeg.exe", scripts / "ffmpeg.exe"])
-        result["ffprobe"] = self._first_existing([library_bin / "ffprobe.exe", scripts / "ffprobe.exe"])
+        needs_host_fallback = not result["yt_dlp"] or not result["ffmpeg"] or not result["ffprobe"]
+        conda_base = self._discover_conda_base() if needs_host_fallback else None
+        result["conda_base"] = str(conda_base) if conda_base else None
+
+        if not result["yt_dlp"]:
+            ytdlp_command, ytdlp_display = self._resolve_conda_ytdlp(conda_base)
+            if ytdlp_command:
+                result["yt_dlp"] = {"command": ytdlp_command, "display": ytdlp_display}
+        if conda_base:
+            library_bin = conda_base / "Library" / "bin"
+            scripts = conda_base / "Scripts"
+            result["ffmpeg"] = result["ffmpeg"] or self._first_existing(
+                [library_bin / "ffmpeg.exe", scripts / "ffmpeg.exe"]
+            )
+            result["ffprobe"] = result["ffprobe"] or self._first_existing(
+                [library_bin / "ffprobe.exe", scripts / "ffprobe.exe"]
+            )
+        if not result["yt_dlp"]:
+            result["missing"].append("yt-dlp")
         if not result["ffmpeg"]:
             result["missing"].append("ffmpeg")
         if not result["ffprobe"]:
@@ -355,6 +404,7 @@ class VideoEventToolkit:
                 path = self.workspace_path / path
         else:
             path = self.workspace_path / "video_event_clip"
+        path = path.resolve()
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -540,12 +590,20 @@ class VideoEventToolkit:
             clip_stem = "event_clip"
             before_clips = set(self._collect_files(output_path, [f"{clip_stem}.*"]))
             section = f"*{self._format_timestamp(window_start)}-{self._format_timestamp(window_end)}"
-            format_selector = f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best"
+            format_selector = (
+                f"bestvideo[height<={height}][ext=mp4][vcodec!*=av01]+bestaudio[ext=m4a]/"
+                f"bestvideo[height<={height}][vcodec!*=av01]+bestaudio/"
+                f"best[height<={height}][vcodec!*=av01]/"
+                f"bestvideo[height<={height}]+bestaudio/"
+                f"best[height<={height}]/best"
+            )
             download_cmd = self._yt_command(
                 dependencies,
                 [
                     "--download-sections",
                     section,
+                    "--ffmpeg-location",
+                    str(Path(dependencies["ffmpeg"]).parent),
                     "-f",
                     format_selector,
                     "--merge-output-format",

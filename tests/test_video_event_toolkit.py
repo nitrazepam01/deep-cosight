@@ -9,6 +9,38 @@ sys.path.insert(0, os.path.abspath("."))
 from app.cosight.tool.video_event_toolkit import VideoEventToolkit
 
 
+def test_resolve_dependencies_prefers_project_media_bin(tmp_path):
+    project_bin = tmp_path / "tools" / "media" / "bin"
+    project_pydeps = tmp_path / "tools" / "media" / "pydeps"
+    conda_scripts = tmp_path / "conda" / "Scripts"
+    conda_library_bin = tmp_path / "conda" / "Library" / "bin"
+    project_bin.mkdir(parents=True)
+    project_pydeps.mkdir(parents=True)
+    conda_scripts.mkdir(parents=True)
+    conda_library_bin.mkdir(parents=True)
+    (project_bin / "yt-dlp.exe").write_text("", encoding="utf-8")
+    (project_bin / "yt-dlp-script.py").write_text("", encoding="utf-8")
+    (project_bin / "ffmpeg.exe").write_text("", encoding="utf-8")
+    (project_bin / "ffprobe.exe").write_text("", encoding="utf-8")
+    (conda_scripts / "yt-dlp.exe").write_text("", encoding="utf-8")
+    (conda_library_bin / "ffmpeg.exe").write_text("", encoding="utf-8")
+    (conda_library_bin / "ffprobe.exe").write_text("", encoding="utf-8")
+
+    toolkit = VideoEventToolkit(conda_base=str(tmp_path / "conda"))
+    toolkit.project_root = tmp_path
+
+    def fail_conda_discovery():
+        raise AssertionError("conda fallback should not run")
+
+    toolkit._discover_conda_base = fail_conda_discovery
+    deps = toolkit._resolve_dependencies()
+
+    assert deps["missing"] == []
+    assert deps["yt_dlp"]["command"] == [sys.executable, str(project_bin / "yt-dlp-script.py")]
+    assert deps["ffmpeg"] == str(project_bin / "ffmpeg.exe")
+    assert deps["ffprobe"] == str(project_bin / "ffprobe.exe")
+
+
 def test_resolve_dependencies_prefers_conda_base_paths(tmp_path):
     scripts = tmp_path / "Scripts"
     library_bin = tmp_path / "Library" / "bin"
