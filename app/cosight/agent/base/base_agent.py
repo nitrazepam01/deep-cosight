@@ -294,6 +294,7 @@ class BaseAgent:
             "youtobe_tool": "YouTube工具",
             "image_search": "图片搜索",
             "audio_recognition": "音频识别",
+            "music_recognition_lookup": "音乐识别检索",
             
             # 文件操作类工具
             "file_saver": "保存文件",
@@ -378,7 +379,7 @@ class BaseAgent:
         # 搜索类：支持交叉验证
         if name in (
             "search_baidu", "search_google", "tavily_search", "search_wiki", "image_search",
-            "wiki_entry_parse", "google_books_volume_search", "youtobe_tool",
+            "wiki_entry_parse", "google_books_volume_search", "youtobe_tool", "music_recognition_lookup",
         ):
             return ["source_trace", "rule_assist", "self_consistency"]
         

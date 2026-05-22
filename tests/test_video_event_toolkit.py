@@ -83,6 +83,15 @@ here are the smiling cloud blocks
     assert VideoEventToolkit._score_cue(cues[1]["text"], ["2000", "level", "cloud"]) == 1
 
 
+def test_parse_window_and_timestamp_accept_dict_values():
+    start, end = VideoEventToolkit._parse_window({"start": "00:32:14", "end": "00:33:05"})
+
+    assert start == 1934
+    assert end == 1985
+    assert VideoEventToolkit._parse_timestamp({"source_video_timestamp": "00:32:27"}) == 1947
+    assert VideoEventToolkit._parse_timestamp({"source_video_seconds": 1947}) == 1947
+
+
 def test_youtobe_tool_uses_subtitles_and_writes_artifacts(tmp_path):
     class FakeToolkit(VideoEventToolkit):
         def _resolve_dependencies(self):
@@ -149,6 +158,79 @@ this is it level 2000 coming at you hot
     assert Path(result["artifacts"]["contact_sheet_path"]).exists()
     assert Path(result["artifacts"]["audio_path"]).exists()
     assert len(result["commands"]) == 5
+
+
+def test_youtobe_tool_falls_back_to_audio_only_when_clip_download_fails(tmp_path):
+    class FakeToolkit(VideoEventToolkit):
+        def _resolve_dependencies(self):
+            return {
+                "conda_base": "D:\\Miniconda",
+                "yt_dlp": {"command": ["yt-dlp"], "display": "D:\\Miniconda\\Scripts\\yt-dlp.exe"},
+                "ffmpeg": "ffmpeg.exe",
+                "ffprobe": "ffprobe.exe",
+                "missing": [],
+                "install_hint": self.INSTALL_HINT,
+            }
+
+        def _run_command(self, args, timeout=None, cwd=None):
+            cwd = Path(cwd or tmp_path)
+            if "-J" in args:
+                return subprocess.CompletedProcess(
+                    args,
+                    0,
+                    stdout=json.dumps(
+                        {
+                            "id": "abc123",
+                            "title": "Example long video",
+                            "channel": "ExampleChannel",
+                            "duration": 2200,
+                            "webpage_url": "https://example.test/watch?v=abc123",
+                        }
+                    ),
+                    stderr="",
+                )
+            if "--write-auto-subs" in args:
+                (cwd / "abc123.en.vtt").write_text(
+                    """WEBVTT
+
+00:32:27.000 --> 00:32:29.000
+[Music]
+""",
+                    encoding="utf-8",
+                )
+                return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+            if "--download-sections" in args:
+                return subprocess.CompletedProcess(args, 1, stdout="", stderr="video clip blocked")
+            if "--get-url" in args:
+                return subprocess.CompletedProcess(args, 0, stdout="https://media.example/audio.webm\n", stderr="")
+            if args[0] == "ffmpeg.exe":
+                assert "https://media.example/audio.webm" in args
+                Path(args[-1]).write_bytes(b"audio")
+                return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+            raise AssertionError(f"unexpected command: {args}")
+
+    result = json.loads(
+        FakeToolkit(workspace_path=str(tmp_path)).youtobe_tool(
+            video_url="https://example.test/watch?v=abc123",
+            timeline_terms=["music"],
+            event_description="music begins",
+            candidate_window={"start": "00:32:20", "end": "00:32:45"},
+            audio_start_timestamp="00:32:20",
+            audio_duration_seconds=25,
+            output_dir=str(tmp_path / "out"),
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["media_mode"] == "audio_only_fallback"
+    assert result["artifacts"]["clip_path"] is None
+    assert result["artifacts"]["contact_sheet_path"] is None
+    assert Path(result["artifacts"]["audio_path"]).exists()
+    assert result["candidate_event_time"]["source_video_timestamp"] == "00:32:20.000"
+    assert [command["step"] for command in result["commands"]][-2:] == [
+        "audio_only_url_lookup",
+        "audio_only_extract",
+    ]
 
 
 def test_youtobe_tool_can_return_subtitle_time_map_only(tmp_path):

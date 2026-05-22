@@ -39,6 +39,7 @@
         "wiki_entry_parse",
         "google_books_volume_search",
         "youtobe_tool",
+        "music_recognition_lookup",
         "audio_recognition",
         "ask_question_about_image",
         "ask_question_about_video",

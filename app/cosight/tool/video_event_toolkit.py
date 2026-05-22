@@ -65,6 +65,18 @@ class VideoEventToolkit:
     def _parse_timestamp(value: Any) -> Optional[float]:
         if value is None or value == "":
             return None
+        if isinstance(value, dict):
+            for key in ("source_video_timestamp", "timestamp", "time", "start"):
+                if key in value:
+                    parsed = VideoEventToolkit._parse_timestamp(value.get(key))
+                    if parsed is not None:
+                        return parsed
+            for key in ("source_video_seconds", "seconds"):
+                if key in value:
+                    parsed = VideoEventToolkit._parse_timestamp(value.get(key))
+                    if parsed is not None:
+                        return parsed
+            return None
         if isinstance(value, (int, float)):
             return float(value)
         text = str(value).strip()
@@ -102,6 +114,20 @@ class VideoEventToolkit:
     def _parse_window(cls, value: Any) -> Tuple[Optional[float], Optional[float]]:
         if not value:
             return None, None
+        if isinstance(value, dict):
+            start_value = (
+                value.get("start")
+                or value.get("start_timestamp")
+                or value.get("from")
+                or value.get("begin")
+            )
+            end_value = (
+                value.get("end")
+                or value.get("end_timestamp")
+                or value.get("to")
+                or value.get("stop")
+            )
+            return cls._parse_timestamp(start_value), cls._parse_timestamp(end_value)
         if isinstance(value, (list, tuple)) and len(value) >= 2:
             return cls._parse_timestamp(value[0]), cls._parse_timestamp(value[1])
         text = str(value).strip()
@@ -408,6 +434,94 @@ class VideoEventToolkit:
         path.mkdir(parents=True, exist_ok=True)
         return path
 
+    def _extract_audio_only(
+        self,
+        dependencies: Dict[str, Any],
+        video_url: str,
+        output_path: Path,
+        start_seconds: float,
+        duration_seconds: int,
+        commands: List[Dict[str, Any]],
+    ) -> Optional[Path]:
+        """Extract a short audio artifact directly from the best-audio stream."""
+        audio_url_cmd = self._yt_command(
+            dependencies,
+            [
+                "--no-playlist",
+                "--socket-timeout",
+                "20",
+                "--retries",
+                "0",
+                "--fragment-retries",
+                "0",
+                "-f",
+                "ba",
+                "--get-url",
+                video_url,
+            ],
+        )
+        audio_url_run = self._run_command(audio_url_cmd, timeout=60, cwd=output_path)
+        commands.append(
+            {
+                "step": "audio_only_url_lookup",
+                "returncode": audio_url_run.returncode,
+                "command": self._command_display(audio_url_cmd[:8] + ["..."]),
+                "stderr_tail": self._shorten(audio_url_run.stderr, 300),
+            }
+        )
+        if audio_url_run.returncode != 0:
+            return None
+
+        audio_url = None
+        for line in audio_url_run.stdout.splitlines():
+            line = line.strip()
+            if line.startswith(("http://", "https://")):
+                audio_url = line
+                break
+        if not audio_url:
+            commands.append(
+                {
+                    "step": "audio_only_url_parse",
+                    "returncode": 1,
+                    "command": "parse yt-dlp --get-url output",
+                    "stderr_tail": "No HTTP(S) audio URL found in yt-dlp output",
+                }
+            )
+            return None
+
+        audio_path = output_path / "event_audio.wav"
+        audio_cmd = [
+            dependencies["ffmpeg"],
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-ss",
+            f"{float(start_seconds):.3f}",
+            "-i",
+            audio_url,
+            "-t",
+            str(duration_seconds),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            str(audio_path),
+        ]
+        audio_run = self._run_command(audio_cmd, timeout=90, cwd=output_path)
+        commands.append(
+            {
+                "step": "audio_only_extract",
+                "returncode": audio_run.returncode,
+                "command": self._command_display(audio_cmd[:8] + ["..."]),
+                "stderr_tail": self._shorten(audio_run.stderr, 300),
+            }
+        )
+        if audio_run.returncode == 0 and audio_path.exists():
+            return audio_path
+        return None
+
     def media_timeline_parse(
         self,
         video_url: str,
@@ -478,6 +592,59 @@ class VideoEventToolkit:
                 }
             )
             if metadata_run.returncode != 0:
+                if not subtitles_only:
+                    window_start, window_end = self._parse_window(candidate_window)
+                    audio_start = self._parse_timestamp(audio_start_timestamp)
+                    if audio_start is None:
+                        audio_start = self._parse_timestamp(event_timestamp)
+                    if audio_start is None:
+                        audio_start = window_start
+                    if audio_start is not None:
+                        audio_duration = self._safe_int(audio_duration_seconds, 20, 3, 120)
+                        if window_start is not None and window_end is not None and not audio_start_timestamp:
+                            audio_duration = min(audio_duration, int(max(3, window_end - window_start)))
+                        audio_path = self._extract_audio_only(
+                            dependencies,
+                            video_url,
+                            output_path,
+                            float(audio_start),
+                            audio_duration,
+                            commands,
+                        )
+                        if audio_path:
+                            return self._json(
+                                {
+                                    "ok": True,
+                                    "metadata": {"webpage_url": video_url},
+                                    "event_description": event_description,
+                                    "dependency_status": dependency_status,
+                                    "subtitle_files": [],
+                                    "timeline_terms": timeline_terms or [],
+                                    "subtitle_time_map": [],
+                                    "subtitle_cues": [],
+                                    "selected_cue": None,
+                                    "clip_window": {
+                                        "start_seconds": window_start,
+                                        "end_seconds": window_end,
+                                        "start": self._format_timestamp(window_start) if window_start is not None else None,
+                                        "end": self._format_timestamp(window_end) if window_end is not None else None,
+                                    },
+                                    "candidate_event_time": {
+                                        "source_video_seconds": float(audio_start),
+                                        "source_video_timestamp": self._format_timestamp(float(audio_start)),
+                                        "clip_offset_seconds": 0,
+                                    },
+                                    "artifacts": {
+                                        "clip_path": None,
+                                        "contact_sheet_path": None,
+                                        "audio_path": str(audio_path),
+                                    },
+                                    "commands": commands,
+                                    "media_mode": "audio_only_fallback",
+                                    "warning": "Metadata lookup failed, but a short audio artifact was extracted directly from the best-audio stream.",
+                                    "next_step": "Use music_recognition_lookup on artifacts.audio_path, then cross-check candidates with reliable sources. Do not finalize from broad search snippets alone.",
+                                }
+                            )
                 return self._json(
                     {
                         "ok": False,
@@ -624,6 +791,62 @@ class VideoEventToolkit:
                 }
             )
             if download_run.returncode != 0:
+                audio_start = self._parse_timestamp(audio_start_timestamp)
+                if audio_start is None:
+                    audio_start = self._parse_timestamp(event_timestamp)
+                if audio_start is None and selected_cue:
+                    audio_start = float(selected_cue["start_seconds"] or window_start)
+                if audio_start is None:
+                    audio_start = window_start
+                audio_duration = self._safe_int(audio_duration_seconds, 20, 3, 120)
+                audio_path = self._extract_audio_only(
+                    dependencies,
+                    video_url,
+                    output_path,
+                    float(audio_start),
+                    audio_duration,
+                    commands,
+                )
+                if audio_path:
+                    return self._json(
+                        {
+                            "ok": True,
+                            "metadata": {
+                                "title": title,
+                                "channel": channel,
+                                "duration_seconds": duration,
+                                "video_id": video_id,
+                                "webpage_url": metadata.get("webpage_url") or video_url,
+                            },
+                            "event_description": event_description,
+                            "dependency_status": dependency_status,
+                            "subtitle_files": [str(path) for path in subtitle_files],
+                            "timeline_terms": terms,
+                            "subtitle_time_map": subtitle_time_map,
+                            "subtitle_cues": subtitle_cues,
+                            "selected_cue": selected_cue,
+                            "clip_window": {
+                                "start_seconds": window_start,
+                                "end_seconds": window_end,
+                                "start": self._format_timestamp(window_start),
+                                "end": self._format_timestamp(window_end),
+                            },
+                            "candidate_event_time": {
+                                "source_video_seconds": float(audio_start),
+                                "source_video_timestamp": self._format_timestamp(float(audio_start)),
+                                "clip_offset_seconds": 0,
+                            },
+                            "artifacts": {
+                                "clip_path": None,
+                                "contact_sheet_path": None,
+                                "audio_path": str(audio_path),
+                            },
+                            "commands": commands,
+                            "media_mode": "audio_only_fallback",
+                            "warning": "Clip/contact-sheet extraction failed, but a short audio artifact was extracted directly from the best-audio stream.",
+                            "next_step": "Use music_recognition_lookup on artifacts.audio_path, then cross-check candidates with reliable sources. Do not finalize from broad search snippets alone.",
+                        }
+                    )
                 return self._json(
                     {
                         "ok": False,
@@ -749,7 +972,7 @@ class VideoEventToolkit:
                         "audio_path": str(audio_path) if audio_path.exists() else None,
                     },
                     "commands": commands,
-                    "next_step": "Inspect the contact sheet to confirm the visual event timestamp, then run audio_recognition on artifacts.audio_path.",
+                    "next_step": "Inspect the contact sheet to confirm the visual event timestamp. For music identification, run music_recognition_lookup on artifacts.audio_path when available, including audio-only fallback artifacts, then cross-check candidates; do not finalize from broad search snippets alone.",
                 }
             )
         except Exception as exc:

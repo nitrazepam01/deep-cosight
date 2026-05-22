@@ -940,6 +940,45 @@ def audio_recognition_skill():
     }
 
 
+def music_recognition_lookup_skill():
+    return {
+        'skill_name': 'music_recognition_lookup',
+        'skill_type': "function",
+        'display_name_zh': '音乐识别检索',
+        'display_name_en': 'Music Recognition Lookup',
+        'description_zh': '对短音频片段调用本地音乐识别后端，返回候选曲名、艺人和原始响应；结果需再交叉验证',
+        'description_en': 'Call a local music-recognition backend for a short audio clip and return candidate song metadata plus the raw response',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f13',
+            name='app.cosight.tool.music_recognition_toolkit.music_recognition_lookup',
+            description_zh='调用本地音乐识别服务识别短音频片段，默认兼容 http://127.0.0.1:12400 这类本地后端',
+            description_en='Recognize likely songs in a short audio clip through a local recognition service, compatible with local HTTP backends such as http://127.0.0.1:12400',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "audio_path": {
+                        "type": "string",
+                        "description_zh": "本地短音频路径，建议为 10-25 秒片段",
+                        "description_en": "Local short audio path, preferably a 10-25 second clip"
+                    },
+                    "backend_url": {
+                        "type": "string",
+                        "description_zh": "可选本地识别服务地址，默认读取环境变量或 http://127.0.0.1:12400",
+                        "description_en": "Optional local recognition endpoint; defaults to environment variables or http://127.0.0.1:12400"
+                    },
+                    "timeout_seconds": {
+                        "type": "integer",
+                        "description_zh": "请求超时时间，默认 30 秒",
+                        "description_en": "Request timeout in seconds, default 30"
+                    }
+                },
+                "required": ["audio_path"]
+            }
+        )
+    }
+
+
 def google_books_volume_search_skill():
     return {
         'skill_name': 'google_books_volume_search',
@@ -1026,14 +1065,14 @@ def youtobe_tool_skill():
         'skill_type': "function",
         'display_name_zh': 'YouTube 工具',
         'display_name_en': 'YouTube Tool',
-        'description_zh': '获取在线视频的字幕与时间对照，并可按时间窗导出短片段、截图总览和音频片段',
-        'description_en': 'Get online-video subtitles with timestamps, and optionally export a short clip, contact sheet, and audio segment',
+        'description_zh': '获取在线视频的字幕与时间对照，并可按时间窗导出短片段、截图总览和短音频；视频片段受限时会尽量降级抽取音频证据',
+        'description_en': 'Get online-video subtitles with timestamps, and optionally export a short clip, contact sheet, and short audio; when clip extraction is blocked, try lightweight audio evidence',
         'semantic_apis': ["api_search", "api_code_execution"],
         'function': SkillFunction(
             id='9d0794bb-c4f2-478e-9f49-39bbd2385f12',
             name='app.cosight.video_event_toolkit.youtobe_tool',
-            description_zh='解析在线视频，优先返回字幕和时间对照，必要时导出短片段、截图和音频线索',
-            description_en='Analyze an online video by first returning subtitle timestamps, and export clip, frame, or audio clues when needed',
+            description_zh='解析在线视频，优先返回字幕和时间对照，必要时导出短片段、截图和音频线索。识别音乐时，拿到时间窗后优先保留短音频证据；如果视频片段或截图抽取失败，不要直接用搜索猜答案，应尝试音频降级结果或报告证据不足',
+            description_en='Analyze an online video by first returning subtitle timestamps, and export clip, frame, or audio clues when needed. For music identification, keep short audio evidence once a time window is known; if clip or frame extraction fails, do not guess from broad search results alone, use the audio fallback artifact or report the evidence gap',
             parameters={
                 "type": "object",
                 "properties": {
@@ -1062,8 +1101,8 @@ def youtobe_tool_skill():
                         "description_en": "Optional source-video timestamp of the event, for example '00:32:31.5'; used for event audio"
                     },
                     "audio_start_timestamp": {
-                        "description_zh": "可选音频截取开始时间；未提供时使用 event_timestamp 或候选时间点",
-                        "description_en": "Optional source-video timestamp where audio extraction starts"
+                        "description_zh": "可选音频截取开始时间；未提供时使用 event_timestamp 或候选时间点。音乐识别题建议明确提供该值，以便视频片段失败时仍可尝试 audio-only 短音频抽取",
+                        "description_en": "Optional source-video timestamp where audio extraction starts. For music-identification tasks, provide this explicitly so audio-only extraction can still be attempted if clip extraction fails"
                     },
                     "pre_roll_seconds": {
                         "type": "integer",
@@ -1077,8 +1116,8 @@ def youtobe_tool_skill():
                     },
                     "audio_duration_seconds": {
                         "type": "integer",
-                        "description_zh": "截取音频长度，默认 20 秒",
-                        "description_en": "Length of extracted audio, default 20 seconds"
+                        "description_zh": "截取音频长度，默认 20 秒；音乐识别通常使用 10-30 秒短片段",
+                        "description_en": "Length of extracted audio, default 20 seconds; music recognition usually works best with a short 10-30 second segment"
                     },
                     "download_height": {
                         "type": "integer",

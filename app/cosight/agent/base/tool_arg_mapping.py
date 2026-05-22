@@ -133,6 +133,14 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'frame_rate': ['fps', 'sample_rate'],
             'output_dir': ['output_path', 'save_dir', 'artifact_dir'],
         }
+    },
+    'music_recognition_lookup': {
+        'required': ['audio_path'],
+        'aliases': {
+            'audio_path': ['audio', 'file', 'file_path', 'filepath', 'path', 'wav_path', 'clip_path'],
+            'backend_url': ['endpoint', 'url', 'recognition_url', 'service_url'],
+            'timeout_seconds': ['timeout', 'request_timeout'],
+        }
     }
 }
 

@@ -127,6 +127,9 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
 8. For long online-video evidence tasks:
    - Parsing a long video directly is difficult. Prefer youtobe_tool to first obtain subtitles and timestamp mappings as clues; then use a narrow candidate window to export a short clip, contact sheet, or audio segment when visual or sound verification is needed.
    - Prefer short extracted evidence over feeding the entire video to ask_question_about_video; keep the output concise.
+   - For music or sound changes, once a timestamp is known, explicitly request a short audio segment with audio_start_timestamp and audio_duration_seconds. If clip/contact-sheet extraction is blocked, use the audio-only fallback artifact when available rather than switching directly to broad web-search guesses.
+   - When identifying music from a video, use music_recognition_lookup on a short extracted audio clip when a local recognition backend is available. Treat returned matches as candidates and cross-check the song title and composer/artist against reliable sources before finalizing.
+   - If recognition fails or returns no candidates, do not rely on generic comments or broad web-search snippets alone; use visual/game-context clues and targeted source pages as supporting evidence.
 
 # HTML Report Optimization Rules:
 10. When generating HTML reports, follow these optimization requirements:
@@ -404,6 +407,9 @@ def actor_system_prompt_zh(work_space_path):
 8. 处理长在线视频证据题时：
    - 直接解析长视频难度较大，优先用 youtobe_tool 获取字幕文本和时间对照，把字幕命中和时间点当作线索；需要视觉或声音核验时，再用较窄时间窗导出短片段、截图总览和音频。
    - 优先使用短片段、截图线索和事件附近音频，不要直接把整段视频喂给 ask_question_about_video；保持输出简洁。
+   - 处理音乐或声音变化时，一旦定位到时间点，应明确传入 audio_start_timestamp 和 audio_duration_seconds 请求短音频。若短视频或截图抽取受限，优先使用工具返回的 audio-only 降级音频证据，不要直接转向宽泛网页搜索猜答案。
+   - 需要识别视频中的音乐时，如果本地音乐识别后端可用，可对短音频片段使用 music_recognition_lookup；返回结果只作为候选，最终曲名和作者/艺人必须再用可靠来源交叉验证。
+   - 如果音乐识别失败或没有候选，不要只凭泛泛评论或宽泛搜索片段下结论；应结合画面、游戏机制、字幕时间点和更有针对性的来源页面继续核验。
 
 # HTML报告优化规则：
 10. 生成HTML报告时的优化要求：

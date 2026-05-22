@@ -69,6 +69,7 @@ def create_actor_template(template_name, work_space_path):
                    wiki_entry_parse_skill(),
                    google_books_volume_search_skill(),
                    youtobe_tool_skill(),
+                   music_recognition_lookup_skill(),
                    audio_recognition_skill(),
                    ask_question_about_video_skill()],
         # , terminate_skill(), browser_use_skill()
