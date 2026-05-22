@@ -19,6 +19,7 @@ import re
 from pathlib import Path
 
 from app.common.logger_util import logger
+from app.cosight.tool.workspace_path_utils import resolve_workspace_artifact_path
 
 default_encoding: str = "utf-8"
 DEFAULT_FORMAT: str = ".md"  # Default format for files without extension
@@ -144,17 +145,11 @@ class FileToolkit:
         try:
             logger.info(f"reading content to file: {file}")
             
-            # Handle API path format (e.g., /api/nae-deep-research/v1/work_space/...)
-            if file.startswith('/api/nae-deep-research/v1/'):
-                # Extract relative path after the API prefix
-                relative_path = file[len('/api/nae-deep-research/v1/'):]
-                absolute_path = os.path.join(self.work_space_path, relative_path)
+            resolved_file = resolve_workspace_artifact_path(file, self.work_space_path)
+            if os.path.exists(resolved_file):
+                absolute_path = resolved_file
             else:
-                # Use the input path if it exists, otherwise use workspace path
-                if os.path.exists(file):
-                    absolute_path = file
-                else:
-                    absolute_path = os.path.join(self.work_space_path, os.path.basename(file))
+                absolute_path = os.path.join(self.work_space_path, os.path.basename(file))
 
             # Verify file exists
             if not os.path.exists(absolute_path):

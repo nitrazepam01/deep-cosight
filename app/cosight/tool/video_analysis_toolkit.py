@@ -23,11 +23,13 @@ import numpy as np
 import soundfile as sf
 import asyncio
 from app.common.logger_util import logger
+from app.cosight.tool.workspace_path_utils import resolve_workspace_artifact_path
 
 
 class VideoTool:
-    def __init__(self, llm_config):
+    def __init__(self, llm_config, workspace_path=None):
         self.llm_config = llm_config
+        self.workspace_path = workspace_path
 
     name: str = "Video Tool"
     description: str = (
@@ -52,6 +54,7 @@ class VideoTool:
 
     async def video_analy(self, video_path: str, question: str):
         video_url = ''
+        video_path = resolve_workspace_artifact_path(video_path, self.workspace_path)
         if video_path.startswith('http://') or video_path.startswith('https://'):
             video_url = video_path
         else:

@@ -24,10 +24,12 @@ import soundfile as sf
 import asyncio
 
 from app.common.logger_util import logger
+from app.cosight.tool.workspace_path_utils import resolve_workspace_artifact_path
 
 class VisionTool():
-    def __init__(self, llm_config):
+    def __init__(self, llm_config, workspace_path=None):
         self.llm_config = llm_config
+        self.workspace_path = workspace_path
 
     name: str = "Vision Tool"
     description: str = (
@@ -52,6 +54,7 @@ class VisionTool():
 
     async def _run(self, image_path_url, task_prompt):
         img_url = ''
+        image_path_url = resolve_workspace_artifact_path(image_path_url, self.workspace_path)
         if image_path_url.startswith('http://') or image_path_url.startswith('https://'):
             img_url = image_path_url
         else:

@@ -25,6 +25,7 @@ from urllib.parse import urlparse
 import requests
 
 from app.common.logger_util import logger
+from app.cosight.tool.workspace_path_utils import resolve_workspace_artifact_path
 
 
 class MusicRecognitionToolkit:
@@ -94,7 +95,8 @@ class MusicRecognitionToolkit:
         return None
 
     def _resolve_audio_path(self, audio_path: str) -> Path:
-        path = Path(str(audio_path or "").strip()).expanduser()
+        resolved = resolve_workspace_artifact_path(str(audio_path or "").strip(), str(self.workspace_path))
+        path = Path(resolved).expanduser()
         if not path.is_absolute():
             path = self.workspace_path / path
         return path.resolve()

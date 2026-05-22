@@ -77,13 +77,16 @@ class TaskActorAgent(BaseAgent):
                                   "api_key": tool_llm.api_key})
         image_toolkit = VisionTool({"base_url": vision_llm.base_url,
                                     "model": vision_llm.model,
-                                    "api_key": vision_llm.api_key})
+                                    "api_key": vision_llm.api_key},
+                                   workspace_path=self.work_space_path)
         audio_toolkit = AudioTool({"base_url": vision_llm.base_url,
                                    "model": vision_llm.model,
-                                   "api_key": vision_llm.api_key})
+                                   "api_key": vision_llm.api_key},
+                                  workspace_path=self.work_space_path)
         video_toolkit = VideoTool({"base_url": vision_llm.base_url,
                                    "model": vision_llm.model,
-                                   "api_key": vision_llm.api_key})
+                                   "api_key": vision_llm.api_key},
+                                  workspace_path=self.work_space_path)
         doc_toolkit = DocumentProcessingToolkit()
         search_toolkit = SearchToolkit()
         deep_search_toolkit = DeepSearchToolkit({

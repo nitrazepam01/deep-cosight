@@ -129,6 +129,7 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
    - Do not use ask_question_about_video for music or sound-identification tasks. It is not an audio fingerprinting tool and should not be used to identify songs, composers, artists, or background music.
    - For music or sound changes, once a timestamp is known, explicitly request a short audio segment with audio_start_timestamp and audio_duration_seconds. If clip/contact-sheet extraction is blocked, use the audio-only fallback artifact when available rather than switching directly to broad web-search guesses.
    - When identifying music from a video, run music_recognition_lookup on the short extracted audio clip. The tool handles common sample-rate/channel differences for the local music lookup backend, so pass the source clip directly instead of changing tool routes because the audio format is uncertain.
+   - If visual inspection of a contact sheet or clip fails but youtobe_tool has already produced a plausible short audio artifact, continue with music_recognition_lookup and record the timestamp uncertainty instead of repeatedly retrying visual QA.
    - If a general audio understanding check is useful, use audio_recognition on the same short audio clip; do not substitute video Q&A, speech transcription, or humming-style lookup for song recognition.
    - Treat music-recognition matches as candidates and cross-check the song title and composer/artist against reliable sources before finalizing. If recognition is unavailable or returns no candidates, say that explicitly in the evidence trail and avoid finalizing from generic comments or broad web-search snippets alone.
 
@@ -410,6 +411,7 @@ def actor_system_prompt_zh(work_space_path):
    - 音乐、声音变化或背景音乐识别任务禁止使用 ask_question_about_video。它不是音频指纹识别工具，不能用来识别歌曲、作曲者、艺人或背景音乐。
    - 处理音乐或声音变化时，一旦定位到时间点，应明确传入 audio_start_timestamp 和 audio_duration_seconds 请求短音频。若短视频或截图抽取受限，优先使用工具返回的 audio-only 降级音频证据，不要直接转向宽泛网页搜索猜答案。
    - 需要识别视频中的音乐时，先对短音频片段使用 music_recognition_lookup。该工具会处理常见采样率和声道差异，音频格式不确定时也应直接交给它，不要因此切换路线。
+   - 如果截图总览或短视频视觉核验失败，但 youtobe_tool 已经产出合理的短音频，应继续调用 music_recognition_lookup，并在证据链中注明时间点仍有不确定性，不要反复卡在视觉问答上。
    - 如果需要通用音频理解辅助，再对同一短音频使用 audio_recognition。不要用视频问答、语音转写或哼唱式检索替代歌曲识别。
    - 音乐识别返回结果只作为候选，最终曲名和作者/艺人必须再用可靠来源交叉验证。如果识别服务不可用或没有候选，应在证据链中明确说明，不要只凭泛泛评论或宽泛搜索片段下最终结论。
 

@@ -25,10 +25,12 @@ import asyncio
 from urllib.parse import urlparse
 
 from app.common.logger_util import logger
+from app.cosight.tool.workspace_path_utils import resolve_workspace_artifact_path
 
 class AudioTool:
-    def __init__(self, llm_config):
+    def __init__(self, llm_config, workspace_path=None):
         self.llm_config = llm_config
+        self.workspace_path = workspace_path
 
     name: str = "Audio Tool"
     description: str = (
@@ -62,6 +64,7 @@ class AudioTool:
     async def audio_recognition(self, audio_path, task_prompt):
         audio_url = ''
         audio_format = ''
+        audio_path = resolve_workspace_artifact_path(audio_path, self.workspace_path)
         if audio_path.startswith('http://') or audio_path.startswith('https://'):
             audio_url = audio_path
             audio_format = self.get_audio_extension(audio_path)
