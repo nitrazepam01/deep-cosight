@@ -68,6 +68,61 @@ logger.info(f"Using REPLAY_BASE_PATH: {REPLAY_BASE_PATH}")
 REPLAY_DELAY = float(os.environ.get("REPLAY_DELAY", "0.3"))
 
 
+def _redacted_length(value: Any) -> str:
+    try:
+        return f"<redacted length={len(value)}>"
+    except Exception:
+        return "<redacted>"
+
+
+def _summarize_search_params(params: Any) -> dict:
+    if not isinstance(params, dict):
+        return {"type": type(params).__name__}
+
+    session_info = params.get("sessionInfo") if isinstance(params.get("sessionInfo"), dict) else {}
+    content_items = params.get("content") if isinstance(params.get("content"), list) else []
+    content_chars = 0
+    for item in content_items:
+        if isinstance(item, dict):
+            content_chars += len(str(item.get("value") or ""))
+
+    agent_run_config = params.get("agentRunConfig") if isinstance(params.get("agentRunConfig"), dict) else {}
+    uploaded_files = params.get("uploadedFiles") if isinstance(params.get("uploadedFiles"), list) else []
+    knowledge_bases = params.get("knowledgeBases") if isinstance(params.get("knowledgeBases"), list) else []
+    draft_snapshot = params.get("draftPlanSnapshot")
+
+    summary = {
+        "planAction": params.get("planAction"),
+        "stream": params.get("stream"),
+        "replay": params.get("replay"),
+        "requirePlanApproval": params.get("requirePlanApproval"),
+        "workspaceId": params.get("workspaceId"),
+        "planSessionId": params.get("planSessionId") or session_info.get("planSessionId"),
+        "sessionInfo": {
+            "messageSerialNumber": session_info.get("messageSerialNumber"),
+            "threadId": session_info.get("threadId"),
+            "sessionId": session_info.get("sessionId"),
+            "username": session_info.get("username"),
+            "planSessionId": session_info.get("planSessionId"),
+        },
+        "content": {
+            "items": len(content_items),
+            "chars": content_chars,
+        },
+        "contentProperties": _redacted_length(params.get("contentProperties"))
+        if params.get("contentProperties")
+        else None,
+        "revisionPrompt": _redacted_length(params.get("revisionPrompt"))
+        if params.get("revisionPrompt")
+        else "",
+        "draftPlanSnapshot": "<redacted>" if isinstance(draft_snapshot, dict) else None,
+        "uploadedFilesCount": len(uploaded_files),
+        "knowledgeBasesCount": len(knowledge_bases),
+        "agentRunConfigKeys": sorted(agent_run_config.keys()) if agent_run_config else [],
+    }
+    return summary
+
+
 def _resolve_workspace_name(workspace_path_value: str) -> str | None:
     if not workspace_path_value or not isinstance(workspace_path_value, str):
         return None
@@ -715,7 +770,7 @@ def validate_search_input(params: dict) -> dict | None:
 
 @searchRouter.post("/deep-research/search")
 async def search(request: Request, params: Any = Body(None)):
-    logger.info(f"=====params:{params}")
+    logger.info(f"=====params:{_summarize_search_params(params)}")
 
     # if not await session_manager.authority(request):
     #     raise HTTPException(status_code=403, detail="Forbidden")
@@ -744,6 +799,7 @@ async def search(request: Request, params: Any = Body(None)):
     if not plan_session_id:
         plan_session_id = f"plan_session_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
     plan_action = _normalize_plan_action(params.get("planAction"), require_plan_approval=require_plan_approval)
+    suppress_replan_persistent_trace = plan_action == "plan_revise_execute"
     revision_prompt = str(params.get("revisionPrompt") or "").strip()
     requested_workspace_id = str(params.get("workspaceId") or "").strip()
     incoming_draft_snapshot = params.get("draftPlanSnapshot") if isinstance(params.get("draftPlanSnapshot"), dict) else None
@@ -951,11 +1007,15 @@ async def search(request: Request, params: Any = Body(None)):
                 # 确保父目录存在
                 file_path.parent.mkdir(parents=True, exist_ok=True)
 
+                was_plan_payload = False
+
                 # 处理Plan对象转换为可序列化的dict
                 if isinstance(data, Plan):
+                    was_plan_payload = True
                     plan_obj = data
                     plan_dict = _serialize_plan_data(plan_obj)
-                    logger.info(f"step_files:{plan_obj.step_files}")
+                    if not suppress_replan_persistent_trace:
+                        logger.info(f"step_files:{plan_obj.step_files}")
 
                     # logger.info(f"Plan对象已转换为字典: {plan_dict}")
                     data = plan_dict
@@ -963,9 +1023,13 @@ async def search(request: Request, params: Any = Body(None)):
                     # 先放入队列，确保计划进度立即发送到前端，不等待可信分析
                     # 将数据放入队列以便流式发送（优先处理）
                     if plan_queue is not None and main_loop is not None:
-                        logger.info(f"Pushing Plan data to queue for plan_id: {plan_id}")
+                        if not suppress_replan_persistent_trace:
+                            logger.info(f"Pushing Plan data to queue for plan_id: {plan_id}")
                         # 确保 plan 数据立即放入队列，优先于可信分析
                         push_queue(plan_dict)
+
+                    if suppress_replan_persistent_trace:
+                        return
 
                     # 检查是否有新完成的步骤，触发可信分析（仅对当前会话内未分析的步骤触发一次）
                     # 注意：可信分析是异步的，不会阻塞计划进度的发送
@@ -991,6 +1055,15 @@ async def search(request: Request, params: Any = Body(None)):
                     except Exception:
                         pass
                     logger.info(f"Tool event received: {data.get('event_type')} for {data.get('tool_name')} at step {data.get('step_index')}")
+
+                if suppress_replan_persistent_trace:
+                    if (not was_plan_payload) and plan_queue is not None and main_loop is not None:
+                        try:
+                            safe_data = _rewrite_paths_in_payload(data)
+                        except Exception:
+                            safe_data = data
+                        push_queue(safe_data)
+                    return
 
                 # 准备写入内容（自动处理不同类型）
                 if isinstance(data, (dict, list)):
@@ -1643,7 +1716,7 @@ async def search(request: Request, params: Any = Body(None)):
                 curr_workspace = work_space_path
         # 基于工作区目录名，在单独的 REPLAY_BASE_PATH 下构造回放文件路径
         replay_file_path = None
-        if curr_workspace:
+        if curr_workspace and not suppress_replan_persistent_trace:
             try:
                 # 提取工作区目录名（例如 work_space_20260105_192427_xxx）
                 workspace_name = os.path.basename(os.path.normpath(curr_workspace))
@@ -1719,7 +1792,7 @@ async def search(request: Request, params: Any = Body(None)):
         # 记录模式：包裹现有流并写入文件
         async for chunk in generate_stream_response(generator_func, params):
             try:
-                if replay_file_path:
+                if replay_file_path and not suppress_replan_persistent_trace:
                     try:
                         # chunk 为 bytes，直接解码并按行写入
                         text = chunk.decode('utf-8')

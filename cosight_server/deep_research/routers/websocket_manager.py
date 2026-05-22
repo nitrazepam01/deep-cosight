@@ -31,6 +31,99 @@ from cosight_server.sdk.common.utils import get_timestamp
 logger = get_logger("websocket")
 wsRouter = APIRouter()
 
+
+def _redacted_length(value) -> str:
+    try:
+        return f"<redacted length={len(value)}>"
+    except Exception:
+        return "<redacted>"
+
+
+def _summarize_ws_envelope(data: dict) -> dict:
+    if not isinstance(data, dict):
+        return {"type": type(data).__name__}
+    payload = data.get("data")
+    return {
+        "action": data.get("action"),
+        "topic": data.get("topic"),
+        "lang": data.get("lang"),
+        "data": _redacted_length(payload) if payload is not None else None,
+    }
+
+
+def _summarize_ws_message(message: dict) -> dict:
+    if not isinstance(message, dict):
+        return {"type": type(message).__name__}
+    session_info = message.get("sessionInfo") if isinstance(message.get("sessionInfo"), dict) else {}
+    from_back_end = {}
+    extra = message.get("extra") if isinstance(message.get("extra"), dict) else {}
+    raw_from_back_end = extra.get("fromBackEnd") if isinstance(extra.get("fromBackEnd"), dict) else {}
+    if raw_from_back_end:
+        from_back_end = {
+            "requirePlanApproval": raw_from_back_end.get("requirePlanApproval"),
+            "workspaceId": raw_from_back_end.get("workspaceId"),
+            "planSessionId": raw_from_back_end.get("planSessionId"),
+            "revisionPrompt": _redacted_length(raw_from_back_end.get("revisionPrompt"))
+            if raw_from_back_end.get("revisionPrompt")
+            else "",
+            "draftPlanSnapshot": "<redacted>"
+            if isinstance(raw_from_back_end.get("draftPlanSnapshot"), dict)
+            else None,
+        }
+    init_data = message.get("initData") if isinstance(message.get("initData"), list) else []
+    return {
+        "uuid": message.get("uuid"),
+        "type": message.get("type"),
+        "from": message.get("from"),
+        "timestamp": message.get("timestamp"),
+        "initDataCount": len(init_data),
+        "sessionInfo": {
+            "messageSerialNumber": session_info.get("messageSerialNumber"),
+            "threadId": session_info.get("threadId"),
+            "planSessionId": session_info.get("planSessionId"),
+        },
+        "fromBackEnd": from_back_end,
+    }
+
+
+def _extract_outgoing_init_data(data: dict) -> tuple[dict, dict]:
+    if not isinstance(data, dict):
+        return {}, {}
+    if isinstance(data.get("content"), dict):
+        return {"type": data.get("contentType")}, data.get("content")
+    inner = data.get("data") if isinstance(data.get("data"), dict) else data
+    init_data = inner.get("initData") if isinstance(inner.get("initData"), dict) else {}
+    return inner, init_data
+
+
+def _is_sensitive_plan_push(data: dict) -> bool:
+    inner, init_data = _extract_outgoing_init_data(data)
+    event_type = init_data.get("eventType") or inner.get("type")
+    approval_state = str(init_data.get("approvalState") or "").strip().lower()
+    return (
+        event_type == "plan_revision_applied"
+        or approval_state == "revising"
+        or bool(init_data.get("latestRevisionPrompt"))
+    )
+
+
+def _summarize_outgoing_payload(topic: str, data: dict) -> dict:
+    inner, init_data = _extract_outgoing_init_data(data)
+    return {
+        "topic": topic,
+        "type": inner.get("type"),
+        "eventType": init_data.get("eventType"),
+        "approvalState": init_data.get("approvalState"),
+        "threadId": init_data.get("threadId"),
+        "workspaceId": init_data.get("workspaceId"),
+        "executionId": init_data.get("executionId"),
+        "planSessionId": init_data.get("planSessionId"),
+        "planVersion": init_data.get("planVersion"),
+        "hasDraftPlanSnapshot": isinstance(init_data.get("draftPlanSnapshot"), dict),
+        "hasLatestRevisionPrompt": bool(init_data.get("latestRevisionPrompt")),
+    }
+
+
 class WebsocketManager:
     def __init__(self):
         # 存放激活的ws连接对象
@@ -85,7 +178,13 @@ class WebsocketManager:
     async def send_json_to_topic(self, topic: str, data: dict, default_ws: Optional[WebSocket] = None):
         ws = self.get_ws_for_topic(topic) or default_ws
         if ws is not None:
-            logger.info(f"send_json_to_topic >>>>>>>>>>>>>> topic: {topic}, data: {data}")
+            if _is_sensitive_plan_push(data):
+                logger.info(
+                    "send_json_to_topic >>>>>>>>>>>>>> "
+                    f"summary: {_summarize_outgoing_payload(topic, data)}"
+                )
+            else:
+                logger.info(f"send_json_to_topic >>>>>>>>>>>>>> topic: {topic}, data: {data}")
             await self.send_json(data, ws)
 
     async def broadcast(self, message: str):
@@ -140,17 +239,23 @@ async def websocket_handler(
         # Started by AICoder, pid:cd2a2pa21827c9b148ae08eff0221b0be93612b0
         while True:
             data = await websocket.receive_json()
-            logger.info(f"receive >>>>>>>>>>>>>> {data}")
+            request_action = data.get("action")
+            if request_action == "plan_revise_execute":
+                logger.info(f"receive >>>>>>>>>>>>>> summary: {_summarize_ws_envelope(data)}")
+            else:
+                logger.info(f"receive >>>>>>>>>>>>>> {data}")
             # 处理订阅动作，允许前端仅通过 topic 绑定路由（刷新后无需立即发起新任务即可接收后续消息）
             if data.get("action") == "subscribe":
                 topic = data.get("topic")
                 manager.bind_topic(topic, websocket)
                 logger.info(f"bind topic >>> {topic} to current websocket")
                 continue
-            request_action = data.get("action")
             if request_action in {"message", "plan_draft", "plan_approve", "plan_revise_execute", "coder_run_approve", "coder_run_skip"}:
                 message = json.loads(data.get("data"))
-                logger.info(f"message >>>>>>>>>>>>>> {message}")
+                if request_action == "plan_revise_execute":
+                    logger.info(f"message >>>>>>>>>>>>>> summary: {_summarize_ws_message(message)}")
+                else:
+                    logger.info(f"message >>>>>>>>>>>>>> {message}")
                 # 绑定当前 topic 到该 websocket
                 manager.bind_topic(data.get("topic"), websocket)
 
@@ -592,7 +697,13 @@ async def _no_stream_handler(params, url, headers, topic, websocket):
     async with aiohttp.ClientSession() as session:
         async with session.post(url=url, json=params, headers=headers) as response:
             resp = await response.json()
-            logger.info(f"/deep-research/search >>>>>>>>>>> resp: {resp}")
+            if _is_sensitive_plan_push(resp):
+                logger.info(
+                    "/deep-research/search >>>>>>>>>>> "
+                    f"resp summary: {_summarize_outgoing_payload(topic, resp)}"
+                )
+            else:
+                logger.info(f"/deep-research/search >>>>>>>>>>> resp: {resp}")
             await manager.send_json({
                 "topic": topic,
                 "data": {
