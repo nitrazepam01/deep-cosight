@@ -871,19 +871,30 @@ def search_baidu_skill():
 
 
 def ask_question_about_video_skill():
+    description_zh = (
+        "对视频画面、场景、动作、物体等视觉内容进行问答；不要用于歌曲、背景音乐、作曲者或艺人识别。"
+        "遇到视频中的音乐识别任务，应先用 youtobe_tool 抽取短音频，再用 music_recognition_lookup；"
+        "必要时再用 audio_recognition 辅助理解音频内容。"
+    )
+    description_en = (
+        "Ask questions about visual video content such as scenes, actions, and objects. "
+        "Do not use this tool to identify songs, background music, composers, or artists. "
+        "For music identification in a video, first extract a short audio clip with youtobe_tool, "
+        "then use music_recognition_lookup; optionally use audio_recognition for general audio understanding."
+    )
     return {
         'skill_name': 'ask_question_about_video',
         'skill_type': "function",
         'display_name_zh': '获取视频内容',
         'display_name_en': 'Video Content analyse',
-        'description_zh': '获取视频内容',
-        'description_en': 'Ask a question about the video.',
+        'description_zh': description_zh,
+        'description_en': description_en,
         'semantic_apis': ["api_search"],
         'function': SkillFunction(
             id='8d5e7f3b-a4c2-4d1b-9f6e-2c8b9d7e1234',
             name='app.cosight.tool.deep_search_toolkit.deep_search',
-            description_zh='获取视频内容',
-            description_en='Ask a question about the video.',
+            description_zh=description_zh,
+            description_en=description_en,
             parameters={
                 "type": "object",
                 "properties": {
@@ -906,19 +917,27 @@ def ask_question_about_video_skill():
 
 
 def audio_recognition_skill():
+    description_zh = (
+        "用于转写或理解短音频内容，可辅助判断人声、歌词或声音事件；"
+        "歌曲/背景音乐识别应优先使用 music_recognition_lookup。"
+    )
+    description_en = (
+        "Transcribe or understand short audio content, useful for speech, lyrics, or sound events. "
+        "For song or background-music identification, prefer music_recognition_lookup."
+    )
     return {
         'skill_name': 'audio_recognition',
         'skill_type': "function",
         'display_name_zh': '根据任务描述和输入音频识别输出音频内容',
         'display_name_en': 'Identify the output audio content based on the task description and input audio',
-        'description_zh': '根据任务描述和输入音频识别输出音频内容',
-        'description_en': 'Identify the output audio content based on the task description and input audio',
+        'description_zh': description_zh,
+        'description_en': description_en,
         'semantic_apis': ["api_search"],
         'function': SkillFunction(
             id='8d5e7f3b-a4c2-4d1b-9f6e-2c8b9d7e1234',
             name='app.cosight.tool.deep_search_toolkit.deep_search',
-            description_zh='根据任务描述和输入音频识别输出音频内容',
-            description_en='Identify the output audio content based on the task description and input audio',
+            description_zh=description_zh,
+            description_en=description_en,
             parameters={
                 "type": "object",
                 "properties": {
@@ -941,13 +960,21 @@ def audio_recognition_skill():
 
 
 def music_recognition_lookup_skill():
+    description_zh = (
+        "对短音频片段调用本地音乐识别后端，返回候选曲名、艺人和原始响应；"
+        "这是从视频短音频中识别歌曲/背景音乐的首选工具，结果需再交叉验证。"
+    )
+    description_en = (
+        "Call a local music-recognition backend for a short audio clip and return candidate song metadata plus the raw response. "
+        "This is the preferred tool for identifying songs or background music after audio has been extracted from a video; cross-check results before finalizing."
+    )
     return {
         'skill_name': 'music_recognition_lookup',
         'skill_type': "function",
         'display_name_zh': '音乐识别检索',
         'display_name_en': 'Music Recognition Lookup',
-        'description_zh': '对短音频片段调用本地音乐识别后端，返回候选曲名、艺人和原始响应；结果需再交叉验证',
-        'description_en': 'Call a local music-recognition backend for a short audio clip and return candidate song metadata plus the raw response',
+        'description_zh': description_zh,
+        'description_en': description_en,
         'semantic_apis': ["api_search"],
         'function': SkillFunction(
             id='9d0794bb-c4f2-478e-9f49-39bbd2385f13',

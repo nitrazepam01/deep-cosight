@@ -126,10 +126,10 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
    - For recipe cross-reference snippets such as "Stuff ... with: Recipe Name, 374", report the referenced page number and keep PDF extraction only as an audit fallback when available.
 8. For long online-video evidence tasks:
    - Parsing a long video directly is difficult. Prefer youtobe_tool to first obtain subtitles and timestamp mappings as clues; then use a narrow candidate window to export a short clip, contact sheet, or audio segment when visual or sound verification is needed.
-   - Prefer short extracted evidence over feeding the entire video to ask_question_about_video; keep the output concise.
+   - Do not use ask_question_about_video for music or sound-identification tasks. It is not an audio fingerprinting tool and should not be used to identify songs, composers, artists, or background music.
    - For music or sound changes, once a timestamp is known, explicitly request a short audio segment with audio_start_timestamp and audio_duration_seconds. If clip/contact-sheet extraction is blocked, use the audio-only fallback artifact when available rather than switching directly to broad web-search guesses.
-   - When identifying music from a video, use music_recognition_lookup on a short extracted audio clip when a local recognition backend is available. Treat returned matches as candidates and cross-check the song title and composer/artist against reliable sources before finalizing.
-   - If recognition fails or returns no candidates, do not rely on generic comments or broad web-search snippets alone; use visual clues, timestamp evidence, and targeted source pages as supporting evidence.
+   - When identifying music from a video, run music_recognition_lookup on the short extracted audio clip. If a general audio understanding check is useful, use audio_recognition on the same short audio clip; do not substitute video Q&A for song recognition.
+   - Treat music-recognition matches as candidates and cross-check the song title and composer/artist against reliable sources before finalizing. If recognition is unavailable or returns no candidates, say that explicitly in the evidence trail and avoid finalizing from generic comments or broad web-search snippets alone.
 
 # HTML Report Optimization Rules:
 10. When generating HTML reports, follow these optimization requirements:
@@ -406,10 +406,10 @@ def actor_system_prompt_zh(work_space_path):
    - 遇到 "Stuff ... with: Recipe Name, 374" 这类配方交叉引用片段时，报告引用的书内页码；本地 PDF 抽取只作为辅助核验。
 8. 处理长在线视频证据题时：
    - 直接解析长视频难度较大，优先用 youtobe_tool 获取字幕文本和时间对照，把字幕命中和时间点当作线索；需要视觉或声音核验时，再用较窄时间窗导出短片段、截图总览和音频。
-   - 优先使用短片段、截图线索和事件附近音频，不要直接把整段视频喂给 ask_question_about_video；保持输出简洁。
+   - 音乐、声音变化或背景音乐识别任务禁止使用 ask_question_about_video。它不是音频指纹识别工具，不能用来识别歌曲、作曲者、艺人或背景音乐。
    - 处理音乐或声音变化时，一旦定位到时间点，应明确传入 audio_start_timestamp 和 audio_duration_seconds 请求短音频。若短视频或截图抽取受限，优先使用工具返回的 audio-only 降级音频证据，不要直接转向宽泛网页搜索猜答案。
-   - 需要识别视频中的音乐时，如果本地音乐识别后端可用，可对短音频片段使用 music_recognition_lookup；返回结果只作为候选，最终曲名和作者/艺人必须再用可靠来源交叉验证。
-   - 如果音乐识别失败或没有候选，不要只凭泛泛评论或宽泛搜索片段下结论；应结合画面、字幕时间点和更有针对性的来源页面继续核验。
+   - 需要识别视频中的音乐时，必须先对短音频片段使用 music_recognition_lookup；如果需要通用音频理解辅助，再对同一短音频使用 audio_recognition。不要用视频问答替代歌曲识别。
+   - 音乐识别返回结果只作为候选，最终曲名和作者/艺人必须再用可靠来源交叉验证。如果识别服务不可用或没有候选，应在证据链中明确说明，不要只凭泛泛评论或宽泛搜索片段下最终结论。
 
 # HTML报告优化规则：
 10. 生成HTML报告时的优化要求：
