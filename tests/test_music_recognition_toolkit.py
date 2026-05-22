@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import wave
 
 import requests
 
@@ -9,6 +10,14 @@ sys.path.insert(0, os.path.abspath("."))
 from app.cosight.tool.music_recognition_toolkit import MusicRecognitionToolkit
 from app.cosight.agent.runtime.skill_catalog import ACTOR_SKILL_CATALOG, build_actor_skills
 from app.cosight.tool.tool_result_processor import ToolResultProcessor
+
+
+def write_test_wav(path, sample_rate=48000, channels=2):
+    with wave.open(str(path), "wb") as wav_file:
+        wav_file.setnchannels(channels)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(b"\x00\x00" * channels * sample_rate)
 
 
 class FakeNcmResponse:
@@ -28,8 +37,8 @@ class FakeNcmResponse:
 
 
 def test_music_recognition_lookup_extracts_ncm_recognize_candidate(tmp_path):
-    audio_file = tmp_path / "sample.mp3"
-    audio_file.write_bytes(b"fake-audio")
+    audio_file = tmp_path / "sample.wav"
+    write_test_wav(audio_file)
 
     class FakeToolkit(MusicRecognitionToolkit):
         def _post_json(self, endpoint, payload, timeout):
@@ -50,8 +59,8 @@ def test_music_recognition_lookup_extracts_ncm_recognize_candidate(tmp_path):
 
 
 def test_music_recognition_lookup_reports_backend_unavailable(tmp_path):
-    audio_file = tmp_path / "sample.mp3"
-    audio_file.write_bytes(b"fake-audio")
+    audio_file = tmp_path / "sample.wav"
+    write_test_wav(audio_file)
 
     class UnavailableToolkit(MusicRecognitionToolkit):
         def _post_json(self, endpoint, payload, timeout):
@@ -69,9 +78,37 @@ def test_music_recognition_lookup_reports_backend_unavailable(tmp_path):
     assert "connection refused" in result["message"]
 
 
+def test_music_recognition_lookup_falls_back_to_default_endpoint(tmp_path):
+    audio_file = tmp_path / "sample.wav"
+    write_test_wav(audio_file)
+    endpoints = []
+
+    class FallbackToolkit(MusicRecognitionToolkit):
+        def _post_json(self, endpoint, payload, timeout):
+            endpoints.append(endpoint)
+            if endpoint == "http://127.0.0.1:5000/recognize":
+                raise requests.ConnectionError("connection refused")
+            return FakeNcmResponse()
+
+    result = json.loads(
+        FallbackToolkit(workspace_path=str(tmp_path)).music_recognition_lookup(
+            audio_path=str(audio_file),
+            backend_url="http://127.0.0.1:5000/recognize",
+        )
+    )
+
+    assert result["ok"] is True
+    assert endpoints == [
+        "http://127.0.0.1:5000/recognize",
+        "http://127.0.0.1:12400",
+    ]
+    assert result["backend"]["fallback_used"] is True
+    assert result["candidates"][0]["song_name"] == "Example Song"
+
+
 def test_music_recognition_lookup_rejects_non_local_backend(tmp_path):
-    audio_file = tmp_path / "sample.mp3"
-    audio_file.write_bytes(b"fake-audio")
+    audio_file = tmp_path / "sample.wav"
+    write_test_wav(audio_file)
 
     result = json.loads(
         MusicRecognitionToolkit(workspace_path=str(tmp_path)).music_recognition_lookup(
@@ -108,9 +145,9 @@ def test_music_recognition_lookup_extracts_nested_candidates():
 
 
 def test_music_recognition_lookup_resolves_relative_audio_path_from_workspace(tmp_path):
-    audio_file = tmp_path / "clips" / "sample.mp3"
+    audio_file = tmp_path / "clips" / "sample.wav"
     audio_file.parent.mkdir()
-    audio_file.write_bytes(b"fake-audio")
+    write_test_wav(audio_file)
     seen_payloads = []
 
     class CapturingToolkit(MusicRecognitionToolkit):
@@ -120,7 +157,7 @@ def test_music_recognition_lookup_resolves_relative_audio_path_from_workspace(tm
 
     result = json.loads(
         CapturingToolkit(workspace_path=str(tmp_path)).music_recognition_lookup(
-            audio_path="clips/sample.mp3",
+            audio_path="clips/sample.wav",
             backend_url="http://127.0.0.1:12400",
         )
     )

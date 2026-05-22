@@ -962,7 +962,7 @@ def audio_recognition_skill():
 def music_recognition_lookup_skill():
     description_zh = (
         "对短音频片段调用本地音乐识别后端，返回候选曲名、艺人和原始响应；"
-        "这是从视频短音频中识别歌曲/背景音乐的首选工具，结果需再交叉验证。"
+        "适合从视频短音频中识别歌曲/背景音乐，会先整理常见音频格式差异，结果需再交叉验证。"
     )
     description_en = (
         "Call a local music-recognition backend for a short audio clip and return candidate song metadata plus the raw response. "
@@ -979,8 +979,8 @@ def music_recognition_lookup_skill():
         'function': SkillFunction(
             id='9d0794bb-c4f2-478e-9f49-39bbd2385f13',
             name='app.cosight.tool.music_recognition_toolkit.music_recognition_lookup',
-            description_zh='调用本地音乐识别服务识别短音频片段，默认兼容 http://127.0.0.1:12400 这类本地后端',
-            description_en='Recognize likely songs in a short audio clip through a local recognition service, compatible with local HTTP backends such as http://127.0.0.1:12400',
+            description_zh='调用本地音乐识别服务识别短音频片段，默认使用 http://127.0.0.1:12400，并会整理常见采样率/声道差异',
+            description_en='Recognize likely songs in a short audio clip through a local music-recognition service, defaulting to http://127.0.0.1:12400 and normalizing common sample-rate/channel differences',
             parameters={
                 "type": "object",
                 "properties": {
@@ -991,8 +991,8 @@ def music_recognition_lookup_skill():
                     },
                     "backend_url": {
                         "type": "string",
-                        "description_zh": "可选本地识别服务地址，默认读取环境变量或 http://127.0.0.1:12400",
-                        "description_en": "Optional local recognition endpoint; defaults to environment variables or http://127.0.0.1:12400"
+                        "description_zh": "通常不要填写；除非用户明确给出已启动的本地识别服务地址，否则默认使用环境变量或 http://127.0.0.1:12400",
+                        "description_en": "Usually leave this blank; unless the user explicitly provides a running local recognition endpoint, use environment variables or http://127.0.0.1:12400"
                     },
                     "timeout_seconds": {
                         "type": "integer",

@@ -15,8 +15,11 @@
 
 import json
 import os
+import shutil
+import subprocess
+import wave
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import requests
@@ -28,6 +31,8 @@ class MusicRecognitionToolkit:
     """Call a local music-recognition backend and normalize song candidates."""
 
     DEFAULT_ENDPOINT = "http://127.0.0.1:12400"
+    NCM_SAMPLE_RATE = 48000
+    NCM_CHANNELS = 2
     LOCAL_ENDPOINT_HOSTS = {"127.0.0.1", "localhost", "::1"}
     ENDPOINT_ENV_NAMES = (
         "MUSIC_RECOGNITION_URL",
@@ -67,6 +72,17 @@ class MusicRecognitionToolkit:
                 return value
         return self.DEFAULT_ENDPOINT
 
+    def _endpoint_candidates(self, backend_url: Optional[str]) -> List[str]:
+        primary = self._resolve_endpoint(backend_url)
+        candidates = [primary]
+        if backend_url:
+            fallback = self._resolve_endpoint(None)
+            if fallback not in candidates:
+                candidates.append(fallback)
+            if self.DEFAULT_ENDPOINT not in candidates:
+                candidates.append(self.DEFAULT_ENDPOINT)
+        return candidates
+
     @classmethod
     def _validate_endpoint(cls, endpoint: str) -> Optional[str]:
         parsed = urlparse(endpoint)
@@ -82,6 +98,114 @@ class MusicRecognitionToolkit:
         if not path.is_absolute():
             path = self.workspace_path / path
         return path.resolve()
+
+    @staticmethod
+    def _repo_root() -> Path:
+        return Path(__file__).resolve().parents[3]
+
+    def _resolve_ffmpeg(self) -> Optional[str]:
+        for env_name in ("FFMPEG_PATH", "FFMPEG_BINARY"):
+            value = os.environ.get(env_name)
+            if value and Path(value).exists():
+                return value
+
+        suffix = ".exe" if os.name == "nt" else ""
+        local_candidates = [
+            self._repo_root() / "tools" / "media" / "bin" / f"ffmpeg{suffix}",
+            self._repo_root() / "tools" / "media" / "bin" / "ffmpeg",
+        ]
+        for candidate in local_candidates:
+            if candidate.exists():
+                return str(candidate)
+        return shutil.which("ffmpeg")
+
+    @staticmethod
+    def _probe_wav_format(audio_path: Path) -> Dict[str, Any]:
+        if audio_path.suffix.lower() != ".wav":
+            return {"format": audio_path.suffix.lower().lstrip(".") or "unknown"}
+        try:
+            with wave.open(str(audio_path), "rb") as wav_file:
+                frames = wav_file.getnframes()
+                sample_rate = wav_file.getframerate()
+                return {
+                    "format": "wav",
+                    "sample_rate": sample_rate,
+                    "channels": wav_file.getnchannels(),
+                    "sample_width_bytes": wav_file.getsampwidth(),
+                    "duration_seconds": round(frames / sample_rate, 3) if sample_rate else None,
+                }
+        except Exception as exc:
+            return {"format": "wav", "probe_error": str(exc)}
+
+    def _normalize_audio_for_backend(self, audio_path: Path, timeout: int) -> Tuple[Path, Dict[str, Any]]:
+        source_format = self._probe_wav_format(audio_path)
+        status: Dict[str, Any] = {
+            "target_sample_rate": self.NCM_SAMPLE_RATE,
+            "target_channels": self.NCM_CHANNELS,
+            "source": source_format,
+        }
+
+        if (
+            source_format.get("format") == "wav"
+            and source_format.get("sample_rate") == self.NCM_SAMPLE_RATE
+            and source_format.get("channels") == self.NCM_CHANNELS
+        ):
+            status.update({"converted": False, "reason": "already_compatible"})
+            return audio_path, status
+
+        ffmpeg = self._resolve_ffmpeg()
+        if not ffmpeg:
+            status.update({"converted": False, "error": "ffmpeg_not_found"})
+            return audio_path, status
+
+        normalized_path = audio_path.with_name(f"{audio_path.stem}_ncm_48k.wav")
+        cmd = [
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(audio_path),
+            "-vn",
+            "-ac",
+            str(self.NCM_CHANNELS),
+            "-ar",
+            str(self.NCM_SAMPLE_RATE),
+            str(normalized_path),
+        ]
+        try:
+            run = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=max(10, min(timeout, 120)),
+            )
+        except Exception as exc:
+            status.update({"converted": False, "error": "audio_normalization_failed", "message": str(exc)})
+            return audio_path, status
+
+        if run.returncode != 0 or not normalized_path.exists():
+            status.update(
+                {
+                    "converted": False,
+                    "error": "audio_normalization_failed",
+                    "returncode": run.returncode,
+                    "stderr_tail": self._shorten(run.stderr, 500),
+                }
+            )
+            return audio_path, status
+
+        status.update(
+            {
+                "converted": True,
+                "path": str(normalized_path),
+                "ffmpeg": ffmpeg,
+                "returncode": run.returncode,
+                "output": self._probe_wav_format(normalized_path),
+            }
+        )
+        return normalized_path, status
 
     def _post_json(self, endpoint: str, payload: Dict[str, Any], timeout: int) -> requests.Response:
         return requests.post(endpoint, json=payload, timeout=timeout)
@@ -224,7 +348,8 @@ class MusicRecognitionToolkit:
         logger.info("Using music_recognition_lookup, audio_path=%s", audio_path)
         try:
             resolved_audio_path = self._resolve_audio_path(audio_path)
-            endpoint = self._resolve_endpoint(backend_url)
+            endpoints = self._endpoint_candidates(backend_url)
+            endpoint = endpoints[0]
             endpoint_error = self._validate_endpoint(endpoint)
             timeout = max(5, min(int(timeout_seconds or self.timeout), 120))
 
@@ -267,37 +392,95 @@ class MusicRecognitionToolkit:
                     }
                 )
 
-            payload = {"file": str(resolved_audio_path)}
-            response = self._post_json(endpoint, payload, timeout)
-            raw_text = response.text or ""
-            try:
-                raw_result = response.json()
-            except Exception:
-                raw_result = {"text": self._shorten(raw_text)}
+            backend_audio_path, audio_normalization = self._normalize_audio_for_backend(resolved_audio_path, timeout)
+            payload = {"file": str(backend_audio_path)}
+            attempts: List[Dict[str, Any]] = []
+            last_exc: Optional[requests.RequestException] = None
+            for endpoint in endpoints:
+                endpoint_error = self._validate_endpoint(endpoint)
+                if endpoint_error:
+                    attempts.append(
+                        {
+                            "endpoint": endpoint,
+                            "ok": False,
+                            "error": "unsupported_backend_endpoint",
+                            "message": endpoint_error,
+                        }
+                    )
+                    continue
+                try:
+                    response = self._post_json(endpoint, payload, timeout)
+                except requests.RequestException as exc:
+                    last_exc = exc
+                    attempts.append(
+                        {
+                            "endpoint": endpoint,
+                            "ok": False,
+                            "error": "music_recognition_backend_unavailable",
+                            "message": self._shorten(str(exc), 500),
+                        }
+                    )
+                    continue
 
-            candidates = self._extract_candidates(raw_result)
-            ok = response.ok and self._backend_success(raw_result, candidates)
+                raw_text = response.text or ""
+                try:
+                    raw_result = response.json()
+                except Exception:
+                    raw_result = {"text": self._shorten(raw_text)}
 
-            return self._json(
-                {
-                    "ok": ok,
-                    "audio_path": str(resolved_audio_path),
-                    "audio_size_bytes": resolved_audio_path.stat().st_size,
-                    "backend": {
-                        "type": "local_http_music_recognition",
+                candidates = self._extract_candidates(raw_result)
+                ok = response.ok and self._backend_success(raw_result, candidates)
+                attempts.append(
+                    {
                         "endpoint": endpoint,
-                        "compatible_backend": "ncm-recognize-api",
+                        "ok": ok,
                         "http_status": response.status_code,
-                    },
-                    "candidates": candidates,
-                    "candidate_count": len(candidates),
-                    "raw_result": raw_result,
-                    "note": (
-                        "Treat these as song candidates. Cross-check title and composer/artist "
-                        "with reliable sources before producing a final answer."
-                    ),
-                }
-            )
+                        "candidate_count": len(candidates),
+                    }
+                )
+
+                return self._json(
+                    {
+                        "ok": ok,
+                        "audio_path": str(resolved_audio_path),
+                        "audio_size_bytes": resolved_audio_path.stat().st_size,
+                        "recognized_audio_path": str(backend_audio_path),
+                        "recognized_audio_size_bytes": backend_audio_path.stat().st_size,
+                        "audio_normalization": audio_normalization,
+                        "backend": {
+                            "type": "local_http_music_recognition",
+                            "endpoint": endpoint,
+                            "compatible_backend": "ncm-recognize-api",
+                            "http_status": response.status_code,
+                            "fallback_used": endpoint != endpoints[0],
+                        },
+                        "backend_attempts": attempts,
+                        "candidates": candidates,
+                        "candidate_count": len(candidates),
+                        "raw_result": raw_result,
+                        "note": (
+                            "Treat these as song candidates. Cross-check title and composer/artist "
+                            "with reliable sources before producing a final answer."
+                        ),
+                    }
+                )
+
+            if attempts and all(item.get("error") == "unsupported_backend_endpoint" for item in attempts):
+                return self._json(
+                    {
+                        "ok": False,
+                        "error": "unsupported_backend_endpoint",
+                        "message": attempts[0].get("message"),
+                        "audio_path": str(resolved_audio_path),
+                        "backend": {
+                            "type": "local_http_music_recognition",
+                            "endpoint": endpoints[0],
+                        },
+                        "backend_attempts": attempts,
+                    }
+                )
+            if last_exc:
+                raise last_exc
         except requests.RequestException as exc:
             return self._json(
                 {
@@ -305,11 +488,13 @@ class MusicRecognitionToolkit:
                     "error": "music_recognition_backend_unavailable",
                     "message": str(exc),
                     "audio_path": str(audio_path),
+                    "audio_normalization": audio_normalization if "audio_normalization" in locals() else None,
                     "backend": {
                         "type": "local_http_music_recognition",
                         "endpoint": self._resolve_endpoint(backend_url),
                         "compatible_backend": "ncm-recognize-api",
                     },
+                    "backend_attempts": attempts if "attempts" in locals() else [],
                     "hint": "Start the local recognition service, for example ncm-recognize-api on http://127.0.0.1:12400.",
                 }
             )

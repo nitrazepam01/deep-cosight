@@ -504,9 +504,9 @@ class VideoEventToolkit:
             str(duration_seconds),
             "-vn",
             "-ac",
-            "1",
+            "2",
             "-ar",
-            "16000",
+            "48000",
             str(audio_path),
         ]
         audio_run = self._run_command(audio_cmd, timeout=90, cwd=output_path)
@@ -925,7 +925,7 @@ class VideoEventToolkit:
                 "-ac",
                 "2",
                 "-ar",
-                "44100",
+                "48000",
                 str(audio_path),
             ]
             audio_run = self._run_command(audio_cmd, timeout=90, cwd=output_path)

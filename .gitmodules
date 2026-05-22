@@ -1,0 +1,3 @@
+[submodule "tools/media/ncm-recognize-api"]
+	path = tools/media/ncm-recognize-api
+	url = https://github.com/MerlinCN/ncm-recognize-api.git
