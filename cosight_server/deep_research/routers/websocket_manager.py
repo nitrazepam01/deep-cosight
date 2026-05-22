@@ -100,10 +100,20 @@ def _is_sensitive_plan_push(data: dict) -> bool:
     inner, init_data = _extract_outgoing_init_data(data)
     event_type = init_data.get("eventType") or inner.get("type")
     approval_state = str(init_data.get("approvalState") or "").strip().lower()
+    draft_plan_snapshot = init_data.get("draftPlanSnapshot")
+    draft_has_revision_prompt = (
+        isinstance(draft_plan_snapshot, dict)
+        and bool(draft_plan_snapshot.get("latestRevisionPrompt"))
+    )
     return (
         event_type == "plan_revision_applied"
         or approval_state == "revising"
+        or (
+            approval_state in {"approved", "executing"}
+            and isinstance(draft_plan_snapshot, dict)
+        )
         or bool(init_data.get("latestRevisionPrompt"))
+        or draft_has_revision_prompt
     )
 
 

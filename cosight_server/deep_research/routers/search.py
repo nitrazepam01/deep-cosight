@@ -123,6 +123,40 @@ def _summarize_search_params(params: Any) -> dict:
     return summary
 
 
+def _should_drop_draft_snapshot(payload: dict) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    approval_state = str(payload.get("approvalState") or "").strip().lower()
+    event_type = str(payload.get("eventType") or "").strip()
+    return approval_state in {"approved", "executing"} or event_type == "plan_execution_started"
+
+
+def _sanitize_persistent_plan_trace(payload: Any, *, drop_draft_snapshot: bool = False) -> Any:
+    if isinstance(payload, dict):
+        should_drop_draft_snapshot = drop_draft_snapshot or _should_drop_draft_snapshot(payload)
+        sanitized = {}
+        for key, value in payload.items():
+            if key == "latestRevisionPrompt":
+                sanitized[key] = ""
+                continue
+            if key == "draftPlanSnapshot" and should_drop_draft_snapshot:
+                continue
+            sanitized[key] = _sanitize_persistent_plan_trace(
+                value,
+                drop_draft_snapshot=should_drop_draft_snapshot,
+            )
+        return sanitized
+    if isinstance(payload, list):
+        return [
+            _sanitize_persistent_plan_trace(
+                item,
+                drop_draft_snapshot=drop_draft_snapshot,
+            )
+            for item in payload
+        ]
+    return payload
+
+
 def _resolve_workspace_name(workspace_path_value: str) -> str | None:
     if not workspace_path_value or not isinstance(workspace_path_value, str):
         return None
@@ -741,7 +775,7 @@ def _clean_replay_json(json_text: str) -> str:
                 return obj
         
         # 清理数据
-        cleaned_data = remove_fields(data)
+        cleaned_data = _sanitize_persistent_plan_trace(remove_fields(data))
         
         # 重新序列化为 JSON
         return json.dumps(cleaned_data, ensure_ascii=False) + '\n'
@@ -1065,21 +1099,23 @@ async def search(request: Request, params: Any = Body(None)):
                         push_queue(safe_data)
                     return
 
+                persist_data = _sanitize_persistent_plan_trace(data)
+
                 # 准备写入内容（自动处理不同类型）
-                if isinstance(data, (dict, list)):
+                if isinstance(persist_data, (dict, list)):
                     try:
-                        content = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+                        content = json.dumps(persist_data, ensure_ascii=False, indent=2) + "\n"
                     except TypeError as e:
                         logger.error(f"JSON序列化失败，尝试转换对象: {e}", exc_info=True)
                         # 尝试将复杂对象转换为字符串
-                        if isinstance(data, dict):
-                            serializable_data = {k: str(v) for k, v in data.items()}
-                        elif isinstance(data, list):
+                        if isinstance(persist_data, dict):
+                            serializable_data = {k: str(v) for k, v in persist_data.items()}
+                        elif isinstance(persist_data, list):
                             serializable_data = [str(item) if not isinstance(item, (
-                            dict, list, str, int, float, bool, type(None))) else item for item in data]
+                            dict, list, str, int, float, bool, type(None))) else item for item in persist_data]
                         content = json.dumps(serializable_data, ensure_ascii=False, indent=2) + "\n"
                 else:
-                    content = str(data) + "\n"
+                    content = str(persist_data) + "\n"
 
                 # 追加写入当前 plan 的日志
                 with open(file_path, mode='a', encoding='utf-8') as f:
@@ -1087,8 +1123,8 @@ async def search(request: Request, params: Any = Body(None)):
 
                 # 如果包含最终结果，单独落盘 final 文件
                 try:
-                    if isinstance(data, dict) and data.get("result"):
-                        payload_to_save = dict(data)
+                    if isinstance(persist_data, dict) and persist_data.get("result"):
+                        payload_to_save = dict(persist_data)
 
                         # 将前端清理前备份在后端的 orderedTaskList 合并到最终 .final.json
                         try:
