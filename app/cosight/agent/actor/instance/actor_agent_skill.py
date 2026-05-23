@@ -265,19 +265,28 @@ def search_image_skill():
 
 
 def browser_use_skill():
+    description_zh = (
+        "模拟浏览器交互以解决确实需要页面点击、登录态或复杂表单操作的任务；"
+        "不要把它用于在线视频片段检查、音乐/背景音乐识别，普通网页取证优先使用搜索或网页抓取工具。"
+    )
+    description_en = (
+        "Simulate browser interaction only for tasks that truly require page clicks, authenticated state, "
+        "or complex form workflows. Do not use it for online-video segment inspection or music/background-music "
+        "identification; use search or fetch tools for ordinary web evidence."
+    )
     return {
         'skill_name': 'browser_use',
         'skill_type': "function",
         'display_name_zh': '浏览器交互模拟',
         'display_name_en': 'Browser Interaction Simulation',
-        'description_zh': '模拟浏览器交互以解决需要多步操作的任务',
-        'description_en': 'Simulate browser interaction to solve tasks requiring multi-step actions',
+        'description_zh': description_zh,
+        'description_en': description_en,
         'semantic_apis': ["api_browser_simulation"],
         'function': SkillFunction(
             id='2c44f9ad-be5c-4e6c-a9d8-1426b23828a1',
             name='app.cosight.browser_toolkit.browser_use',
-            description_zh='通过模拟浏览器交互解决复杂任务',
-            description_en='Solve complex tasks by simulating browser interactions',
+            description_zh=description_zh,
+            description_en=description_en,
             parameters={
                 "type": "object",
                 "properties": {
@@ -874,13 +883,13 @@ def ask_question_about_video_skill():
     description_zh = (
         "对视频画面、场景、动作、物体等视觉内容进行问答；不要用于歌曲、背景音乐、作曲者或艺人识别。"
         "遇到视频中的音乐识别任务，应先用 youtobe_tool 抽取短音频，再用 music_recognition_lookup；"
-        "必要时再用 audio_recognition 辅助理解音频内容。"
+        "不要把本工具或 audio_recognition 当作音乐识别后备。"
     )
     description_en = (
         "Ask questions about visual video content such as scenes, actions, and objects. "
         "Do not use this tool to identify songs, background music, composers, or artists. "
         "For music identification in a video, first extract a short audio clip with youtobe_tool, "
-        "then use music_recognition_lookup; optionally use audio_recognition for general audio understanding."
+        "then use music_recognition_lookup; do not use this tool or audio_recognition as a music-identification fallback."
     )
     return {
         'skill_name': 'ask_question_about_video',
@@ -919,11 +928,11 @@ def ask_question_about_video_skill():
 def audio_recognition_skill():
     description_zh = (
         "用于转写或理解短音频内容，可辅助判断人声、歌词或声音事件；"
-        "歌曲/背景音乐识别应优先使用 music_recognition_lookup。"
+        "不用于歌曲/背景音乐识别，也不要作为 music_recognition_lookup 的后备工具。"
     )
     description_en = (
         "Transcribe or understand short audio content, useful for speech, lyrics, or sound events. "
-        "For song or background-music identification, prefer music_recognition_lookup."
+        "It is not for song/background-music identification and should not be used as a fallback for music_recognition_lookup."
     )
     return {
         'skill_name': 'audio_recognition',
@@ -962,11 +971,11 @@ def audio_recognition_skill():
 def music_recognition_lookup_skill():
     description_zh = (
         "对短音频片段调用本地音乐识别后端，返回候选曲名、艺人和原始响应；"
-        "适合从视频短音频中识别歌曲/背景音乐，会先整理常见音频格式差异，结果需再交叉验证。"
+        "这是从视频短音频中识别歌曲/背景音乐的主路径，会先整理常见音频格式差异，结果需再交叉验证。"
     )
     description_en = (
         "Call a local music-recognition backend for a short audio clip and return candidate song metadata plus the raw response. "
-        "This is the preferred tool for identifying songs or background music after audio has been extracted from a video; cross-check results before finalizing."
+        "This is the primary tool for identifying songs or background music after audio has been extracted from a video; cross-check results before finalizing."
     )
     return {
         'skill_name': 'music_recognition_lookup',
@@ -1098,8 +1107,8 @@ def youtobe_tool_skill():
         'function': SkillFunction(
             id='9d0794bb-c4f2-478e-9f49-39bbd2385f12',
             name='app.cosight.video_event_toolkit.youtobe_tool',
-            description_zh='解析在线视频，优先返回字幕和时间对照，必要时导出短片段、截图和音频线索。识别音乐时，拿到时间窗后优先保留短音频证据；如果视频片段或截图抽取失败，不要直接用搜索猜答案，应尝试音频降级结果或报告证据不足',
-            description_en='Analyze an online video by first returning subtitle timestamps, and export clip, frame, or audio clues when needed. For music identification, keep short audio evidence once a time window is known; if clip or frame extraction fails, do not guess from broad search results alone, use the audio fallback artifact or report the evidence gap',
+            description_zh='解析在线视频，优先返回字幕和时间对照，必要时导出短片段、截图和音频线索。识别音乐时，拿到时间窗后优先保留短音频证据并交给 music_recognition_lookup；不要转去 ask_question_about_image、ask_question_about_video、audio_recognition 或 browser_use 猜歌',
+            description_en='Analyze an online video by first returning subtitle timestamps, and export clip, frame, or audio clues when needed. For music identification, keep short audio evidence once a time window is known and pass it to music_recognition_lookup; do not switch to ask_question_about_image, ask_question_about_video, audio_recognition, or browser_use to guess songs',
             parameters={
                 "type": "object",
                 "properties": {
@@ -1174,19 +1183,27 @@ def youtobe_tool_skill():
 
 
 def ask_question_about_image_skill():
+    description_zh = (
+        "对普通图片的场景、文字、物体等视觉内容进行问答；"
+        "不要用于视频音乐/背景音乐识别，也不要用 contact sheet 来猜曲名。"
+    )
+    description_en = (
+        "Ask questions about ordinary image content such as scenes, text, and objects. "
+        "Do not use it for video music/background-music identification or contact-sheet based song guessing."
+    )
     return {
         'skill_name': 'ask_question_about_image',
         'skill_type': "function",
         'display_name_zh': '根据任务描述解析图片内容',
         'display_name_en': 'Image Content analyse',
-        'description_zh': '根据任务描述解析图片内容',
-        'description_en': 'Ask a question about the image.',
+        'description_zh': description_zh,
+        'description_en': description_en,
         'semantic_apis': ["api_search"],
         'function': SkillFunction(
             id='8d5e7f3b-a4c2-4d1b-9f6e-2c8b9d7e1234',
             name='app.cosight.tool.deep_search_toolkit.deep_search',
-            description_zh='图片内容解析',
-            description_en='Ask a question about the image.',
+            description_zh=description_zh,
+            description_en=description_en,
             parameters={
                 "type": "object",
                 "properties": {

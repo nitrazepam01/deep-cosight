@@ -79,17 +79,17 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
     },
     "ask_question_about_image": {
         "display_name_zh": "图片分析",
-        "description_zh": "对图片内容进行智能识别和问答",
+        "description_zh": "对普通图片内容进行视觉问答；不要用于视频音乐或背景音乐识别",
         "needs_workspace": False,
     },
     "ask_question_about_video": {
         "display_name_zh": "视频分析",
-        "description_zh": "对视频内容进行智能分析和问答",
+        "description_zh": "对视频画面内容进行视觉问答；不要用于歌曲、背景音乐、作曲者或艺人识别",
         "needs_workspace": False,
     },
     "audio_recognition": {
         "display_name_zh": "语音识别",
-        "description_zh": "将音频转换为文字",
+        "description_zh": "将语音或声音内容转换为文字；不要作为歌曲识别后备工具",
         "needs_workspace": False,
     },
     "music_recognition_lookup": {
@@ -109,7 +109,7 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
     },
     "browser_use": {
         "display_name_zh": "浏览器交互模拟",
-        "description_zh": "通过浏览器自动化执行需要多步页面操作的任务",
+        "description_zh": "通过浏览器自动化执行确需页面交互的任务；不要用于在线视频片段检查或音乐识别",
         "needs_workspace": False,
     },
     "fetch_website_content": {

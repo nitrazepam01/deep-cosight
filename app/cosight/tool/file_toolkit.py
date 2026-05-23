@@ -62,7 +62,7 @@ class FileToolkit:
             f"(type={file_kind}, suffix={suffix or 'none'}, size={size_bytes} bytes). "
             "file_read only returns textual content and will not expose raw binary bytes. "
             "Reference this file path in the report instead of embedding its contents. "
-            "For images, use ask_question_about_image if you need semantic analysis."
+            "Use a media-specific tool only when semantic analysis is required; for video music tasks, prefer extracted audio with music_recognition_lookup."
         )
 
     def file_saver(self, content: str | bytes = None, file_path: str = None, mode: str = "a", binary: bool = False) -> str:

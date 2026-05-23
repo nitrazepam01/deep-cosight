@@ -642,7 +642,7 @@ class VideoEventToolkit:
                                     "commands": commands,
                                     "media_mode": "audio_only_fallback",
                                     "warning": "Metadata lookup failed, but a short audio artifact was extracted directly from the best-audio stream.",
-                                    "next_step": "Use music_recognition_lookup on artifacts.audio_path, then cross-check candidates with reliable sources. Do not finalize from broad search snippets alone.",
+                                    "next_step": "Use music_recognition_lookup on artifacts.audio_path, then cross-check candidates with reliable sources. If there is no candidate, extract adjacent source-video audio windows; do not switch to visual/video QA or broad search snippets alone.",
                                 }
                             )
                 return self._json(
@@ -724,8 +724,16 @@ class VideoEventToolkit:
             selected_cue = subtitle_cues[0] if subtitle_cues else None
             pre_roll = self._safe_int(pre_roll_seconds, 10, 0, 300)
             post_roll = self._safe_int(post_roll_seconds, 45, 5, 600)
+            audio_duration = self._safe_int(audio_duration_seconds, 20, 3, 120)
+            requested_audio_start = self._parse_timestamp(audio_start_timestamp)
+            if requested_audio_start is None:
+                requested_audio_start = self._parse_timestamp(event_timestamp)
+
             if window_start is None or window_end is None:
-                if not selected_cue:
+                if requested_audio_start is not None:
+                    window_start = max(0.0, float(requested_audio_start) - pre_roll)
+                    window_end = float(requested_audio_start) + max(float(post_roll), float(audio_duration))
+                elif not selected_cue:
                     return self._json(
                         {
                             "ok": False,
@@ -743,10 +751,16 @@ class VideoEventToolkit:
                             "commands": commands,
                         }
                     )
-                cue_start = float(selected_cue["start_seconds"] or 0)
-                cue_end = float(selected_cue["end_seconds"] or cue_start)
-                window_start = max(0.0, cue_start - pre_roll)
-                window_end = cue_end + post_roll
+                else:
+                    cue_start = float(selected_cue["start_seconds"] or 0)
+                    cue_end = float(selected_cue["end_seconds"] or cue_start)
+                    window_start = max(0.0, cue_start - pre_roll)
+                    window_end = cue_end + post_roll
+            elif requested_audio_start is not None:
+                requested_audio_end = float(requested_audio_start) + float(audio_duration)
+                if requested_audio_start < window_start or requested_audio_end > window_end:
+                    window_start = max(0.0, float(requested_audio_start) - pre_roll)
+                    window_end = float(requested_audio_start) + max(float(post_roll), float(audio_duration))
 
             if duration:
                 window_end = min(float(duration), float(window_end))
@@ -798,7 +812,6 @@ class VideoEventToolkit:
                     audio_start = float(selected_cue["start_seconds"] or window_start)
                 if audio_start is None:
                     audio_start = window_start
-                audio_duration = self._safe_int(audio_duration_seconds, 20, 3, 120)
                 audio_path = self._extract_audio_only(
                     dependencies,
                     video_url,
@@ -844,7 +857,7 @@ class VideoEventToolkit:
                             "commands": commands,
                             "media_mode": "audio_only_fallback",
                             "warning": "Clip/contact-sheet extraction failed, but a short audio artifact was extracted directly from the best-audio stream.",
-                            "next_step": "Use music_recognition_lookup on artifacts.audio_path, then cross-check candidates with reliable sources. Do not finalize from broad search snippets alone.",
+                            "next_step": "Use music_recognition_lookup on artifacts.audio_path, then cross-check candidates with reliable sources. If there is no candidate, extract adjacent source-video audio windows; do not switch to visual/video QA or broad search snippets alone.",
                         }
                     )
                 return self._json(
@@ -902,15 +915,14 @@ class VideoEventToolkit:
                 }
             )
 
-            event_seconds = self._parse_timestamp(event_timestamp)
+            event_seconds = self._parse_timestamp(audio_start_timestamp)
             if event_seconds is None:
-                event_seconds = self._parse_timestamp(audio_start_timestamp)
+                event_seconds = self._parse_timestamp(event_timestamp)
             if event_seconds is None and selected_cue:
                 event_seconds = float(selected_cue["start_seconds"] or window_start)
             if event_seconds is None:
                 event_seconds = window_start
             audio_offset = max(0.0, event_seconds - window_start)
-            audio_duration = self._safe_int(audio_duration_seconds, 20, 3, 120)
             audio_path = output_path / "event_audio.wav"
             audio_cmd = [
                 dependencies["ffmpeg"],
@@ -937,6 +949,23 @@ class VideoEventToolkit:
                     "stderr_tail": self._shorten(audio_run.stderr, 300),
                 }
             )
+
+            audio_mode = "clip"
+            audio_is_valid = audio_path.exists() and audio_path.stat().st_size > 1024
+            if audio_run.returncode != 0 or not audio_is_valid:
+                fallback_audio_path = self._extract_audio_only(
+                    dependencies,
+                    video_url,
+                    output_path,
+                    float(event_seconds),
+                    audio_duration,
+                    commands,
+                )
+                if fallback_audio_path and fallback_audio_path.exists() and fallback_audio_path.stat().st_size > 1024:
+                    audio_path = fallback_audio_path
+                    audio_offset = 0.0
+                    audio_mode = "audio_only_fallback"
+                    audio_is_valid = True
 
             return self._json(
                 {
@@ -969,10 +998,11 @@ class VideoEventToolkit:
                     "artifacts": {
                         "clip_path": str(clip_path),
                         "contact_sheet_path": str(contact_sheet) if contact_sheet.exists() else None,
-                        "audio_path": str(audio_path) if audio_path.exists() else None,
+                        "audio_path": str(audio_path) if audio_is_valid else None,
                     },
                     "commands": commands,
-                    "next_step": "Inspect the contact sheet to confirm the visual event timestamp. For music identification, run music_recognition_lookup on artifacts.audio_path when available, including audio-only fallback artifacts, then cross-check candidates; do not finalize from broad search snippets alone.",
+                    "media_mode": audio_mode,
+                    "next_step": "Use subtitle_time_map and contact_sheet_path only as timing evidence if needed. For music identification, run music_recognition_lookup on artifacts.audio_path when available; if it has no candidate, extract adjacent source-video audio windows and try again before cross-checking reliable sources.",
                 }
             )
         except Exception as exc:

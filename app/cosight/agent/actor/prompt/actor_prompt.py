@@ -125,12 +125,13 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
    - If a question asks which page in a specific book contains or is referenced by an entry, prefer google_books_volume_search with the Google Books volume id or URL and the search term. Use page_id/snippet_text evidence and distinguish book page numbers from PDF physical pages.
    - For recipe cross-reference snippets such as "Stuff ... with: Recipe Name, 374", report the referenced page number and keep PDF extraction only as an audit fallback when available.
 8. For long online-video evidence tasks:
-   - Parsing a long video directly is difficult. Prefer youtobe_tool to first obtain subtitles and timestamp mappings as clues; then use a narrow candidate window to export a short clip, contact sheet, or audio segment when visual or sound verification is needed.
+   - Parsing a long video directly is difficult. Prefer youtobe_tool to first obtain subtitles and timestamp mappings as clues; then use a narrow candidate window to export a short clip, contact sheet, or audio segment when timing or sound verification is needed. Contact sheets are timing evidence, not a reason to call visual QA for song identification.
+   - For video music-identification tasks, do not call browser_use or the model-dependent media QA tools ask_question_about_image, ask_question_about_video, and audio_recognition unless the user explicitly asks for those exact tools. They are not part of the music-identification route when youtobe_tool has produced usable subtitle/audio artifacts.
    - Do not use ask_question_about_video for music or sound-identification tasks. It is not an audio fingerprinting tool and should not be used to identify songs, composers, artists, or background music.
    - For music or sound changes, once a timestamp is known, explicitly request a short audio segment with audio_start_timestamp and audio_duration_seconds. If clip/contact-sheet extraction is blocked, use the audio-only fallback artifact when available rather than switching directly to broad web-search guesses.
    - When identifying music from a video, run music_recognition_lookup on the short extracted audio clip. The tool handles common sample-rate/channel differences for the local music lookup backend, so pass the source clip directly instead of changing tool routes because the audio format is uncertain.
    - If visual inspection of a contact sheet or clip fails but youtobe_tool has already produced a plausible short audio artifact, continue with music_recognition_lookup and record the timestamp uncertainty instead of repeatedly retrying visual QA.
-   - If a general audio understanding check is useful, use audio_recognition on the same short audio clip; do not substitute video Q&A, speech transcription, or humming-style lookup for song recognition.
+   - If music_recognition_lookup returns no candidate for one window, try adjacent short audio windows around the estimated cue before using comments or broad web snippets. Do not switch to audio_recognition, browser_use, or visual media QA as song-identification fallbacks.
    - Treat music-recognition matches as candidates and cross-check the song title and composer/artist against reliable sources before finalizing. If recognition is unavailable or returns no candidates, say that explicitly in the evidence trail and avoid finalizing from generic comments or broad web-search snippets alone.
 
 # HTML Report Optimization Rules:
@@ -407,12 +408,13 @@ def actor_system_prompt_zh(work_space_path):
    - 如果题目询问某本书中某条目/配方引用的是哪一页，优先使用 google_books_volume_search，传入 Google Books volume id 或 URL 和关键词。依据 page_id/snippet_text，不要把书内页码和 PDF 物理页混淆。
    - 遇到 "Stuff ... with: Recipe Name, 374" 这类配方交叉引用片段时，报告引用的书内页码；本地 PDF 抽取只作为辅助核验。
 8. 处理长在线视频证据题时：
-   - 直接解析长视频难度较大，优先用 youtobe_tool 获取字幕文本和时间对照，把字幕命中和时间点当作线索；需要视觉或声音核验时，再用较窄时间窗导出短片段、截图总览和音频。
+   - 直接解析长视频难度较大，优先用 youtobe_tool 获取字幕文本和时间对照，把字幕命中和时间点当作线索；需要时间或声音核验时，再用较窄时间窗导出短片段、截图总览和音频。截图总览只作为时间证据，不是调用视觉问答来猜歌的理由。
+   - 处理视频音乐识别时，除非用户明确要求这些具体工具，不要调用 browser_use、ask_question_about_image、ask_question_about_video、audio_recognition 这类浏览器或多模态媒体问答工具。当 youtobe_tool 已经产出字幕或短音频证据时，它们不属于音乐识别链路，应直接跳过。
    - 音乐、声音变化或背景音乐识别任务禁止使用 ask_question_about_video。它不是音频指纹识别工具，不能用来识别歌曲、作曲者、艺人或背景音乐。
    - 处理音乐或声音变化时，一旦定位到时间点，应明确传入 audio_start_timestamp 和 audio_duration_seconds 请求短音频。若短视频或截图抽取受限，优先使用工具返回的 audio-only 降级音频证据，不要直接转向宽泛网页搜索猜答案。
    - 需要识别视频中的音乐时，先对短音频片段使用 music_recognition_lookup。该工具会处理常见采样率和声道差异，音频格式不确定时也应直接交给它，不要因此切换路线。
    - 如果截图总览或短视频视觉核验失败，但 youtobe_tool 已经产出合理的短音频，应继续调用 music_recognition_lookup，并在证据链中注明时间点仍有不确定性，不要反复卡在视觉问答上。
-   - 如果需要通用音频理解辅助，再对同一短音频使用 audio_recognition。不要用视频问答、语音转写或哼唱式检索替代歌曲识别。
+   - 如果 music_recognition_lookup 在一个时间窗没有候选，优先尝试目标时间点附近的相邻短音频窗，不要把 audio_recognition、browser_use 或视觉媒体问答当成歌曲识别的后备工具。
    - 音乐识别返回结果只作为候选，最终曲名和作者/艺人必须再用可靠来源交叉验证。如果识别服务不可用或没有候选，应在证据链中明确说明，不要只凭泛泛评论或宽泛搜索片段下最终结论。
 
 # HTML报告优化规则：
