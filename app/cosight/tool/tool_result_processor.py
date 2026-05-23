@@ -867,9 +867,12 @@ class ToolResultProcessor:
                 result_count = len(candidates)
             else:
                 backend = parsed_result.get("backend") or {}
+                attempts = parsed_result.get("backend_attempts") or []
+                attempt_endpoints = [item.get("endpoint") for item in attempts if item.get("endpoint")]
+                endpoint_summary = " -> ".join(dict.fromkeys(attempt_endpoints)) or backend.get("endpoint")
                 summary = (
                     f"Music recognition returned no confirmed candidates; "
-                    f"error={parsed_result.get('error')}; endpoint={backend.get('endpoint')}"
+                    f"error={parsed_result.get('error')}; endpoints={endpoint_summary}"
                 )
                 result_count = 0
 

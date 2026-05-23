@@ -59,6 +59,11 @@ Default endpoint:
 http://127.0.0.1:12400
 ```
 
+`music_recognition_lookup` will first try this default endpoint. If the
+service is not already reachable and `tools/media/ncm-recognize-api` has
+dependencies installed, the tool can start `server.js` in the background and
+wait briefly before sending the recognition request.
+
 Override with one of:
 
 ```text

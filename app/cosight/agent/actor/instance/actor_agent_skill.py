@@ -998,11 +998,6 @@ def music_recognition_lookup_skill():
                         "description_zh": "本地短音频路径，建议为 10-25 秒片段",
                         "description_en": "Local short audio path, preferably a 10-25 second clip"
                     },
-                    "backend_url": {
-                        "type": "string",
-                        "description_zh": "通常不要填写；除非用户明确给出已启动的本地识别服务地址，否则默认使用环境变量或 http://127.0.0.1:12400",
-                        "description_en": "Usually leave this blank; unless the user explicitly provides a running local recognition endpoint, use environment variables or http://127.0.0.1:12400"
-                    },
                     "timeout_seconds": {
                         "type": "integer",
                         "description_zh": "请求超时时间，默认 30 秒",

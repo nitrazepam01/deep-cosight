@@ -17,6 +17,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 import wave
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -40,6 +41,7 @@ class MusicRecognitionToolkit:
         "NCM_RECOGNIZE_API_URL",
         "NCM_RECOGNIZE_URL",
     )
+    AUTOSTART_TIMEOUT_SECONDS = 15
 
     def __init__(
         self,
@@ -75,13 +77,15 @@ class MusicRecognitionToolkit:
 
     def _endpoint_candidates(self, backend_url: Optional[str]) -> List[str]:
         primary = self._resolve_endpoint(backend_url)
-        candidates = [primary]
+        candidates = []
+        if self.DEFAULT_ENDPOINT:
+            candidates.append(self.DEFAULT_ENDPOINT)
+        if primary not in candidates:
+            candidates.append(primary)
         if backend_url:
             fallback = self._resolve_endpoint(None)
             if fallback not in candidates:
                 candidates.append(fallback)
-            if self.DEFAULT_ENDPOINT not in candidates:
-                candidates.append(self.DEFAULT_ENDPOINT)
         return candidates
 
     @classmethod
@@ -211,6 +215,106 @@ class MusicRecognitionToolkit:
 
     def _post_json(self, endpoint: str, payload: Dict[str, Any], timeout: int) -> requests.Response:
         return requests.post(endpoint, json=payload, timeout=timeout)
+
+    def _local_backend_dir(self) -> Path:
+        return self._repo_root() / "tools" / "media" / "ncm-recognize-api"
+
+    def _backend_log_paths(self) -> Tuple[Path, Path]:
+        log_dir = self._repo_root() / "tmp"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        return log_dir / f"ncm-recognize-out-{stamp}.log", log_dir / f"ncm-recognize-err-{stamp}.log"
+
+    @staticmethod
+    def _node_executable() -> Optional[str]:
+        return shutil.which("node.exe" if os.name == "nt" else "node") or shutil.which("node")
+
+    def _is_default_endpoint(self, endpoint: str) -> bool:
+        return endpoint.rstrip("/") == self.DEFAULT_ENDPOINT.rstrip("/")
+
+    def _endpoint_reachable(self, endpoint: str, timeout: float = 0.5) -> bool:
+        try:
+            response = requests.post(
+                endpoint,
+                json={"file": "__cosight_backend_healthcheck__.wav"},
+                timeout=timeout,
+            )
+            return response.status_code < 500
+        except requests.RequestException:
+            return False
+
+    def _maybe_start_local_backend(self, endpoint: str) -> Dict[str, Any]:
+        status: Dict[str, Any] = {
+            "attempted": False,
+            "ok": False,
+            "endpoint": endpoint,
+        }
+        if not self._is_default_endpoint(endpoint):
+            status["skipped_reason"] = "autostart_only_supports_default_endpoint"
+            return status
+        if self._endpoint_reachable(endpoint):
+            status.update({"ok": True, "already_running": True})
+            return status
+
+        service_dir = self._local_backend_dir()
+        server_js = service_dir / "server.js"
+        node_exe = self._node_executable()
+        status.update(
+            {
+                "attempted": True,
+                "service_dir": str(service_dir),
+                "server": str(server_js),
+                "node": node_exe,
+            }
+        )
+        if not server_js.exists():
+            status["error"] = "ncm_recognize_api_not_installed"
+            return status
+        if not (service_dir / "node_modules").exists():
+            status["error"] = "node_modules_missing"
+            status["hint"] = "Run npm install in tools/media/ncm-recognize-api, or use tools/start_music_recognition_backend.ps1 -Install."
+            return status
+        if not node_exe:
+            status["error"] = "node_not_found"
+            return status
+
+        try:
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            stdout_path, stderr_path = self._backend_log_paths()
+            stdout_file = open(stdout_path, "a", encoding="utf-8")
+            stderr_file = open(stderr_path, "a", encoding="utf-8")
+            proc = subprocess.Popen(
+                [node_exe, str(server_js)],
+                cwd=str(service_dir),
+                stdout=stdout_file,
+                stderr=stderr_file,
+                stdin=subprocess.DEVNULL,
+                creationflags=creationflags,
+            )
+            status["pid"] = proc.pid
+            status["stdout_log"] = str(stdout_path)
+            status["stderr_log"] = str(stderr_path)
+            stdout_file.close()
+            stderr_file.close()
+        except Exception as exc:
+            if "stdout_file" in locals():
+                stdout_file.close()
+            if "stderr_file" in locals():
+                stderr_file.close()
+            status["error"] = "backend_start_failed"
+            status["message"] = str(exc)
+            return status
+
+        deadline = time.time() + self.AUTOSTART_TIMEOUT_SECONDS
+        while time.time() < deadline:
+            if self._endpoint_reachable(endpoint):
+                status.update({"ok": True, "startup_wait_seconds": round(self.AUTOSTART_TIMEOUT_SECONDS - max(0, deadline - time.time()), 3)})
+                return status
+            time.sleep(0.5)
+
+        status["error"] = "backend_start_timeout"
+        status["timeout_seconds"] = self.AUTOSTART_TIMEOUT_SECONDS
+        return status
 
     @staticmethod
     def _clean_text(value: Any) -> Optional[str]:
@@ -397,6 +501,7 @@ class MusicRecognitionToolkit:
             backend_audio_path, audio_normalization = self._normalize_audio_for_backend(resolved_audio_path, timeout)
             payload = {"file": str(backend_audio_path)}
             attempts: List[Dict[str, Any]] = []
+            backend_autostart: List[Dict[str, Any]] = []
             last_exc: Optional[requests.RequestException] = None
             for endpoint in endpoints:
                 endpoint_error = self._validate_endpoint(endpoint)
@@ -410,6 +515,9 @@ class MusicRecognitionToolkit:
                         }
                     )
                     continue
+                autostart_status = self._maybe_start_local_backend(endpoint)
+                if autostart_status.get("attempted") or autostart_status.get("already_running"):
+                    backend_autostart.append(autostart_status)
                 try:
                     response = self._post_json(endpoint, payload, timeout)
                 except requests.RequestException as exc:
@@ -432,18 +540,21 @@ class MusicRecognitionToolkit:
 
                 candidates = self._extract_candidates(raw_result)
                 ok = response.ok and self._backend_success(raw_result, candidates)
+                result_error = None if ok else "music_recognition_no_candidates"
                 attempts.append(
                     {
                         "endpoint": endpoint,
                         "ok": ok,
                         "http_status": response.status_code,
                         "candidate_count": len(candidates),
+                        "error": result_error,
                     }
                 )
 
                 return self._json(
                     {
                         "ok": ok,
+                        "error": result_error,
                         "audio_path": str(resolved_audio_path),
                         "audio_size_bytes": resolved_audio_path.stat().st_size,
                         "recognized_audio_path": str(backend_audio_path),
@@ -455,8 +566,10 @@ class MusicRecognitionToolkit:
                             "compatible_backend": "ncm-recognize-api",
                             "http_status": response.status_code,
                             "fallback_used": endpoint != endpoints[0],
+                            "autostart_used": any(item.get("attempted") and item.get("ok") for item in backend_autostart),
                         },
                         "backend_attempts": attempts,
+                        "backend_autostart": backend_autostart,
                         "candidates": candidates,
                         "candidate_count": len(candidates),
                         "raw_result": raw_result,
@@ -479,6 +592,7 @@ class MusicRecognitionToolkit:
                             "endpoint": endpoints[0],
                         },
                         "backend_attempts": attempts,
+                        "backend_autostart": backend_autostart if "backend_autostart" in locals() else [],
                     }
                 )
             if last_exc:
@@ -493,10 +607,11 @@ class MusicRecognitionToolkit:
                     "audio_normalization": audio_normalization if "audio_normalization" in locals() else None,
                     "backend": {
                         "type": "local_http_music_recognition",
-                        "endpoint": self._resolve_endpoint(backend_url),
+                        "endpoint": endpoints[0] if "endpoints" in locals() and endpoints else self._resolve_endpoint(backend_url),
                         "compatible_backend": "ncm-recognize-api",
                     },
                     "backend_attempts": attempts if "attempts" in locals() else [],
+                    "backend_autostart": backend_autostart if "backend_autostart" in locals() else [],
                     "hint": "Start the local recognition service, for example ncm-recognize-api on http://127.0.0.1:12400.",
                 }
             )

@@ -36,11 +36,21 @@ class FakeNcmResponse:
         }
 
 
+class NoAutostartMixin:
+    def _maybe_start_local_backend(self, endpoint):
+        return {
+            "attempted": False,
+            "ok": True,
+            "endpoint": endpoint,
+            "skipped_reason": "test_backend_mocked",
+        }
+
+
 def test_music_recognition_lookup_extracts_ncm_recognize_candidate(tmp_path):
     audio_file = tmp_path / "sample.wav"
     write_test_wav(audio_file)
 
-    class FakeToolkit(MusicRecognitionToolkit):
+    class FakeToolkit(NoAutostartMixin, MusicRecognitionToolkit):
         def _post_json(self, endpoint, payload, timeout):
             return FakeNcmResponse()
 
@@ -62,7 +72,7 @@ def test_music_recognition_lookup_reports_backend_unavailable(tmp_path):
     audio_file = tmp_path / "sample.wav"
     write_test_wav(audio_file)
 
-    class UnavailableToolkit(MusicRecognitionToolkit):
+    class UnavailableToolkit(NoAutostartMixin, MusicRecognitionToolkit):
         def _post_json(self, endpoint, payload, timeout):
             raise requests.ConnectionError("connection refused")
 
@@ -83,10 +93,10 @@ def test_music_recognition_lookup_falls_back_to_default_endpoint(tmp_path):
     write_test_wav(audio_file)
     endpoints = []
 
-    class FallbackToolkit(MusicRecognitionToolkit):
+    class FallbackToolkit(NoAutostartMixin, MusicRecognitionToolkit):
         def _post_json(self, endpoint, payload, timeout):
             endpoints.append(endpoint)
-            if endpoint == "http://127.0.0.1:5000/recognize":
+            if endpoint == "http://127.0.0.1:12400":
                 raise requests.ConnectionError("connection refused")
             return FakeNcmResponse()
 
@@ -99,8 +109,8 @@ def test_music_recognition_lookup_falls_back_to_default_endpoint(tmp_path):
 
     assert result["ok"] is True
     assert endpoints == [
-        "http://127.0.0.1:5000/recognize",
         "http://127.0.0.1:12400",
+        "http://127.0.0.1:5000/recognize",
     ]
     assert result["backend"]["fallback_used"] is True
     assert result["candidates"][0]["song_name"] == "Example Song"
@@ -150,7 +160,7 @@ def test_music_recognition_lookup_resolves_relative_audio_path_from_workspace(tm
     write_test_wav(audio_file)
     seen_payloads = []
 
-    class CapturingToolkit(MusicRecognitionToolkit):
+    class CapturingToolkit(NoAutostartMixin, MusicRecognitionToolkit):
         def _post_json(self, endpoint, payload, timeout):
             seen_payloads.append(payload)
             return FakeNcmResponse()
