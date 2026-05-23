@@ -164,7 +164,6 @@ a = Analysis(
         'app.cosight.tool.interpreters.interpreter_error',
         'app.cosight.tool.interpreters.subprocess_interpreter',
         'app.cosight.tool.interpreters.__init__',
-        'app.cosight.tool.music_recognition_toolkit',
         'app.cosight.tool.plan_toolkit',
         'app.cosight.tool.scrape_website_toolkit',
         'app.cosight.tool.search_toolkit',

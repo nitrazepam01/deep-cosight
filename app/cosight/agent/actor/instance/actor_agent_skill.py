@@ -882,14 +882,14 @@ def search_baidu_skill():
 def ask_question_about_video_skill():
     description_zh = (
         "对视频画面、场景、动作、物体等视觉内容进行问答；不要用于歌曲、背景音乐、作曲者或艺人识别。"
-        "遇到视频中的音乐识别任务，应先用 youtobe_tool 抽取短音频，再用 music_recognition_lookup；"
-        "不要把本工具或 audio_recognition 当作音乐识别后备。"
+        "遇到视频中的音乐识别任务，应先用 youtobe_tool 抽取字幕、时间点和短音频证据，"
+        "再把短音频交给 audio_recognition；不要用本工具猜歌。"
     )
     description_en = (
         "Ask questions about visual video content such as scenes, actions, and objects. "
         "Do not use this tool to identify songs, background music, composers, or artists. "
-        "For music identification in a video, first extract a short audio clip with youtobe_tool, "
-        "then use music_recognition_lookup; do not use this tool or audio_recognition as a music-identification fallback."
+        "For music identification in a video, first use youtobe_tool to extract subtitles, timestamps, and short-audio evidence, "
+        "then pass the short audio to audio_recognition; do not use this visual tool to guess songs."
     )
     return {
         'skill_name': 'ask_question_about_video',
@@ -927,18 +927,20 @@ def ask_question_about_video_skill():
 
 def audio_recognition_skill():
     description_zh = (
-        "用于转写或理解短音频内容，可辅助判断人声、歌词或声音事件；"
-        "不用于歌曲/背景音乐识别，也不要作为 music_recognition_lookup 的后备工具。"
+        "用于识别本地或在线短音频中的歌曲、背景音乐、曲名和艺人信息；"
+        "默认调用 AudD API，凭据从 AUDD_API_TOKEN、AUDD_TOKEN 或 AUDD_API_KEY 环境变量读取。"
+        "识别结果只作为候选，最终曲名、作者或艺人仍需用可靠来源交叉验证。"
     )
     description_en = (
-        "Transcribe or understand short audio content, useful for speech, lyrics, or sound events. "
-        "It is not for song/background-music identification and should not be used as a fallback for music_recognition_lookup."
+        "Identify songs, background music, titles, and artist metadata in a local or online short audio clip. "
+        "It uses the AudD API by default and reads credentials from AUDD_API_TOKEN, AUDD_TOKEN, or AUDD_API_KEY. "
+        "Treat recognition results as candidates and cross-check final title, composer, or artist with reliable sources."
     )
     return {
         'skill_name': 'audio_recognition',
         'skill_type': "function",
-        'display_name_zh': '根据任务描述和输入音频识别输出音频内容',
-        'display_name_en': 'Identify the output audio content based on the task description and input audio',
+        'display_name_zh': '音频歌曲识别',
+        'display_name_en': 'Audio Song Recognition',
         'description_zh': description_zh,
         'description_en': description_en,
         'semantic_apis': ["api_search"],
@@ -957,54 +959,12 @@ def audio_recognition_skill():
                     },
                     "task_prompt": {
                         "type": "string",
-                        "description_zh": "任务内容描述",
-                        "description_en": "task description"
+                        "description_zh": "任务内容描述，例如识别歌曲、背景音乐、曲名、作曲者或艺人",
+                        "description_en": "Task description, such as identifying a song, background music, title, composer, or artist"
                     }
                 },
 
                 "required": ["audio_path", "task_prompt"]
-            }
-        )
-    }
-
-
-def music_recognition_lookup_skill():
-    description_zh = (
-        "对短音频片段调用本地音乐识别后端，返回候选曲名、艺人和原始响应；"
-        "这是从视频短音频中识别歌曲/背景音乐的主路径，会先整理常见音频格式差异，结果需再交叉验证。"
-    )
-    description_en = (
-        "Call a local music-recognition backend for a short audio clip and return candidate song metadata plus the raw response. "
-        "This is the primary tool for identifying songs or background music after audio has been extracted from a video; cross-check results before finalizing."
-    )
-    return {
-        'skill_name': 'music_recognition_lookup',
-        'skill_type': "function",
-        'display_name_zh': '音乐识别检索',
-        'display_name_en': 'Music Recognition Lookup',
-        'description_zh': description_zh,
-        'description_en': description_en,
-        'semantic_apis': ["api_search"],
-        'function': SkillFunction(
-            id='9d0794bb-c4f2-478e-9f49-39bbd2385f13',
-            name='app.cosight.tool.music_recognition_toolkit.music_recognition_lookup',
-            description_zh='调用本地音乐识别服务识别短音频片段，默认使用 http://127.0.0.1:12400，并会整理常见采样率/声道差异',
-            description_en='Recognize likely songs in a short audio clip through a local music-recognition service, defaulting to http://127.0.0.1:12400 and normalizing common sample-rate/channel differences',
-            parameters={
-                "type": "object",
-                "properties": {
-                    "audio_path": {
-                        "type": "string",
-                        "description_zh": "本地短音频路径，建议为 10-25 秒片段",
-                        "description_en": "Local short audio path, preferably a 10-25 second clip"
-                    },
-                    "timeout_seconds": {
-                        "type": "integer",
-                        "description_zh": "请求超时时间，默认 30 秒",
-                        "description_en": "Request timeout in seconds, default 30"
-                    }
-                },
-                "required": ["audio_path"]
             }
         )
     }
@@ -1102,8 +1062,8 @@ def youtobe_tool_skill():
         'function': SkillFunction(
             id='9d0794bb-c4f2-478e-9f49-39bbd2385f12',
             name='app.cosight.video_event_toolkit.youtobe_tool',
-            description_zh='解析在线视频，优先返回字幕和时间对照，必要时导出短片段、截图和音频线索。识别音乐时，拿到时间窗后优先保留短音频证据并交给 music_recognition_lookup；不要转去 ask_question_about_image、ask_question_about_video、audio_recognition 或 browser_use 猜歌',
-            description_en='Analyze an online video by first returning subtitle timestamps, and export clip, frame, or audio clues when needed. For music identification, keep short audio evidence once a time window is known and pass it to music_recognition_lookup; do not switch to ask_question_about_image, ask_question_about_video, audio_recognition, or browser_use to guess songs',
+            description_zh='解析在线视频，优先返回字幕和时间对照，必要时导出短片段、截图和音频线索。识别音乐时，拿到时间窗后保留短音频和时间证据，再用 audio_recognition 识别候选歌曲；不要转去 ask_question_about_image、ask_question_about_video 或 browser_use 猜歌',
+            description_en='Analyze an online video by first returning subtitle timestamps, and export clip, frame, or audio clues when needed. For music identification, keep short-audio and timing evidence once a time window is known, then use audio_recognition to identify candidate songs; do not switch to ask_question_about_image, ask_question_about_video, or browser_use to guess songs',
             parameters={
                 "type": "object",
                 "properties": {

@@ -134,12 +134,11 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
             'output_dir': ['output_path', 'save_dir', 'artifact_dir'],
         }
     },
-    'music_recognition_lookup': {
-        'required': ['audio_path'],
+    'audio_recognition': {
+        'required': ['audio_path', 'task_prompt'],
         'aliases': {
-            'audio_path': ['audio', 'file', 'file_path', 'filepath', 'path', 'wav_path', 'clip_path'],
-            'backend_url': ['endpoint', 'url', 'recognition_url', 'service_url'],
-            'timeout_seconds': ['timeout', 'request_timeout'],
+            'audio_path': ['file', 'file_path', 'filepath', 'path', 'audio', 'audio_file', 'audio_url', 'clip_path'],
+            'task_prompt': ['prompt', 'question', 'task', 'description', 'query'],
         }
     }
 }

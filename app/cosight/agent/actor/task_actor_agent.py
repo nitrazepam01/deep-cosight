@@ -43,7 +43,6 @@ from app.cosight.tool.coder_lite_toolkit import CoderLiteToolkit
 from app.cosight.tool.wikipedia_toolkit import WikipediaToolkit
 from app.cosight.tool.google_books_toolkit import GoogleBooksToolkit
 from app.cosight.tool.video_event_toolkit import VideoEventToolkit
-from app.cosight.tool.music_recognition_toolkit import MusicRecognitionToolkit
 from config.config import get_tavily_config
 from app.common.logger_util import logger
 
@@ -106,7 +105,6 @@ class TaskActorAgent(BaseAgent):
         wikipedia_toolkit = WikipediaToolkit()
         google_books_toolkit = GoogleBooksToolkit()
         video_event_toolkit = VideoEventToolkit(workspace_path=self.work_space_path)
-        music_recognition_toolkit = MusicRecognitionToolkit(workspace_path=self.work_space_path)
         all_functions = {"mark_step": act_toolkit.mark_step,
                          # "deep_search": deep_search_toolkit.deep_search,
                         #  "search_baidu": search_baidu,
@@ -116,7 +114,6 @@ class TaskActorAgent(BaseAgent):
                          "wiki_entry_parse": wikipedia_toolkit.wiki_entry_parse,
                          "google_books_volume_search": google_books_toolkit.google_books_volume_search,
                          "youtobe_tool": video_event_toolkit.youtobe_tool,
-                         "music_recognition_lookup": music_recognition_toolkit.music_recognition_lookup,
                         #  "image_search": tavily_search.search,
                          "audio_recognition": audio_toolkit.speech_to_text,
                          # "search_duckgo": search_toolkit.search_duckduckgo,

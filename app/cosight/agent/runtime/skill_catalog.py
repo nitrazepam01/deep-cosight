@@ -88,14 +88,9 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "needs_workspace": False,
     },
     "audio_recognition": {
-        "display_name_zh": "语音识别",
-        "description_zh": "将语音或声音内容转换为文字；不要作为歌曲识别后备工具",
+        "display_name_zh": "音频歌曲识别",
+        "description_zh": "识别短音频中的歌曲、背景音乐、曲名和艺人信息，结果需再交叉验证",
         "needs_workspace": False,
-    },
-    "music_recognition_lookup": {
-        "display_name_zh": "音乐识别检索",
-        "description_zh": "调用本地音乐识别后端识别短音频片段，返回候选曲名和艺人信息",
-        "needs_workspace": True,
     },
     "extract_document_content": {
         "display_name_zh": "文档解析",
@@ -208,7 +203,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         mark_step_skill, file_saver_skill,
         file_read_skill, file_str_replace_skill, file_find_in_content_skill,
         ask_question_about_image_skill, ask_question_about_video_skill,
-        audio_recognition_skill, music_recognition_lookup_skill,
+        audio_recognition_skill,
         extract_document_content_skill, browser_use_skill,
         create_html_report_skill, fetch_website_content_skill,
         fetch_website_content_with_images_skill, fetch_website_images_only_skill,
@@ -233,7 +228,6 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "ask_question_about_image": ask_question_about_image_skill,
         "ask_question_about_video": ask_question_about_video_skill,
         "audio_recognition": audio_recognition_skill,
-        "music_recognition_lookup": music_recognition_lookup_skill,
         "extract_document_content": extract_document_content_skill,
         "create_html_report": create_html_report_skill,
         "browser_use": browser_use_skill,

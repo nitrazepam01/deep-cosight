@@ -511,8 +511,6 @@ class ToolResultProcessor:
                 return ToolResultProcessor._process_google_books_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'youtobe_tool':
                 return ToolResultProcessor._process_video_event_result(tool_name, tool_args, tool_result, task_title)
-            elif tool_name == 'music_recognition_lookup':
-                return ToolResultProcessor._process_music_recognition_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'execute_code':
                 return ToolResultProcessor._process_code_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name in ['file_saver', 'file_read', 'file_str_replace', 'file_find_in_content','create_html_report']:
@@ -523,6 +521,8 @@ class ToolResultProcessor:
                 return ToolResultProcessor._process_website_content_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name in ['ask_question_about_image', 'ask_question_about_video']:
                 return ToolResultProcessor._process_image_result(tool_name, tool_args, tool_result, task_title)
+            elif tool_name == 'audio_recognition':
+                return ToolResultProcessor._process_audio_result(tool_name, tool_args, tool_result, task_title)
             else:
                 return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
         except Exception as e:
@@ -851,50 +851,6 @@ class ToolResultProcessor:
             return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
 
     @staticmethod
-    def _process_music_recognition_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
-        """处理音乐识别候选结果"""
-        try:
-            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
-            if not isinstance(parsed_result, dict):
-                raise ValueError("Music recognition tool did not return a JSON object")
-
-            candidates = parsed_result.get("candidates") or []
-            if parsed_result.get("ok") and candidates:
-                first = candidates[0]
-                song = first.get("song_name") or "unknown song"
-                artist = first.get("artist_name") or "unknown artist"
-                summary = f"Music recognition returned {len(candidates)} candidate(s); top candidate: {song} - {artist}"
-                result_count = len(candidates)
-            else:
-                backend = parsed_result.get("backend") or {}
-                attempts = parsed_result.get("backend_attempts") or []
-                attempt_endpoints = [item.get("endpoint") for item in attempts if item.get("endpoint")]
-                endpoint_summary = " -> ".join(dict.fromkeys(attempt_endpoints)) or backend.get("endpoint")
-                summary = (
-                    f"Music recognition returned no confirmed candidates; "
-                    f"error={parsed_result.get('error')}; endpoints={endpoint_summary}"
-                )
-                result_count = 0
-
-            urls = []
-            audio_path = parsed_result.get("audio_path")
-            if audio_path:
-                urls.append(audio_path)
-
-            return {
-                "tool_type": "analysis",
-                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
-                "first_url": urls[0] if urls else None,
-                "urls": urls,
-                "result_count": result_count,
-                "has_content": bool(parsed_result),
-                "parsed_result": parsed_result,
-            }
-        except Exception as e:
-            logger.error(f"Error processing music recognition result: {e}")
-            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
-    
-    @staticmethod
     def _process_code_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
         """处理代码执行结果"""
         try:
@@ -1179,6 +1135,46 @@ class ToolResultProcessor:
                 ),
                 "error": str(e)
             }
+
+    @staticmethod
+    def _process_audio_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
+        """处理音频识别结果"""
+        try:
+            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+            if not isinstance(parsed_result, dict):
+                raise ValueError("Audio tool did not return a JSON object")
+
+            urls = []
+            result = parsed_result.get("result") or {}
+            for key in ("song_link", "apple_music_url", "spotify_url"):
+                value = result.get(key)
+                if value and value not in urls:
+                    urls.append(value)
+
+            if parsed_result.get("ok"):
+                title = result.get("title") or "unknown title"
+                artist = result.get("artist") or "unknown artist"
+                summary = f"Audio recognition candidate: {title} by {artist}"
+                result_count = parsed_result.get("candidate_count", 1)
+            else:
+                summary = (
+                    f"Audio recognition failed: {parsed_result.get('error')}; "
+                    f"{parsed_result.get('message', '')}"
+                ).strip()
+                result_count = 0
+
+            return {
+                "tool_type": "analysis",
+                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
+                "first_url": urls[0] if urls else None,
+                "urls": urls,
+                "result_count": result_count,
+                "has_content": bool(parsed_result),
+                "parsed_result": parsed_result,
+            }
+        except Exception as e:
+            logger.error(f"Error processing audio result: {e}")
+            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
     
     @staticmethod
     def _process_default_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:

@@ -642,7 +642,7 @@ class VideoEventToolkit:
                                     "commands": commands,
                                     "media_mode": "audio_only_fallback",
                                     "warning": "Metadata lookup failed, but a short audio artifact was extracted directly from the best-audio stream.",
-                                    "next_step": "Use music_recognition_lookup on artifacts.audio_path, then cross-check candidates with reliable sources. If there is no candidate, extract adjacent source-video audio windows; do not switch to visual/video QA or broad search snippets alone.",
+                                    "next_step": "Run audio_recognition on artifacts.audio_path, keep it as timestamped audio evidence, then cross-check candidate titles with reliable sources. If the timing is uncertain, extract adjacent source-video audio windows; do not switch to visual/video QA or broad search snippets alone.",
                                 }
                             )
                 return self._json(
@@ -857,7 +857,7 @@ class VideoEventToolkit:
                             "commands": commands,
                             "media_mode": "audio_only_fallback",
                             "warning": "Clip/contact-sheet extraction failed, but a short audio artifact was extracted directly from the best-audio stream.",
-                            "next_step": "Use music_recognition_lookup on artifacts.audio_path, then cross-check candidates with reliable sources. If there is no candidate, extract adjacent source-video audio windows; do not switch to visual/video QA or broad search snippets alone.",
+                            "next_step": "Run audio_recognition on artifacts.audio_path, keep it as timestamped audio evidence, then cross-check candidate titles with reliable sources. If the timing is uncertain, extract adjacent source-video audio windows; do not switch to visual/video QA or broad search snippets alone.",
                         }
                     )
                 return self._json(
@@ -1002,7 +1002,7 @@ class VideoEventToolkit:
                     },
                     "commands": commands,
                     "media_mode": audio_mode,
-                    "next_step": "Use subtitle_time_map and contact_sheet_path only as timing evidence if needed. For music identification, run music_recognition_lookup on artifacts.audio_path when available; if it has no candidate, extract adjacent source-video audio windows and try again before cross-checking reliable sources.",
+                    "next_step": "Use subtitle_time_map and contact_sheet_path only as timing evidence if needed. For music identification, run audio_recognition on artifacts.audio_path; if the timing is uncertain, extract adjacent source-video audio windows before cross-checking reliable sources.",
                 }
             )
         except Exception as exc:
