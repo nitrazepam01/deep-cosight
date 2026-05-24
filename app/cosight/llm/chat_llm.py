@@ -70,8 +70,13 @@ class ChatLLM:
         self.langfuse_trace = None  # 当前的 Langfuse trace 对象
         # 消息截断配置：从环境变量读取，默认保留最近20条消息
         self.max_messages = int(os.environ.get("MAX_MESSAGES", "20"))
-        # 工具返回内容的最大长度（字符数），默认50000字符
+        # 工具返回内容的最大长度（字符数），默认50000字符；0 或负数表示不按工具内容长度截断
         self.max_tool_content_length = int(os.environ.get("MAX_TOOL_CONTENT_LENGTH", "50000"))
+        # 短工具结果通常仍包含有效证据，低于该长度时不做内容截断
+        self.min_tool_content_truncate_length = max(
+            0,
+            int(os.environ.get("MIN_TOOL_CONTENT_TRUNCATE_LENGTH", "8000")),
+        )
         
         # 上下文压缩配置
         self.compression_enabled = os.environ.get("ENABLE_CONTEXT_COMPRESSION", "false").lower() in ("true", "1", "yes")
@@ -145,6 +150,54 @@ class ChatLLM:
             total_chars += chinese_chars / 1.5 + other_chars / 4
         
         return int(total_chars) + len(messages) * 4  # 加上消息开销
+
+    def _truncate_tool_contents(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Trim oversized tool outputs before any LLM request is built."""
+        if self.max_tool_content_length <= 0:
+            return messages
+
+        result = []
+        for msg in messages:
+            msg_copy = msg.copy()
+            if msg_copy.get("role") == "tool" and isinstance(msg_copy.get("content"), str):
+                content = msg_copy["content"]
+                if self._should_truncate_tool_content(content):
+                    marker = f"\n\n[内容已截断：原始长度 {len(content)} 字符，仅保留前后片段]\n\n"
+                    payload_length = self.max_tool_content_length - len(marker)
+                    if payload_length <= 0:
+                        msg_copy["content"] = content[:self.max_tool_content_length]
+                        result.append(msg_copy)
+                        continue
+                    head_length = max(1, int(payload_length * 0.75))
+                    tail_length = max(0, payload_length - head_length)
+                    tail_content = content[-tail_length:] if tail_length else ""
+                    msg_copy["content"] = f"{content[:head_length]}{marker}{tail_content}"
+                    logger.warning(
+                        f"Truncated tool response from {msg_copy.get('name', 'unknown')}: "
+                        f"{len(content)} -> {self.max_tool_content_length} characters"
+                    )
+            result.append(msg_copy)
+
+        return result
+
+    def _should_truncate_tool_content(self, content: str) -> bool:
+        """Return whether a tool output is long enough to benefit from truncation."""
+        return (
+            self.max_tool_content_length > 0
+            and len(content) > self.max_tool_content_length
+            and len(content) > self.min_tool_content_truncate_length
+        )
+
+    def _prepare_messages_for_request(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Apply lightweight context limits before sending messages to the model."""
+        messages = self._truncate_tool_contents(messages)
+
+        non_system_count = sum(1 for msg in messages if msg.get("role") != "system")
+        if self.max_messages > 0 and non_system_count > self.max_messages:
+            messages = self._truncate_messages(messages)
+            messages = self._truncate_tool_contents(messages)
+
+        return messages
 
     def _should_compress_context(self, messages: List[Dict[str, Any]]) -> tuple:
         """判断是否需要压缩上下文
@@ -408,7 +461,7 @@ Keep facts, data, file paths. Remove redundancy. Output summary only:"""
                 # 截断工具返回的冗长内容
                 if msg_copy.get("role") == "tool" and isinstance(msg_copy.get("content"), str):
                     content = msg_copy["content"]
-                    if len(content) > self.max_tool_content_length:
+                    if self._should_truncate_tool_content(content):
                         truncated_content = content[:self.max_tool_content_length]
                         msg_copy["content"] = (
                             f"{truncated_content}\n\n[内容已截断：原始长度 {len(content)} 字符，"
@@ -505,7 +558,7 @@ Keep facts, data, file paths. Remove redundancy. Output summary only:"""
             # 截断工具返回的冗长内容
             if msg_copy.get("role") == "tool" and isinstance(msg_copy.get("content"), str):
                 content = msg_copy["content"]
-                if len(content) > self.max_tool_content_length:
+                if self._should_truncate_tool_content(content):
                     truncated_content = content[:self.max_tool_content_length]
                     msg_copy["content"] = (
                         f"{truncated_content}\n\n[内容已截断：原始长度 {len(content)} 字符，"
@@ -583,6 +636,8 @@ Keep facts, data, file paths. Remove redundancy. Output summary only:"""
             for msg in messages:
                 if msg.get("role") == "assistant" and "reasoning_content" not in msg:
                     msg["reasoning_content"] = ""
+
+        messages = self._prepare_messages_for_request(messages)
         
         # 【新增】检查是否需要压缩上下文
         should_compress, current_tokens = self._should_compress_context(messages)
@@ -613,6 +668,8 @@ Keep facts, data, file paths. Remove redundancy. Output summary only:"""
                     "tool_choice": "auto",
                     "temperature": self.temperature
                 }
+                if self.max_tokens is not None:
+                    api_params["max_tokens"] = self.max_tokens
                 
                 # 如果启用了 thinking mode，添加 extra_body 参数
                 if use_thinking:
@@ -725,6 +782,13 @@ Keep facts, data, file paths. Remove redundancy. Output summary only:"""
                 elif "rate limit" in error_str.lower():
                     time.sleep(30)
                 elif "timeout" in error_str.lower():
+                    original_max = self.max_messages
+                    self.max_messages = max(5, self.max_messages - 5)
+                    messages = self._prepare_messages_for_request(messages)
+                    logger.warning(
+                        f"Timeout on attempt {attempt + 1}; reduced context for retry: "
+                        f"max_messages {original_max}->{self.max_messages}"
+                    )
                     time.sleep(10)
                 if attempt == max_retries-1:
                     logger.error(f"Failed to create after {max_retries} attempts.")
@@ -780,6 +844,8 @@ Keep facts, data, file paths. Remove redundancy. Output summary only:"""
             for msg in messages:
                 if msg.get("role") == "assistant" and "reasoning_content" not in msg:
                     msg["reasoning_content"] = ""
+
+        messages = self._prepare_messages_for_request(messages)
         
         # 【新增】检查是否需要压缩上下文
         should_compress, current_tokens = self._should_compress_context(messages)

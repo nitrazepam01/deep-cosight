@@ -94,6 +94,7 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
    - Add clear categorization of information and source references
    - Reflect on potential information gaps and compile findings into detailed analysis reports
    - If you need to get the content in the link, you can use the web content fetch tool
+   - For long web/PDF/table evidence, do not ask the model to read whole pages. Use search results, document/PDF parsers, or code-based extraction to produce small evidence tables or line-level snippets first, then reason from that structured evidence.
    - The final report must not be output until all placeholder content has been fully replaced and resolved
    - Reflect on potential information gaps and compile findings into exhaustive analysis reports that maximize detail depth and content comprehensiveness, ensuring all outputs are well-structured, thoroughly documented, and include actionable recommendations with supporting evidence
    - Keep as many figures, tables, and text as possible in the final file, and use the file_read tools in the WorkSpace directory to get the file content you need if necessary
@@ -377,6 +378,7 @@ def actor_system_prompt_zh(work_space_path):
    - 对信息进行明确分类并标注来源
    - 反思潜在的信息缺口，并将发现整理为详尽的分析报告
    - 若需获取链接内容，可使用网页内容抓取工具
+   - 对长网页、PDF、表格类证据，不要让模型直接阅读整页原文。应先用搜索结果、文档/PDF 解析或代码式抽取生成小型证据表/命中行片段，再基于这些结构化证据判断。
    - 最终报告必须在所有占位内容完全替换和解决后输出
    - 反思潜在的信息缺口，并生成详尽的分析报告，最大化内容深度和全面性，确保所有输出结构清晰、文档完整并包含支持证据的可操作建议
    - 尽可能保留图表、表格和文本内容，如需使用内容，可通过工作区目录的 file_read 工具获取

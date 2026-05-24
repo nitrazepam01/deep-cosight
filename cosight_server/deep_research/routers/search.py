@@ -527,6 +527,79 @@ def _build_plan_session_snapshot(
     }
 
 
+def _sync_draft_plan_message_tree(
+    thread: dict,
+    *,
+    workspace_id: str,
+    execution_id: str,
+    plan_session_id: str,
+    approval_state: str,
+    plan_version: int,
+    latest_revision_prompt: str,
+    draft_plan_snapshot: dict | None,
+    now_ms: int,
+) -> bool:
+    if not isinstance(thread, dict) or not isinstance(draft_plan_snapshot, dict):
+        return False
+    steps = draft_plan_snapshot.get("steps")
+    if not isinstance(steps, list) or len(steps) == 0:
+        return False
+
+    message_tree = thread.get("messageTree")
+    if not isinstance(message_tree, dict):
+        return False
+    nodes = message_tree.get("nodes")
+    if not isinstance(nodes, dict):
+        return False
+
+    target_node = None
+    target_node_id = None
+    for node_id, node in nodes.items():
+        if not isinstance(node, dict) or node.get("role") != "assistant":
+            continue
+        metadata = node.get("metadata") if isinstance(node.get("metadata"), dict) else {}
+        if metadata.get("pendingPlaceholder") is True:
+            target_node = node
+            target_node_id = node_id
+            break
+
+    if target_node is None:
+        active_path = message_tree.get("activePath")
+        if isinstance(active_path, list):
+            for item in reversed(active_path):
+                node_id = item.get("nodeId") if isinstance(item, dict) else None
+                node = nodes.get(node_id) if node_id else None
+                if isinstance(node, dict) and node.get("role") == "assistant":
+                    target_node = node
+                    target_node_id = node_id
+                    break
+
+    if target_node is None:
+        return False
+
+    metadata = target_node.get("metadata") if isinstance(target_node.get("metadata"), dict) else {}
+    metadata.update({
+        "executionId": execution_id,
+        "planSessionId": plan_session_id,
+        "planVersion": int(plan_version or 1),
+        "approvalState": approval_state,
+        "draftPlanSnapshot": draft_plan_snapshot,
+        "latestRevisionPrompt": latest_revision_prompt or "",
+        "pendingKind": "plan_draft",
+        "pendingPlaceholder": False,
+        "pendingAction": "draft",
+        "pendingWorkspaceId": workspace_id or metadata.get("pendingWorkspaceId", ""),
+    })
+    target_node["metadata"] = metadata
+    target_node["content"] = ""
+    target_node["timestamp"] = target_node.get("timestamp") or now_ms
+
+    if target_node_id:
+        message_tree.setdefault("metadata", {})["lastActiveMessageId"] = target_node_id
+        message_tree["metadata"]["lastSwitchTime"] = now_ms
+    return True
+
+
 def _persist_thread_plan_approval_state(
     thread_id: str,
     *,
@@ -584,6 +657,17 @@ def _persist_thread_plan_approval_state(
                 right_panel_state["dagInitData"] = draft_plan_snapshot
                 right_panel_state["draftPlanSnapshot"] = draft_plan_snapshot
             thread["rightPanelState"] = right_panel_state
+            _sync_draft_plan_message_tree(
+                thread,
+                workspace_id=workspace_id,
+                execution_id=execution_id,
+                plan_session_id=plan_session_id,
+                approval_state=approval_state,
+                plan_version=int(plan_version or 0),
+                latest_revision_prompt=latest_revision_prompt,
+                draft_plan_snapshot=draft_plan_snapshot,
+                now_ms=now_ms,
+            )
             thread["updatedAt"] = now_ms
             updated = True
             break

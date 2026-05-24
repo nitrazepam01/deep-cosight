@@ -15,6 +15,7 @@
 
 import inspect
 import json
+import re
 import sys
 import time
 from typing import List, Dict, Any
@@ -51,6 +52,142 @@ class BaseAgent:
         # Only set plan to None if it hasn't been set by subclass
         if not hasattr(self, 'plan'):
             self.plan = None  # Will be set by subclasses that have access to Plan
+
+    def _get_step_context(self, step_index: int = None) -> str:
+        if self.plan is None or step_index is None:
+            return ""
+        try:
+            if 0 <= int(step_index) < len(self.plan.steps):
+                return str(self.plan.steps[int(step_index)])
+        except Exception:
+            return ""
+        return ""
+
+    def _extract_focus_keywords(self, function_args: str, step_index: int = None) -> list[str]:
+        focus_text = " ".join(
+            part for part in [
+                getattr(self.plan, "title", "") if self.plan else "",
+                self._get_step_context(step_index),
+                function_args or "",
+            ]
+            if part
+        )
+        tokens = re.findall(r"[A-Za-z0-9][A-Za-z0-9'._/-]{2,}", focus_text.lower())
+        stopwords = {
+            "the", "and", "for", "with", "from", "that", "this", "into", "about",
+            "which", "during", "same", "each", "all", "any", "are", "was", "were",
+            "query", "website_url", "http", "https", "www", "com", "org", "net",
+        }
+        keywords = []
+        for token in tokens:
+            normalized = token.strip("'._/-")
+            if len(normalized) < 3 or normalized in stopwords:
+                continue
+            if normalized not in keywords:
+                keywords.append(normalized)
+            if len(keywords) >= 40:
+                break
+        return keywords
+
+    def _extract_url_from_args(self, function_args: str) -> str:
+        if not function_args:
+            return ""
+        try:
+            parsed = json.loads(function_args)
+            if isinstance(parsed, dict):
+                for key in ("website_url", "url", "page_url", "source_url"):
+                    if parsed.get(key):
+                        return str(parsed[key])
+        except Exception:
+            pass
+        match = re.search(r"https?://[^\s\"'}]+", function_args)
+        return match.group(0) if match else ""
+
+    def _build_text_evidence_observation(
+        self,
+        function_name: str,
+        function_args: str,
+        raw_result: str,
+        step_index: int = None,
+    ) -> str:
+        keywords = self._extract_focus_keywords(function_args, step_index)
+        keyword_set = set(keywords)
+        lines = []
+        seen = set()
+        for original_line in raw_result.splitlines():
+            line = re.sub(r"\s+", " ", original_line).strip()
+            if not line:
+                continue
+            dedup_key = line.lower()
+            if dedup_key in seen:
+                continue
+            seen.add(dedup_key)
+            lines.append(line)
+
+        hit_indexes = set()
+        date_or_table = re.compile(
+            r"(\b(?:19|20)\d{2}\b|\b\d{1,2}:\d{2}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b)",
+            re.IGNORECASE,
+        )
+        for idx, line in enumerate(lines):
+            lower_line = line.lower()
+            keyword_hit = any(keyword in lower_line for keyword in keyword_set)
+            structured_hit = bool(date_or_table.search(line)) and (
+                function_name == "fetch_website_content" or keyword_hit
+            )
+            if keyword_hit or structured_hit:
+                hit_indexes.update(range(max(0, idx - 1), min(len(lines), idx + 2)))
+
+        if not hit_indexes:
+            for idx, line in enumerate(lines[:30]):
+                if 8 <= len(line) <= 240:
+                    hit_indexes.add(idx)
+
+        evidence_lines = []
+        for idx in sorted(hit_indexes):
+            line = lines[idx]
+            if len(line) > 500:
+                line = line[:250] + " ... " + line[-200:]
+            evidence_lines.append({"line": idx + 1, "text": line})
+            if len(evidence_lines) >= 60:
+                break
+
+        observation = {
+            "tool_observation": "script_extracted_evidence",
+            "tool_name": function_name,
+            "source_url": self._extract_url_from_args(function_args),
+            "raw_content_length": len(raw_result),
+            "line_count": len(lines),
+            "task_focus": self._get_step_context(step_index),
+            "keywords_used": keywords[:20],
+            "evidence_lines": evidence_lines,
+            "note": (
+                "The raw tool result is preserved in the UI/session record. "
+                "Use these extracted evidence lines for reasoning; call a more targeted search, "
+                "document/PDF parser, or code-based extractor if exact rows are still needed."
+            ),
+        }
+        return json.dumps(observation, ensure_ascii=False)
+
+    def _prepare_tool_result_for_llm(
+        self,
+        function_name: str,
+        function_args: str,
+        result,
+        step_index: int = None,
+    ) -> str:
+        raw_result = str(result)
+        if function_name in {"fetch_website_content", "browser_use", "extract_document_content", "file_read"}:
+            if len(raw_result) > 6000:
+                compact = self._build_text_evidence_observation(
+                    function_name, function_args, raw_result, step_index
+                )
+                logger.info(
+                    f"Prepared script-extracted observation for {function_name}: "
+                    f"{len(raw_result)} -> {len(compact)} characters"
+                )
+                return compact
+        return raw_result
 
     def _get_runtime_agent_metadata(self) -> Dict[str, str]:
         agent_type = getattr(self, "runtime_agent_type", "")
@@ -603,10 +740,12 @@ class BaseAgent:
                 except Exception as e:
                     logger.warning(f"Failed to record tool call to plan: {e}")
 
+            llm_result = self._prepare_tool_result_for_llm(function_name, function_args, result, step_index)
+
             return {
                 "role": "tool",
                 "name": function_name,
-                "content": str(result),
+                "content": llm_result,
                 "tool_call_id": tool_call_id
             }
         except Exception as e:
