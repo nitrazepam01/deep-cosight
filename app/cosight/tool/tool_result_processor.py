@@ -505,6 +505,12 @@ class ToolResultProcessor:
             # 根据工具名称精确匹配选择处理方式
             if tool_name in ['search_baidu', 'search_google', 'search_wiki', 'tavily_search', 'image_search']:
                 return ToolResultProcessor._process_search_result(tool_name, tool_args, tool_result, task_title)
+            elif tool_name == 'wiki_entry_parse':
+                return ToolResultProcessor._process_wikipedia_result(tool_name, tool_args, tool_result, task_title)
+            elif tool_name == 'google_books_volume_search':
+                return ToolResultProcessor._process_google_books_result(tool_name, tool_args, tool_result, task_title)
+            elif tool_name == 'youtobe_tool':
+                return ToolResultProcessor._process_video_event_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name == 'execute_code':
                 return ToolResultProcessor._process_code_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name in ['file_saver', 'file_read', 'file_str_replace', 'file_find_in_content','create_html_report']:
@@ -515,6 +521,8 @@ class ToolResultProcessor:
                 return ToolResultProcessor._process_website_content_result(tool_name, tool_args, tool_result, task_title)
             elif tool_name in ['ask_question_about_image', 'ask_question_about_video']:
                 return ToolResultProcessor._process_image_result(tool_name, tool_args, tool_result, task_title)
+            elif tool_name == 'audio_recognition':
+                return ToolResultProcessor._process_audio_result(tool_name, tool_args, tool_result, task_title)
             else:
                 return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
         except Exception as e:
@@ -651,7 +659,197 @@ class ToolResultProcessor:
                 ),
                 "error": str(e)
             }
-    
+
+    @staticmethod
+    def _process_wikipedia_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
+        """处理 Wiki 词条解析工具结果"""
+        try:
+            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+            if not isinstance(parsed_result, dict):
+                raise ValueError("Wikipedia tool did not return a JSON object")
+
+            urls = []
+            for candidate in parsed_result.get("source_urls") or []:
+                if candidate and candidate not in urls:
+                    urls.append(candidate)
+            for candidate in [
+                (parsed_result.get("revision") or {}).get("url"),
+                (parsed_result.get("references") or {}).get("url"),
+                ((parsed_result.get("revision_history") or {}).get("matched_revision") or {}).get("url"),
+            ]:
+                if candidate and candidate not in urls:
+                    urls.append(candidate)
+            for match in (parsed_result.get("revision_history") or {}).get("matches") or []:
+                candidate = match.get("url")
+                if candidate and candidate not in urls:
+                    urls.append(candidate)
+            url = urls[0] if urls else None
+            summary_parts = []
+
+            page = parsed_result.get("page") or {}
+            revision = parsed_result.get("revision") or {}
+            counts = parsed_result.get("counts") or {}
+            title = page.get("title") or revision.get("title") or parsed_result.get("title")
+            if title:
+                summary_parts.append(
+                    f"Wiki entry parsed for {title}"
+                )
+            if revision:
+                summary_parts.append(
+                    f"revision oldid {revision.get('oldid')} at {revision.get('timestamp')}"
+                )
+            if counts.get("reference_count") is not None:
+                summary_parts.append(
+                    f"reference_count={counts.get('reference_count')}"
+                )
+            if counts.get("revision_count") is not None:
+                summary_parts.append(
+                    f"revision_count={counts.get('revision_count')}"
+                )
+            if counts.get("matched_item_count") is not None:
+                summary_parts.append(
+                    f"matched_item_count={counts.get('matched_item_count')}"
+                )
+            if counts.get("history_delta_match_count") is not None:
+                summary_parts.append(
+                    f"history_delta_match_count={counts.get('history_delta_match_count')}"
+                )
+            matched_revision = (parsed_result.get("revision_history") or {}).get("matched_revision") or {}
+            if matched_revision:
+                summary_parts.append(
+                    f"first history metric match oldid {matched_revision.get('oldid')} at {matched_revision.get('timestamp')}"
+                )
+            fields = parsed_result.get("fields") or []
+            matched_fields = [
+                field.get("matched_field_name") or field.get("requested_field")
+                for field in fields
+                if not field.get("error")
+            ]
+            if matched_fields:
+                summary_parts.append(f"fields={', '.join(str(item) for item in matched_fields[:3])}")
+
+            if not summary_parts:
+                summary_parts.append("Wiki entry parsing completed")
+            for warning in parsed_result.get("audit") or []:
+                if len(summary_parts) < 6:
+                    summary_parts.append(str(warning))
+
+            return {
+                "tool_type": "search",
+                "summary": ToolResultProcessor._get_localized_summary(
+                    "；".join(summary_parts),
+                    " ; ".join(summary_parts),
+                    task_title
+                ),
+                "first_url": url or ToolResultProcessor._generate_search_results_page_url(tool_name, tool_args, urls),
+                "urls": urls,
+                "result_count": 1 if url else 0,
+                "has_content": bool(parsed_result),
+                "parsed_result": parsed_result,
+            }
+        except Exception as e:
+            logger.error(f"Error processing wikipedia result: {e}")
+            return {
+                "tool_type": "search",
+                "summary": ToolResultProcessor._get_localized_summary(
+                    "Wiki 词条解析完成",
+                    "Wiki entry parsing completed",
+                    task_title
+                ),
+                "error": str(e)
+            }
+
+    @staticmethod
+    def _process_google_books_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
+        """处理 Google Books 书内搜索工具结果"""
+        try:
+            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+            if not isinstance(parsed_result, dict):
+                raise ValueError("Google Books tool did not return a JSON object")
+
+            urls = []
+            if parsed_result.get("search_url"):
+                urls.append(parsed_result["search_url"])
+            for candidate in parsed_result.get("volume_candidates") or []:
+                url = candidate.get("info_link")
+                if url and url not in urls:
+                    urls.append(url)
+
+            best = parsed_result.get("best_page_reference") or {}
+            if best:
+                summary = (
+                    f"Google Books search for {parsed_result.get('query')} in {parsed_result.get('book_id')}: "
+                    f"best page reference {best.get('page_number')} from {best.get('source_page_id')}"
+                )
+            else:
+                summary = (
+                    f"Google Books search for {parsed_result.get('query')} in {parsed_result.get('book_id')}: "
+                    f"{parsed_result.get('matched_page_count', 0)} matched pages"
+                )
+
+            return {
+                "tool_type": "search",
+                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
+                "first_url": urls[0] if urls else None,
+                "urls": urls,
+                "result_count": parsed_result.get("matched_page_count", 0),
+                "has_content": bool(parsed_result),
+                "parsed_result": parsed_result,
+            }
+        except Exception as e:
+            logger.error(f"Error processing Google Books result: {e}")
+            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
+
+    @staticmethod
+    def _process_video_event_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
+        """处理在线视频片段工具结果"""
+        try:
+            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+            if not isinstance(parsed_result, dict):
+                raise ValueError("Video event tool did not return a JSON object")
+
+            urls = []
+            artifacts = parsed_result.get("artifacts") or {}
+            for key in ("contact_sheet_path", "clip_path", "audio_path"):
+                value = artifacts.get(key)
+                if value:
+                    urls.append(value)
+
+            if parsed_result.get("ok"):
+                metadata = parsed_result.get("metadata") or {}
+                clip_window = parsed_result.get("clip_window") or {}
+                subtitle_time_map = parsed_result.get("subtitle_time_map") or []
+                if clip_window:
+                    summary = (
+                        f"Parsed media timeline for {metadata.get('title')} and exported "
+                        f"{clip_window.get('start')} to {clip_window.get('end')}"
+                    )
+                else:
+                    summary = (
+                        f"Parsed media subtitle timeline for {metadata.get('title')}: "
+                        f"{len(subtitle_time_map)} entries"
+                    )
+                result_count = len([value for value in artifacts.values() if value])
+            else:
+                summary = (
+                    f"Media timeline parsing failed: {parsed_result.get('error')}; "
+                    f"missing={((parsed_result.get('dependency_status') or {}).get('missing') or [])}"
+                )
+                result_count = 0
+
+            return {
+                "tool_type": "analysis",
+                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
+                "first_url": urls[0] if urls else None,
+                "urls": urls,
+                "result_count": result_count,
+                "has_content": bool(parsed_result),
+                "parsed_result": parsed_result,
+            }
+        except Exception as e:
+            logger.error(f"Error processing video event result: {e}")
+            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
+
     @staticmethod
     def _process_code_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
         """处理代码执行结果"""
@@ -937,6 +1135,46 @@ class ToolResultProcessor:
                 ),
                 "error": str(e)
             }
+
+    @staticmethod
+    def _process_audio_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:
+        """处理音频识别结果"""
+        try:
+            parsed_result = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+            if not isinstance(parsed_result, dict):
+                raise ValueError("Audio tool did not return a JSON object")
+
+            urls = []
+            result = parsed_result.get("result") or {}
+            for key in ("song_link", "apple_music_url", "spotify_url"):
+                value = result.get(key)
+                if value and value not in urls:
+                    urls.append(value)
+
+            if parsed_result.get("ok"):
+                title = result.get("title") or "unknown title"
+                artist = result.get("artist") or "unknown artist"
+                summary = f"Audio recognition candidate: {title} by {artist}"
+                result_count = parsed_result.get("candidate_count", 1)
+            else:
+                summary = (
+                    f"Audio recognition failed: {parsed_result.get('error')}; "
+                    f"{parsed_result.get('message', '')}"
+                ).strip()
+                result_count = 0
+
+            return {
+                "tool_type": "analysis",
+                "summary": ToolResultProcessor._get_localized_summary(summary, summary, task_title),
+                "first_url": urls[0] if urls else None,
+                "urls": urls,
+                "result_count": result_count,
+                "has_content": bool(parsed_result),
+                "parsed_result": parsed_result,
+            }
+        except Exception as e:
+            logger.error(f"Error processing audio result: {e}")
+            return ToolResultProcessor._process_default_result(tool_name, tool_args, tool_result, task_title)
     
     @staticmethod
     def _process_default_result(tool_name: str, tool_args: str, tool_result: str, task_title: str = "") -> Dict[str, Any]:

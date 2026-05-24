@@ -170,6 +170,71 @@ def search_wiki_skill():
     }
 
 
+def wiki_entry_parse_skill():
+    return {
+        'skill_name': 'wiki_entry_parse',
+        'skill_type': "function",
+        'display_name_zh': 'Wiki 词条解析',
+        'display_name_en': 'Wiki Entry Parser',
+        'description_zh': '对 Wiki 词条进行详细解析，返回版本、历史、源码、字段、章节和表格等结构化信息',
+        'description_en': 'Parse a Wiki entry in detail and return structured revision, history, source, field, section, and table data',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f14',
+            name='app.cosight.wikipedia_toolkit.wiki_entry_parse',
+            description_zh='解析 Wiki 词条的版本、源码和页面结构',
+            description_en='Parse Wiki entry revisions, source, and page structure',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "site": {
+                        "type": "string",
+                        "description_zh": "MediaWiki 站点域名，默认 en.wikipedia.org",
+                        "description_en": "MediaWiki site domain, default en.wikipedia.org"
+                    },
+                    "title": {
+                        "type": "string",
+                        "description_zh": "页面标题",
+                        "description_en": "Page title"
+                    },
+                    "revision": {
+                        "type": "object",
+                        "description_zh": "包含：mode、oldid、start_timestamp、end_timestamp、cutoff_timestamp、year、inclusive",
+                        "description_en": "Keys: mode, oldid, start_timestamp, end_timestamp, cutoff_timestamp, year, inclusive"
+                    },
+                    "include": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description_zh": "可选值：metadata、revision_history、wikitext、rendered_html、references、infobox、sections、tables",
+                        "description_en": "Values: metadata, revision_history, wikitext, rendered_html, references, infobox, sections, tables"
+                    },
+                    "extract": {
+                        "type": "object",
+                        "description_zh": "包含：field_names、section_keywords、table_keywords、include_links、clean_wikitext、link_mode",
+                        "description_en": "Keys: field_names, section_keywords, table_keywords, include_links, clean_wikitext, link_mode"
+                    },
+                    "history_metrics": {
+                        "type": "object",
+                        "description_zh": "包含：with_size_deltas、match_delta、output_date_format",
+                        "description_en": "Keys: with_size_deltas, match_delta, output_date_format"
+                    },
+                    "counting": {
+                        "type": "object",
+                        "description_zh": "包含：dedupe_by、pattern_scope、include_patterns、exclude_patterns",
+                        "description_en": "Keys: dedupe_by, pattern_scope, include_patterns, exclude_patterns"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description_zh": "可选语言代码；不提供时从 site 推断",
+                        "description_en": "Optional language code; inferred from site when omitted"
+                    }
+                },
+                "required": ["title"]
+            }
+        )
+    }
+
+
 def search_image_skill():
     return {
         'skill_name': 'image_search',
@@ -200,19 +265,28 @@ def search_image_skill():
 
 
 def browser_use_skill():
+    description_zh = (
+        "模拟浏览器交互以解决确实需要页面点击、登录态或复杂表单操作的任务；"
+        "不要把它用于在线视频片段检查、音乐/背景音乐识别，普通网页取证优先使用搜索或网页抓取工具。"
+    )
+    description_en = (
+        "Simulate browser interaction only for tasks that truly require page clicks, authenticated state, "
+        "or complex form workflows. Do not use it for online-video segment inspection or music/background-music "
+        "identification; use search or fetch tools for ordinary web evidence."
+    )
     return {
         'skill_name': 'browser_use',
         'skill_type': "function",
         'display_name_zh': '浏览器交互模拟',
         'display_name_en': 'Browser Interaction Simulation',
-        'description_zh': '模拟浏览器交互以解决需要多步操作的任务',
-        'description_en': 'Simulate browser interaction to solve tasks requiring multi-step actions',
+        'description_zh': description_zh,
+        'description_en': description_en,
         'semantic_apis': ["api_browser_simulation"],
         'function': SkillFunction(
             id='2c44f9ad-be5c-4e6c-a9d8-1426b23828a1',
             name='app.cosight.browser_toolkit.browser_use',
-            description_zh='通过模拟浏览器交互解决复杂任务',
-            description_en='Solve complex tasks by simulating browser interactions',
+            description_zh=description_zh,
+            description_en=description_en,
             parameters={
                 "type": "object",
                 "properties": {
@@ -806,19 +880,30 @@ def search_baidu_skill():
 
 
 def ask_question_about_video_skill():
+    description_zh = (
+        "对视频画面、场景、动作、物体等视觉内容进行问答；不要用于歌曲、背景音乐、作曲者或艺人识别。"
+        "遇到视频中的音乐识别任务，应先用 youtobe_tool 抽取字幕、时间点和短音频证据，"
+        "再把短音频交给 audio_recognition；不要用本工具猜歌。"
+    )
+    description_en = (
+        "Ask questions about visual video content such as scenes, actions, and objects. "
+        "Do not use this tool to identify songs, background music, composers, or artists. "
+        "For music identification in a video, first use youtobe_tool to extract subtitles, timestamps, and short-audio evidence, "
+        "then pass the short audio to audio_recognition; do not use this visual tool to guess songs."
+    )
     return {
         'skill_name': 'ask_question_about_video',
         'skill_type': "function",
         'display_name_zh': '获取视频内容',
         'display_name_en': 'Video Content analyse',
-        'description_zh': '获取视频内容',
-        'description_en': 'Ask a question about the video.',
+        'description_zh': description_zh,
+        'description_en': description_en,
         'semantic_apis': ["api_search"],
         'function': SkillFunction(
             id='8d5e7f3b-a4c2-4d1b-9f6e-2c8b9d7e1234',
             name='app.cosight.tool.deep_search_toolkit.deep_search',
-            description_zh='获取视频内容',
-            description_en='Ask a question about the video.',
+            description_zh=description_zh,
+            description_en=description_en,
             parameters={
                 "type": "object",
                 "properties": {
@@ -841,19 +926,29 @@ def ask_question_about_video_skill():
 
 
 def audio_recognition_skill():
+    description_zh = (
+        "用于识别本地或在线短音频中的歌曲、背景音乐、曲名和艺人信息；"
+        "默认调用 AudD API，凭据从 AUDD_API_TOKEN、AUDD_TOKEN 或 AUDD_API_KEY 环境变量读取。"
+        "识别结果只作为候选，最终曲名、作者或艺人仍需用可靠来源交叉验证。"
+    )
+    description_en = (
+        "Identify songs, background music, titles, and artist metadata in a local or online short audio clip. "
+        "It uses the AudD API by default and reads credentials from AUDD_API_TOKEN, AUDD_TOKEN, or AUDD_API_KEY. "
+        "Treat recognition results as candidates and cross-check final title, composer, or artist with reliable sources."
+    )
     return {
         'skill_name': 'audio_recognition',
         'skill_type': "function",
-        'display_name_zh': '根据任务描述和输入音频识别输出音频内容',
-        'display_name_en': 'Identify the output audio content based on the task description and input audio',
-        'description_zh': '根据任务描述和输入音频识别输出音频内容',
-        'description_en': 'Identify the output audio content based on the task description and input audio',
+        'display_name_zh': '音频歌曲识别',
+        'display_name_en': 'Audio Song Recognition',
+        'description_zh': description_zh,
+        'description_en': description_en,
         'semantic_apis': ["api_search"],
         'function': SkillFunction(
             id='8d5e7f3b-a4c2-4d1b-9f6e-2c8b9d7e1234',
             name='app.cosight.tool.deep_search_toolkit.deep_search',
-            description_zh='根据任务描述和输入音频识别输出音频内容',
-            description_en='Identify the output audio content based on the task description and input audio',
+            description_zh=description_zh,
+            description_en=description_en,
             parameters={
                 "type": "object",
                 "properties": {
@@ -864,8 +959,8 @@ def audio_recognition_skill():
                     },
                     "task_prompt": {
                         "type": "string",
-                        "description_zh": "任务内容描述",
-                        "description_en": "task description"
+                        "description_zh": "任务内容描述，例如识别歌曲、背景音乐、曲名、作曲者或艺人",
+                        "description_en": "Task description, such as identifying a song, background music, title, composer, or artist"
                     }
                 },
 
@@ -875,20 +970,195 @@ def audio_recognition_skill():
     }
 
 
+def google_books_volume_search_skill():
+    return {
+        'skill_name': 'google_books_volume_search',
+        'skill_type': "function",
+        'display_name_zh': 'Google Books 书内搜索',
+        'display_name_en': 'Google Books Volume Search',
+        'description_zh': '在 Google Books 指定书籍/卷内搜索关键词，默认返回少量精确 page_id、OCR snippet 和页码引用；适合书内页码定位题',
+        'description_en': 'Search inside a Google Books volume, returning concise page_id, OCR snippet, and page-number evidence by default; useful for book page-number lookup tasks',
+        'semantic_apis': ["api_search"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f11',
+            name='app.cosight.google_books_toolkit.google_books_volume_search',
+            description_zh='使用 Google Books SearchWithinVolume2 进行书内搜索；默认输出精简证据，避免长结果拖慢模型',
+            description_en='Use Google Books SearchWithinVolume2 to search within a volume; returns concise evidence by default to avoid long model context',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description_zh": "书内搜索关键词，例如 raccoon",
+                        "description_en": "Search keyword inside the book, for example raccoon"
+                    },
+                    "book_id": {
+                        "type": "string",
+                        "description_zh": "Google Books volume id；已知时优先传入",
+                        "description_en": "Google Books volume id; pass this when known"
+                    },
+                    "book_url": {
+                        "type": "string",
+                        "description_zh": "Google Books 链接；工具会从 id 参数中解析 volume id",
+                        "description_en": "Google Books URL; the tool parses the volume id from the id parameter"
+                    },
+                    "book_title": {
+                        "type": "string",
+                        "description_zh": "书名或检索词；未提供 book_id/book_url 时用于解析 volume id",
+                        "description_en": "Book title or search query; used to resolve volume id when book_id/book_url is missing"
+                    },
+                    "target_phrase": {
+                        "type": "string",
+                        "description_zh": "可选目标短语，用于给 snippet 中页码引用排序，例如 Sweet Potato and Apple Dressing",
+                        "description_en": "Optional target phrase used to rank page references in snippets"
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description_zh": "最多检查的书内搜索结果数，默认 10；默认只返回其中最强的少量证据页",
+                        "description_en": "Maximum in-volume search results to inspect, default 10; concise output returns only the strongest evidence pages"
+                    },
+                    "max_volume_candidates": {
+                        "type": "integer",
+                        "description_zh": "通过书名解析 volume id 时最多检查的候选数，默认 5",
+                        "description_en": "Maximum volume candidates to inspect when resolving from title, default 5"
+                    },
+                    "detail_level": {
+                        "type": "string",
+                        "enum": ["concise", "full"],
+                        "description_zh": "返回详细程度，默认 concise；只有调试时才用 full",
+                        "description_en": "Output detail level, default concise; use full only for debugging"
+                    },
+                    "max_evidence_pages": {
+                        "type": "integer",
+                        "description_zh": "精简输出中最多返回的证据页数，默认 3",
+                        "description_en": "Maximum evidence pages in concise output, default 3"
+                    },
+                    "snippet_chars": {
+                        "type": "integer",
+                        "description_zh": "每条 OCR snippet 的最大字符数，默认 220",
+                        "description_en": "Maximum characters per OCR snippet, default 220"
+                    },
+                    "max_reference_candidates": {
+                        "type": "integer",
+                        "description_zh": "精简输出中最多返回的页码引用候选数，默认 3",
+                        "description_en": "Maximum page-reference candidates in concise output, default 3"
+                    }
+                },
+                "required": ["query"]
+            }
+        )
+    }
+
+
+def youtobe_tool_skill():
+    return {
+        'skill_name': 'youtobe_tool',
+        'skill_type': "function",
+        'display_name_zh': 'YouTube 工具',
+        'display_name_en': 'YouTube Tool',
+        'description_zh': '获取在线视频的字幕与时间对照，并可按时间窗导出短片段、截图总览和短音频；视频片段受限时会尽量降级抽取音频证据',
+        'description_en': 'Get online-video subtitles with timestamps, and optionally export a short clip, contact sheet, and short audio; when clip extraction is blocked, try lightweight audio evidence',
+        'semantic_apis': ["api_search", "api_code_execution"],
+        'function': SkillFunction(
+            id='9d0794bb-c4f2-478e-9f49-39bbd2385f12',
+            name='app.cosight.video_event_toolkit.youtobe_tool',
+            description_zh='解析在线视频，优先返回字幕和时间对照，必要时导出短片段、截图和音频线索。识别音乐时，拿到时间窗后保留短音频和时间证据，再用 audio_recognition 识别候选歌曲；不要转去 ask_question_about_image、ask_question_about_video 或 browser_use 猜歌',
+            description_en='Analyze an online video by first returning subtitle timestamps, and export clip, frame, or audio clues when needed. For music identification, keep short-audio and timing evidence once a time window is known, then use audio_recognition to identify candidate songs; do not switch to ask_question_about_image, ask_question_about_video, or browser_use to guess songs',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "video_url": {
+                        "type": "string",
+                        "description_zh": "在线视频 URL，例如 YouTube 链接",
+                        "description_en": "Online video URL, such as a YouTube link"
+                    },
+                    "timeline_terms": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description_zh": "需要在字幕时间对照中优先返回的相关词条",
+                        "description_en": "Terms to prioritize in the subtitle time map"
+                    },
+                    "event_description": {
+                        "type": "string",
+                        "description_zh": "要定位的视觉/声音事件描述",
+                        "description_en": "Description of the visual or audio event to locate"
+                    },
+                    "candidate_window": {
+                        "description_zh": "可选候选时间窗，例如 '00:32:12-00:33:05'；提供后优先使用",
+                        "description_en": "Optional candidate window, for example '00:32:12-00:33:05'; preferred when provided"
+                    },
+                    "event_timestamp": {
+                        "description_zh": "可选事件在原视频中的时间点，例如 '00:32:31.5'；用于截取事件后的音频",
+                        "description_en": "Optional source-video timestamp of the event, for example '00:32:31.5'; used for event audio"
+                    },
+                    "audio_start_timestamp": {
+                        "description_zh": "可选音频截取开始时间；未提供时使用 event_timestamp 或候选时间点。音乐识别题建议明确提供该值，以便视频片段失败时仍可尝试 audio-only 短音频抽取",
+                        "description_en": "Optional source-video timestamp where audio extraction starts. For music-identification tasks, provide this explicitly so audio-only extraction can still be attempted if clip extraction fails"
+                    },
+                    "pre_roll_seconds": {
+                        "type": "integer",
+                        "description_zh": "候选时间点前保留秒数，默认 10",
+                        "description_en": "Seconds before the candidate timestamp to keep, default 10"
+                    },
+                    "post_roll_seconds": {
+                        "type": "integer",
+                        "description_zh": "候选时间点后保留秒数，默认 45",
+                        "description_en": "Seconds after the candidate timestamp to keep, default 45"
+                    },
+                    "audio_duration_seconds": {
+                        "type": "integer",
+                        "description_zh": "截取音频长度，默认 20 秒；音乐识别通常使用 10-30 秒短片段",
+                        "description_en": "Length of extracted audio, default 20 seconds; music recognition usually works best with a short 10-30 second segment"
+                    },
+                    "download_height": {
+                        "type": "integer",
+                        "description_zh": "下载视频最大高度，默认 360",
+                        "description_en": "Maximum downloaded video height, default 360"
+                    },
+                    "frame_rate": {
+                        "type": "number",
+                        "description_zh": "contact sheet 抽帧帧率，默认每秒 1 帧",
+                        "description_en": "Frame sampling rate for the contact sheet, default 1 fps"
+                    },
+                    "subtitles_only": {
+                        "type": "boolean",
+                        "description_zh": "只返回字幕文本与时间对照，不下载视频片段",
+                        "description_en": "Only return subtitle text with timestamps, without downloading a video clip"
+                    },
+                    "output_dir": {
+                        "type": "string",
+                        "description_zh": "可选输出目录；相对路径会保存到当前 workspace",
+                        "description_en": "Optional output directory; relative paths are saved under the current workspace"
+                    }
+                },
+                "required": ["video_url"]
+            }
+        )
+    }
+
+
 def ask_question_about_image_skill():
+    description_zh = (
+        "对普通图片的场景、文字、物体等视觉内容进行问答；"
+        "不要用于视频音乐/背景音乐识别，也不要用 contact sheet 来猜曲名。"
+    )
+    description_en = (
+        "Ask questions about ordinary image content such as scenes, text, and objects. "
+        "Do not use it for video music/background-music identification or contact-sheet based song guessing."
+    )
     return {
         'skill_name': 'ask_question_about_image',
         'skill_type': "function",
         'display_name_zh': '根据任务描述解析图片内容',
         'display_name_en': 'Image Content analyse',
-        'description_zh': '根据任务描述解析图片内容',
-        'description_en': 'Ask a question about the image.',
+        'description_zh': description_zh,
+        'description_en': description_en,
         'semantic_apis': ["api_search"],
         'function': SkillFunction(
             id='8d5e7f3b-a4c2-4d1b-9f6e-2c8b9d7e1234',
             name='app.cosight.tool.deep_search_toolkit.deep_search',
-            description_zh='图片内容解析',
-            description_en='Ask a question about the image.',
+            description_zh=description_zh,
+            description_en=description_en,
             parameters={
                 "type": "object",
                 "properties": {
@@ -938,6 +1208,7 @@ def extract_document_content_skill():
             }
         )
     }
+
 
 def create_html_report_skill():
     """为Agent框架提供的HTML报告生成技能定义

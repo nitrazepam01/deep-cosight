@@ -37,6 +37,21 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "搜索维基百科获取知识信息",
         "needs_workspace": False,
     },
+    "wiki_entry_parse": {
+        "display_name_zh": "Wiki 词条解析",
+        "description_zh": "对 Wiki 词条进行详细解析，返回版本、历史、源码、字段、章节和表格等结构化信息",
+        "needs_workspace": False,
+    },
+    "google_books_volume_search": {
+        "display_name_zh": "Google Books 书内搜索",
+        "description_zh": "在 Google Books 指定书籍内搜索关键词，默认返回少量精确页标识、OCR 片段和页码引用",
+        "needs_workspace": False,
+    },
+    "youtobe_tool": {
+        "display_name_zh": "YouTube 工具",
+        "description_zh": "获取在线视频的字幕文本与时间对照，并可按时间窗导出短片段、截图总览和音频片段",
+        "needs_workspace": True,
+    },
     "mark_step": {
         "display_name_zh": "标记步骤",
         "description_zh": "标记任务步骤的完成状态和结果",
@@ -64,17 +79,17 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
     },
     "ask_question_about_image": {
         "display_name_zh": "图片分析",
-        "description_zh": "对图片内容进行智能识别和问答",
+        "description_zh": "对普通图片内容进行视觉问答；不要用于视频音乐或背景音乐识别",
         "needs_workspace": False,
     },
     "ask_question_about_video": {
         "display_name_zh": "视频分析",
-        "description_zh": "对视频内容进行智能分析和问答",
+        "description_zh": "对视频画面内容进行视觉问答；不要用于歌曲、背景音乐、作曲者或艺人识别",
         "needs_workspace": False,
     },
     "audio_recognition": {
-        "display_name_zh": "语音识别",
-        "description_zh": "将音频转换为文字",
+        "display_name_zh": "音频歌曲识别",
+        "description_zh": "识别短音频中的歌曲、背景音乐、曲名和艺人信息，结果需再交叉验证",
         "needs_workspace": False,
     },
     "extract_document_content": {
@@ -89,7 +104,7 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
     },
     "browser_use": {
         "display_name_zh": "浏览器交互模拟",
-        "description_zh": "通过浏览器自动化执行需要多步页面操作的任务",
+        "description_zh": "通过浏览器自动化执行确需页面交互的任务；不要用于在线视频片段检查或音乐识别",
         "needs_workspace": False,
     },
     "fetch_website_content": {
@@ -183,10 +198,13 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
     """
     from app.cosight.agent.actor.instance.actor_agent_skill import (
         execute_code_skill, search_google_skill, tavily_search_skill,
-        search_wiki_skill, mark_step_skill, file_saver_skill,
+        search_wiki_skill, wiki_entry_parse_skill,
+        google_books_volume_search_skill, youtobe_tool_skill,
+        mark_step_skill, file_saver_skill,
         file_read_skill, file_str_replace_skill, file_find_in_content_skill,
         ask_question_about_image_skill, ask_question_about_video_skill,
-        audio_recognition_skill, extract_document_content_skill, browser_use_skill,
+        audio_recognition_skill,
+        extract_document_content_skill, browser_use_skill,
         create_html_report_skill, fetch_website_content_skill,
         fetch_website_content_with_images_skill, fetch_website_images_only_skill,
         coder_list_files_skill, coder_read_file_skill, coder_write_file_skill,
@@ -199,6 +217,9 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "search_google": search_google_skill,
         "tavily_search": tavily_search_skill,
         "search_wiki": search_wiki_skill,
+        "wiki_entry_parse": wiki_entry_parse_skill,
+        "google_books_volume_search": google_books_volume_search_skill,
+        "youtobe_tool": youtobe_tool_skill,
         "mark_step": mark_step_skill,
         "file_saver": file_saver_skill,
         "file_read": file_read_skill,

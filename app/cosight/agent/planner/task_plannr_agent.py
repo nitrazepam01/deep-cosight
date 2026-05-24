@@ -71,10 +71,13 @@ class TaskPlannerAgent(BaseAgent):
         return self.execute(self.history, max_iteration=1)
 
     def re_plan(self, question, output_format=""):
-        self.history.append(
+        # Replanning only needs the planner rules and the latest plan snapshot.
+        # Sending the whole planner history can make long research tasks time out.
+        system_messages = [msg for msg in self.history if msg.get("role") == "system"]
+        messages = system_messages + [
             {"role": "user", "content": planner_re_plan_prompt(question, self.plan.format(), output_format)}
-        )
-        return self.execute(self.history, max_iteration=1)
+        ]
+        return self.execute(messages, max_iteration=1)
 
     def finalize_plan(self, question, output_format=""):
         self.history.append(

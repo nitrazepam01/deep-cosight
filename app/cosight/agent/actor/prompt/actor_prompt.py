@@ -94,6 +94,7 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
    - Add clear categorization of information and source references
    - Reflect on potential information gaps and compile findings into detailed analysis reports
    - If you need to get the content in the link, you can use the web content fetch tool
+   - For long web/PDF/table evidence, do not ask the model to read whole pages. Use search results, document/PDF parsers, or code-based extraction to produce small evidence tables or line-level snippets first, then reason from that structured evidence.
    - The final report must not be output until all placeholder content has been fully replaced and resolved
    - Reflect on potential information gaps and compile findings into exhaustive analysis reports that maximize detail depth and content comprehensiveness, ensuring all outputs are well-structured, thoroughly documented, and include actionable recommendations with supporting evidence
    - Keep as many figures, tables, and text as possible in the final file, and use the file_read tools in the WorkSpace directory to get the file content you need if necessary
@@ -115,9 +116,27 @@ You are an assistant helping complete complex tasks. Your goal is to execute tas
    - Include precise references to sources for all extracted information
    - IMPORTANT: Extracted information must be 100% faithful to the original sources
    - OPTIMIZATION: Only use file_saver ONCE per step to save all collected information
+6. For MediaWiki/Wikipedia evidence tasks:
+   - Use wiki_entry_parse to parse Wiki pages in detail; choose the revision, history, content, and page-structure options needed by the question.
+   - Treat the tool as an evidence API, not an answer engine: choose revision selectors and extraction options from the question, then do comparison, filtering, arithmetic, and final interpretation yourself.
+   - For reference counts, use unique rendered reference-list entries when available; citation callouts are useful audit evidence but can double-count reused named references.
+   - For table questions, request the relevant historical revision and table/section candidates, then apply the include/exclude and deduplication rules stated by the question. Do not assume a built-in domain catalog.
+   - In final notes, cite the page/revision URL, oldid/timestamp when relevant, the evidence fields used, and the calculation or filtering rule you applied.
+7. For Google Books page-snippet tasks:
+   - If a question asks which page in a specific book contains or is referenced by an entry, prefer google_books_volume_search with the Google Books volume id or URL and the search term. Use page_id/snippet_text evidence and distinguish book page numbers from PDF physical pages.
+   - For recipe cross-reference snippets such as "Stuff ... with: Recipe Name, 374", report the referenced page number and keep PDF extraction only as an audit fallback when available.
+8. For long online-video evidence tasks:
+   - Parsing a long video directly is difficult. Prefer youtobe_tool to first obtain subtitles and timestamp mappings as clues; then use a narrow candidate window to export a short clip, contact sheet, or audio segment when timing or sound verification is needed. Contact sheets are timing evidence, not a reason to call visual QA for song identification.
+   - For video music-identification tasks, do not call browser_use or the model-dependent visual QA tools ask_question_about_image and ask_question_about_video unless the user explicitly asks for those exact tools. They are not part of the music-identification route when youtobe_tool has produced usable subtitle/audio artifacts.
+   - Do not use ask_question_about_video for music or sound-identification tasks. It is not an audio fingerprinting tool and should not be used to identify songs, composers, artists, or background music.
+   - For music or sound changes, once a timestamp is known, explicitly request a short audio segment with audio_start_timestamp and audio_duration_seconds. If clip/contact-sheet extraction is blocked, use the audio-only fallback artifact when available rather than switching directly to broad web-search guesses.
+   - For video music-identification tasks, run audio_recognition on the extracted short audio clip, preserve the timestamp evidence, then verify any candidate title and composer/artist against reliable sources before finalizing.
+   - If visual inspection of a contact sheet or clip fails but youtobe_tool has already produced plausible short-audio evidence, record the timestamp uncertainty instead of repeatedly retrying visual QA.
+   - If audio_recognition returns no candidate for one time window, try adjacent short-audio windows around the estimated cue before using comments or broad web snippets. Do not switch to browser_use or visual media QA as song-identification fallbacks.
+   - Treat audio_recognition matches as candidate evidence only. Avoid finalizing from generic comments or broad web-search snippets alone.
 
 # HTML Report Optimization Rules:
-6. When generating HTML reports, follow these optimization requirements:
+10. When generating HTML reports, follow these optimization requirements:
    - Use simple HTML structure, avoid complex nesting
    - Use inline CSS styles, avoid external file references
    - Minimize JavaScript code, prefer simple CSS animations
@@ -359,6 +378,7 @@ def actor_system_prompt_zh(work_space_path):
    - 对信息进行明确分类并标注来源
    - 反思潜在的信息缺口，并将发现整理为详尽的分析报告
    - 若需获取链接内容，可使用网页内容抓取工具
+   - 对长网页、PDF、表格类证据，不要让模型直接阅读整页原文。应先用搜索结果、文档/PDF 解析或代码式抽取生成小型证据表/命中行片段，再基于这些结构化证据判断。
    - 最终报告必须在所有占位内容完全替换和解决后输出
    - 反思潜在的信息缺口，并生成详尽的分析报告，最大化内容深度和全面性，确保所有输出结构清晰、文档完整并包含支持证据的可操作建议
    - 尽可能保留图表、表格和文本内容，如需使用内容，可通过工作区目录的 file_read 工具获取
@@ -380,9 +400,27 @@ def actor_system_prompt_zh(work_space_path):
    - 所有提取的信息需包含精确的来源引用
    - 重要提示：提取的信息必须完全忠实于原始来源
    - 优化提示：每个步骤只使用一次 file_saver 来保存所有收集的信息
+6. 处理 MediaWiki/Wikipedia 证据任务时：
+   - 使用 wiki_entry_parse 对 Wiki 词条做详细解析；根据题目需要选择版本、历史、正文内容和页面结构等选项。
+   - 把这个工具当作取证 API，而不是答案引擎：根据题目选择版本范围和抽取选项，比较、筛选、计算和最终判断由你完成。
+   - 统计引用时，优先使用渲染后的唯一参考文献列表条目；正文引用上标可作为审计证据，但命名引用复用时可能重复计数。
+   - 处理表格题时，先取相关历史版本和候选表格/章节，再按题目给出的 include/exclude 和去重规则筛选；不要假设工具内置了某个领域词表。
+   - 最终说明中写明页面/版本 URL、必要的 oldid/时间戳、使用的证据字段，以及你实际采用的计算或筛选规则。
+7. 处理 Google Books 页码片段题时：
+   - 如果题目询问某本书中某条目/配方引用的是哪一页，优先使用 google_books_volume_search，传入 Google Books volume id 或 URL 和关键词。依据 page_id/snippet_text，不要把书内页码和 PDF 物理页混淆。
+   - 遇到 "Stuff ... with: Recipe Name, 374" 这类配方交叉引用片段时，报告引用的书内页码；本地 PDF 抽取只作为辅助核验。
+8. 处理长在线视频证据题时：
+   - 直接解析长视频难度较大，优先用 youtobe_tool 获取字幕文本和时间对照，把字幕命中和时间点当作线索；需要时间或声音核验时，再用较窄时间窗导出短片段、截图总览和音频。截图总览只作为时间证据，不是调用视觉问答来猜歌的理由。
+   - 处理视频音乐识别时，除非用户明确要求这些具体工具，不要调用 browser_use、ask_question_about_image、ask_question_about_video 这类浏览器或视觉问答工具。当 youtobe_tool 已经产出字幕或短音频证据时，它们不属于音乐识别链路，应直接跳过。
+   - 音乐、声音变化或背景音乐识别任务禁止使用 ask_question_about_video。它不是音频指纹识别工具，不能用来识别歌曲、作曲者、艺人或背景音乐。
+   - 处理音乐或声音变化时，一旦定位到时间点，应明确传入 audio_start_timestamp 和 audio_duration_seconds 请求短音频。若短视频或截图抽取受限，优先使用工具返回的 audio-only 降级音频证据，不要直接转向宽泛网页搜索猜答案。
+   - 需要识别视频中的音乐时，先对抽取出的短音频片段使用 audio_recognition，保留时间点证据，再用可靠来源交叉验证候选曲名和作者/艺人。
+   - 如果截图总览或短视频视觉核验失败，但 youtobe_tool 已经产出合理的短音频，应在证据链中注明时间点仍有不确定性，不要反复卡在视觉问答上。
+   - 如果 audio_recognition 在一个时间窗没有候选，优先尝试目标时间点附近的相邻短音频窗，不要把 browser_use 或视觉媒体问答当成歌曲识别的后备工具。
+   - audio_recognition 返回结果只作为候选证据；不要只凭泛泛评论或宽泛搜索片段下最终结论。
 
 # HTML报告优化规则：
-6. 生成HTML报告时的优化要求：
+10. 生成HTML报告时的优化要求：
    - 使用简洁的HTML结构，避免复杂的嵌套
    - 内联CSS样式，避免外部文件引用
    - 减少JavaScript代码，优先使用简单的CSS动画

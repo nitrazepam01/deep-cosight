@@ -29,6 +29,7 @@ from app.cosight.task.task_manager import TaskManager
 from llm import llm_for_plan, llm_for_act, llm_for_tool, llm_for_vision
 from cosight_server.deep_research.services.i18n_service import i18n
 from cosight_server.deep_research.services.credibility_analyzer import credibility_analyzer
+from cosight_server.deep_research.services.result_exporter import write_result_jsonl
 from app.common.logger_util import logger
 
 # 引入CoSight所需的依赖
@@ -65,6 +66,95 @@ logger.info(f"Using REPLAY_BASE_PATH: {REPLAY_BASE_PATH}")
 
 # 回放间隔时长配置（秒），可通过环境变量 REPLAY_DELAY 设置，默认 0.3 秒
 REPLAY_DELAY = float(os.environ.get("REPLAY_DELAY", "0.3"))
+
+
+def _redacted_length(value: Any) -> str:
+    try:
+        return f"<redacted length={len(value)}>"
+    except Exception:
+        return "<redacted>"
+
+
+def _summarize_search_params(params: Any) -> dict:
+    if not isinstance(params, dict):
+        return {"type": type(params).__name__}
+
+    session_info = params.get("sessionInfo") if isinstance(params.get("sessionInfo"), dict) else {}
+    content_items = params.get("content") if isinstance(params.get("content"), list) else []
+    content_chars = 0
+    for item in content_items:
+        if isinstance(item, dict):
+            content_chars += len(str(item.get("value") or ""))
+
+    agent_run_config = params.get("agentRunConfig") if isinstance(params.get("agentRunConfig"), dict) else {}
+    uploaded_files = params.get("uploadedFiles") if isinstance(params.get("uploadedFiles"), list) else []
+    knowledge_bases = params.get("knowledgeBases") if isinstance(params.get("knowledgeBases"), list) else []
+    draft_snapshot = params.get("draftPlanSnapshot")
+
+    summary = {
+        "planAction": params.get("planAction"),
+        "stream": params.get("stream"),
+        "replay": params.get("replay"),
+        "requirePlanApproval": params.get("requirePlanApproval"),
+        "workspaceId": params.get("workspaceId"),
+        "planSessionId": params.get("planSessionId") or session_info.get("planSessionId"),
+        "sessionInfo": {
+            "messageSerialNumber": session_info.get("messageSerialNumber"),
+            "threadId": session_info.get("threadId"),
+            "sessionId": session_info.get("sessionId"),
+            "username": session_info.get("username"),
+            "planSessionId": session_info.get("planSessionId"),
+        },
+        "content": {
+            "items": len(content_items),
+            "chars": content_chars,
+        },
+        "contentProperties": _redacted_length(params.get("contentProperties"))
+        if params.get("contentProperties")
+        else None,
+        "revisionPrompt": _redacted_length(params.get("revisionPrompt"))
+        if params.get("revisionPrompt")
+        else "",
+        "draftPlanSnapshot": "<redacted>" if isinstance(draft_snapshot, dict) else None,
+        "uploadedFilesCount": len(uploaded_files),
+        "knowledgeBasesCount": len(knowledge_bases),
+        "agentRunConfigKeys": sorted(agent_run_config.keys()) if agent_run_config else [],
+    }
+    return summary
+
+
+def _should_drop_draft_snapshot(payload: dict) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    approval_state = str(payload.get("approvalState") or "").strip().lower()
+    event_type = str(payload.get("eventType") or "").strip()
+    return approval_state in {"approved", "executing"} or event_type == "plan_execution_started"
+
+
+def _sanitize_persistent_plan_trace(payload: Any, *, drop_draft_snapshot: bool = False) -> Any:
+    if isinstance(payload, dict):
+        should_drop_draft_snapshot = drop_draft_snapshot or _should_drop_draft_snapshot(payload)
+        sanitized = {}
+        for key, value in payload.items():
+            if key == "latestRevisionPrompt":
+                sanitized[key] = ""
+                continue
+            if key == "draftPlanSnapshot" and should_drop_draft_snapshot:
+                continue
+            sanitized[key] = _sanitize_persistent_plan_trace(
+                value,
+                drop_draft_snapshot=should_drop_draft_snapshot,
+            )
+        return sanitized
+    if isinstance(payload, list):
+        return [
+            _sanitize_persistent_plan_trace(
+                item,
+                drop_draft_snapshot=drop_draft_snapshot,
+            )
+            for item in payload
+        ]
+    return payload
 
 
 def _resolve_workspace_name(workspace_path_value: str) -> str | None:
@@ -437,6 +527,79 @@ def _build_plan_session_snapshot(
     }
 
 
+def _sync_draft_plan_message_tree(
+    thread: dict,
+    *,
+    workspace_id: str,
+    execution_id: str,
+    plan_session_id: str,
+    approval_state: str,
+    plan_version: int,
+    latest_revision_prompt: str,
+    draft_plan_snapshot: dict | None,
+    now_ms: int,
+) -> bool:
+    if not isinstance(thread, dict) or not isinstance(draft_plan_snapshot, dict):
+        return False
+    steps = draft_plan_snapshot.get("steps")
+    if not isinstance(steps, list) or len(steps) == 0:
+        return False
+
+    message_tree = thread.get("messageTree")
+    if not isinstance(message_tree, dict):
+        return False
+    nodes = message_tree.get("nodes")
+    if not isinstance(nodes, dict):
+        return False
+
+    target_node = None
+    target_node_id = None
+    for node_id, node in nodes.items():
+        if not isinstance(node, dict) or node.get("role") != "assistant":
+            continue
+        metadata = node.get("metadata") if isinstance(node.get("metadata"), dict) else {}
+        if metadata.get("pendingPlaceholder") is True:
+            target_node = node
+            target_node_id = node_id
+            break
+
+    if target_node is None:
+        active_path = message_tree.get("activePath")
+        if isinstance(active_path, list):
+            for item in reversed(active_path):
+                node_id = item.get("nodeId") if isinstance(item, dict) else None
+                node = nodes.get(node_id) if node_id else None
+                if isinstance(node, dict) and node.get("role") == "assistant":
+                    target_node = node
+                    target_node_id = node_id
+                    break
+
+    if target_node is None:
+        return False
+
+    metadata = target_node.get("metadata") if isinstance(target_node.get("metadata"), dict) else {}
+    metadata.update({
+        "executionId": execution_id,
+        "planSessionId": plan_session_id,
+        "planVersion": int(plan_version or 1),
+        "approvalState": approval_state,
+        "draftPlanSnapshot": draft_plan_snapshot,
+        "latestRevisionPrompt": latest_revision_prompt or "",
+        "pendingKind": "plan_draft",
+        "pendingPlaceholder": False,
+        "pendingAction": "draft",
+        "pendingWorkspaceId": workspace_id or metadata.get("pendingWorkspaceId", ""),
+    })
+    target_node["metadata"] = metadata
+    target_node["content"] = ""
+    target_node["timestamp"] = target_node.get("timestamp") or now_ms
+
+    if target_node_id:
+        message_tree.setdefault("metadata", {})["lastActiveMessageId"] = target_node_id
+        message_tree["metadata"]["lastSwitchTime"] = now_ms
+    return True
+
+
 def _persist_thread_plan_approval_state(
     thread_id: str,
     *,
@@ -494,6 +657,17 @@ def _persist_thread_plan_approval_state(
                 right_panel_state["dagInitData"] = draft_plan_snapshot
                 right_panel_state["draftPlanSnapshot"] = draft_plan_snapshot
             thread["rightPanelState"] = right_panel_state
+            _sync_draft_plan_message_tree(
+                thread,
+                workspace_id=workspace_id,
+                execution_id=execution_id,
+                plan_session_id=plan_session_id,
+                approval_state=approval_state,
+                plan_version=int(plan_version or 0),
+                latest_revision_prompt=latest_revision_prompt,
+                draft_plan_snapshot=draft_plan_snapshot,
+                now_ms=now_ms,
+            )
             thread["updatedAt"] = now_ms
             updated = True
             break
@@ -685,7 +859,7 @@ def _clean_replay_json(json_text: str) -> str:
                 return obj
         
         # 清理数据
-        cleaned_data = remove_fields(data)
+        cleaned_data = _sanitize_persistent_plan_trace(remove_fields(data))
         
         # 重新序列化为 JSON
         return json.dumps(cleaned_data, ensure_ascii=False) + '\n'
@@ -714,7 +888,7 @@ def validate_search_input(params: dict) -> dict | None:
 
 @searchRouter.post("/deep-research/search")
 async def search(request: Request, params: Any = Body(None)):
-    logger.info(f"=====params:{params}")
+    logger.info(f"=====params:{_summarize_search_params(params)}")
 
     # if not await session_manager.authority(request):
     #     raise HTTPException(status_code=403, detail="Forbidden")
@@ -743,6 +917,7 @@ async def search(request: Request, params: Any = Body(None)):
     if not plan_session_id:
         plan_session_id = f"plan_session_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
     plan_action = _normalize_plan_action(params.get("planAction"), require_plan_approval=require_plan_approval)
+    suppress_replan_persistent_trace = plan_action == "plan_revise_execute"
     revision_prompt = str(params.get("revisionPrompt") or "").strip()
     requested_workspace_id = str(params.get("workspaceId") or "").strip()
     incoming_draft_snapshot = params.get("draftPlanSnapshot") if isinstance(params.get("draftPlanSnapshot"), dict) else None
@@ -950,11 +1125,15 @@ async def search(request: Request, params: Any = Body(None)):
                 # 确保父目录存在
                 file_path.parent.mkdir(parents=True, exist_ok=True)
 
+                was_plan_payload = False
+
                 # 处理Plan对象转换为可序列化的dict
                 if isinstance(data, Plan):
+                    was_plan_payload = True
                     plan_obj = data
                     plan_dict = _serialize_plan_data(plan_obj)
-                    logger.info(f"step_files:{plan_obj.step_files}")
+                    if not suppress_replan_persistent_trace:
+                        logger.info(f"step_files:{plan_obj.step_files}")
 
                     # logger.info(f"Plan对象已转换为字典: {plan_dict}")
                     data = plan_dict
@@ -962,9 +1141,13 @@ async def search(request: Request, params: Any = Body(None)):
                     # 先放入队列，确保计划进度立即发送到前端，不等待可信分析
                     # 将数据放入队列以便流式发送（优先处理）
                     if plan_queue is not None and main_loop is not None:
-                        logger.info(f"Pushing Plan data to queue for plan_id: {plan_id}")
+                        if not suppress_replan_persistent_trace:
+                            logger.info(f"Pushing Plan data to queue for plan_id: {plan_id}")
                         # 确保 plan 数据立即放入队列，优先于可信分析
                         push_queue(plan_dict)
+
+                    if suppress_replan_persistent_trace:
+                        return
 
                     # 检查是否有新完成的步骤，触发可信分析（仅对当前会话内未分析的步骤触发一次）
                     # 注意：可信分析是异步的，不会阻塞计划进度的发送
@@ -991,21 +1174,32 @@ async def search(request: Request, params: Any = Body(None)):
                         pass
                     logger.info(f"Tool event received: {data.get('event_type')} for {data.get('tool_name')} at step {data.get('step_index')}")
 
+                if suppress_replan_persistent_trace:
+                    if (not was_plan_payload) and plan_queue is not None and main_loop is not None:
+                        try:
+                            safe_data = _rewrite_paths_in_payload(data)
+                        except Exception:
+                            safe_data = data
+                        push_queue(safe_data)
+                    return
+
+                persist_data = _sanitize_persistent_plan_trace(data)
+
                 # 准备写入内容（自动处理不同类型）
-                if isinstance(data, (dict, list)):
+                if isinstance(persist_data, (dict, list)):
                     try:
-                        content = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+                        content = json.dumps(persist_data, ensure_ascii=False, indent=2) + "\n"
                     except TypeError as e:
                         logger.error(f"JSON序列化失败，尝试转换对象: {e}", exc_info=True)
                         # 尝试将复杂对象转换为字符串
-                        if isinstance(data, dict):
-                            serializable_data = {k: str(v) for k, v in data.items()}
-                        elif isinstance(data, list):
+                        if isinstance(persist_data, dict):
+                            serializable_data = {k: str(v) for k, v in persist_data.items()}
+                        elif isinstance(persist_data, list):
                             serializable_data = [str(item) if not isinstance(item, (
-                            dict, list, str, int, float, bool, type(None))) else item for item in data]
+                            dict, list, str, int, float, bool, type(None))) else item for item in persist_data]
                         content = json.dumps(serializable_data, ensure_ascii=False, indent=2) + "\n"
                 else:
-                    content = str(data) + "\n"
+                    content = str(persist_data) + "\n"
 
                 # 追加写入当前 plan 的日志
                 with open(file_path, mode='a', encoding='utf-8') as f:
@@ -1013,8 +1207,8 @@ async def search(request: Request, params: Any = Body(None)):
 
                 # 如果包含最终结果，单独落盘 final 文件
                 try:
-                    if isinstance(data, dict) and data.get("result"):
-                        payload_to_save = dict(data)
+                    if isinstance(persist_data, dict) and persist_data.get("result"):
+                        payload_to_save = dict(persist_data)
 
                         # 将前端清理前备份在后端的 orderedTaskList 合并到最终 .final.json
                         try:
@@ -1026,6 +1220,17 @@ async def search(request: Request, params: Any = Body(None)):
 
                         with open(plan_final_path, mode='w', encoding='utf-8') as ff:
                             ff.write(json.dumps(payload_to_save, ensure_ascii=False, indent=2))
+                        try:
+                            result_path = write_result_jsonl(
+                                workspace_path=work_space_path_time,
+                                plan_data=payload_to_save,
+                                question=query_content,
+                                task_id=plan_id or workspace_id,
+                            )
+                            if result_path:
+                                logger.info(f"result.jsonl 已生成: {result_path}")
+                        except Exception as result_err:
+                            logger.warning(f"生成 result.jsonl 失败: {result_err}", exc_info=True)
                 except Exception as _:
                     pass
 
@@ -1631,7 +1836,7 @@ async def search(request: Request, params: Any = Body(None)):
                 curr_workspace = work_space_path
         # 基于工作区目录名，在单独的 REPLAY_BASE_PATH 下构造回放文件路径
         replay_file_path = None
-        if curr_workspace:
+        if curr_workspace and not suppress_replan_persistent_trace:
             try:
                 # 提取工作区目录名（例如 work_space_20260105_192427_xxx）
                 workspace_name = os.path.basename(os.path.normpath(curr_workspace))
@@ -1707,7 +1912,7 @@ async def search(request: Request, params: Any = Body(None)):
         # 记录模式：包裹现有流并写入文件
         async for chunk in generate_stream_response(generator_func, params):
             try:
-                if replay_file_path:
+                if replay_file_path and not suppress_replan_persistent_trace:
                     try:
                         # chunk 为 bytes，直接解码并按行写入
                         text = chunk.decode('utf-8')

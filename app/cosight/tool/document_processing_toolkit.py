@@ -19,7 +19,7 @@ import requests
 import mimetypes
 import json
 from retry import retry
-from typing import List, Dict, Any, Optional, Tuple, Literal
+from typing import List, Optional, Tuple, Literal
 from PIL import Image
 from io import BytesIO
 from bs4 import BeautifulSoup
@@ -46,6 +46,7 @@ class DocumentProcessingToolkit:
         self.cache_dir = "tmp/"
         if cache_dir:
             self.cache_dir = cache_dir
+        os.makedirs(self.cache_dir, exist_ok=True)
 
         proxy = os.environ.get("PROXY")
         self.proxies = {"http": proxy, "https": proxy} if proxy else None
