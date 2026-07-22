@@ -29,8 +29,9 @@ class VideoEventToolkit:
     """Extract concise evidence clips around events in long online videos."""
 
     INSTALL_HINT = (
-        "Place yt-dlp, ffmpeg, and ffprobe under tools/media/bin, "
-        "or install them in conda base with: conda install -n base -c conda-forge ffmpeg yt-dlp"
+        "Install yt-dlp with: pip install yt-dlp, "
+        "or place yt-dlp.exe under tools/media/bin, "
+        "or install in conda base with: conda install -n base -c conda-forge ffmpeg yt-dlp"
     )
 
     def __init__(
@@ -208,14 +209,32 @@ class VideoEventToolkit:
     def _resolve_project_ytdlp(self) -> Tuple[Optional[List[str]], Optional[str]]:
         executable_names = ["yt-dlp.exe", "yt-dlp"] if os.name == "nt" else ["yt-dlp", "yt-dlp.exe"]
         for directory in self._project_tool_dirs():
-            script = directory / "yt-dlp-script.py"
-            if script.exists():
-                return [sys.executable, str(script)], str(script)
-
+            # 1. 项目本地 tools/media/bin/ 下的 yt-dlp.exe
             for name in executable_names:
                 candidate = directory / name
                 if candidate.exists():
                     return [str(candidate)], str(candidate)
+
+        # 2. 当前 Python 环境 pip 安装的 yt-dlp (python -m yt_dlp)
+        try:
+            result = self._run_command([sys.executable, "-m", "yt_dlp", "--version"], timeout=20)
+            if result.returncode == 0:
+                return [sys.executable, "-m", "yt_dlp"], f"{sys.executable} -m yt_dlp"
+        except Exception as exc:
+            logger.info("yt_dlp module check failed: %s", exc)
+
+        # 3. 系统 PATH 中的 yt-dlp 命令
+        for name in executable_names:
+            try:
+                where = subprocess.run(
+                    ["where", name] if os.name == "nt" else ["which", name],
+                    capture_output=True, text=True, timeout=10,
+                )
+                if where.returncode == 0:
+                    path = where.stdout.strip().splitlines()[0]
+                    return [path], path
+            except Exception:
+                continue
 
         return None, None
 
