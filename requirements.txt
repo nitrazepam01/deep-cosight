@@ -33,7 +33,7 @@ PyMuPDF==1.24.0
 python-docx==1.2.0
 docx2markdown==0.1.1
 openpyxl==3.1.5
-pandas==3.0.3
+pandas>=2.1.0,<2.4.0
 numpy==2.3.4
 
 # --- 科学计算 & 可视化 ---
