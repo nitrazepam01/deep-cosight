@@ -72,6 +72,11 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "在文件中查找并替换字符串",
         "needs_workspace": False,
     },
+    "process_uploaded_file": {
+        "display_name_zh": "上传文件处理",
+        "description_zh": "处理上传到工作区的文件（PDF/Word/Excel/PPT/压缩包/音视频等），返回结构化 Markdown 内容",
+        "needs_workspace": False,
+    },
     "file_find_in_content": {
         "display_name_zh": "文件内容搜索",
         "description_zh": "在文件中搜索指定内容",
@@ -197,6 +202,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
     仅返回请求的 skills，而非全量。
     """
     from app.cosight.agent.actor.instance.actor_agent_skill import (
+        process_uploaded_file_skill,
         execute_code_skill, search_google_skill, tavily_search_skill,
         search_wiki_skill, wiki_entry_parse_skill,
         google_books_volume_search_skill, youtobe_tool_skill,
@@ -229,6 +235,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "ask_question_about_video": ask_question_about_video_skill,
         "audio_recognition": audio_recognition_skill,
         "extract_document_content": extract_document_content_skill,
+        "process_uploaded_file": process_uploaded_file_skill,
         "create_html_report": create_html_report_skill,
         "browser_use": browser_use_skill,
         "fetch_website_content": fetch_website_content_skill,

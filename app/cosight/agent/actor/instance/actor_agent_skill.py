@@ -1294,3 +1294,32 @@ def fetch_website_images_only_skill():
         )
     }
 
+
+
+def process_uploaded_file_skill():
+    return {
+        'skill_name': 'process_uploaded_file',
+        'skill_type': "function",
+        'display_name_zh': '上传文件处理',
+        'display_name_en': 'Process uploaded file',
+        'description_zh': '处理上传到工作区的文件（PDF/Word/Excel/PPT/压缩包/音视频/图片/文本等），自动识别格式并返回结构化 Markdown 内容',
+        'description_en': 'Process uploaded files in workspace (PDF/Word/Excel/PPT/Archive/Audio/Video/Image/Text etc), auto-detect format and return structured Markdown content',
+        'semantic_apis': ["api_file_management"],
+        'function': SkillFunction(
+            id='a7f3b8e2-5c1d-4f9a-8e6b-0d3c7b2a9f41',
+            name='app.cosight.tool.uploaded_file_toolkit.UploadedFileToolkit.process_uploaded_file',
+            description_zh='处理上传到工作区的文件，自动识别格式并返回结构化 Markdown 内容',
+            description_en='Process uploaded files in workspace, auto-detect format and return structured Markdown content',
+            parameters={
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description_zh": "上传文件的路径（在工作区目录内）",
+                        "description_en": "Path to the uploaded file (inside workspace)"
+                    }
+                },
+                "required": ["file_path"]
+            }
+        )
+    }

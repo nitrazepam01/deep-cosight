@@ -27,6 +27,7 @@ from app.cosight.task.time_record_util import time_record
 from app.cosight.tool.act_toolkit import ActToolkit
 from app.cosight.tool.code_toolkit import CodeToolkit
 from app.cosight.tool.file_toolkit import FileToolkit
+from app.cosight.tool.uploaded_file_toolkit import UploadedFileToolkit
 from app.cosight.tool.deep_search.deep_search import DeepSearchToolkit
 from app.cosight.tool.terminate_toolkit import TerminateToolkit
 from app.cosight.tool.web_util import WebToolkit
@@ -71,6 +72,7 @@ class TaskActorAgent(BaseAgent):
         act_toolkit = ActToolkit(self.plan)
         terminate_toolkit = TerminateToolkit()
         file_toolkit = FileToolkit(work_space_path)
+        uploaded_file_toolkit = UploadedFileToolkit(work_space_path)
         web_toolkit = WebToolkit({"base_url": tool_llm.base_url,
                                   "model": tool_llm.model,
                                   "api_key": tool_llm.api_key})
@@ -122,6 +124,7 @@ class TaskActorAgent(BaseAgent):
                          "file_read": file_toolkit.file_read,
                          "file_str_replace": file_toolkit.file_str_replace,
                          "file_find_in_content": file_toolkit.file_find_in_content,
+                         "process_uploaded_file": uploaded_file_toolkit.process_uploaded_file,
                          "browser_use": web_toolkit.browser_use,
                          "ask_question_about_image": image_toolkit.ask_question_about_image,
                          "ask_question_about_video": video_toolkit.ask_question_about_video,

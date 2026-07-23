@@ -57,13 +57,24 @@ class FileToolkit:
         suffix = Path(absolute_path).suffix.lower()
         file_kind = "image" if suffix in KNOWN_IMAGE_EXTENSIONS else "binary"
         size_bytes = os.path.getsize(absolute_path)
-        return (
+
+        tool_hint = ""
+        if suffix in (".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".pdf"):
+            tool_hint = "Use process_uploaded_file to extract structured content."
+        elif suffix in (".mp3", ".wav", ".flac", ".aac", ".m4a", ".ogg"):
+            tool_hint = "Use audio_recognition for speech-to-text."
+        elif suffix in (".zip", ".rar", ".7z", ".tar", ".gz"):
+            tool_hint = "Use process_uploaded_file to explore archive structure."
+
+        msg = (
             f"Binary file detected at {absolute_path} "
             f"(type={file_kind}, suffix={suffix or 'none'}, size={size_bytes} bytes). "
             "file_read only returns textual content and will not expose raw binary bytes. "
-            "Reference this file path in the report instead of embedding its contents. "
-            "Use a media-specific tool only when semantic analysis is required; for video music tasks, pass extracted audio to audio_recognition and keep it as timestamped evidence."
         )
+        if tool_hint:
+            msg += tool_hint + " "
+        msg += "Reference this file path in the report instead of embedding its contents."
+        return msg
 
     def file_saver(self, content: str | bytes = None, file_path: str = None, mode: str = "a", binary: bool = False) -> str:
         r"""Save content to a file at the specified path. Supports both text and binary files. Default mode is append to preserve existing content.
@@ -178,7 +189,17 @@ class FileToolkit:
 
             return ''.join(lines)
         except UnicodeDecodeError:
-            return self._build_binary_read_message(absolute_path)
+            # 对文本类文件尝试 GBK 编码回退
+            try:
+                with open(absolute_path, 'r', encoding='gbk') as f:
+                    lines = f.readlines()
+                if start_line is not None or end_line is not None:
+                    start = start_line if start_line is not None else 0
+                    end = end_line if end_line is not None else len(lines)
+                    lines = lines[start:end]
+                return ''.join(lines)
+            except UnicodeDecodeError:
+                return self._build_binary_read_message(absolute_path)
         except PermissionError as e:
             logger.error(f"Error: Permission denied. Try with sudo=True if appropriate: {str(e)}",exc_info=True)
             return "Error: Permission denied. Try with sudo=True if appropriate"

@@ -2545,6 +2545,7 @@ function createMessageElement(message) {
             <div class="message-bubble message-redo-result" style="display: none;"></div>
             <div class="message-meta">
                 ${actionsHtml}
+                ${(message.metadata && message.metadata.files) ? '<div class="message-attachments"><button class="attachment-trigger" data-files=\'' + JSON.stringify(message.metadata.files) + '\'><i class="fas fa-paperclip"></i>' + (message.metadata.files.length > 1 ? '<span class="attachment-count">' + message.metadata.files.length + '</span>' : '') + '</button><div class="attachment-dropdown" style="display:none"><div class="attachment-dropdown-list"></div></div></div>' : ''}
                 <div class="message-meta-right">
                     ${redoSwitcherHtml}
                     <span class="message-time" data-timestamp="${safeTimestamp}" title="${timeTitle}">${timeStr}</span>
@@ -4967,7 +4968,7 @@ function addMessageToThreadStorage(thread, message, options = {}) {
             role: message.role,
             content: message.content,
             timestamp: message.timestamp || Date.now(),
-            metadata: message.metadata || {}
+            metadata: (message.files && Array.isArray(message.files) && message.files.length > 0) ? { ...(message.metadata || {}), files: message.files.slice() } : (message.metadata || {})
         },
         {
             parentId: parentId,
@@ -5401,17 +5402,17 @@ function validateFile(file) {
 function addUploadedFile(file) {
     const validation = validateFile(file);
     if (!validation.valid) {
-        showFileDuplicateModal(validation.message);
+        showFileValidationModal("\u6587\u4ef6\u7c7b\u578b\u4e0d\u652f\u6301", validation.message);
         return false;
     }
     
     if (uploadedFiles.length >= FileUploadConfig.maxFiles) {
-        showFileDuplicateModal(`最多只能上传 ${FileUploadConfig.maxFiles} 个文件`);
+        showFileValidationModal('文件数量超限', `最多只能上传 ${FileUploadConfig.maxFiles} 个文件`);
         return false;
     }
     
     if (uploadedFiles.some(f => f.name === file.name && f.size === file.size)) {
-        showFileDuplicateModal('该文件已添加到上传列表');
+        showFileValidationModal('文件重复', '该文件已添加到上传列表');
         return false;
     }
     
@@ -5905,11 +5906,38 @@ async function sendMessage() {
     await clearRightPanelImmediatelyForNewRun(sourceThreadId);
     
     const sendTimestamp = Date.now();
+    // 先上传文件到服务器，获取服务端文件 ID
+    let uploadedFileIds = [];
     const userMessage = {
         role: 'user',
         content: message,
-        timestamp: sendTimestamp
+        timestamp: sendTimestamp,
+        files: undefined
     };
+    if (uploadedFiles && uploadedFiles.length > 0) {
+        try {
+            const formData = new FormData();
+            uploadedFiles.forEach(function(f) { formData.append('files', f.file); });
+            var apiBaseUrl = (window.SessionService && window.SessionService.apiBaseUrl) ? window.SessionService.apiBaseUrl : '';
+            var uploadResp = await fetch(apiBaseUrl + '/upload', { method: 'POST', body: formData });
+            var uploadResult = await uploadResp.json();
+            if (uploadResult.code === 0 && uploadResult.data && uploadResult.data.files) {
+                var uploadedFileInfos = uploadResult.data.files.map(function(f) {
+                    return {
+                        id: f.id,
+                        originalName: f.originalName,
+                        size: f.size,
+                        url: f.url || '/upload_files/' + f.id
+                    };
+                });
+                uploadedFileIds = uploadedFileInfos.map(function(f) { return f.id; });
+                userMessage.files = uploadedFileInfos;
+            }
+        } catch (e) {
+            console.error('File upload failed:', e);
+        }
+    }
+
     const outboundPayload = {
         user: message,
         'meta-message': pendingMetaMessageEvents.slice(),
@@ -5947,7 +5975,12 @@ async function sendMessage() {
         planSessionId,
         pendingPlaceholderMessageId,
         pendingKind: 'pendingPlaceholder',
+        uploadedFiles: uploadedFileIds,
     });
+
+    // \u6e05\u9664\u6587\u4ef6\u9884\u89c8\u5217\u8868
+    uploadedFiles = [];
+    renderFilePreview();
 }
 
 async function sendToBackend(message, sourceThreadId = AppState.currentThreadId, outboundPayload = null, sendOptions = {}) {
@@ -8713,7 +8746,7 @@ function initThreeColumnLayout() {
     initDeleteMessageConfirmModal();
     initMessageExportFormatModal();
     initPlanRevisionModal();
-    initFileDuplicateModal();
+    initFileValidationModal();
     initSettingsModal();
     initFolderDragDrop();
     clearAllFloatingToolPanels();
@@ -9088,11 +9121,13 @@ function toggleThinkingMode() {
 
 // ==================== 文件重复弹窗控制 ====================
 
-function showFileDuplicateModal(message) {
+function showFileValidationModal(title, message) {
     const modal = document.getElementById('file-duplicate-confirm-modal-overlay');
     const messageEl = document.getElementById('file-duplicate-confirm-message');
+    const titleEl = document.getElementById('file-validation-modal-title');
     
     if (modal && messageEl) {
+        if (titleEl) titleEl.textContent = title || '\u6587\u4ef6\u91cd\u590d';
         messageEl.textContent = message;
         modal.style.display = 'flex';
     }
@@ -9101,29 +9136,29 @@ function showFileDuplicateModal(message) {
 window.exportMessageAsLatex = exportMessageAsLatex;
 window.exportMessageAsWord = exportMessageAsWord;
 
-function closeFileDuplicateModal() {
+function closeFileValidationModal() {
     const modal = document.getElementById('file-duplicate-confirm-modal-overlay');
     if (modal) {
         modal.style.display = 'none';
     }
 }
 
-function initFileDuplicateModal() {
+function initFileValidationModal() {
     const closeBtn = document.getElementById('close-file-duplicate-confirm-modal');
     const confirmBtn = document.getElementById('confirm-file-duplicate-confirm-btn');
     
     if (!closeBtn) return;
     
-    closeBtn.addEventListener('click', closeFileDuplicateModal);
+    closeBtn.addEventListener('click', closeFileValidationModal);
     
     if (confirmBtn) {
-        confirmBtn.addEventListener('click', closeFileDuplicateModal);
+        confirmBtn.addEventListener('click', closeFileValidationModal);
     }
     
     const modal = document.getElementById('file-duplicate-confirm-modal-overlay');
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
-            closeFileDuplicateModal();
+            closeFileValidationModal();
         }
     });
 }
@@ -9259,3 +9294,181 @@ window.createThread = createNewThread;
 window.getThreadById = getThreadById;
 window.handleTestCommand = handleTestCommand;
 window.toggleThinkingMode = toggleThinkingMode;
+
+// ==================== 消息附件交互 ====================
+
+function initMessageAttachments() {
+    var showTimer = null;
+    var hideTimer = null;
+
+    function showDropdown(trigger) {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        if (showTimer) return;
+        showTimer = setTimeout(function() {
+            showTimer = null;
+            document.querySelectorAll('.attachment-dropdown').forEach(function(d) {
+                d.style.display = 'none';
+            });
+            var container = trigger.parentElement;
+            var dropdown = container.querySelector('.attachment-dropdown');
+            if (!dropdown) return;
+            var rect = trigger.getBoundingClientRect();
+            var spaceBelow = window.innerHeight - rect.bottom;
+            var spaceAbove = rect.top;
+            dropdown.style.top = '';
+            dropdown.style.bottom = '';
+            if (spaceBelow > 200) {
+                dropdown.style.top = '100%';
+                dropdown.style.bottom = 'auto';
+            } else {
+                dropdown.style.top = 'auto';
+                dropdown.style.bottom = '100%';
+            }
+            dropdown.style.display = 'block';
+            renderAttachmentDropdown(trigger, dropdown);
+        }, 500);
+    }
+
+    function hideDropdown(container) {
+        if (showTimer) { clearTimeout(showTimer); showTimer = null; }
+        if (hideTimer) return;
+        hideTimer = setTimeout(function() {
+            hideTimer = null;
+            var dropdown = container.querySelector('.attachment-dropdown');
+            if (dropdown) dropdown.style.display = 'none';
+        }, 500);
+    }
+
+    function cancelHide() {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    }
+
+    document.addEventListener('mouseenter', function(e) {
+        if (e.target.nodeType !== 1) return;
+        var trigger = e.target.closest('.attachment-trigger');
+        if (trigger) showDropdown(trigger);
+    }, true);
+
+    document.addEventListener('mouseleave', function(e) {
+        if (e.target.nodeType !== 1) return;
+        var trigger = e.target.closest('.attachment-trigger');
+        if (trigger) {
+            var container = trigger.parentElement;
+            hideDropdown(container);
+        }
+    }, true);
+
+    document.addEventListener('mouseenter', function(e) {
+        if (e.target.nodeType !== 1) return;
+        var dd = e.target.closest('.attachment-dropdown');
+        if (dd) cancelHide();
+    }, true);
+
+    document.addEventListener('mouseleave', function(e) {
+        if (e.target.nodeType !== 1) return;
+        var dd = e.target.closest('.attachment-dropdown');
+        if (dd) {
+            var container = dd.parentElement;
+            hideDropdown(container);
+        }
+    }, true);
+
+    document.addEventListener("click", function(e) {
+        if (e.target.nodeType !== 1) return;
+        if (!e.target.closest(".attachment-trigger") && !e.target.closest(".attachment-dropdown")) {
+            document.querySelectorAll(".attachment-dropdown").forEach(function(d) {
+                d.style.display = "none";
+            });
+        }
+    });
+}
+
+function renderAttachmentDropdown(trigger, dropdown) {
+    var list = dropdown.querySelector('.attachment-dropdown-list');
+    if (!list) return;
+    var filesStr = trigger.getAttribute('data-files');
+    if (!filesStr) return;
+    try { var files = JSON.parse(filesStr); } catch(e) { return; }
+    if (!Array.isArray(files)) return;
+    list.innerHTML = '';
+    files.forEach(function(finfo) {
+        var fileId = (typeof finfo === 'string') ? finfo : finfo.id;
+        var origName = (typeof finfo === 'string') ? finfo : (finfo.originalName || finfo.id);
+        var fileSize = (typeof finfo === 'string') ? 0 : (finfo.size || 0);
+        var sizeText = fileSize > 0 ? formatFileSize(fileSize) : '';
+        var ext = origName.lastIndexOf('.') > 0 ? origName.substring(origName.lastIndexOf('.') + 1).toLowerCase() : '';
+        var typeClass = 'other';
+        var iconClass = 'fa-file';
+        if (['jpg','jpeg','png','gif','bmp','svg','webp'].indexOf(ext) >= 0) { iconClass = 'fa-file-image'; typeClass = 'image'; }
+        else if (['mp3','wav','ogg','flac','aac','wma'].indexOf(ext) >= 0) { iconClass = 'fa-file-audio'; typeClass = 'audio'; }
+        else if (['mp4','avi','mkv','mov','wmv','flv'].indexOf(ext) >= 0) { iconClass = 'fa-file-video'; typeClass = 'video'; }
+        else if (['doc','docx','txt','rtf','odt'].indexOf(ext) >= 0) { iconClass = 'fa-file-word'; typeClass = 'document'; }
+        else if (['xls','xlsx','csv'].indexOf(ext) >= 0) { iconClass = 'fa-file-excel'; typeClass = 'spreadsheet'; }
+        else if (['ppt','pptx','key'].indexOf(ext) >= 0) { iconClass = 'fa-file-powerpoint'; typeClass = 'presentation'; }
+        else if (['pdf'].indexOf(ext) >= 0) { iconClass = 'fa-file-pdf'; typeClass = 'pdf'; }
+        else if (['py','js','ts','html','css','java','cpp','c','h','sql','json','xml','yaml','yml','md','sh','bat'].indexOf(ext) >= 0) { iconClass = 'fa-file-code'; typeClass = 'code'; }
+        else if (['zip','rar','7z','tar','gz'].indexOf(ext) >= 0) { iconClass = 'fa-file-archive'; typeClass = 'archive'; }
+        
+        var item = document.createElement('div');
+        item.className = 'file-preview-item';
+        item.style.cssText = 'width:auto;min-width:220px;cursor:pointer;';
+        
+        item.innerHTML = '<div class="file-preview-icon ' + typeClass + '"><i class="fas ' + iconClass + '"></i></div>' +
+            '<div class="file-preview-info">' +
+                '<div class="file-preview-name" title="' + escapeHtml(origName) + '">' + escapeHtml(origName) + '</div>' +
+                (sizeText ? '<div class="file-preview-size">' + sizeText + '</div>' : '') +
+            '</div>' +
+            '<button class="file-preview-remove" title="\u5220\u9664" data-file-id="' + fileId + '">' +
+                '<i class="fas fa-times"></i>' +
+            '</button>';
+        
+        // Click item to download (fetch + blob + a.click)
+        item.addEventListener('click', function(e) {
+            if (e.target.closest('.file-preview-remove')) return;
+            var apiBase = (window.SessionService && window.SessionService.apiBaseUrl) ? window.SessionService.apiBaseUrl : '';
+            var dlUrl = apiBase + '/upload_files/' + encodeURIComponent(fileId);
+            fetch(dlUrl).then(function(r) { return r.blob(); }).then(function(blob) {
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = origName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+            }).catch(function(err) {
+                console.error('Download failed:', err);
+            });
+        });
+        
+        list.appendChild(item);
+    });
+}
+
+
+
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.file-preview-remove');
+    if (btn) {
+        e.stopPropagation();
+        var fileId = btn.getAttribute('data-file-id');
+        if (fileId && confirm('\u786e\u5b9a\u8981\u5220\u9664\u6b64\u6587\u4ef6\u5417\uff1f')) {
+            var _apiBase = (window.SessionService && window.SessionService.apiBaseUrl) ? window.SessionService.apiBaseUrl : '';
+            fetch(_apiBase + '/upload/' + encodeURIComponent(fileId), { method: 'DELETE' })
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    if (result.code === 0) {
+                        var item = btn.closest('.file-preview-item');
+                        if (item) item.remove();
+                    } else {
+                        alert('\u5220\u9664\u5931\u8d25: ' + (result.message || '\u672a\u77e5\u9519\u8bef'));
+                    }
+                })
+                .catch(function(err) {
+                    alert('\u5220\u9664\u5931\u8d25: ' + err.message);
+                });
+        }
+    }
+});
+
+// Initialize attachment interactions
+initMessageAttachments();
