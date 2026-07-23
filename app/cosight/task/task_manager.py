@@ -181,3 +181,45 @@ class TaskManager:
             counter_bucket[int(step_index)] = next_value
             return next_value
 
+
+
+    @classmethod
+    def copy_uploaded_files_to_workspace(cls, upload_ids: list, workspace_path: str) -> dict:
+        """将已上传的文件从 upload_files 目录复制到工作区。"""
+        import shutil
+        import os
+
+        # 与 main.py 中的路径解析逻辑保持一致
+        _upload_env = os.environ.get("TRAFFIC_OPS_UPLOAD_DIR")
+        if _upload_env:
+            upload_dir = os.path.join(_upload_env, "upload_files")
+        else:
+            upload_dir = "upload_files"
+        upload_dir = os.path.abspath(upload_dir)
+        workspace_str = os.path.abspath(str(workspace_path))
+
+        if not upload_ids:
+            return {"success": True, "copied_count": 0, "message": "无文件需要复制"}
+
+        os.makedirs(workspace_str, exist_ok=True)
+
+        copied = 0
+        errors = []
+        for file_id in upload_ids:
+            src = os.path.join(upload_dir, file_id)
+            dst = os.path.join(workspace_str, file_id)
+            if os.path.exists(src):
+                try:
+                    shutil.copy2(src, dst)
+                    copied += 1
+                except Exception as e:
+                    errors.append(f"{file_id}: {e}")
+            else:
+                errors.append(f"{file_id}: 源文件不存在")
+
+        success = len(errors) == 0
+        message = f"成功复制 {copied} 个文件"
+        if errors:
+            message += f"，{len(errors)} 个失败: {'; '.join(errors[:5])}"
+
+        return {"success": success, "copied_count": copied, "message": message}

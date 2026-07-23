@@ -43,6 +43,7 @@
         "ask_question_about_image",
         "ask_question_about_video",
         "extract_document_content",
+        "process_uploaded_file",
         "create_html_report",
         "browser_use",
         "fetch_website_content",

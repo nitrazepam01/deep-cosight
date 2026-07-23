@@ -1015,7 +1015,7 @@ async def search(request: Request, params: Any = Body(None)):
     if uploaded_files and work_space_path_time and not is_existing_approval_followup:
         logger.info(f"Copying uploaded files to workspace: {uploaded_files}")
         try:
-            copy_result = copy_uploaded_files_to_workspace(
+            copy_result = TaskManager.copy_uploaded_files_to_workspace(
                 upload_ids=uploaded_files,
                 workspace_path=work_space_path_time
             )

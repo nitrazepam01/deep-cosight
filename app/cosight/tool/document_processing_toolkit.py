@@ -124,8 +124,9 @@ class DocumentProcessingToolkit:
                 else:
                     tmp_path = document_path
 
+                import tempfile
                 file_name = os.path.basename(tmp_path)
-                md_file_path = f"{file_name}.md"
+                md_file_path = os.path.join(tempfile.gettempdir(), f"{file_name}.md")
                 docx_to_markdown(tmp_path, md_file_path)
 
                 # load content of md file

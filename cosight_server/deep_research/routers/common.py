@@ -25,6 +25,12 @@ from cosight_server.sdk.common.api_result import json_result
 from cosight_server.sdk.common.cache import Cache
 from app.common.logger_util import logger
 
+import uuid
+import shutil
+from fastapi import File as FastAPIFile, UploadFile
+from cosight_server.sdk.common.api_result import json_result
+
+
 commonRouter = APIRouter()
 
 server_start_timestamp = int(datetime.now().timestamp() * 1000)
@@ -888,3 +894,54 @@ async def stop_message(body: Dict = Body(...)):
     return json_result(0, 'success', {
         'status': 'stopped'
     })
+
+
+@commonRouter.post("/upload")
+async def upload_files(files: list[UploadFile] = FastAPIFile(...)):
+    """上传文件到 upload_files 目录，返回文件 ID 列表供后续使用。"""
+    upload_dir = "upload_files"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    uploaded = []
+    for file in files:
+        ext = os.path.splitext(file.filename or "file")[1] if file.filename else ""
+        file_id = f"{uuid.uuid4().hex}{ext}"
+        file_path = os.path.join(upload_dir, file_id)
+        
+        try:
+            content = await file.read()
+            with open(file_path, "wb") as f:
+                f.write(content)
+            uploaded.append({
+                "id": file_id,
+                "originalName": file.filename or "unknown",
+                "size": len(content),
+                "url": f"/upload_files/{file_id}",
+            })
+        except Exception as e:
+            logger.error(f"文件上传失败 {file.filename}: {e}")
+            return json_result(1, f"文件 {file.filename} 上传失败: {e}")
+    
+    logger.info(f"上传成功: {len(uploaded)} 个文件")
+    return json_result(0, "上传成功", {"files": uploaded})
+
+
+@commonRouter.delete("/upload/{file_id}")
+async def delete_uploaded_file(file_id: str):
+    """Delete an uploaded file by its ID."""
+    import os
+    from cosight_server.sdk.common.api_result import json_result
+
+    safe_name = os.path.basename(file_id)
+    file_path = os.path.join("upload_files", safe_name)
+
+    if not os.path.exists(file_path):
+        return json_result(1, f"File not found: {safe_name}")
+
+    try:
+        os.remove(file_path)
+        logger.info(f"File deleted: {safe_name}")
+        return json_result(0, "Deleted successfully")
+    except Exception as e:
+        logger.error(f"Failed to delete {safe_name}: {e}")
+        return json_result(1, f"Delete failed: {e}")

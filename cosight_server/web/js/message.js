@@ -738,7 +738,8 @@
                     planSessionId: planSessionId,
                     draftPlanSnapshot: (options.draftPlanSnapshot && typeof options.draftPlanSnapshot === 'object')
                         ? options.draftPlanSnapshot
-                        : null
+                        : null,
+                    uploadedFiles: Array.isArray(options.uploadedFiles) ? options.uploadedFiles : []
                 }
             },
             // 会被服务端解析的会话信息
