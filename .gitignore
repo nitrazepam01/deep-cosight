@@ -35,3 +35,7 @@ sessions.json
 test_env_check.txt
 .agents/
 .claude/
+tmp/
+.reasonix/
+submit_prepare/
+external/**/*.pdf
