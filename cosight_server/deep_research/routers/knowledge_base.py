@@ -151,7 +151,7 @@ def _get_lightrag_work_dir() -> str:
         os.makedirs(explicit, exist_ok=True)
         return explicit
     # 默认使用与 kb_meta.json 同级的 lightrag_data 目录
-    storage = os.path.abspath(os.getenv("LIGHTRAG_STORAGE_DIR", "./lightrag_data"))
+    storage = os.path.abspath(os.getenv("LIGHTRAG_STORAGE_DIR", "./rag_data"))
     os.makedirs(storage, exist_ok=True)
     return storage
 
