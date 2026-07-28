@@ -86,10 +86,17 @@ python-multipart>=0.0.6
 wheel==0.45.1
 setuptools==77.0.3
 
-# --- setup.py 中的历史依赖（部分为可选项） ---
+# --- setup.py ---
 loguru==0.7.3
 pysqlite3==0.5.4
 arxiv2text==0.1.14
 linkup==0.1.3
 wolframalpha==5.1.3
 python-pptx==1.0.2
+
+# --- OCR for scanned PDFs ---
+docling==2.115.0
+PyMuPDF==1.27.2.3
+
+# --- RAG-Anything / document parsing ---
+# RAG-Anything: pip install -e ./RAG-Anything

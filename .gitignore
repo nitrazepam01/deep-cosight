@@ -39,3 +39,5 @@ tmp/
 .reasonix/
 submit_prepare/
 external/**/*.pdf
+rag_data/
+rag_storage/

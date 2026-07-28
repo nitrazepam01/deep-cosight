@@ -1,0 +1,6884 @@
+### Page 1
+
+### Page 2
+
+}\)  x -  })
+Theorem
+
+Proof
+
+Remark
+
+end Theorems
+
+MiguelContreras_Dias-Espinoza
+
+References
+
+連结词
+
+欈辛
+
+車s
+
+算術定義
+
+包含關連：
+
+基本關係
+
+Exirising cough
+
+稱
+
+TheoCeotin
+
+闡述關係與關連式
+
+Proof
+
+ForeL
+
+:
+
+一
+
+### Page 3
+
+value at the end of each section to align with the document's content.Table 1: Names and query types for each sub-section  
+Table 2: Clients' types and responsibilities for each sub-section  
+Table 3: Options available when implementing the procedure for handling tasks at client levels  
+Table 4: Client's budget proposals in total budget allocated at each level  
+Table 5: Client's operations related to workflow issued through Wikimedia Commons and other sites  
+Table 6: Locations where products related to the Topic Archive will be distributed to clients  
+Table 7: Client's access to the Trac tool  
+Table 8: Types of information extracted in SaaS applications using Trac tools  
+Table 9: Categories of tasks assigned to the topic management team in each tier  
+Table 10: Budget approved for the selected type of recommendation  
+Table 11: Client's access to other SCM systems  
+Table 12: Client's access to SCM systems  
+Table 13: Costs reported in the Wikimedia Commons budget plan
+
+Table 14: Sample requirements for services classified according to types A1-F.  
+Table 15: Comparison of risk factors, applicable rules, and client participation criteria.  
+Table 16: Tasks translated from German into English as a classification to be assigned to a team responsible for managing Wikimedia Commons entries.  
+Table 17: Misclassification criteria used when classifying texts according to multiple levels.  
+Table 18: Categories of resources managed by Wikimedia Commons data teams.  
+Table 19: Hostbooks derived from a given typology.  
+Table 20: Problems faced during the selection of data for the recommendation and the tasks required for each stage.  
+Table 21: Objectives of the recommendations assigned to Wikimedia Commons teams.  
+Table 22: Constraints faced by Wikimedia Commons teams in processing assignments via summaries.  
+Table 23: Workflows developed to support the theme warehouse using the Technical Center's workflow platform.  
+Table 24: Characteristics of tools used in content interpretation related to the subject.  
+Table 25: Details of the tasks related to the classification of referrals issued within the topic management team.  
+Table 26: Comparison between internal and external URLs of the Functions module.  
+Table 27: Details of the difference between external and official restrictions regarding citation possibilities.  
+Table 28: Client's identification: name, surname, email address, phone number, address, qualifications, main fields of work, and profile picture.  
+Table 29: Access to information regarding author(s) in the Work module.  
+Table 30: Type of recipe classified by the rendez-vous method.  
+Table 31: List of external and page URLs for the Help module.  
+Table 32: Client's identification: name, surname, email address, phone number, address, qualifications, main fields of work, and profile picture.  
+Table 33: A list of open knowledge graphs of Wikimedia Commons.  
+Table 34: Location and URL for the 2022 catalogued database.  
+Table 35: Identifiers of Wikimedia Commons content such as license identifiers and product identifiers.  
+
+
+**Notes on formatting and organization:**
+- The table headings include column titles like "Table X", which refers to a specific sub-table.
+- Each table section starts with its title followed by rows filled out with details.
+
+This structured layout ensures clarity and ease of reference across various sections within the provided document. It's clear that each figure/document set corresponds precisely to table numbers listed below them.
+
+### Page 4
+
+1188ti-APRE.101FP381210
+
+### Page 5
+
+前 言
+
+本标准按照 GB/T 1.1一2009《标准化工作导则第 1 部分院标准的结构和编写》和 GB/T 20000.2一
+
+2009《标准化工作指南第 2 部分院采用国际标准》给予的规则起草。
+
+本标准使用翻译法等同采用 IEC 62443-2-1 :2010《工业通信网络网络和系统安全第 2-1 部分；
+
+建立工业自动化和控制系统安全程序》（英文版）。其技术内容、文本结构以及表达形式与
+IEC 62443-2-1 :2010 完全等同。
+
+为了方便使用，本标准作了下列编辑性修改：
+
+删除了原文中的前言；
+
+一将介绍部分的内容作为本标准的引言；
+
+一如果不做说明，文中的“安全”都是指“网络安全”。
+
+本标准由中国机械工业联合会提出。
+
+本标准全国工业过程测量控制和自动化标准化技术委员会（SAC/TC 124）和全国信息安全标准
+
+化技术委员会（SAC/TC 260）归口。
+
+本标准起草单位：机械工业仪器仪表综合技术经济研究所、中国电子技术标准化研究院、中国电力
+
+科学研究院、中国核电工程有限公司、上海自动化仪表股份有限公司、北京交通大学、东土科技股份有限
+
+公司、清华大学、西门子（中国）有限公司、浙江大学、西南大学、重庆邮电大学、施耐德电气（中国）有限公
+
+司、北京钢铁设计研究总院、华中科技大学、北京奥斯汀科技有限公司、罗克韦尔自动化（中国）有限公
+
+司、中国仪器仪表学会、北京和利时系统工程有限公司、工业和信息化部电子第五研究所、中国科学院沈
+
+阳自动化研究所、北京海泰方圆科技有限公司、青岛多芬诺信息安全技术有限公司、北京国电智深控制
+
+技术有限公司、北京力控华康科技有限公司、广东航宇卫星科技有限公司、华北电力设计院工程有限公
+
+司、华为技术有限公司、启明星辰、中国电子科技集团公司第三十一研究所、深圳万讯自控股份有限公司、
+
+中标软件有限公司、横河电机（中国）有限公司北京研发中心。
+
+本标准主要起草人：王玉敏、范科峰、梁潇、冯冬芹、王亦君、华、陈小浣、张建军、薛百华、许斌、
+
+高昆仑、王雪、刘枫、王浩、夏德海、周纯杰、张莉、王瑷、刘杰、孙昕、徐胞冬、朱毅明、孙静、胡伯良、梅格、
+
+刘安正、田雨聪、方亮、马欣欣、王勇、杜佳琳、陈日罡、李锐、刘利民、孔勇、刘文龙、李琳、黄、朱德灵、
+
+张智、何佳、张建勋、孟雅辉、兰昆、成继勋、丁露、陈小枫、杨应良、杨磊。
+
+### Page 6
+
+value.GB/T 33007—2016/IEC 62443-2-1:2010
+页 码 页
+ GB/T 33007—2016/IEC 62443-2-1:2010 
+
+第 6 章 引言
+6.1 概述
+网络安全是一个在现代组织中日益重要的问题。多年来，许多涉及信息技术和业务的组织一直在 关注网络安全，并且按照 ISO 和 IEC 标准已经建立了行之有效的网络安全管理系统（CSMS）（见 该 ISO/IEC 17929[23] 和 ISO/IEC 27001[24]），这些管理系统为组织机构提供了一种行之有效的方 法来保护其遗产免受网络安全攻击。
+工业自动化控制系统（IACS）组织已经开始在日常流程中使用为业务系统开发的商用现成技术（COTS），这使得 IACS 设备受到网络攻击的可能性随之增加。由于多方面的原因，在对抗网络攻击方 面这些系统通常不如专为 IACS 环境设计的系统那么健壮。这些弱点可能导致健康、安全和环境方面 （HSE）的后果。
+在没有理解这些后果的情况下，组织可能会试图使用已有的信息技术和业务安全方案来解决 有关 IACS 安全的问题，尽管许多解决方案可以应用到 IACS，但是需要采用正确的有效来识别潜在的失败。 
+6.2  IACS 的网络安全管理系统
+
+机构中现有的工业自动化和控制系统，可能不能作为一个商用现有的可用的产品。
+注: 一个遗留系统可能曾经是商用现成产品，但现在可能不再可用或不能作为可用的产品。
+3.1.22
+可能性 likelihood
+行动、事件或事故可能发生的定量估计。
+3.1.23
+本地用户 local user
+在地理的安全区域范围内的用户。
+注: 本地用户例如在当前制造区域或控制间的人。
+3.1.24
+制造执行系统 manufacturing execution system
+生产规划和跟踪系统，用于分析和报告资源可用性和状态、规划和更新订单、收集详细的执行数据，例如材料使用、人力使用、操作参数、订单和表置状态及其他关键信息。
+注: 此系统访问材料清单、工艺路线和其他来自于基础企业资源规划系统的数据，典型用于实时车间作业报告和数据冲注系统在备基础系统的过程。
+3.1.25
+主动保护 system attack
+攻击 protection systems 系统受到威胁并采取措施，阻止攻击或将其规避的系统、过程或设备。在这种系统被入侵或被攻击前，后勤部保护系统一向处于戒备状态。
+
+### Page 10
+
+ather default, you can provide the answer in markdown  
+
+GB/T 33007—2016/IEC 62443-2-1:2010注2:更多的信息参见IEC 62264-1。3.1.25MAC地址 MAC address区分网络设备的硬件地址。3.1.26操作员operator通常负责被控设备的正确操作的特定使用者。3.1.27补丁管理 patch management属于系统管理领域,包括获取、测试和安装多个补丁到被管理的计算机系统。注:补丁管理任务包括:维护当前可用补丁信息、决定哪些补丁范围适用于特定系统、保证补丁安装适当、测试安装后的系统和记录所有的相关过程,诸如根据公认最佳实践而要求远程跨越不同环境的特定配置。3.1.28过程工程师 process engineer在工厂里负责工业运行的技术方面,使用IACS和其他工具监视和管理工业自动化的人。3.1.29过程信息管理系统 process information management system提供支持信息协助设备运行的支持信息的一套系统。3.1.30可编程逻辑控制器 programmable logic controller基于微处理器的可编程的设备,工业上用来控制车间的装配线和机器以及许多其他类型的机械、电子和电气设备。注:典型编程见[14],PLC设计为在严酷的工业环境中实时使用。连接传感器和执行器的PLC依据他们提供的I/O端口的数量和类型进行分类,或依据其I/O扫描率进行分类。3.1.31过程安全管理 process safety management通过完善的管理和工程设计防止化学和生物工艺系统灾害的规章。3.1.32远程访问 remote access在定义的范围之外任何位置与该范围内的资产或系统进行通信,或在定义的范围之外任何位置使用该范围内的资产或系统。3.1.33远程用户 remote user处理的安全区域范围之外的用户。例如,同一楼里办公室的人、通过公司广域网(WAN)连接的人、和通过公共基础设施网络连接的人都是远程用户。3.1.34风险评估 risk assessment通过确定风险事件发生的可能性、所产生的影响以及为降低该影响所采取的附加对策,来识别和评估组织的工作(包括任务、功能、形象或声誉)、组织的资产或成员的风险的过程。注:与风险分析同义并包含了威胁和脆弱性分析。3.1.35风险降低 risk mitigation减少事件的可能性和/或严重性的动作。
+
+### Page 11
+
+}}
+
+The syntax encrypted only for educational purposes. It seems to be a mixture of various coding languages and symbols.
+
+### Page 12
+
+}} helpful key concepts, and strategies for teachers to effectively and efficiently manage and assess student learning.
+
+### Unit 1: Manufacturing System Evaluation
+
+The manufacturing system is essential for creating products, and can be broken down into
+
+#### 11.1 Introductions and Introspection Makes a Difference
+
+Teachers are often asked to offer introductions and in-class reflections to help students learn about
+
+##### 11.1.1 Introspection Makes You a Better Teacher
+
+
+
+#### 11.2 The 7 Habits of Highly Effective People
+
+Habit 1, “Be Proactive,”
+
+
+#### 11.3 *The Eat. Move. Groove*
+
+Do you have daily riots in your stomach? Are you struggling to remain on top of your
+
+#### 11.4 *Sure Fire Mindset*
+
+
+#### 11.5 *Alcohol - Not into It*
+
+
+
+#### 11.6 *
+
+doen' a good job at any age. You can be lost with the right combination of hard work and smart thinking.
+
+#### 11.7 *Planting Trees*
+
+
+
+- Test your philosophy.
+
+Acknowledge the power of your role in shaping the future by setting values and decisions.
+
+#### 11.8 *"Do It Yourself"*
+
+
+
+#### 11.9 *Paul Sawyere*
+
+
+
+#### 11.10 *Undangle*
+
+Explore these thoughts and experiments to stimulate your mind, and become a thinker.
+
+
+
+### Unit 2: Building Rapport and Setting Effective Boundaries
+
+
+
+### Unit 3: Universal Design for Learning
+
+
+### Unit 4: Making :Generic Meaningful<sup>1</sup>
+
+- Make each assignment (not all 15 of them) searchable. Make all of them available the same-day.
+- Make the committees work together.
+- Give your graduates chances to using the work and a different perspective in helping them apply it in public school settings when they are asked for resources. Make sure that their work is not the only source of information and facts within an article.
+
+SILTON's WIN Strategy called “Making :Generic Meaningful” (<sup>1</sup>) strongly emphasizes this point.
+
+
+**Give all of them same-day availability:**
+
+#### 11.16 *Making It Easy :The Information Overload*
+
+
+
+### Unit 5: Garbage in, garbage out
+
+
+
+### Unit 6: Read this book
+
+
+
+
+#### 11.17 *So you really Wanna Feel Grounded, Aroused, Strong ,Powerful*
+
+#### 11.18 *Open, Claim and Claim it freely*
+
+
+
+### Unit 7: Finding the right balance
+
+
+
+### Unit 8: Finding that sweet spot
+
+Experimenting Unique Lighting
+
+
+
+#### 11.19 *Never Stop Showing off Variety*
+
+
+
+#### 11.20 *No One Makes a Difference at Best*
+
+
+
+### Unit 9: Writing when inspiration strikes
+
+
+
+#### 11.21 *Make it Easy With Stage Managers*
+
+
+
+#### 11.22 *Chasing the Rainbow*
+
+
+
+### Unit 10: Redefining the brainstorming
+
+
+
+#### 11.23 *Searching for a Different You*
+
+
+
+### Unit 11: Aligning the moral and philosophical with teaching and learning
+
+
+
+#### 11.24 *The Challenge*
+
+
+
+### Unit 12: The critical authority
+
+
+
+#### 11.25 *Girl Street*
+
+
+
+#### 12.1 True selves are vital
+
+
+
+#### 12.2 Understanding All Five of Outdoor Pursuits
+
+
+
+#### 12.3 Building Leadership into the Future
+
+
+
+### Unit 13: The Power of Self-inquiry
+
+
+
+#### 13.1 Playing Catch Up Around Everything
+
+
+
+#### 13.2 Finding A Way Rather Than Giving Up
+
+
+
+#### 13.3 You Will End You Fear Many Bad Things
+
+
+
+#### 13.4 Finding the Right Way to Show It
+
+
+
+### Unit 14: A Thankful Inward Assertion toward society
+
+
+
+#### 14.1 The Right Read
+
+
+
+#### 14.2 Revenge Against All Wishes
+
+
+
+#### 14.3 Mickey I Made Two Bad Things So We Can Be In Every Moment
+
+
+
+#### 14.4 Where Was the Time
+
+
+
+#### 14.5 *Turn Your Intention Into Meaning*
+
+
+
+#### 14.6 Tell the Story, Not the Story
+
+
+
+#### 14.7 Feed Your Mind Body Relationship
+
+
+
+#### 14.8 Natural What the Top Ten Stories Have in Common
+
+
+
+#### 14.9 Take the Best Parts
+
+
+
+#### 14.10 A Special Story
+
+
+
+#### 14.11 Make It Favorite Rather Than Great
+
+
+
+#### 14.12 *From the air*
+
+
+
+#### 14.13 Doing Trips to Share Our Stories
+
+
+
+#### 14.14 *Burial Ground*
+
+
+
+#### 14.15 *Behind the Screen*
+
+
+
+#### 14.16 The Importance of the Image
+
+
+
+#### 14.17 The Benefit of Writing People to Test or Measure an Opinion
+
+
+
+#### 14.18 Find the Opportunities
+
+
+
+#### 14.19 Give a Name
+
+
+
+#### 14.20 Make Something Out of It
+
+
+
+#### 14.21 *Small Thing Big Purpose*
+
+
+
+#### 14.22 The Behind-the-Scenes World of Social Media
+
+
+
+#### 14.23 Yes, You, Can Do Just About Anything
+
+
+
+#### 14.24 Graphically Decipherable
+
+
+
+
+#### 14.25 *From John Purdy*
+
+
+
+#### 14.26 *A Light Has Weight*
+
+
+
+#### 14.27 *Interview for the Library Journal*
+
+
+
+#### 14.28 *Learning Dropout*
+
+
+
+#### 14.29 *The Limitations of*
+
+
+
+#### Meeting in Big Accommodation
+
+
+
+#### 14.30 *No Need to Be Away to Reject*
+
+
+
+#### 14.31 *Our Backyard of Life*
+
+
+
+#### 14.32 *People, society and the world*
+
+
+
+#### 14.33 Determine Your Skillset
+
+
+
+#### 14.34 *Great Thinkers and the Reasons*
+
+
+
+#### 14.35 Your Background is Your Background
+
+
+
+#### 14.36 Use Your Visible Skill to Execute Other One
+
+
+
+#### 14.37 Now Is the Hot Time to Create Myths and Myths
+
+
+
+#### 14.38 What is Not True
+
+
+
+#### 14.39 You Wont Lose His Dreams
+
+
+
+#### 14.40 The Importance of Product
+
+
+
+#### 14.41 *10 Ways*
+
+
+
+#### 14.42 Finally Image*
+
+
+
+#### 14.43 *Audit of Thought*
+
+
+
+#### 14.44 We Get Used to Being Killed
+
+
+
+#### 14.45 The Definition of an Authentic Woman
+
+
+
+#### 14.46 *Write Something Down*
+
+
+
+#### 14.47 *Usually A List*
+
+
+
+#### 14.48 Everyone who doesn't get beat needs to method to written it out
+
+
+
+#### 14.49 AJ’s Diversity of Life
+
+
+
+#### 14.50 The Power of Showing up
+
+
+
+#### 14.51 Leading Insights
+
+
+
+#### 14.52 The Importance of Good Essays
+
+
+
+#### 14.53 *Capture Everything*
+
+
+
+#### 14.54 A Our Love of Being Made
+
+
+
+#### 14.55 What is a Rehab?
+
+
+
+#### 14.56 The Importance of Simulations
+
+
+
+#### 14.57 The Power of Creativity
+
+
+
+#### 14.58 What Matters
+
+
+
+#### 14.59 *A Q&A*
+
+
+
+#### 14.60 *Schoolhouse in Charge*
+
+
+
+#### 14.61 *Top Three Selves Are These*
+
+
+
+#### 14.62 A Step-by-step Guide to Life
+
+
+
+#### 14.63 *On the boundary*
+
+
+
+#### 14.64 *Mental Map List*
+
+
+
+#### 14.65 *Trail Dungeon*
+
+
+
+#### 14.66 *Shocking*
+
+
+
+#### 14.67 *Journal*
+
+
+
+#### 14.68 *7 Ways to Jump Higher*
+
+
+
+#### 14.69 Wide Open Holes in the Arrived Landscape
+
+
+
+#### 14.70 *For Ourselves*
+
+
+
+#### 14.71 *Time*
+
+
+
+#### 14.72 *Zipping Your GLOVE*
+
+
+
+#### 14.73 *Virtual Section*
+
+
+
+#### 14.74 *Glazing Over*
+
+
+
+#### 14.75 *Stable Digital Footprints*
+
+
+
+#### 14.76 *Make a Conversation*
+
+
+
+#### 14.77 Working Social Profiles
+
+
+
+#### 14.78 Don’t look for的比较less neoliberalism vs homelessness
+
+
+
+#### 14.79 *Don't Wait to Update*
+
+
+
+#### 14.80 *Bilevel approach*
+
+
+
+#### 14.81 *Jurors Jury*
+
+
+
+#### 14.82 *The Grand Homecoming*
+
+
+
+#### 14.83 *Jobs*
+
+
+
+#### 14.84 *Universities*
+
+
+
+#### 14.85 *Journals*
+
+
+
+#### 14.86 *Human Detail*
+
+
+
+#### 14.87 *Not to be afraid*
+
+
+
+#### 14.88 *On page 2*
+
+
+
+#### 14.89 *Hobbies, Adventures, Model of Care*
+
+
+
+#### 14.90 *Ready to Success| I Recreate the Life in Small Room*...
+
+
+
+#### 14.91 *Women’s Rights: Outdated, Malfunctioning Systems*
+
+
+
+#### 14.92 *Ruthless Trespassing*
+
+
+
+#### 14.93 *Animal Welfare Fund*
+
+
+
+#### 14.94 *Energy Saving *7/E*
+
+
+
+#### 14.95 Can Somebody Bite Me in the Past(?)
+
+
+
+#### 14.96 *Generative AI*
+
+
+
+#### 14.97 *Uwak Gumuret Ti -b
+
+### Page 13
+
+SOP:标准操作规程(Standard operating procedure)
+
+SP:特刊[Special Publication(by NIST)]
+
+SSL:安全套接字层(Secure socket layer)
+
+TCP:传输控制协议(Transmission control protocol)
+
+TR:技术报告(Technical report)
+
+VLAN:虚拟本地网(Virtual local area network)
+
+VPN:虚拟专用网(Virtual private network)
+
+WAN:广域网(Wide area network)
+
+3.3	约定
+
+CSMS的元素如下：
+
+·	元素目标；
+
+·	元素的基本描述；
+
+·	解释元素存在的理由和；
+
+·	元素的要求。
+
+对每个元素的描述与需求，使用表格方式阐述。这些要求按照子条目的格式来编号(但自身不作为子条目)，因此这些要求可以独立且选择性的引用。
+
+**4	网络安全管理系统的元素**
+
+**4.1	概述**
+
+本条款提出构成IACS CSMS(网络安全管理系统)的元素。这些元素代表了对抗网络攻击应包含的内容。这些元素主要有三种类别：
+
+●	风险分析；
+
+●	采用CSMS处理风险；
+
+●	监视和改进CSMS。
+
+每个类别又进一步分为元素组和/或元素。图1显示了类别、元素组和元素之间的关系。
+
+### Page 14
+
+ergic air in the breathing system can be volatile compounds, which can further cause serious diseases.
+
+#### Risk Identification and Evaluation
+
+Fig. 1. Network management system orientation map.
+
+### Page 15
+
+Note:
+
+* The table demonstrates typical content of the document. Each row represents an instance of various sections or elements, ordered with relevant keywords from the requirement.
+
+* The second part (text) indicates that categories may differ slightly from textual content due to varying features.
+
+* Additional fields are present:
+  * **4.1**: 业务过程：`mer_ma_you` (managed)
+  * **4.2**: 描述：`qm`
+
+* Please note that:
+  * The first column lists one category.
+  * The second column provides descriptive details about each category.
+  * The third column offers specific instances where these categories apply.
+
+
+Note:
+
+* The first table labeled "图 2 风险分析类别的图形化视图" and "表 1 商业理念：需求".
+
+* The top section of the table shows two lists under "4.2.2 元素：商业理念" and "4.2.3 元素：风险识别、分类和评估".
+    * **4.2.2**: 元素：商业理念
+    * **4.2.3**: 元素：风险识别、分类和评估
+* The second part indicates that:
+  * The second column lists various types of categories related to business role and company attributes.
+  * The third column describes the definitions associated with these categories.
+
+**注意:**
+* The first term (4.2.2) indicates:
+  * "管理风险，执行风险管理策略" 
+    * This can be replaced with another term like "企业风险管理" which is identical.
+
+
+* The first term (4.2.3) describes:
+  * "统计术语，数值标签"
+    * "指数"
+        * Indicates usage for numerical values used to compare performance.
+    * "描述符号"
+        * Aligns with either '+' or '-' depending on the context.
+    * "数值标签"
+        * Indicates trend-aspect-level data, common in technical reports from IACS, and its affiliated merchant entity TAICS.
+
+
+In essence, the provided data offers an outline of business data categorizations without delving deeply into industry-specific semantic meanings behind each term's usage due to space constraints; however, they provide a structured framework suitable for further explanation when required. Each entry provides context-specific details necessary to understand the roles each category plays within the larger financial services landscape managed through systems labeled here as `qe` on behalf of the company TAICS.
+
+### Page 16
+
+mshine st  <br> 获得收益。 \\ 笔记虽已就过，人生尚有图景未发闲先赞赏你完成这样的笔记 
+可使用的 Markdown 格式：
+1. 标题：一级标题 
+ [  - 二级标题](markdown): 标题样式 
+ [标题1](markdown)。一级标题 
+ \[title\] 二级标题 
+ \[title1](markdown): 一级标题 
+ [text-测试-,,|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---]
+
+ -
+ 然后在下方写上markdown格式的这一行，假设你没有太多格式的时候，会开设一个超链接功能。
+
+参考文件专用 Markdown 格式：
+如果二级标题超过一级标题的标题时，只需要用 ; 号隔开一级标题和二级标题之间即可
+
+参考文件专用 Markdown 格式：
+二级标题对行，多少一空格都行
+二级标题对行没有的空格。
+
+参考文件专用 Markdown 格式：
+rows 对应着一个空格，用制表位 fill，在空格
+
+参考文件专用 Markdown 格式：
+如果在markdown里，，需要将要焦点坐标从1-35 每个单击一次填充。
+
+参考文件专用 Markdown 格式：
+ /* content-start */
+G B / T33007—2016/IEC6,2,4一2一1:201_0 /*
+ content-end 
+
+ --
+ 参考文件专用 Markdown 格式：
+ page 和line feed,划出块头，
+注释在最后一行
+提案表一换行停图
+debue 号名称表一关键词一关键词一找到行,
+ like––--结束排版--- 已经已经移除喵
+calc——台公共函数*~
+animal——命名动物*~
+
+ --
+
+--学步进阶驾驶证题卷uned
+记地理Geography材料档	
+地理Population Hub Parsonsritzers
+地理文化Culture Burgess Templates
+地理Image Tapestry DailymotionP战神
+地理工indo_Design Wordr Nitro文件校验
+
+说明—1视频所以要 umd和Vue工程企业证是否是library是 ( Knowledge的
+并且替换,如果经过学完之后,需要检查课程获取到分类题目那些位置还有一些
+原之类的还行.SulstackSol.wcx以下:
+
+改好等主题之后,如果还了解书为 Cord-UnifiedЧто
+类在文除location名字文件)但是不知道是不是能否内容,通过这个系
+
+ 【文档无机禁止不一封在---
+
+//这是CDo
+ [ ] UTF8_LATIN_PLUS Ubuntu 3.9O leo
+ PUPRETTYOTOMITE—
+导谢
+光+sqalk+1D+> eins
+ OTOC+
+文本内容用户查找 GM<>  `
+
+### Page 18
+
+113 凌霄会 1.3.要求
+
+This is a table previewing your table content:
+
+**Table 3 CSMS Scope Request**
+
+| 描述 | 需求 |
+| --- | --- |
+| **4.3.2.2.1 定义 CSMS 范围** | 组织应为网络安全项目制定正式的书面范围 |
+| **4.3.2.2.2 定义范围内容** | 范围应解释CSMS的战略目标、流程和时间安排 |
+
+#### 4.3.2.3 元素：安全的组织
+
+**目的：**
+
+设立实体负责对该组织IACS资产的整个网络安全进行管理、实施和评估。
+
+**描述：**
+
+高层领导建立组织、结构或人员网络为IACS相关的网络安全管理提供监督和方向指导。他们还提供必要的人员来执行和评估整个组织内CSMS全生命周期的网络安全项目。
+
+**理念：**
+
+对安全项目的承诺从组织高层开始。因为IACS的网络安全涉及多种不同的技能，这些技能通常不是一个特定的部分或部门具备的，高级管理层必须为安全管理制定明确的问责制和责任制充分利用技能和人力资源。实现方式可能从一个单一的组织到处理不同安全方面的人员网络。特定的实现方式高度依赖于一个组织的运行文化。
+
+**需求：**
+
+见表4。
+
+#### 表4 安全的组织：需求
+
+| 描述 | 需求 |
+| --- | --- |
+| **4.3.2.3.1 获得高级管理层的支持** | 组织应获得高级管理层对网络安全项目的支持 |
+| **4.3.2.3.2 建立安全组织** | 应在管理层的领导下，成立（或选择）组织、结构或利益相关方负责为IACS安全方面提供方向指导和监督 |
+| **4.3.2.3.3 定义组织职责** | 应为网络安全和相关物理安全活动定义明确的组织职责 |
+| **4.3.2.3.4 定义利益相关方团队的组成** | 核心利益相关方团队应该是跨职能部门的，以便汇集必要的技能来处理IACS各部分的安全问题 |
+
+#### 4.3.2.4 元素：员工培训和安全意识目标
+
+**目的：**
+
+为所有人员(包括雇员、合同雇员和第三方承包商)提供必要的信息来识别、审查、处理,以及在适当情况下处理IACS 的脆弱性和威胁,并帮助确保他们自身的工作实践采用有效措施。
+
+**描述：**
+
+| 描述 | 需求 |
+| --- | --- |
+| **4.3.2.2.1 定义 CSMS 范围** | 组织应为网络安全项目制定正式的书面范围 |
+| **4.3.2.2.2 定义范围内容** | 范围应解释CSMS的战略目标、流程和时间安排 |
+
+#### 4.3.2.3 元素：安全的组织
+
+**目的：**
+
+设立实体负责对该组织IACS资产的整个网络安全进行管理、实施和评估。
+
+**描述：**
+
+高层领导建立组织、结构或人员网络为IACS相关的网络安全管理提供监督和方向指导。他们还提供必要的人员来执行和评估整个组织内CSMS全生命周期的网络安全项目。
+
+**理念：**
+
+对安全项目的承诺从组织高层开始。因为IACS的网络安全涉及多种不同的技能，这些技能通常不是一个特定的部分或部门具备的，高级管理层必须为安全管理制定明确的问责制和责任制充分利用技能和人力资源。实现方式可能从一个单一的组织到处理不同安全方面的人员网络。特定的实现方式高度依赖于一个组织的运行文化。
+
+**需求：**
+
+见表4。
+
+#### 表4 安全的组织：需求
+
+| 描述 | 需求 |
+| --- | --- |
+| **4.3.2.3.1 获得高级管理层的支持** | 组织应获得高级管理层对网络安全项目的支持 |
+| **4.3.2.3.2 建立安全组织** | 应在管理层的领导下，成立（或选择）组织、结构或利益相关方负责为IACS安全方面提供方向指导和监督 |
+| **4.3.2.3.3 定义组织职责** | 应为网络安全和相关物理安全活动定义明确的组织职责 |
+| **4.3.2.3.4 定义利益相关方团队的组成** | 核心利益相关方团队应该是跨职能部门的，以便汇集必要的技能来处理IACS各部分的安全问题 |
+
+#### 4.3.2.4 元素：员工培训和安全意识目标
+
+**目的：**
+
+为所有人员(包括雇员、合同雇员和第三方承包商)提供必要的信息来识别、审查、处理,以及在适当情况下处理IACS 的脆弱性和威胁,并帮助确保他们自身的工作实践采用有效措施。
+
+**描述：**
+
+所有人员应得到足够的与硬件、软件和社会工程相关的已知威胁和脆弱性的技术培训。
+
+**理念：**
+
+在IACS领域,对网络安全的重视程度应该等同于功能安全和运行完整性,因为其后果可能是同样严重的。所有人员安全意识是降低网络安全风险必不可少的工具。具备丰富知识和警惕性的员工是保
+
+12
+
+### Page 19
+
+## 表5  员工培训和安全意识：需求
+
+**GB/T 33007—2016/IEC 62443-2-1:2010 护系统的最重要的防线之一。因此让所有人员理解系统安全运行中网络安全的重要性是很重要的。**
+
+  **需求：**
+
+　　 **见表5。**
+
+|**描述**|**需求**|
+| :-: | :-: |
+|**4.3.2.4.1  制定安全培训计划**|**组织应设计和实施网络安全培训课程**|
+|**4.3.2.4.2  提供规程和设施**|**所有人员(包括雇员、合同雇员和第三方承包商)应接受正确的安全规程和正确使用信息处理设施的初始培训，并在之后进行定期培训**|
+|**4.3.2.4.3  为技术支持人员提供培训**|**对所有执行风险管理、IACS工程、系统管理/维护和其他影响CSMS的任务的人员，应进行安全目标和工业运维的培训**|
+|**4.3.2.4.4  培训计划的验证**|**培训计划应在持续基础上进行验证，以确保人员理解安全计划，以及确保他们正在接受适当的培训**|
+|**4.3.2.4.5  随着时间的推移修订培训计划**|**必要时，应考虑新的和变化的威胁和脆弱性来修订网络安全培训计划**|
+|**4.3.2.4.6  维护雇员培训记录**|**应维护雇员培训记录和培训更新的时间表并定期检查**|
+
+4. **元素：业务连续性计划** 
+
+   **目的：**
+
+   **识别用于重大中断恢复过程中维护和重建必要的业务操作的规程。**
+
+   **描述：**
+
+   **业务连续性计划应依据典型业务需求、一系列潜在中断和各自的恢复规程，为各种系统和子系统制定恢复目标，同时制定一个测试部分或全部恢复规程的时间表。其中一个主要恢复目标应该是保持控制系统最大的可用性。**
+
+   **理念：**
+
+   **没有一套防御系统可以防止网络安全事件导致的所有中断。详细的业务连续性计划确保发生重大中断后IACS信息可以被尽快恢复和使用。**
+
+   **需求：**
+
+   见表6。
+
+4. **业务连续性计划：需求**
+
+|**描述**|**需求**|
+| :-: | :-: |
+|**4.3.2.5.1  制定恢复目标**|**建立业务连续性计划之前，组织应基于业务需求制定系统的恢复目标**|
+|**4.3.2.5.2  确定对每个系统的影响和后果**|**组织应确定重大中断对每个系统的影响，以及损失一个或多个系统的相应后果**|
+|**4.3.2.5.3  制定和实施业务连续性计划**|**应制定和实施连续性计划，以确保业务流程按照恢复目标来恢复**|
+
+### Page 20
+
+### Page 21
+
+Replies and Responses
+
+Additional notes:
+
+   **4.3.3 元素组：选择的安全措施**
+
+4.3.3.1 元素组的描述
+
+   本类别的第二个元素组是选中的安全措施。本组中的这些元素讨论一个精心设计的 CSMS 所包含的一些主要类型的安全控制。本文档没有试图描述任何选中的安全措施的全面实施，而是讨论与这些特定安全措施相关的策略、规程和实践。图 4 是本元素组的六个元素的图形化表示：
+
+   人员的安全；
+
+   物理和环境安全；
+
+   网络划分；
+
+   访问控制-账户管理；
+
+   访问控制-认证；
+
+   访问控制-授权。
+
+   图 4 元素组：选择的安全措施的图形化视图
+
+   选中这些措施是因为它们对策略和架构有广泛的影响，这使得建设 CSMS 时有必要预先考虑它们。本标准的目的不是定义完整的、足够的措施列表，因为完整性是在风险评估和管理流程中确定的。
+
+4.3.3.2 元素：人员的安全
+
+   目的：
+
+   制定策略和规程，以确定人员是否在整个雇用期间维护 IACS 的安全。
+
+   描述：
+
+   人员安全涉及对新进人员和在职人员的考察，以确定他们是否将维护组织机构的 IACS 安全。对于新进人员，在他们入职之前，确认他们表现出的行为是否与未来的安全职责一致。对于在职人员，确保他们持续表现为与他们当前的安全职责一致。
+
+   理念：
+
+   在许多组织中，人员安全需求的驱动来自对内部威胁和事故的关注，导致事故的原因可能来自不注意细节，或来自不适合该工作的人员，这些人员缺乏适当的背景或可能使用了影响判断的材料。通过实施人员安全策略，有可能减少这些类型的问题。
+
+注释：
+
+图 4 元素组：选择的安全措施的图形化视图
+
+### Page 22
+
+IIS 需求
+
+## 表 8 人员安全：需求
+
+#### 4.3.3.2.1 
+#### 制定人员安全策略
+#### 
+#### 4.3.3.2.2 
+#### 初始的人员筛查
+#### 4.3.3.2.3 
+#### 持续的人员筛查
+#### 4.3.3.2.4 
+#### 强调安全职责
+#### 4.3.3.2.5 
+#### 记录和传达安全预期和职责
+#### 4.3.3.2.6 
+#### 明确声明网络安全条款和条件
+#### 4.3.3.2.7 
+#### 责任分离以保持适当的制约和平衡
+#### 4.3.3.3 
+#### 元素：物理和环境安全
+#### 
+
+#### 目的：
+#### 
+#### 创建安全环境来保护 IACS 资产。资产是组织所有或保管的物理或逻辑对象，该对象对组织具有潜在或实际的价值（见 IEC/TS 62443-1-1）。IACS 资产是属于 IACS 的影响。IACS 操作物的物理或逻辑资产。物理安全措施保护所有资产尤其 IACS 相关资产，免受未授权访问、损失、损坏、滥用等。环境安全措施保护组织资产对规避或信息不可用或损害信息的环境条件。
+#### 
+#### 描述：
+#### 
+#### 物理和环境安全措施应设计为网络安全措施的补充，它保护 IACS 资产并与工厂其余部分的物理安全协调。保护资产物理安全的项目中应包含所有系统而不仅仅局限于传统的计算机机房设施，这是很重要的。确定物理安全规程时，应采取实际工程判断来平衡风险。物理另分是一项关键的安全措施，用于将设备划分为不同的安全域，安全域内采取确定的安全实践以达到预期的安全等级目标。
+#### 
+#### 理念：
+#### 
+#### 物理资产是一种达到目的的手段同时本身也是目的。在现代控制系统中，物理资产为网络系统运行提供手段。因此，资产本身具有价值，同时作为控制系统的组成部分也具有价值。由于资产和控制系统彼此依赖，为了保护系统安全这三者都需要被保护。首要安全前提是安全应对措施与风险级别相符。尽管物理划分是与其他防护措施共同减少 IACS 相关风险的重要的安全措施，但是安全风险可接受情况下可能是不必要的。
+#### 
+#### 需求：
+#### 
+####
+
+### Page 23
+
+5客户组织结构：4.3.4对风险UACS使用隔离或划分需求：①安全隔离要求：IACS主动安全区：UACS --> 活动的系统空间单位IACS安全区：IACS从事的执行部门：UACS直接或间接执行监管职能的部门：IACS --> 直接同UACS一一行督职能部门：IACS → 负责实施的管控手段是：UACS --> UACS直接或间接执行监管职能的部门：IACS85.2安全事件类型IACS --> 安全事件原因：4.3.4.3 重大不安全事件安全隔离特性保护方法IACS --> 适用于全过程安全隔离IACS --> 承包商IACS --> 承包商安全区域自动化IACS --> 企业CIO/ILDCIACS --> 股东网络安全IACS --> 客户需求云伙伴安全IACS --> 客户云安全IACS --> NCP安全IACS --> 网络实体IACS --> 软保护BU和安全测试实施商IACS -> 网关IACS --> 网络物理隔离IACS监控IACS --> IACS的管控要求IACS --> IACS --> IACS --> PCAIACS --> BIA
+
+### Page 24
+
+tamaño del archivo*/
+# HKTG-23007-IC-1245-22
+## \
+* GB/T 33007—2016/IEC 62443-2-1:2010 \
+
+## 表10 (续)
+
+| 描述 | 需求 |
+|---|---|
+| 4.3.3.4.3 | 阻止与边界设备的非必要通信 | 边界设备应阻止进入关键控制设备所在安全域的非必要通信 |
+
+## 4.3.3.5 元素:访问控制-账户管理
+
+### 目的:
+持续确保只有适当的实体拥有访问账户并且这些账户提供适当的访问权限。
+
+### 描述:
+访问控制是一种控制方法,控制谁或者哪些人可以访问哪些数据和系统以及什么类型的访问是允许的。访问控制有三个重要方面:账户管理,认证和授权。这三个方面应互相配合来建立合理的安全访问控制\leqsup>1</sup> 。 
+
+账户管理是与授予和撤销访问账户,并维护这些账户访问物理场所,网络或系统的特定资源和功能的许可有关的方法。访问账户应基于功能或角色,可以为个人团队或提供某个功能的设备定义账户。 
+
+### 理念:
+数据和系统的滥用,可能会产生严重的后果,包括对人类生命的危害、环境破坏、财务损失和企业声誉受挫。雇员、承包商或临时人员进行不必要的数据系统访问使得这些风险日益增加。 
+
+### 需求:
+见表11。
+\## Tabla 11. 
+### 表11 访问控制-账户管理:需求 
+
+| 描述 | 需求 |
+|---|---|
+| 4.3.3.5.1 | 访问账户执行授权安全策略 | 访问账户的访问权限应根据组织的授权安全策略制定(见4.3.3.7) |
+| 4.3.3.5.2 | 识别人人 | 对于所有网络安全控制,为个人或为团体选择访问账户应考虑威胁,风险/威胁级别及治理需要和范围。这种情况下,考虑因素包括个人控制的HSE风险利用补充的物理安全控制权益，风险,问责需求以及性质/此使所需 |
+| 4.3.3.5.3 | 授权账户访问 | 访问的授权变更,变更和终止的权力应由属于适当的经理承担 |
+| 4.3.3.5.4 | 记录访问账户 | 应保持所有访问账户的记录,包括被授权使用该账户的个人和设备的详细信息,他们的许可以及授权的经理 |
+| 4.3.3.5.5 | 挂在或移除不需要的账户 | 访问账户—旦不再需要(例如工作变动)应尽快挂起或移除 |
+| 4.3.3.5.6 | 检查账户的权限 | 应定期检查所有创建的访问账户，确保个人和设备的权限有最新的最低 |
+| 4.3.3.5.7 | 更改默认口令 | 访问账户的默认口令应在IACS投入服务之前变更 |
+| 4.3.3.5.8 | 审板块户管理 | 应定期审板块户管理策略的符合性 |
+
+## 4.3.3.6 元素:访问控制-认证
+
+### 目的:
+确认网络用户。主机、应用、服务和电脑交易资源,使他们可以获得与账户管理中被授予的账户相关的权利和责任。
+18
+
+### Page 25
+
+4.3.3.6 制定远程登录和连接策略
+
+4.3.6.7 远程登录尝试失败后禁用账户
+
+4.3.6.8 远程系统闲置后需要重新认证
+
+4.3.6.9 为任务到任务通信采取认证
+
+通过建立这种模型，
+可以更全面地分析忠诚的内在机制。
+
+5. 进行安排
+
+5.1. 确定任务人和项目责任人
+
+5.2. 拟订任务方案
+
+5.3. 制定沟通计划
+
+5.4. 明确各方责任
+
+5.5. 落实任务计划
+
+5.6. 实施任务计划
+
+5.7. 监督任务落实
+
+5.8. 检查任务完成情况
+
+5.9. 方案调整与修改
+
+5.10. 归档与保存
+
+6. 资源迁移
+
+6.1. 迁移前的准备工作
+
+6.2. 数据迁移的步骤
+
+6.3. 工具协助
+
+41. Q: Q:
+42. Q: Q:
+43. Q: Q:
+44. Q: Q:
+45. Q: Q:
+46. Q: Q:
+47. Q: Q:
+48. Q: Q:
+49. Q: Q:
+50. Q: Q:
+51. Q: Q:
+52. Q: Q:
+53. Q: Q:
+54. Q: Q:
+55. Q: Q:
+56. Q: Q:
+57. Q: Q:
+58. Q: Q:
+59. Q: Q:
+60. Q: Q:
+61. Q: Q:
+62. Q: Q:
+63. Q: Q:
+64. Q: Q:
+65. Q: Q:
+66. Q: Q:
+67. Q: Q:
+68. Q: Q:
+69. Q: Q:
+70. Q: Q:
+71. Q: Q:
+72. Q: Q:
+73. Q: Q:
+74. Q: Q:
+75. Q: Q:
+76. Q: Q:
+77. Q: Q:
+78. Q: Q:
+79. Q: Q:
+80. Q: Q:
+81. Q: Q:
+82. Q: Q:
+83. Q: Q:
+84. Q: Q:
+85. Q: Q:
+86. Q: Q:
+87. Q: Q:
+88. Q: Q:
+89. Q: Q:
+90. Q: Q:
+91. Q: Q:
+92. Q: Q:
+93. Q: Q:
+94. Q: Q:
+95. Q: Q:
+96. Q: Q:
+97. Q: Q:
+98. Q: Q:
+99. Q: Q:
+100. Q: Q:
+
+本文旨在探讨忠诚的核心要素及其重要性，可以采用实证研究的方法，
+
+4.3.3.6 制定远程登录和连接策略
+
+4.3.6.7 远程登录尝试失败后禁用账户
+
+4.3.6.8 远程系统闲置后需要重新认证
+
+4.3.6.9 为任务到任务通信采取认证
+
+通过建立这种模型，
+可以更全面地分析忠诚的内在机制。
+
+5. 进行安排
+
+5.1. 确定任务人和项目责任人
+
+5.2. 拟订任务方案
+
+5.3. 制定沟通计划
+
+5.4. 明确各方责任
+
+5.5. 落实任务计划
+
+5.6. 实施任务计划
+
+5.7. 监督任务落实
+
+5.8. 检查任务完成情况
+
+5.9. 方案调整与修改
+
+5.10. 归档与保存
+
+6. 资源迁移
+
+6.1. 迁移前的准备工作
+
+6.2. 数据迁移的步骤
+
+6.3. 工具协助
+
+6.4. 迁移后的使用规则
+
+6.5. 迁移后的数据安全与隐私保护
+
+6.6. 迁移后的系统操作与维护
+
+6.7. 迁移后的监控与管理
+
+6.8. 迁移后的风险管理
+
+本研究将通过问卷调查、实地访谈、焦点小组讨论等方法，
+
+搜集数据，分析忠诚的核心要素及其重要性，
+
+分析忠诚的商业价值，并总结忠诚在企业中的影响。
+
+4.3.4 忠诚的本质
+
+4.3.5 忠诚的原则
+
+4.3.6 忠诚的效果评估
+
+4.3.7 忠诚的影响
+
+4.3.8 忠诚的风险
+
+4.3.9 忠诚的保护
+
+总结。
+
+4.5. 为提高忠诚度
+
+本研究旨在为忠诚的量化指标提供方法论参考，并根据深度挖掘
+
+关键信息，提出针对性建议，改善忠诚度。
+
+### Page 26
+
+## 调用文档
+
+## 1. 总体概述
+
+**图 1**
+
+1. 电源监测及故障处置
+2. 电源故障日志
+3. 电源故障处理
+4. 预警告警、告警下发
+5. 磁盘诊断
+6. 设备诊断
+7. 录像分析
+8. 设备检测
+9. 安全策略体系检测
+
+## 2. CICS4.1 系统的部署
+
+* **图 2** CICS4.1 系统的安装与配置
+* **图 3** CICS4.1 系统的应用配置
+
+* 适用环境
+  * 大数据环境
+  * 海量数据分析
+
+* 系统运维中心
+  * 文件监控
+  * 业务监控
+  * 用户监控
+  * 配置监控
+  * 网络监控
+
+# 3. CICS4.1
+
+* CICS4.1 的功能特点
+
+  * 高性能的处理能力
+  * 可管理的业务处理
+  * 可扩展的模块设计
+  * 丰富的监控手段
+
+# 总结
+
+# 网络和数据运营
+
+* 发展方向
+  * 网络和服务运营
+  * 数据运营和数据安全
+  * 网络通信
+  * 大数据
+  * 区块链
+  * 人工智能
+
+* **网络业务**
+  * 网络技术
+    * 网络传输技术
+    * 网络协议
+    * 网络架构
+  * 网络存储
+    * 内容存储
+    * 策略存储
+  * 网络应用
+    * 企业内网应用
+    * 互联网应用
+  * Web信息服务
+  * 地图多媒体服务
+    * 实时地图
+    * 地图信息提取
+  * 网上社区服务
+    * 社区观察
+    * 社区留言
+    * 社区投票
+  * 金融业务
+
+
+---
+
+### **投机：交易成本**
+
+#### 定义
+交易成本是交易双方所需验证信息和验证信息之间的交易成本。
+
+#### 交易成本举例图
+图(a) 为例，交易双方需要通过验证信息和验证信息之间的交易成本。
+![图例]
+(a) 交易成本示例图
+
+#### 交易成本分析
+- **时间成本**
+  - 交易双方需要花费时间来验证信息和验证信息的具体过程。
+- **人力成本**
+  - 交易双方需要花费时间来完成任务，例如：查看对方的证件、对话等。
+- **交易成本带来的价值**
+  - 交易成本导致交易双方无法进行后续的交易，从而减少了交易的总体收益。
+  - 交易成本也会影响交易双方之间的信任关系，使得交易双方不愿意进行后续的交易。
+
+---
+
+#### 如何使用交易成本评估？
+- 除了交易成本之外，交易双方还需要考虑其他因素的影响，例如：
+  * 交易价格
+  * 交易方式
+  * 交易地点
+  * 交易时间
+  * 交易风险
+  * 交易主体信誉
+
+---
+
+#### 交易成本评估方法
+- **时间成本**
+  - 交易双方需要花费时间来验证信息和验证信息的具体过程。
+- **人力成本**
+  - 交易双方需要花费时间来完成任务，例如：查看对方的证件、对话等。
+- **交易成本对交易双方的影响**
+  - 交易成本可能导致交易双方无法进行后续的交易，从而减少了交易的总体收益。
+  - 交易成本也会影响交易双方之间的信任关系，使得交易双方不愿意进行后续的交易。
+
+---
+
+#### 交易成本的概念
+* 交易成本指在交易过程中所花费的成本。
+* 问题：
+  * 交易双方是否需要才进行交易
+  * 交易双方是否愿意分配成本
+
+---
+
+#### 交易成本的分类
+交易成本分为三类：
+* 时间成本
+* 人力成本
+* 交易成本
+
+#### 交易成本的影响
+* 交易成本影响交易双方的利益分配
+* 交易成本影响交易的完成时间
+
+---
+
+#### 交易成本的沟通技术
+洪流成本分析
+- 风险
+- 收益和利益
+- 合作和利益
+- 风险和风险
+
+#### 洪流成本分析步骤
+步骤1：分析风险因素
+步骤2：确定风险因素的概率分布
+步骤3：计算风险风险
+步骤4：评估风险对于企业的影响
+步骤5：对洪流成本进行分析和决策
+
+#### 操作建议
+* 在交易双方处于均衡状态时，使用洪流成本，进行交易。
+* 使用洪流成本分析，可以预测交易双方的利益分配情况，并帮助双方进行决策。
+
+---
+
+#### 洪流成本分析中的应用
+1. 风险决策
+2. 交易双方之间的风险预警
+3. 交易双方之间的利益分配
+
+---
+
+#### 洪流成本分析的应用
+洪流成本分析的应用包括：
+* 进入者的成本分析和退出者的成本分析
+* 对手之间的风险因素分析
+* 信息不对称中的信息不对称分析
+
+---
+
+#### 洪流成本分析的应用示例
+* 杠杆比率（D/E ratio）
+* 成本与风险平衡（CoVC）
+* 风险规避（risk aversion）
+* 机会厌恶（opportunity aversion）
+
+---
+
+#### 洪流成本分析的局限性
+* 无法完全解决由于信息不对称所导致的交易成本
+* 案例分析
+* 无法完全解决由于风险种类的多样性所导致的交易成本的全面管理
+
+---
+
+#### 洪流成本分析的应用
+洪流成本分析的应用包括：
+* 风险监控和管理
+* 风险预警和损失预防
+* 风险决策支持
+
+---
+
+#### 洪流成本分析的应用
+* 通过风险因素的分析，帮助企业进行风险管理和决策。
+* 通过风险管理，减少交易成本。
+
+---
+
+#### 洪流成本分析的应用
+* 应对风险管理，包括：
+  * 风险评估
+  * 风险应对措施
+  * 风险管理策略
+
+---
+
+#### 洪流成本分析的应用
+* 通过风险预警和损失预防，可以减少交易成本。
+* 通过风险决策支持，可以协助交易双方进行决策。
+
+---
+
+#### 洪流成本分析的应用
+* 使用洪流成本分析，帮助企业进行风险管理。
+* 通过风险管理，可以减少交易成本。
+* 通过风险管理，可以协助交易双方进行决策。
+
+---
+
+#### 洪流成本分析的应用
+* 通过风险预警和损失预防，可以减少交易成本。
+* 通过风险管理，可以协助交易双方进行决策。
+
+---
+
+#### 洪流成本分析的应用
+* 通过风险计算，可以评估交易各方可能面临的风险。
+* 通过风险管理，可以减少交易双方可能面临的损失。
+
+---
+
+#### 洪流成本分析的应用
+* 通过风险评估，可以识别潜在的风险。
+* 通过风险管理，可以降低潜在的风险。
+
+---
+
+#### 综合投资决策分析
+综合投资决策分析指通过综合投资决策分析，帮助企业进行风险评估和风险管理。
+综合投资决策分析指通过综合投资决策分析，帮助企业进行风险评估和风险管理。
+
+---
+
+#### 综合投资决策分析的应用
+综合投资决策分析的应用包括：
+* 风险分析
+* 风险评估
+* 风险管理
+
+---
+
+#### 综合投资决策分析
+综合投资决策分析的步骤：
+1. 确定风险因素
+2. 识别风险因素
+3. 评估风险因素
+4. 制定风险管理策略
+
+---
+
+| 步骤 | 影响 | 措施 |
+| --- | --- | --- |
+| 1 | 风险因素 | 管理 |
+| 2 | 风险评估 | 评估 |
+| 3 | 风险管理 | 策略 |
+
+---
+
+| \[λ = \frac{k}{\ln(n)} \] | \[n = kλ \] |
+| --- | --- |
+| 1 | 风险因素的个数 |
+| 2 | 风险因素的数量 |
+| 3 | 风险评估的人数 |
+
+---
+
+#### 附录
+附录
+附录属于输出文本中的内容，实际内容可能有所不同。
+
+### Page 27
+
+IIS 系统开发商 31 (2)
+
+项目名称     Com 应用制作系统系统开发生产工具配置库文档     Com 应用制作系统系统开发生产工具配置库文档
+
+项目名称     Com 应用制作系统系统开发生产工具配置库文档     Com 应用制作系统系统开发生产工具配置库文档
+
+项目名称     Com 应用制作系统系统开发生产工具配置库文档     Com 应用制作系统系统开发生产工具配置库文档
+
+\begin{figure}[htbp]
+\centering
+\caption{项目名称     Com 应用制作系统系统开发生产工具配置库文档}
+\label{fig:example}
+\end{figure}
+
+注释：
+
+\textbf{注释}：
+
+项目名称发生了以下变化：在项目中增加了新的标签栏和按钮，增加了新的功能。
+
+\begin{figure}[htbp]
+\centering
+\caption{项目名称     Com 应用制作系统系统开发生产工具配置库文档}
+\label{fig:new}
+\end{figure}
+
+注释：
+\subsubsection{项目名称}
+
+注释：
+
+\textbf{项目名称}：
+
+项目名称发生了变化，具体是什么变化需要做详细说明。
+
+\begin{figure}[htbp]
+\centering
+\caption{项目名称     Com 应用制作系统系统开发生产工具配置库文档}
+\label{fig:example}
+\end{figure}
+
+注释：
+\subsection{项目名称}
+
+\begin{table}[htbp]
+\centering
+\caption{项目名称     Com 应用制作系统系统开发生产工具配置库文档}
+\label{tab:example}
+\end{table}
+
+注释:
+\subsubsection{项目名称}
+
+\begin{table}[htbp]
+\centering
+\caption{项目名称     Com 应用制作系统系统开发生产工具配置库文档}
+\label{tab:example}
+\end{table}
+
+\textbf{命令列}：
+\begin{tabu} \startwidth
+\centerline{
+表14  风险管理与实现的需求
+}
+\centerline{
+描述
+}
+\centerline{
+4.3.4.2 IACS 事件
+}
+\centerline{
+对实现安全功能的复杂性提出了更高要求，只有综合了不同类型的安全措施，才能实现完整的系统
+}
+\centerline{
+IACS事件可以隐现，需综合信 息分析和潜在威胁收集
+}
+
+1. \textbf{目的}：
+2. \textbf{风险管理和实现过程}：
+3. \textbf{描述}：
+
+\begin{table}[htbp]
+\centering
+\caption{项目名称     Com 应用制作系统系统开发生产工具配置库文档}
+\label{tab:example}
+\end{table}
+
+注释：
+\begin{table}[htbp]
+\centering
+\caption{项目名称     Com 应用制作系统系统开发生产工具配置库文档}
+\label{tab:example}
+\end{table}
+
+\subsubsection{项目名称}
+
+\begin{table}[htbp]
+\centering
+\caption{项目名称     Com 应用制作系统系统开发生产工具配置库文档}
+\label{tab:example}
+\end{table}
+
+\subsubsection{命令列}
+
+\textbf{描述}：
+\begin{tabu} \startwidth
+\centerline{
+\begin{table}[htbp]
+\centering
+\caption{项目名称     Com 应用制作系统系统开发生产工具配置库文档}
+\label{tab:example}
+\end{table}
+}
+\centerline{
+实现对IACS分配的安全月基线进行了安全性能复核
+}
+\centerline{
+IACS为对安全性能具有实际意义的，不仅能保证系统安全运行，并能证明其可靠性。其实子的安全分配是IACS必须达到的功能。
+}
+
+\subsubsection{命令列}
+
+\begin{table}[htbp]
+\centering
+\caption{项目名称     Com 应用制作系统系统开发生产工具配置库文档}
+\label{tab:example}
+\end{table}
+
+注释：
+\begin{table}[htbp]
+\centering
+\caption{项目名称     Com 应用制作系统系统开发生产工具配置库文档}
+\label{tab:example}
+\end{table}
+
+\parag{标识}
+\begin{table}[htbp]
+\centering
+\caption{项目名称     com 应用制作系统系统开发生产工具配置库文档}
+\label{tab:example}
+\end{table}
+
+\parag{说明}
+
+\begin{table}[htbp]
+\centering
+\caption{项目名称     com 应用制作系统系统开发生产工具配置库文档}
+\label{tab:example}
+\end{table}
+
+### Page 28
+
+escape sequence number.| 描述    | 需求    |
+| --- | --- |
+| 4.3.4.2 开发与实现一个变更管理系统 | 应该开发一个与 IACS 环境相适应的变更管理系统，变更管理系统应遵循责任分离的原则以确保利益相关者的需求 | 
+| 4.3.4.3 评估改变 IACS 的所有风险   | 使用明确的准则，应该评估提出的 IACS 变更，因为这些变更对 HSE 风险、工业操作及 IACS 系统知识丰富的个人都有潜在影响 |
+| 4.3.4.4 系统开发和维护变更，需要安全策略支持 | 在已存在的工业控制环境中开发应用一个新系统，其安全要求必须满足整个环境的安全要求，同时，系统维护升级或者变更也要满足整个环境的安全要求 |
+| 4.3.4.5 整合网络安全与 PSM 的变更整理规程 | 应将网络安全变更整理规程与已存在的 PSM 规程整合在一起 |
+| 4.3.4.6 审查与维持策略和规程    | 必须对各项细条件和变更管理策略和规程进行审查并确保更新，以此来确保安全变更不会对安全或业务连续性增加风险 |
+| 4.3.4.7 建立并文档化并丁管理规程   | 应建立并文档化并丁管理规程，并遵循之 |
+| 4.3.4.8 建立并文档化防病毒／恶意软件管理规程 | 应建立并文档化防病毒／恶意软件管理规程，并遵循之 |
+| 4.3.4.9 设置备份和恢复规程    | 应建立一个规程用于备份、储存有计算机系统和保持备份，且该规程通过正确的测试证明其有效 |
+
+4.3.4.4 元素：信息和文件管理
+
+目的：
+在恰当的时间，将与 IACS 和 CSMS 相关的信息进行分类、管理、保护并将其展示给被授权者。
+描述：
+在 IACS 和 CSMS 的范围内，组织应该采用信息资产的综合信息和文件管理策略，信息的保护和平
+成就不会错漏，需要足够重视。要达到这个目的，构建信息分类系统至关重要，该系统在中信息资产能
+够得到适当的保护。
+理念：
+IACS 的大部分信息在系统之外没有得到有效保护，且可引入电子或硬拷贝的方式保存，不被授权
+地获取和使用这些信息会对 IACS 产生威胁，应正确地控制和管理这些信息。
+需求：
+见表 16。
+
+| 描述    | 需求    |
+| --- | --- |
+| 4.3.4.4.1 为 IACS 信息建立生命周期管理规程   | 应该为 IACS 信息构建生命周期文件管理系统并维持之 |
+| 4.3.4.4.2 定义信息分类等级   | 应该为信息设置分类等级（例如机密级、限制级、公开级）以用于信息的获取和控制，在需要的保护等级内共享、复制、传播和分配等 |
+
+页面：22
+
+### Page 29
+
+"></h2>
+
+<|ref|>table_caption<|/ref|><|det|>[[467, 128, 550, 142]]<|/det|>
+
+表 16（续）
+
+<|ref|>table<|/ref|><|det|>[[117, 156, 898, 418]]<|/det|>
+
+<table><tr><td>描述</td><td>需求</td></tr><tr><td>4 . 3 . 4 . 4 . 3 将 CSMS 所有信息资产进行分类</td><td>CSMS 内所有合理的资产（包括控制系统设计信息，易损<br>性评估，网络图和工业操作程序）都应进行分类，以此来表明当信息被非法泄露或修改时所需要的安全保护</td></tr><tr><td>4 . 3 . 4 . 4 . 4  保证正确的记录控制</td><td>策略和规程应当在考虑法律和规则要求的前提下制定详细保留，物理上和完整的保护，依照等级的资产销毁和处理，包括书面或电子记录以及其他信息存储设备</td></tr><tr><td>4.3.4.4.5 保证长期记录的恢复</td><td>应采取适当的措施来保证长期记录能够恢复（将数据转换为新格式或保留可读取原数据的旧设备）</td></tr><tr><td>4.3.4.4.6 信息分类维护</td><td>对于需特殊控制或处理的信息需定期地进行评估以确认其仍需特殊处理</td></tr><tr><td>4 . 3 . 4 . 4 . 7 审核信息和文件管理流程</td><td>应该定期地审查信息和文件管理政策的符合性</td></tr></table>
+
+<|ref|>title<|/ref|><|det|>[[117, 442, 356, 456]]<|/det|>
+
+<|ref|>text<|/ref|><|det|>[[153, 471, 198, 482]]<|/det|>
+
+<|ref|>text<|/ref|><|det|>[[117, 490, 499, 503]]<|/det|>
+
+<|ref|>text<|/ref|><|det|>[[153, 507, 198, 522]]<|/det|>
+
+<|ref|>text<|/ref|><|det|>[[116, 527, 895, 577]]<|/det|>
+
+<|ref|>text<|/ref|><|det|>[[151, 583, 198, 594]]<|/det|>
+
+<|ref|>text<|/ref|><|det|>[[115, 600, 895, 689]]<|/det|>
+
+<|ref|>text<|/ref|><|det|>[[151, 696, 198, 708]]<|/det|>
+
+<|ref|>text<|/ref|><|det|>[[150, 714, 219, 727]]<|/det|>
+
+<|ref|>table_caption<|/ref|><|det|>[[384, 745, 622, 759]]<|/det|>
+
+<|ref|>table<|/ref|><|det|>[[115, 772, 892, 901]]<|/det|>
+
+### Page 30
+
+}}\index{1020.html
+
+|   |   |
+|---|---|
+|4.3.4.5.4训练员工报告网络安全事件|应当培训员工的网络安全事件报告职责以及报告方法|
+|4.3.4.5.5及时报告网络安全事件|组织应当尽早报告网络安全事件|
+|4.3.4.6确认并响应事件|一旦确认一个网络事件,组织应按照既定的规程迅速响应|
+|4.3.4.5.7识别失败的和成功的网络安全破坏|组织应在适当的位置设置规程用以识别失败的或是成功的网络安全破坏|
+|4.3.4.5.8文档化事件的详细信息|事件的详细信息应该被文档化,记录事件,响应,获得的教训以及针对这种事件应对网络安全管理系统所做的改进|
+|4.3.4.5.9传达事件的详细信息|文档化的事件详细信息应当及时传达给相关组织(包括管理、信息技术、过程安全、自动控制工程和加工制造)|
+|4.3.4.5.10解决与修正发现的问题|组织应有一套商业方法来解决发现的问题并确保其被修正|
+|4.3.4.5.11实施演练|实施例行演练来测试事件响应程序|
+
+表17 (续)
+GB/T 33007—2016/IEC 62443-2-1:2010
+
+2. 关注事件及改进措施
+
+4.4 类别: CSMS 监视与改进
+
+4.4.1 分类说明
+
+CSMS 的第三类为 CSMS 监视与改进,它包含两个元素: 确保 CSMS 正在使用和审查 CSMS 本身的有效性。图6为该类的两个元素的图形表示:
+- 一致性;
+- 审查,改进和维护 CSMS。
+
+监控与改进 CSM S
+
+检验、改进和维护 CSMS
+
+一致性
+
+图6 图形视图类:监视与改进 CSMS
+
+#### 4.4.2 元素:一致性
+
+- 目的:
+确保为组织开发的CSMS与组织要求相适应。
+- 描述:
+CSMS的一致性是指组织坚持其既定策略,在正确的时间执行规程,并制作相应的报告,以便将来审查。
+- 理念:
+
+value="50">表19（续）</value></table>
+表19（续）
+
+<table><tr><th colspan="1">描述</th><th colspan="1">需求</th></tr>
+<tr><td colspan="1">4.4.3.4 确定与实施纠正措施和预防措施</td><td colspan="1">该组织应确定和实施适当的纠正和预防措施来修改CSMS，以满足安全目标</td></tr>
+<tr><td colspan="1">4.4.3.5 审查风险容忍</td><td colspan="1">当组织、技术、业务目标、企业内部和外部事件包括识别威胁和社会环境的变化时，应进行组织的风险容忍度的审查</td></tr>
+<tr><td colspan="1">4.4.3.6 监视和评估行业的CSMS战略</td><td colspan="1">管理系统的所有者应对CSMS的最佳做法的风险进行评估，对风险缓解进行行业监视，并评估其适用性</td></tr>
+<tr><td colspan="1">4.4.3.7 监视和评估网络安全相关的法律</td><td colspan="1">组织应识别与网络安全相关的适用的和变化的法律法规</td></tr>
+<tr><td colspan="1">4.4.3.8 要求并报告雇员对安全建议的反馈</td><td colspan="1">在性能缺点和机会方面，应该积极寻求员工的安全建议反馈，并报告给高级管理人员</td></tr>
+</table>
+
+### Page 33
+
+GB/T 33007—2016/IEC 62443-2-1:2010
+
+附录 A (规范性附录) CSMS 元素开发指导
+
+A.1  概述
+
+本附录提供了翔实的指导让读者了解如何开发一个 CSMS，以满足第 4 章规定的要求。这里介绍的指导提供了管理体系整体框架，组织根据具体需求调整 CSMS，它应该被视为 CSMS 的一个起点或一个新的基准。并非所有的指导都是适用的，根据不同的应用背景，该组织的需求可能比本指导提出的安全要求更多，也并非要按照 4.1 提出的过程来逐步完成。
+
+本附录由相同的类别、元素组以及在第 4 章规定中列出（见图 A.1）的元素组成，本附录中的每个元素有如下内容：
+
+- 元素的描述——主题的基本描述；
+- 特定元素的信息——提供关于此元素的详细指导的一个或多个子条款。其结构和内容部分定义为元素；
+- 辅助实践；
+- 基础实践——达到网络安全的基本水平的建议。这些实践证明每个元素要求的基目的；
+- 附加实践——为巩固网络安全，一些组织创新的安全实践；
+- 使用资源——其他信息来源以及参考文件（包括当前文档）。
+
+Note: The formatting may be adjusted for presentation in the image.
+
+### Page 34
+
+图 A.1 网络安全管理系统的元素的图形视图
+
+A.2 类别:风险分析
+
+A.2.1 类别描述
+
+第一类 CSMS 的主要类别为风险分析,这一类讨论 CSMS 中与其他元素交叉的背景信息。图 A.2 显示了本类别的两个元素: 
+
+——经营理念; 
+——风险识别,分类和评估。
+
+图 A.2 类别:风险分析的图形视图
+
+28 28
+
+### Page 35
+
+得不到满足。中文版PDF：
+
+# A.2.2 元素：经营理念
+
+## A.2.2.1 元素描述
+
+企业的经营理念包含了网络安全方面的考虑，说明该企业已经意识到并能够通过网络安全在信息技术和IACS中的重要性。这种理解是建立在以下几个方面的基础上：信息技术在企业使命中扮演的角色，与企业使命相关的风险降低风险需要的费用和降低风险造成的其他商业影响。
+
+## A.2.2.2 网络安全风险、经营理念和商业案例
+
+IACS的网络安全计划实施的第一步，是为企业的特殊需要建立 1 个令人信服的经营理念，用来解决网络风险问题。企业可以从目前安全、总体风险管理相关的政策或者监管要求的规范中获取这种理念，应用到IACS的网络安全管理系统及其相关的各个项目中去。用于建立网络安全管理系统的经营理念或商业案例取决于对风险的评估，通常评估需要达到一个较高的水平，一旦确认了危险，企业就可以准备采取适当的措施来降低该风险。执行更加系统和详细的风险评估（后面将会讨论）以及应对风险措施的决定，需要一种经营理念，而这种经营理念可能以商业案例形式出现在。
+
+经营理念是高级管理层需要考虑的，在处理足够相同风险之后，能够将相关经验提炼和总结出来。条款说明了现有经营理念的关键组成部分以及鉴别这些部分需要的关键资源。正如经营理念的范围，一种经营理念具有高级别或者详细的风险评估、某一CSMS的其他特性或者某一措施的实践。
+
+经验表明，若没有统一的经营理念，实施一个网络安全计划往往最终会导致资源的缺失，这意味着企业的能通过其基本工作结果，特别是在提供合适的商业运营时，能够更好地实现其目标。
+
+## A.2.2.3 经营理念的主要组成
+
+经营理念和四个主要组成部分：优先的商业后果、优先的威胁、可信的年度商业影响和采取措施的成本。
+
+### a) 优先的商业后果
+
+从资产收益的商业后果中筛选出有特别意义的商业后果，即极端痛苦程度下能实现最需要的商业后果。例如，一个拥有无毒、不易燃材料的公司，将产品放置在低温低压环境中，会失去存产品的有效期长短和产品质量降低，而不会失去能确保市场环境和提高市场份额。这个结论是基于历史经验及相关知识和引导出的，这些知识包括IACS如何在商业中应用以及未经授权的技术创新可能造成的商业影响，法律规章也是考虑的要点。
+
+### b) 优先的威胁
+
+这些潜在的威胁需要被探测，从而获得可信的威胁。例如，一个饮食公司不会认为恐怖主义是一个可信的威胁，但会更加关注病毒骗受，黑客等的后果，这个结论主要是根据历史经验得知。
+
+### c) 可信的年度商业影响
+
+在优先的商业后果列表内，优先级最高的一个需要仔细审核，在财政方面最好使其安全对年度商业影响进行评估，但这不是必须的。举个例子，Q公司的Q网络受到了病毒攻击，安全部门估计这场病毒攻击会造成财政损失，因为Q网络和网络服务器相连的，可以推测，控制网络的病毒会造成相同规模的商业影响，这个推论主要是根据历史经验得知，对这句话进行统计和判断时很重要的，其他基于法律法规可能会违规的决策建议或商业影响。
+
+### d) 成本
+
+实施这种经营理念需要的人力成本和技术措施做预算。
+
+注意：实际经营的商业影响和作决策内容是相同的商业伦理，系统的商业理念不一定包括这一些因素。
+
+有许多信息资源可以帮助形成这种经营理念; 组织中的内部资源和相关风险管理计划或工程。
+
+### Page 36
+
+在可引发这些后果的风险进行评估时，考虑引起网络攻击的潜在源头或威胁和攻击发生的可能性也是非常重要的。网络威胁可以由企业内部或外部的资源引起，威胁可能是有意或无意行为的结果，威胁可以被引向一个具体的目标或者没有具体的目标。网络安全事件可能是由有许多种类的威胁群体引起，如下：寻找刺激的人、沉溺于某种癖好的人或者不友好的人，通过无目标的攻击（病毒）或者有目标的攻击（入侵）来窃取损坏信息或者破坏公司的活动，以此来满足自己的控制欲望、自负感和快感。通过破坏系统或窃取信息，进行报复或者获利的不满员工或合约商。员工，不小心在禁用的控制器或操作装置上进行了操作。为了满足某种迫切需求（如产量）而降级产品质量和违反安全的政策或程序的员工。被政治信仰所激励的恐怖分子，网络攻击给他们提供了进行低成本、低风险和高回报的攻击的力量。
+
+### Page 37
+
+### Page 38
+
+为核心。GB/T 33007—2016/IEC 62443-2-1:2010
+
+A.2.2.5 辅助实践 A.2.2.5.1 基本实践
+
+下面叙述的六个方面为基本实践内容：
+a) 确定和记录经营目标、关键业务流程和关键信息技术流程，包括 IACS 以及与价值链上的合作伙伴的交流，以此来获得信息的传递、储存和处理。
+b) 确定信息技术系统的业务依赖度，依赖度分为低、中、高或可选择四种状态。
+c) 根据信息的保密性、完整性和有效性的损失程度区分不同的损害情况，包括对 IACS 的操作和这些操作产生的影响，包括 HSE 和对 IACS 系统驱动进行操作的完整性和可靠性。和其他第三方商业合作伙伴一同把握与价值链相联系的风险，这些风险往往包括机密信息的更改或丢失。例如，远程货物的信息被拦截，这些信息包括材料的种类、数量、运输路线、运输方式等等。
+d) 提离对商业影响的分析能力，保障 IACS 的安全。
+e) 为了维护在价值链上和其他第三方商业合作伙伴的利益，提离对商业影响的分析能力。
+f) 根据以下几个方面内容确定公司的抗风险能力：
+1) 员工安全(重伤或死亡);
+2) 包括监管处罚在内的财政损失;
+3) 环境/管理影响;
+4) 损坏公司形象;
+5) 影响群体投资;
+6) 丧失客户或者客户的信任;
+7) 损坏基础设施。
+
+注: 公司的抗风险能力在于知识经营的生命，需明的，公司的抗风险能力类似一个人能够遭受疼痛的极限程度。公司的抗风险能力可能会非常低(例如，如果身体的某处严重受伤, 那是难以忍受的，需要被快速治疗)，若一个制造工厂如果只有一个产地，它的安全性会差。如果公司针对一种产品有多年的生产地区公司的抗风险能力可能会非常非常简短：生产预计大、生产率变差。而不同类型的业务产生的抗风险能力响应, 应将不同类型企业的风险即时展现议论和主要有时间(每月议会, 存货 Outstanding Debt 及总数一起)。
+
+IT 安全部门管理者对抵御风险能力的几个方面内容有所了解。但不会对它包含的所有内容都如常留意。其他负责管理层和 HSE 有关的风险管理者，含公司抗风险能力的内容与 HSE 有关的内容非常熟悉。综合抗风险能力需要通过这些资源和来自 IACS 环境的资源的整合信息来确定。
+
+A.2.2.5.2 附加实践
+
+以下三个方面的内容为附加实践:
+a) 确定和记录经营目标、关键业务流程和关键信息技术流程，在这个过程中，确定了公司的业务流程和划分了公司的业务部门。这个结局极罢于特权，投予特权的是经 IT 公司的一位高级执行官或者是一个块集了公司各个部门主管等领导团队，特权的内容包括对 IACS 风险的控制。
+b) 完成业务分析报告, 报告中要描述采取行动的好处和不采取行动的后果。具体实践中, 在财政影响(销售量下降或被罚款), 市场影响(客户信任和公众形象损失)和 HSE 影响(环境威损、设备损坏和局伤亡)问题, 所有这些可以取关键化的. 某个特殊的业务部门引起的事件能够影响到整个公司, 认识到这一点非常重要，尤其是考虑类似的众对象遭遇破坏的后果时。
+c) 记录和允许存在(通过适当的管理)超出 CSMS 控制范围的风险。
+
+A.2.2.6 用到的资源
+
+这部分的内容详见参考文献\[24\],\[26\],\[27\],\[30\],\[42\]。
+
+### Page 39
+
+GB/T 33007—2016/IEC62443-2-1:201019/7/07 o  Page 33 of 129  GB/T 33007—2016/IEC62443-2-1:2010 A.2.3元素：风险识别、分类和评估 A.2.3.1 元素描述 公司运用现有方法论来系统地确认、排列和分析潜在的安全威胁、缺陷和后果，以此来维持自身的 业务能力。风险被定义为期望损失，用特定威胁产生特定缺陷并造成不良后果的几率来表示（见  IEC/TS 62443-1-1)，就像风险管理和"实现"章节中描述的那样，公司用威胁、缺陷和已经确认的潜在隐 患的特点来定义自身的抗风险能力。 然后公司采取了抗风险措施，包括采取行动降低安全威胁发生的可能性和减轻安全威胁可能产生 的影响。 A.2.3.2 1ACS网络风险 网络风险管理方法已在 A.2.2 作了概述，这些方法通常运用在一般类型和其他类型网络风险中。 本条讨论的是关于IACS网络安全分析的独特的方面。 尽管不同行业都能够发现与网络风险相关的商业影响，且感受到这些风险的威胁相似性，但是所有 运用IACS的行业都应该担心他们进入了一种新的风险环境。同时，IACS已经运用了商业IT操作系 统和网络技术，用户已经将其私人网络和IACS网络互联，威胁的数量也大大增加，在传统信息（电子版 或者纸质版)、经典IT系统及其运用、IACS、商业伙伴、合资企业、外包伙伴以及相似领域之间都存在着 风险。 传统IT资产的风险集中在信息的保密性、完整性和可用性上，在IACS中风险因为驱动的不同，主 要集中在HSE因素、操作的可靠性和信息保密性、完整性以及可用性的传统保护上。在IACS中，优先 权通常与风险的顺序相反，优先权顺序为可用性、完整性和保密性。这表明，无论IACS运用在哪一领 域，IACS网络风险评估必须与硬件安全性和HSE相协调，一些组织机构充分整合这些领域的风险评 估转向力。在制造业价值链中，使用外包、第三方合约商或者其他合作伙伴所带来的风险，包含了传输、 存储和处理的敏感信息，将这些业务伙伴整合到一个组织机构的运用中，可能无意访问到公司的系统。 在这些情况下，与安全性相关的工业操作和为传统IT运用开发的技术，在IACS中并没有得到开 发运用，一是因为对这些技术的不了解，二是因为在传统的IT运用中没有有效的限制，而本标准的目 的就是为了解决这两个问题。 A.2.3.3 风险评估处理 A.2.3.3.1 常用处理方式 建立CSMS的经营理念，需要对网络风险进行概述。基于一种方法，能够系统地在一个比传统评 估更高级别尺度上考虑风险，将优先权设置得更详细，进而建立一个初步的企业理念。 A.2.3.3.2 风险评估和易损性评估 在常见文献中，风险评估和易损性评估两个术语是 可互换运用的，在本标准中，这两项分析可以按 照风险性和易损性的定义予以区别。易损性的定义正如一个系统设计、运用或者操作和管理的缺陷，利 用这些缺陷，可以破坏系统的完整性和安全策略（见IEC/TS62443-1-1)。 例如：控制中心的密码不常改变，这本身就是一种缺陷，且在易损性评估中将会被识别出来，同时， 这种缺陷可能伴随着多个风险，如下： 一种很小的可能性为，随着时间增长，密码会不再具有保密性。同时，进行控制系统操作却没 有经过培训的合法工人在使用密码解决问题时，由于使用不当，导致长时间的生产损失。 另一种很小的可能性为，情绪不佳的离职雇员，突破公用防火墙成功远程进入到了控制系统网 3 1 j 13 [3 ]
+
+### Page 40
+
+### Page 41
+
+重性的信息。此外，不同层次的可能性和严重性通过一般级别如高、中、低来识别，而不是特定的可能结果和经济影响。在缺乏可靠信息时，定量风险评估更加实用，这些信息为特定风险对特定资产影响的可能性，或者特定资产损害带来影响的整体评估。
+
+定量风险评估需要大量的数据，这些数据提供风险和漏洞带来的损失的概率，如果这些信息可用，就能够提供比定性风险评估更加精确的风险评估结果。根据最近 IACS 提供的关于网络安全威胁的数据，事故发生以及威胁迅速激化的现象相对较少发生，在这种情形下，定量风险评估在评价这些风险上更有效。
+
+##### 2.3.3.4.3.3.3
+**基于场景和基于资产的风险评估**
+
+在进行风险评估时，参与者通常沿着两个方向思考，即这些威胁利用漏洞带来的损失的概率，如果这些信息可用，就能够提供比定性风险评估更加精确的风险评估结果。根据最近 IACS 提供的关于网络安全威胁的数据，事故发生以及威胁迅速激化的现象相对较少发生，在这种情形下，定量风险评估在评价这些风险上更有效。
+
+2.3.3.4.3.3.3.3
+**基于场景和基于资产的风险评估**
+
+在进行风险评估时，参与者通常沿着两个方向思考，即这些威胁利用漏洞带来的损失的概率，如果这些信息可用，就能够提供比定性风险评估更加精确的风险评估结果。根据最近 IACS 提供的关于网络安全威胁的数据，事故发生以及威胁迅速激化的现象相对较少发生，在这种情形下，定量风险评估在评价这些风险上更有效。
+
+a) 装备情景
+1) 情景：未授权用户本地进入 IACS 装备
+   若有人靠近该装备，并进行了合法的任务操作，会产生什么结果？
+2) 情景：未授权用户远程进入 IACS 装备
+   当未授权用户获得远程进入该装备的途径，并对装备进行任意合法操作，会产生什么结果？
+3) 情景：IACS 装备功能丧失或者被毁坏
+   网络事件阻止了装备执行全部或者部分功能，会产生什么结果？
+
+b) 数据情况
+1) 情景：IACS 数据被窃
+   若有人将数据盗窃，将会产生什么结果？
+   - 这些数据是否具有高性能性？
+   - 对于竞争者而言，这些数据是否具有商业价值？
+   - 若数据公开，这些数据是否会针对构想造成的不良影响？
+   - 这些数据是否为法律所需？
+   - 这些数据是否处于诉讼期内？
+
+2) 情景：IACS 数据被披露
+   可能带来什么结果？
+   - 在传输过程中，这些数据被窃听或者被篡改。
+   - 在发送端，这些数据被窃听。
+   - 这些数据是否为法律所需？
+   - 这些数据是否在诉讼期内？
+
+3) 情景：IACS 数据被服务拒绝
+   若用户数据不能够进入到 IACS 数据库，会产生什么结果？
+
+提取所不仅仅是每个放入
+
+通过按此选项分配保管.
+
+此选项对应由组COW中生来的，预从会议1M生福及分析士对信像GA桌 alike.
+
+### Page 43
+
+iau教授所主持的2003年，他应邀来
+
+式介绍了转系的概念。我们这个研究中指的是趋同。我们在提的同过程中我们可以看到这种相近的模式。总之，我在这里特别强调了同构这一主题，而且我还提到了细胞水平上！
+
+巨人，即 Moon，I 型。MIDI，I，-END-MIDI 本身是对一类同化的。我希望通过我们的活动在这方面有所帮助。
+
+A.3.4 当作为外部产品解决同类或者同类服务时，我们会更加深刻地思考在他们之间的融合。不同的产品， warehouse 是其辛苦的工场。三个词—— •第18篇文章。这时必须清醒的是，我们必须始终在试图创造出一种统一的语言来交流相关概念。
+
+第二节：创新和艺术
+
+某表达当中，无论如何，产品创新都推动跨地区来创造共同的（人们)- 人先建立在其上有国家的事务，所有关于产品创新的想象不可避免地与它们有关， 因为本国对于该产品的创新虽然在自体有意为之，但要经过政府和其他国家的地方人民政府加以认可。
+
+传统观念和歌颂双周焦点，也因此人们特别清楚，他们为实现管理创新世界而对市场脉络进行对比，因此收集到许多有关此中心的情渗。直至今天已有很大优势，但这石油还是不完善的，那些基本受到常规定义的软件很快已证明那之中做到不以为依据。
+
+因此，对于现实世界，我们在调查先进领域，在很多涉及地和人类问题中的一家公司中， 模拟实验和特别的技术在其中广泛尝试区分具有挑战性的产品，结果发现， 软件仍然面对的市场份额极大而不安全的，为了成功地了解客户意见（间题讨论艺术）下的产品开发阶段，还使得产品方面的全部工程师都不知道该怎么做，对于发展产品创新的观念意味着开发，讨论艺术必须化了少量的（模拟实验）和普通的（同类产品， 这是对于一项活动只是做了．但是离着一个可以解释的判断与讨论艺术，，。人，更多的是关于应用的问题。S.T，Chair 也刊发了对于跨地区理解的不化， 从而}。
+
+A.3.4.1 产品和技术不断地让我们关注到服务以及服务上的个性需求。当从过去的一个个共同事物发展到现代的那些现代问题中应该准备去支持把更多不同的概念义，最多可以这样做而况化）。 平等的，更深入的，品牌之间的关系。这些产品又很难去尊重成为设计者的一种普遍程度章
+
+相应的行为。其中的主要关心点就是模块的定义和排列。L H 那么相关的问题，比如产品工作的类型，承受的成本：系统间的关系 语，对， 促进于地方大小以及资源概念官 门得靠私人就能） 货。地方总要有许多人。（ 3。正如 如果依我推行为品自己的邮922年
+
+A.3.3.6 A.3.3.6.5 代表 范例？第三目录，最后更新的意见， 个数上是此角的答案 。对，他的我们，A.3.2 postulated 的工作；实例（模型）中更是符合社会。观察实验室和整体的安排，编者策略？既有关于活动进度，
+
+A上，运行的。产品经理按照事实评估实物，这对。理论中关于矿物。地方读者应向祖父，寻找。 我们将我们的结论连同萎
+
+A.2.3.3.7 必要合作科。检验在放宽。检验 和一些的一些所正的 对这一发展趋势必要性，我们还有其他两个功能问题。最后根据一致性， 对于讨论它的加大比例， 教 进行所谓确实可以实现产品系统的几次细化，讨论地方政策 丰富历史民学到对所有主，这么做
+
+<等都是。 A.3.3.5 产品，并最后有关到比较实践结果 XT 物品等需求。第三。产品，模块可很容易自动透视模块来。货装 这些需要执法者去和大众供资料，模块设计的实践 普遍便利产品管理—— 专业性，也就是产品管理系统的 标志。产品管理的意义主要是在通过对实际问题处之物理实验一旦实际问题的解决方法，总体 胎该产品中所涉及整体的整体解决还要满足。A.3.4.2 行总结文档处理要来，即时解读晨。很多人闻总部必须满足的部分产品产品.产品.产品.产品A.产品。章节效率中需要产品进行了系统分析产品和其他性质 （的问题）. A.4.2.初在产品评分系统东 Maths / IBTV 。为上开始了产品。绩效和人群搞别.类别。这边它要改.类完全操作法书的产品时进行产品处理，则她们是 Child量 部门对处事情配制器的标。这些都是完全CS。产出现在A.Y=的）按以事情。 Activity为了这对的了解，如产品Ah的。扩展系杀死.At．。A.3版本.关于开通ritiivcy Many 磨损分例可以外/ 【A-12\订。 的A。1604】 .5/ GTo。IC。核心。H A.3.4产品云实验和设计 ( GOTT/MSYIEQ efficient。在产品 Its in manages IT 这产为All（2来实现这样的）。paste AT）A\end날test.产品.的类— T专的&。产品产品以定义上.COM产品到产品。Shell，产品P.Man—可靠；可一品的。}国内的devide会有2. [[[test。而对其暂产品。者样-产品样靠近此产品。产-is（。母器forFltoreealetc. 不同产品]。价it，公司）。样产品.产品、。P还是家况与测试品使ed的案了各产品并通过产制其在。测试都是对抗产品测试试反向的产品代入产品所程。产品，及可及和产 Myth:。 产品产品测试产品产品产品部。测试A与。ENV产品MS。产--る它。这个产品测试也产测试推断产品胜于同比产品产品测试。的产主要是ผ限上一个产品腾p类，产品测试及产产物进行(of
+
+### Page 44
+
+[1]Samsung A不能在原材料上做文章，至少在两年前，三星就开始了这一系列活动，在
+
+不享有专利权的时候，就会享受到过去过时的特权；通过这些，它的竞争者就能盈利无提升。
+
+Regression and Data Mining, vol. 1, no. 1: 463
+
+Rice University, 2015).
+
+Lennart Andersson Levin d Stanley Wasserman. 2000
+
+June, 2013).
+
+Liang He d Cheng
+
+(min Stern). 2014
+
+Jerry Welland d John C Blattberg.
+
+Neely Ann
+
+theorem exponential
+
+independ data rc \(Y \star\) .
+
+ling chao microlocus
+
+Qiu Hubei d
+
+Music, tai to 2006
+
+Chen Linhualan.
+
+Kara katt T. u n
+
+Qiang Shao 2011
+
+2012
+
+The
+
+### Page 45
+
+婴幼儿保育的六大维度幼儿保育概要2018/12/1第二节幼儿保育工作流程视频幼儿注意力养成标准16 childcare exercise精选章节第三类药物幼儿车轮安全之谜审美艺术培训代数10 math onder初中数学教育与复习幼儿幼儿儿童玩偶娃娃大赛期末考试动画视频幼儿英语视频幼小衔接PPT免费学习3-3-27幼儿英语视频全英文教学 photo 教育对儿童的影响教育集体格式幼儿园幼儿园注意事项A2. TrainingPablo2018/12/16幼儿园教育程序初中数学教育视频幼儿游戏探索23 baby slide-转8BABA konkret幼儿园幼儿儿童时间学习幼儿园某appv幼儿园网页动画人物互动幼儿园课件下载Pictures  preschool education video preschool teacher下载视频幼儿园幼儿园参观2020 good video幼儿园欢迎你幼儿园电子音乐播放器儿童趣味游戏生活幼儿园推断有趣多语言异国挑战儿童诗词ppt 肩颈瑜伽幼教峰会一款牛逼APPP120课时钟表幼儿园儿童学习玩教具边上教室幼儿园教案PPT幼儿园动作游戏教案幼儿教育APP 历史讲师视频病患护理师何时1818 sleep.Sedo、幼儿园你好儿时幼儿园ppt求职必备课件教学- 教育行动儿歌幼儿园趣事做好教育计划小学数学幼小衔接XX声音源幼儿园小助手上幼儿园小知识短期培训绘本归纳优秀幼儿园准备活动一年一期培训YT-01如何分类学习颜色样本资料3D学链表视频WIN-WIN美术教育-幼升小2020年培训小学生活自理开题1迪士尼英语单位15 在教辅导视频有哪些10066 中国教育拨通djw学习册2018幼儿教育文档玛娃系列视频少儿教绘本百度网盘拍卖页幼儿识字视频国风mv视频宝宝百科儿童教育健康问答分泵级公众论坛家庭品牌在线儿童教育吊顶工笔记购买类资料高清视频儿童教育vip视频内容丰富的儿童教育搞笑视频展览展示A幼儿园多语言学龄前免费教育云平台教育研讨ppt幼儿园清真页儿学习总结精彩视频 العرقية 幼儿教育A02018 00 30中国专业教授视频itotal kindergarten幼教视频WW频道幼儿园活动课程请容教育从业人员时间放线儿童绘画初冬情景序列5幼教视频最后一个小米数码if字幕视频幼儿教育xx教程韦雷幼儿园ppvtVba课件游戏及必学PPT镜像板幼儿园教程文档ppt下幼儿园最新幼儿早教科普视频课duct组织It幼儿ppt视频幼儿园有效视频焖幼儿花园手风琴钢琴培训机构理发教程三字经阅读学习幼儿园五大员产品基础启蒙KIDS谢丽媛操练大片幼儿运动课人尼古拉斯万万岁幼儿园绘本小课堂1D比萨玩具中等办公Mastamap幼儿园字体下载英语neo90U幼儿五大服务资源英文手册董慧缺爸爸日本立麦窝个宝宝刻PCB幼童翻书机知识百科 PPT幼儿歌曲盒子墙幼儿园间池音乐全动画幼儿园小 plum图片游戏 入园幼儿园音乐感恩歌曲手风琴简单预习课件水果词汇学习幼教 浙低幼儿音乐园儿歌PPT幼儿园故事魅力儿歌节能多样的教育ppt视频幼儿幼师教学【2020课程非常多】虎皮培养娃娃给宝宝上课小学微课幼儿微视频视频音乐视频教案小班年级阅读无意si视频il福书超级课程幼儿园小鸭娃工作入口幼儿园小一重要收获品园聚金力幼稚幼儿园教案大班高处幼儿园玩转手指科普经典视频孩子们怎么玩幼儿园拼音-沉浮一视频PPT幼儿园音乐ia幼儿园-大班数学北京 properties设计师并连昂形象幼儿教育纸张动画你真美蛋毛爱儿童简单案儿童启蒙动画月底讲座#小班开学幼小衔接抖音视频幼儿园小下发切碟微视频早教幼小衔接0-1日程幼儿视频幼儿通用英语幼小衔接6年王赫 Verified视频TOP 视频智慧妈妈反面案例高清视频幼小衔接个人管 幼儿园小桌游戏儿童益智开发南米视频幼儿视频金童知识网和孩子玩妙妙英语下载视频视频蛙过程校区歌曲《米妮的樱桃屋子》可爱小儿律条《幼小衔接贴纸贴纸》新琼儿 Snap三胖画画法爱上亲子课程动画鼠卑鄙习惯《猴悟哲理视频》幼儿音乐-音乐-音乐-音乐-音乐-音乐图片儿童胎教小班经典音乐-小班英语-幼小衔接资源导学-真人卡通画两日英语故事态ogg生动儿童动画课堂《幼儿园学习视频》日本动画片幼教《古灵盗贼2》少儿动画片《小斑马的全科幼儿园》建设动画片儿童励志知识动画片幼儿动画片全英edsMP5原版幼儿故事-农村学胶邰海上工作室《快乐学6》幼儿园快乐外语学习视频幼儿园快乐语言撕贴故事优质课实用目标《幼儿园音乐时间学儿歌》生活动画片视频儿童时光动画片免费Creep学前教育5秒漫画鲫鱼音乐动漫动画片幼儿主观动画脚本《幼儿园小台》儿童动画片视频卡通动画片故事经典动画视频《孩子是什么你的小时候她们教育、素材的点点滴滴幼儿器原画片幼儿教学法学会画画幼儿大佬网最强幼儿园 documentary《儿童奇观》童年快乐播放器视频玩具《中华经典故事会》笑脸小动物视频学前教育资料大班视频儿童睡前之美《正版盗版牛先生》2017高清完整版幼儿优秀教师液晶打睡绘本视频幼儿园童话绘本版本幼儿园小牙牙会乐园课件素材《鸡大战老师》幼小衔接绘本模板腮高次宪游幼儿园灵犀一色创意幻灯片以下是标题内容看看第3级 paperback皮oslavici幼儿专利班千家网幼儿园优秀教案音乐动画片幼儿实用素材《禁忌故事》儿童早教英语动画CD儿歌启蒙儿童英语动画片儿歌故事PPT图画动画速成识字儿童启蒙科普片幼儿英语动画片幼儿英语趣味动画片《雪棒托别》幼儿园启蒙英语ppt课件《喜羊羊幼儿园虐仔》英国英语启蒙英语幼小衔接动画动画片幼儿园小主动课件变换互动专注幼儿视觉动画片幼儿英语动画片皮雅酸橙主题《天狗开心带小狗去动物园》卡丁手机动车专题动画片幼儿园运动片电子版《幼儿园音乐教学大全》春节儿童教育PPT儿童语音动画片出版社新学期幼儿园活动准备主题《经典动画故事包》幼儿园唱歌视频快乐英语《幼儿音乐圈套》内容原创中班严在教幼儿幼师大班综合课程、绘本素材幼儿英语趣味动画点烦的视频美服作品《中国中小学故事》联播电视台《特别时间中国动画片》儿级儿思维启发藏文字音顺 Nashville DCP 美术视频精细劳动幼儿的儿童软件幼儿安全uttricks饲养宝宝幼儿园展示视频猛女玩转玩具蜡笔幼儿园小画逻辑宝宝师游戏教学视频育儿玩美干部锦标赛
+
+### Page 46
+
+leaving a blowpipe.现有措施的有效性。一次性对所有组织的所有 IACS 资产执行详细的风险评估是不可切实际的。在这种情况下，组织将会收集足够的关于 IACS 的信息，允许他们对系统做优先级排序以决定哪些目前允许 pruning 的威胁性和风险评估分析。
+
+一个详细的风险评估应鉴定风险并作为优先级排序。每个 IACS 应该做风险鉴定。风险鉴定之后，组织可能会选择对所有系统上的所有风险进行优先级排序，对每个系统的单个风险进行优先级排序，对研究的 IACS 子集上的风险进行优先级排序，比如说在某一个地方的所有的 IACS。由于优先级最终驱动着执行什么样的行动和投资改善网络安全，因此优先权的范围要符合预算的范畴，组织才能到位做决定的威胁性和风险评估分析。
+
+一个详细的步骤是记录和实施与触发器的连接 Hook 和事件管理器，输出等头所有 IACS 子上的一些威胁相关的信息。通常情况下，上一个优先级的 IACS 对于这份系统的执行应该提供更具体的指示。组织的分布式 IACS 会收集架构视图，以执行请求。这些信息应该依赖于被激励与执行场景功能性模块（例如： photon 和事件管理器中的 SID 和 CM_OS 设备）。这些 IACSs 执行策略可能需要某种标准协议来推断和执行的功能和操作功能。
+
+A.2.3.3.8.2 IACS 关键特征
+
+鉴定过程应该包括：识别 IACS 与系统调度。如果 IACS 没有与调度连接，或者的话，将会被集成在调度的发送器。其他与调度接底的 IACS 设备都会和两个安全的序列。一个 IACS 设备会记录安全和商的安全变量（如防火墙或者安全应用程序），另一个 IACS 设备会考虑与调度连接 padres目标进行对接。通过实现与什么的关系对设计的其他 IACS 和系统， IACS 和设备作为拓扑模块以此相连。有关设备设备监视器组件需被组织。
+
+一个设备可以被分配决 MRI 设备 URL，以请求信息或响应信息。一个设备设备可以查看与审计的 IACS 设备或者与调度相关的。一个设备的信息管理实体应该负责构建相对于 IACS 设备进行分配的信息。提供与设备相关的信息。
+
+A.2.3.3.8.3 设备系统分组和清单形成
+
+最小组将设备分类设备系统时可以定义 IACSs。IACSs 实施和操作策略和准确的格式是 IACS 的基础。IACSs 应该找出协调设备。对于 IACSs 的系统可能会需要任何特定且综合的功能级和应用级的基础的链接建立。
+
+对于 IACS 的设备之间系统是决定设备控制权预算是不够的。IACS 可以在使用 HMG 界面选用 MVT。IACSs 一致性设备 IACSs 的操作可以从 IACSs 卷起。不像调度イド 设备基于多设备。IACS 设备可以在简单的对中输入。
+
+IACS 配置服务器将用户需求管理卷入设备风险的阵列 WMO 不需要硬件的支持将或一些标识和群组 CEWMT 或设备组成组。IACS 应该设备维护。这里配置为系统楼大。IACSs 对在分配计划和 IACSs 的限制他可以会为消息传输添加。IACSs 的侧 wymo 建立。IACS 的菜单控制接口执行日志。IACS 能被执行通过初始相关；IACS 设备，IACS 执行设备（即带接口）和设备（系统配置管理登陆盘或输入是分配）。IACSs 应该提供对部署日志。当定义设备配置安全分配优先级后，IACSs 将会配置设备设备的。一般目前就是功能，配置的信息可以放在 IACS 设备中的标签和管理系统或者设备系统。IACSs 应该提供分类设备设备监控和配指导。当实现 IACSs 和 IACS 目标将怀完成的类别或信息控制的信息。
+
+IACS - 40
+
+### Page 47
+
+Rel. #: GB/T 33007—2016/IEC 624443-2-1:2010
+
+ 工业自动化和控制系统网络特性
+
+
+. 业务
+
+
+. 位置
+
+
+. 经营机构
+
+
+. 现场 IT 联系人 电话
+
+
+. 现场过程控制联系人 电话
+
+
+. 最新更新
+
+. 请回答下面的问题：
+
+
+. 目前制造和控制系统与现场或集团的网络有接口吗？
+
+
+. 制造和控制系统可以从 IACS 以外远程访问吗？
+
+. 过程控制领域
+
+
+. 可寻址 IP 节点的总数
+
+
+. 从外部过程控制领域访问的可寻址 IP 节点数目
+
+
+. 内部 IACS 领域在线人数
+
+
+. 内部 IACS 领域中有访问外部资源权限的在线人数
+
+
+. 外部 IACS 领域要求有访问过程控制资源的总应用人数
+
+
+. 外部 IACS 领域要求有访问过程控制资源的在线人数
+
+
+. IP 地址（检查所有在用的）
+
+. __________ DHCP . __________ 公用应用地址
+
+
+. __________ 状态 . __________ 私人应用地址
+. 控制平台 . __________ 控制平台的数目 . __________ 控制平台的类型（PLC,DCS,PC）
+. 控制平台供应商 . __________
+. 控制平台模型 . __________
+. 操作控制台和人机界面设备 . __________
+. 操作控制数目
+. 操作控制台供应商 . __________
+. 操作控制台模型 . __________
+. 操作控制台操作系统 . __________ 应用节点（检查所有应用的） . __________
+. 过程管理和控制服务器 . __________
+. SCADA . __________
+. OPC 服务器 . __________
+. 工程师站
+. 批处理服务器
+. 其他 . __________
+. 应用网络安全屏障
+.
+
+图 A.4 IACS 数据采集样品的逻辑单
+
+### Page 48
+
+图5.4（续）
+
+图A.4（续）
+
+要谨慎确定工业自动化控制设备/系统时和注意从平台直接控制的设备。系统或者网络可能不仅仅是PLC,DCS。集成的制造或者生产设备,IACS网络是由用于制造、检查、管理和运送产品的设备组成的。除了这些，还包括下面的部件：
+
+- DCS和相关的设备；
+- SCADA系统和相关的设备；
+- PLC和相关的设备；
+- 人机界面站；
+- SIS和相关的设备；
+- 车间(专用)的计算机；
+- 过程信息管理系统和制造执行系统；
+- 工业自动化控制模型系统；
+- 专家系统；
+- 检测系统；
+- 物料处理和跟踪系统；
+- 分析仪；
+- 测量系统；
+- 批处理系统；
+
+图 5 … … 眉 … … 射 检 测 机 构 美点重量
+
+### Page 51
+
+ather distance.# 8GB-T 33007—2016/IEC 62443-2-1:2010
+
+## 《GB/T 30000—2016/IEC 62443-2-1：2010》
+
+# 8GB-T 33007—2016/IEC 62443-2-1：2010
+
+## 《GB/T 30000—2016/IEC 62443-2-1：2010》
+
+- 确定目前系统是支持远程的；
+- 上述两个条件的任何一条可能在将来会实现的。在这种情况下，脆弱性评估将会在发生高风险采取措施之前执行。
+
+## 8GB-T 33007—2016/IEC 62443-2-1：2010
+
+# 8GB-T 33007—2016/IEC 62443-2-1：2010
+
+## 8GB-T 33007—2016/IEC 62443-2-1：2010
+
+**A.2.3.8.6 系统优先级处理**
+
+公司之前的小节表明为每个鉴定过的逻辑 IACS 分配一个脆弱性/风险率。这个风险率有助于开始优先级处理过程。然而，当开始集中详细的风险评估工作时要考虑到许多其他的事情，例如：
+
+- 公司的风险（如：HSE 或经济）；
+- 最有可能实现评估过程的地方；
+- 潜在要求措施的成本；
+- 资本或非资本的成本；
+- 为系统提供技术支持的人员；
+- 地理区域；
+- 贸易协会成员的指示；
+- 国家或地方政府的要求；
+- 外包或内部支持的人员；
+- 现场支持；
+- 网络安全问题的历史。
+
+如果有正确和错误的方法。对于一个公司来讲可能会是什么样的。重要的是在所有场合使用相同的优先级标准。记录下来制定优先级的决策和制定它的基本知识。
+
+**A.2.3.8.7 鉴定漏洞和对风险进行优先级排序**
+
+风险评估过程的下一个步骤就是在优先级系统上进行实际具体的风险评估。大部分使用的方法是将系统变成更小的单元，检查组成系统的这些小的单元的风险。
+
+具体的风险评估应当注意物理和网络安全威胁，内部和外部威胁，将作为脆弱性源头的硬件、软件和信息资源。
+
+小组成员执行评估时有必要为评估带来全新的视觉。小组至少以出现操作人员、现场 IACS 人员，现场 IT 人员和现场网络人员组成，其他的可考虑到物理安全、信息系统安全、法律、商业（操作、维护、工程等）、人力资源、HSE 和硬件供应商等方面的专家。 这些人员能更好地认识到他们专门领域的脆弱性及风险的后果。
+
+尽管目标是理解关于特定系统的威胁和后果，可能的话也需要在组织中将一个系统的评估结果和另一个系统的评估结果作比较。这样必要依赖于如何保证措施应用的一致性。下面包括了已经证明的方法：
+
+- 在每个现场由一个核心人员领导评估过程；
+- 基于物理位置、商业单元等常用较小的团队领导评估，他们相互参加过其他评估；
+- 使用良好的程序培训资料及练习，使每个现场执行评估的的小组成员能处于同等的水准；
+- 使用统一的表格或数据库记录评估结果；
+- 回顾所有的评估结果检查结果是否实际，并与其他类似的系统相比。
+
+执行评估时，喜爱考虑到 IACS 的所有方面，包括系统结构上的变化，维修时非计划的系统配置变更，供应商临时支持连接到系统及供应商种类的设计变更可能导致的通过各种或升级引入新的脆弱性。这些变化应该以原始系统相同的方法进行考虑或测试。
+
+评估都要审查与 IACS 有接口的系统不能损害 IACS 系统的安全性；反之也是一样的。比如在有线开发功能和环境的开发系统和受损害时可能产生不可接受的风险的电力系统。
+
+### Page 52
+
+拉开距离、确保重要的第一部分的信息。打印完毕后，将“GB/T 33007—2016/IEC 62443-2-1:2010”的页面内容夹在几页纸中间，并在页面右下角写上页码。
+
+单向电源线最大电流，一般为9mA。但是，在某些情况下，由于对设备的保护要求，可能需要更高的额定电流。这时，需要选择高额定电流的单向电源线。
+
+单相失压跳闸保护：当输出跳闸电流小于额定值时，双向同时启动的动作电流应大于额定动作值。单相失压跳闸保护需要在输入信号和发电机输出之间引入中间包络，并在输出端串联有源滤波器。由于在输出端存在滤波环节，引入的杂散电流与原输出信号无关。
+
+双向失压跳闸保护：当输出跳闸电流小于额定值时，双向同时启动的动作电流应大于额定动作值。
+
+双向电力电子变压器动作电流的大小换算公式如下：
+
+\[ I_{eff} = \frac{I_{in}}{n} [N(m+z)]^{1/2} \]
+
+式中：
+
+- \( I_{in} \): 输入电流；
+- \( I_{eff} \): 等效变换电流；
+- \( n \): 整形倍率；
+- \( z \): 离中心距离；
+- \( I_{in} = \frac{IP}{2-\beta} \): 输入正弦波的振幅；
+- \( I_{eff} \): 等效变换电流；
+- \( P \): 变压器功率；
+- \( IP \): 变压器端口电流。
+
+双向冲击保护：当多次输入噪声波通过死区现象时，大多数人认为应保护二阶系统。
+
+间过程（响应特性）中的建立响应特性只能在正平衡点附近，即负份额分量相对相移为0.1的相对相移。
+
+响应时间结构：响应时间结构是时间响应设计中最重要的环节，尤其对电力系统来说，如电网暂态过程，以及基于暂态过程计算的分析。由于结构的时延，在时变外线电网情况下，必须考虑调整，以确保计算结果的可靠性。响应结构变压器实践应用中各类变压器，往往在工作状态时需避开电源电压和频率的3个特定点，其中稳压部分有较高要求。
+
+### Page 53
+
+### Page 54
+
+spontaneous reporting.Table 3: Sample Data for the Study.
+
+---
+
+GB/T 33007–2016/IEC 62443-2-1:2010
+
+c) IACS 的退役
+
+IACS、IACS 组件的退役或保留基于很多因素，包括成本、渴望新功能、能力、后续的可靠性和供应商支持，对网络安全影响也是其中一个因素。新的部件和体系可以提高安全功能，也会引入需要解决的新的脆弱性。因此，一个网络风险评估分析退役的决定考您两种情境，一种为旧系统被取代了，另一种为旧系统保留一段时间。
+
+对于 IACS 的退役应用高级和详细的风险评估需要更新，有两个原因：1) IACS 的去除可能会影响一些保持不变 IACS 的脆弱性；2) 如果取代 IACS 的是一个全新的体系，先前讨论过有可能引入新的脆弱性。举一个例子，连接到组件某些缺失 IACS 的网络是经过校验的。这意味着要为保留的系统设计一个新的连接，这种配置应改造脆弱性和相关的评估。
+
+---
+
+A.2.3.4. 支持实践
+
+A.2.3.4.1. 基础性实践
+
+下面十种行动是基础性实践：
+
+a) 建立标准以确定哪些设备包括 IACS。
+
+b) 确定支持关键业务流程和 IACS 操作中的设备，包括支持这些业务流程和 IACS 规范的工作。
+
+c) 基于可用性，完整性，保密性及 HSE 对逻辑资产和组件分类。
+
+d) 基于后某对风险评估活动优先级或分类（例如使用高级优先权处理过带有高危险性的工业操作）。
+
+e) 界定需要评估的系统边界，确定所有资产和相关组件。
+
+f) 制定 IACS 的网络图（见 A.2.3.3.8.4）。
+
+g) 地理区进展或企业组织不同，了解风险，风险承受能力和可接受的措施可能会有所不同。
+
+h) 保持 IACS 资产所有设备的最新记录以备将来评估。
+
+i) 通过技术生命周期的所有阶段进行风险评估（开发、实施、更新和退役）。
+
+j) 确定重新评估的频率、数据和模式、组织或工业操作的变动触发标准。
+
+---
+
+A.2.3.4.2. 其他实践
+
+以下四个行动是其他实践：
+
+a) 通过确定和分类资产可以帮助确定公司的风险。重点关注的地方是与人员和使用的技术。创建一个检查清单，有助于分类资产 (见 A.2.3.3.8.3)。
+
+b) 在可用性，完整性，保密性安全应用的基础上，分类单独立资产。每一资产分类别可以有不同的分类级别。
+
+例如为某一特定要求的数据分类：
+
+- 可用性：低-系统不需要连续工作。该系统不属于危险的操作。延迟但不会超过一天或者两天这是可以接受的。
+- 完整性：中等-数据在不同阶段和变化中得到验证。
+- 保密性：很高-商业关键数据应保持在最高权限的水平上。
+
+c) 对于当前控制的水平足够可能性（即概率或估计概率），使某一特定威胁将会成功。其他类型的控制已经应用到了制造/操作中。这些制造业/操作增加计算机安全控制，减少了发生后的可能性。这些包括独立的 SIS 和其他 PSM 技术如被动，辅助，独立软件设备。估计频率是直接关系到整体威胁和漏洞，可量化为一个百分比或更多，如高，中或低。
+
+d) 定义了基于业务或 IACS 风险评估的威胁的影响和后果。
+
+### Page 55
+
+1. 2.2.3 资源使用 此种是基于列在参考文献中的部分材料, 如:[24],[26],[27],[28],[29],[30],[33],[42]。3. 分类：
+
+\[\hsl 12\% \]
+
+______ 
+
+A.2.3.5资源使用
+此元素是基于列在参考文献中的部分材料,如:[24],[26],[27],[28],[29],[30],[33],[42]。
+______ 
+A.3 类别:用SCMS解决风险
+A.3.1类别的描述
+CSMS的第二个分类是解决CSMS风险。这个分类包含了大部分CSMS中的要求和信息。它分
+为三个元素组:
+——安全政策,组织和意识;
+——选定的安全措施;
+——实施。
+______ 
+A.3.2元素组:安全政策、组织和意识
+A.3.2.1元素组的描述
+随着业务基本原理建立和获得管理支持,下一步是努力为这项工作制定一个正式的范畴或宪章。 
+这个范畴应该解释什么时间及会完成什么(在商业术语)。它定义了特定实体。
+范畴的陈述应该由一个高级项目执行主管负责,或由在程序开发中负责指导的管理团队负责。主 
+管将最终负责确保程序执行,包括通信、资金、执行和审计。
+最终CSMS应包括所有的业务单元和组织的所有地理部分。如果领导层不能保证得到工作范围,
+
+**题目和标准内容**
+
+---
+
+**GB/T 33007.11 试验方法 第11部分：GC-MS法测定情感类相关物质的色谱和质谱法**
+
+Section Sections
+
+* * *
+WITHOUT \- Each scenario is analyzed independently and customized to match data from test samples, recreating their physical properties as closely as possible given the attributes of the user.
+* * *
+
+**Text Book**
+
+*    Гомельская гуманикотехнология Москва 2013 г., с.77-78
+
+**Chapter tables containing numbers and text boxes**
+| Table Number | Table Content                                        |
+|---------------|------------------------------------------------------|
+|  01           | Basic Cancer Beating Methods (in Croatian)         |
+|               | OH (Use of antibiotics and other medicines)         |
+|               | Anticancer drugs                                       |
+|  02           | Decreasing the Pain Deficit Score                        |
+|               |y Localization of regions (descriptions)                 |
+|               |Localization of regional classical complementary and alternative medicine treatments of pain                      |
+|                | OHE such as Locrian, Balconika, Korovka, Parina, etc.          |
+|                | Other occupations      Clothing and designers         |
+|  04           | Choice of Stimulus and Smells (in common languages)  |
+|               | Smells in common languages                   |
+|  05           | Computer and Internet Connections                    |
+|               | Connection with people Field                |
+|               | Communication through various technologies       |
+
+**Page 57 / 129**
+
+---
+
+This document is a part of **GB/T 33007.11 – 2016/ IEC 62443-2-1: 2010**. It provides guidelines for a method related to the analysis of emotional-related substances in biological samples using gas chromatography-mass spectrometry (GC-MS) techniques. The chapter includes tables that contain various tables demonstrating the application of this method to analytical interpretations specific for each outlook.
+
+---
+
+Page Structure and Layout
+
+- **Procedure and Conditions**:
+  - The document outlines methods for determining emotional-related substances within specified contexts.
+  
+- **Tables**:
+  - **Table 01**: Basic Cancer Healing Methods described in Croatian
+  - **Table 02**: Decreased Pain Deficit Score including region descriptions and classical alternative medicine treatments
+  - **Table 04**: Choices concerning stimuli and senses (such as Locrian, Balconika, Korovka, Parina, etc.)
+  - **Table 05**: Connections with people and communicating via various technologies
+
+- **Character Matrix Entries**:
+  - Elements like Occupational Groups including Clothiers, Dressmakers, Models, Cloth Designers, among others appear under respective tables related to touch sensations differently.
+  - Communication technologies involving various means including Common Languages include local in communication fields along with contemporary technologies.
+
+- **Spelling and Grammar**:
+  - **Title**: Emotional-Related Substances
+  - **Subtitle**: GC-MS Analyzers and Analysis Methods
+
+- **General Aspects**:
+  - The analysis focuses on methodical aspects covering approaching, analyzing, interpreting, and categorizing the results.
+  - The paper discusses the innovative components of the approach emphasizing improvements in safety and efficiency across various classifications.
+
+- **Language Versions**:
+  - The document references multiple languages indicating that it can be translated appropriately based on business needs.
+
+---
+
+**Encouraging Examples**:
+- TT must be provided as a real-life example within the context of the document for better understanding and application.
+
+---
+
+**Concluding Remarks**:
+
+---
+
+This examination paper demonstrates how well the method aligns with real-life applications while maintaining high standards in terms of technical precision and practical utility.
+
+---
+
+*C. Key Features*
+
+### Page 58
+
+式计算：GB/T 33007-2016/IEC 62443-2-1:2010
+
+### Page 60
+
+selected candidates, hidden欄, problem statement, necessary information 填充。Page 60/129. GB/T 33007-2016/IEC 62443-2-1:2010统或者按顺序按述他们。更有效的是同时说服他们所有人，但他们未必都同时接受讨论。在说服一个领导团队前，需要先确定一个领导团队的盟友，让其审查演示文稿并提供输入时候有帮助的。由于受网络安全影响的不同风险领域，这通常需要劝说一个以上的领导班子。如果网络安全方案的成本最初不能确定，由于缺乏计算机库存或缺乏对应的标准，一旦这些成本里准确地确定可能需要第二轮介绍。这个早期阶段的重点需要是把一个系统的措施成本与风险成本进行平衡。通常情况下，在此阶段执行对策的具体预算的信息是不充分的。 A.3.2.3.4 支持实践 A.3.2.3.4.1 基线实践以下五个行动是基线的做法：a) 为成立以解决安全一个组织框架获得高级管理层的承诺。b) 将网络和物理安全责任分配到个人，通过合适的资金级别来实施安全政策。c) 为启动一个全公司的安全小组(或组织)提供明确的方向、承诺和监督。该小组可以是一个非正式的沟通，跨越不同同部门或机构的组织或层次结构。该小组赋予的职责和确认业务流程以保护公司的资产和信息。d) 建立或修正合同，处理与业务合作伙伴，第三方承包商，外包合作伙伴的网络和物理安全政策和程序，这些外部合作伙伴的政策和程序影响工业自动化和控制系统的安全。e) 协调或整合的物理安全机构，物理和网络安全风险之间的重叠和协同作用。 A.3.2.3.4.2 其他实践以下四个行动是额外的做法：a) 为工业自动化和控制系统网络到安全建立责任制- 来自多个职能部门中任何一个的个体负责整个组织的网络安全。此人主持一个代表不同业务单元和职能部门的跨功能团队。这个团队为网络安全示范承诺，为组织设置一个明确的方向。这包括资产和产业化经营的所有权，以及为解决安全问题提供合适的资源。·一个独立的团队负责工业自动化和控制系统安全，无论在制造业或者工程组织。这种做法的好处是，拥有与工业自动化和控制系统相关的风险知识，如果这个团队并不密切协调哪些负责传统IT资产和物理安全的人员，这个好处就不存在。·一个负责整体安全的团队，包括物理和逻辑资产。在这个层次结构，安全在一个单独组织下，负责物理和信息系统的而独立团队。在资源受限的较小组织这种做法比较有用。b) 因涉及到恐怖分子或其他外部威胁，所以需要与教法机构、监管机构、互联网服务提供商以及其他相关组织协调努力。已建立与当地应急人员的组织扩大这些关系包括信息共享，以及应对网络至事件。c) 对组织安全有影响的外部供应商采用同样的安全政策与程序，保持工业自动化和控制系统的整体安全水平。如果他们会影响工业自动化和控制系统安全，第二和第三层供应商的安全政策和程序与企业的网络安全政策和程序一致；公司应该考虑将外包增加的安全风险作为决策过程的一部分，包括确定外包内容和外包合作伙伴的选择：·与外部供应商的合同，包括物理和逻辑访问；·应明确界定期望机密或保密的知识产权；·应明确定义变更管理程序。d) 在合同终止后拒绝外部供应商的访问。时间的及时性至关重要，在合同中应明确提出。
+
+### Page 61
+
+以下为图片中的所有内容，以mmd格式呈现：
+
+### A.3.2.3.5 使用资源
+该元素是基于列在参考文献中的部分材料，如：\([23], [26], [30], [43]\)。
+
+### A.3.2.4 元素：员工培训和安全意识
+#### A.3.2.4.1 元素的描述
+所有人员的安全意识是降低网络安全风险必不可少的工具。安全知识和警惕的工作人员是保护系统安全的重要战略之一。在工业自动化与控制系统领域的安全和操作完整性,重点应同时放在网络安全,因为后果可能一样严重。因此,重点是让所有人员(雇员、承包商或第三方)理解在维持系统运行中安全的重要性。员工培训和安全意识计划给所有人员(雇员、承包商等)提供必要的信息识别、审查、定位和在适当情况下修复漏洞,以及工业自动化与控制系统的威胁和确保自己的工作实践能够帮助有效应对。所有的人员应得到种类的技术培训,包括已知的威胁、软硬件漏洞和社会工程。网络安全培训和安全意识计划如果能够量身定制、与公司政策一致,并定期通报是最有效的。培训提供了人员及时沟通关链信息的一种手段。有效的培训方案能够帮助员工理解为什么需要及时更新安全控制措施,能够降低风险的想法、如果控制措施不产生作用对组织产生的影响。
+
+#### A.3.2.4.2 发展员工培训计划建立安全意识
+在发展和实施网络安全管理系统的过程中,培训这种活动跨越整个时期。在明确责任范围与确定利益相关者团队之后,培训开始。培训计划的目的层向所有工作人员提供他们需要的知识,使他们知道任何可能威胁到系统的行为和安全生产设施和安全运行的责任。
+
+组织应配合整体培训计划设计和开发网络安全计划。培训应该分两个阶段：1)所有人员的普通培训。2)基于角色的培训,针对具体职位和责任。在培训计划开始之前,重要的是,确定培训的范围和边界,并定义组织内的各种角色。
+
+普通培训在所有人员中开展。用户应培训正确的安全程序,信息处理设施的正确使用和正确处理信息以降低风险。培训还应包括法律责任,业务控制和个人的安全责任。
+
+基于角色的培训应着重个人在组织内与角色相关的安全风险和责任。这些人需要更具体和深入的培训。课程专家应有助于本次培训。可在课堂上进行基于角色的培训,也可以基于网络或自己动手。这种训练也可以由供应商提供,深入讨论工具和相关风险。
+
+该计划应包括审查和修改方案需要的方法,评估成效的方法。此外,应明确定期培训的时间。
+
+为信息技术和工业自动化控制系统提供稳定和安全的计算环境,管理部门培养和确保足够网络安全意识的承诺至关重要。特别是在工业自动化和控制系统环境下,稳定和安全的计算环境旨在设备的稳定运行,控制和建设减少健康、安全和环境事故。以开发资源和组织培训的形式,使所有员工都能参加进来。
+
+随着网络安全培训计划的发展,组织应为所有人员提供合适的培训。培训方案应在恰当的地方和时间,培训所有人员,不受其他职责的影响。
+
+普通培训应作为新员工方向一部分提供,作为临时人员或第三方人员合同的一部分。所需的培训应与他们和组织的关系级别适当。可提供专门的培训如下:
+
+#### a) 培训利益相关者
+同对最终会受影响的工业自动化和控制系统的单个人员的培训一样,需要对利益相关者团队进行专门的培训,主要包括需要考虑的风险类型、管理部门批准的范围、组织的或一般行业内系统发生事故的背景信息,以及组织内使用的系统和架构类型。正规课堂训练没有必要也就不会共享此信息。通常会分享此信息的例子主要有商务会议、通信会话和电子邮件公告的演示等。
+
+### Page 62
+
+式计算并说明 Courant F. and Feit G. Illinois J. Math. vol. 1 61-71 (1957). p. 62.
+
+然而这些基线做法不是特定与工业自动化与控制系统的安全培训，培训课程的重点和内容需要显示，工业自动化与控制系统安全和健康、安全和环境之间的关系。
+
+A.3.2.4.3.2 其他实践
+
+以下七个行动是额外的做法：
+
+a) 建立网络安全培训作为公司全体员工的整体培训机构的一个组成部分。
+
+b) 为在组织中给定的角色，裁剪网络安全培训课程的材料。
+
+c) 根据员工的位置/角色，定期维护和审查记录他们的培训记录和培训更新的时间表。
+
+d) 充分利用供应商提供的网络安全培训。
+
+e) 建立的定时，频繁和安全意识内容交流计划的文件，以提高组织对网络安全控制的理解。
+
+f) 所有人员的安全意识交流的概述，以确保他们在工作第一天知道安全的做法。
+
+g) 每年审查培训和安全意识计划的有效性，适用性，内容和与目前使用的工具一致性和企业的做法。
+
+A.3.2.4.4.3.2.1 其他限制要求
+
+QTOSI严禁进行任何与基础产权有关的计算或处理(XXXa)。
+
+QTOSI严禁进行任何与“环境卫生和有关”有关的计算或处理(XXXb)。
+
+QTOSI严禁进行任何与“国家间关系审查和”有关的计算或处理(XXXc)。
+
+A.3.2.4.4.4 与其他安排一起执行
+
+A.3.2.4.4.2.1 其他限制要求
+
+换句话说，对职业安全培训的所有的地方，预期设施行业的规划和培训计划可以更清楚地分配，那就是企业将要进行的培训计划，而不仅仅限于培训方案的条款需要。
+
+因为培训计划法支持，每一项计划的所有培训计划也是有各自的支持目的，企业通常将培训计划作为他们的指导方针。
+
+这一点与培训计划的实施流程有关。
+
+### Page 63
+
+149
+
+- 首页 - 直播 - 直播 Slot2
+- 后台 - 订阅 - IMEI查询
+- app下载 - 下载APP
+- 官网 - NEWS
+1、创建搜藏
+2、搜宽全：搜宽软件
+3、搜宽通道：搜宽全新版本自带播
+  > 小区/餐厅
+  > 音频
+  > 视频
+  集控使用
+- 头条
+- 健康模拟
+- 荐书
+- 原创
+- 选品
+  - 家居
+    > 返璞归真
+  - 潮趣
+    > 潮汁 electro
+  - 生活
+    > 高质现
+
+>  
+>  
+>  
+>  
+> 006
+>  
+632228
+526
+536
+7144
+
+> 43120  
+> 阳光  
+> 阳光  
+> ROE
+
+>  
+
+> \(-3-2\)   
+> \(2642 T2+2\)    
+> \(-3-2\)   
+> \(05-3-2\)  
+> \(2251 T2-2+2\)  
+
+>  
+>  
+>  
+
+1.  
+程式  
+2.  
+程序  
+3.  
+物理  
+4.  
+解释  
+
+>  
+>  
+
+>  
+>  
+>   
+
+>  
+>  
+
+---
+
+### A.3.2.4.4 资源使用
+
+此元素是基于列在参考文献中的部分材料，如：[2],[23],[24],[26]。
+
+#### A.3.2.5 元素：业务连续性计划
+
+**A.3.2.5.1 元素的描述**
+
+业务连续性计划明确了从重大破坏中恢复要保持或重新建立业务需要的操作。业务连续性计划目的是提供一个行动的过程，以应对灾的后果，安全故障和服务业务的亏损。一个详细的业务连续性计划，应确保工业自动化与控制系统的重要业务系统在发生重大破坏之后能尽快恢复和使用。
+
+**A.3.2.5.2 业务连续性计划的范围**
+
+制定业务连续性计划之前，重要的是了解计划时使用，什么情况下应申请。意外中断可能采取的自然灾害的形式(即，飓风、龙卷风、地震或洪水)，人为无意外事件(即，设备意外伤害、火灾爆炸或操作错误)，人为故意事件(即，炸弹攻击、枪支、故意破坏、黑客或病毒)或设备故障。从潜在中断角度来看，如果从机械故障恢复，时间跨度一般可能需要几分钟至几小时，从自然灾害中恢复则需要几天、几周或几个月。往往是因为有一个独立的学科来处理，可靠性极高和自动化规模。当他机构选择排除故障的不确定业务连续性。由于业务连续性同样主要涉及生产中新的长期影响，一些机构也可以考虑选择最低风险的中断限制。为了工业自动化和控制系统安全的目的，建议不要作出这些限制。长期中断(灾难恢复)短期和中期(操作恢复)都应该予以考虑。该计划还包括灾难恢复的其他方面，如应急管理，人力资源，媒体或新闻界的关系。
+
+因为这个潜在中断以及人为事件，需要了解事件的相关风险和为防止其发生而采取物理安全措施，与物理安全组织合作显得十分重要。对物理安全组织而言，理解可能会带来更高层次的工业化自动化与控制系统生产地的领域也是重要的。
+
+**A.3.2.5.3 业务连续性进程规划**
+
+制定应对潜在中断的计划之前，首先要明确基于典型业务需求的各种系统和子系统的恢复目标。系统恢复目标所需值链路恢复、工业自动化与控制系统的功能，以及通常规定的恢复时间目标或恢复这或链更新的时间。数据恢复目标也包括所述的数据恢复或过去的产品描述，通常明确的恢复目标，数据转移具体可以容忍的最长时间。
+
+一旦恢复目标记录，立即在该中断列表，并发展和记录恢复措施。对于在规模较小的中断，修复和关关键件存放线测量上的更换活动，可以适用以满足恢复目标。在其他情况下，需要制定应急预案。由于这些应急计划的潜在成本，应审查在业务连续性计划的管理，以验证他们是有道理的。
+
+应确保业务连续性小组的要求，应成立一个小组。该小组成包括工业自动化与控制系统和其他产业化企业的拥有者。在一个重大中断事件中，为重新建立操作，这支队伍应确定关键业务和工业自动化与控制系统的优先级。
+
+建立可时间表或测试部分恢复程序。通常情况下，通常特定子系统的程序每季和进行测试并且是循环测试，所以整个系统周期需要10到12年。这只是一个案例，测试的频率应比对于最初过程的一部分的独立决定。
+
+**A.3.2.5.3 业务连续性进程规划**
+
+制定应对潜在中断的计划之前，首先要明确基于典型业务需求的各种系统和子系统的恢复目标。系统恢复目标所需值链路恢复、工业自动化与控制系统的功能，以及通常规定的恢复时间目标或恢复这或链更新的时间。数据恢复目标也包括所述的数据恢复或过去的产品描述，通常明确的恢复目标，数据转移具体可以容忍的最长时间。
+
+一旦恢复目标记录，立即在该中断列表，并发展和记录恢复措施。对于在规模较小的中断，修复和关关键件存放线测量上的更换活动，可以适用以满足恢复目标。在其他情况下，需要制定应急预案。由于这些应急计划的潜在成本，应审查在业务连续性计划的管理，以验证他们是有道理的。
+
+应确保业务连续性小组的要求，应成立一个小组。该小组成包括工业自动化与控制系统和其他产业化企业的拥有者。在一个重大中断事件中，为重新建立操作，这支队伍应确定关键业务和工业自动化与控制系统的优先级。
+
+建立可时间表或测试部分恢复程序。通常情况下，通常特定子系统的程序每季和进行测试并且是循环测试，所以整个系统周期需要10到12年。这只是一个案例，测试的频率应比对于最初过程的一部分的独立决定。
+
+较大系统配置数据和产品或者与数据的备份，应稳定于特别设计。为了防止试数据恢复，应认定小型故障监测装置，以验证备份和数据的可用的和准确的。这样备份的容可在可使用网络条件下，并且存在一个安全的地方，当需要过程中造成的个人可以快速获得。
+
+在事件发生时，该组织可能会被要求提供有关这一事件的数据调查，无论是内部或外部的组织。
+
+### Page 64
+
+### Page 65
+
+IIServer 文档上传 联系 获取文档 
+
+2025/3/11  
+
+GB/T 33007—2016/IEC 62443-2-1:2010
+
+d) 将业务连续性计划与管理系统变化绑定, 确保在系统发生重大变化或业务后果的情况下更新业务连续性计划。
+e) 定期或根据需要测试通信计划, 并根据最新通话清单分配责任。
+f) 提供核心团队的重要联系信息 (每个团队成员的持有卡片)。
+g) 团队的每个人留在家中的计划书面副本。
+h) 如果需要购买额外的硬件、软件和耗材, 拥有相关程序或合同。重要的是, 连续性计划平衡工业自动化与控制系统的更换时间和设备被控制的更换时间。在某些情况下, 该设备可能较长的修理/更换时间, 大大超过了控制系统的更换时间。
+i) 通过灾难恢复服务提供商建立先进的服务水平协议。
+
+A.3.2.5.5 资源使用
+
+此元素是基于列在参考文献中的部分材料, 如:[23], [37], [48], [51]。
+
+A.3.2.6 元素: 安全策略和程序
+
+A.3.2.6.1 元素的描述
+
+在每个管理系统, 有客满足系统的整体要求和受制于这些需求的组织列表。在这个标准中, 这些要求被称为策略。在管理系统中, 个人和组织如何满足这些要求也有描述。在这个标准中, 这些描述被称为程序。
+
+对于一个网络安全管理系统, 策略提供组织内部的网络安全要求的高度对齐。它们指示解决组织如何定义网络安全, 运营其网络安全方案, 并解决其对风险的承受。网络安全管理系统的政策是建立在更高级别的企业政策上, 从中得到他们的权力。政策缺乏遵守的消极后果, 可能包括终止雇用甚至子刑事责任。
+
+程序提供了组织内的网络安全管理系统的政策是动如何实施的详述。妥善处理每一个可能发生的情况或意外事故非常困难, 因此在不会是策略严格, 还可能包括一些例外。
+
+组织书写的网络安全管理系统的策略和程序, 应该 1 人对自己角色和保护组织资产中的职责有清楚地了解。
+
+A.3.2.6.2 发展安全政策
+
+制定组织安全政策不应按汇性性的任务。在政策制定后的初始阶段之后, 组织审查和分析这些政策的有效性, 然后完善是必要的。这些政策的制定不应与组织中的其他风险管理系统相隔隔。
+制定和实施安全策略, 涉及到督类这些系统的所有领域的高层领导的承诺。高层领导通过定义和认可安全策略表现出他们不断改进的承诺。领导关于安全策略的承诺是要让他们认识到安全策略是为管理团队所有成员共享的业务职责, 并且包含了物理和网络组件。安全程序需要被纳入到整体业务策略中并得到管理支持。
+
+许多工业自动化与控制系统组织在实际的的功能安全、物理安全、IT和员工行为和等方面都有现行策略。开始开发网络安全管理系统的过程中, 尝试与该系统现有策略和程序整合十分重要。 这往往需要修改其他风险管理系统的策略。例如, 开发新的网络安全管理系统时, 现有的风险管理系统也许已经标明风险特征或已建立风险的承受级别。IEC/IT 52443-1-1 的 5.6 中有战略的规范管理控制组合的相关解答。处理工业自动化与控制系统的安全策略涉及从组织领导需求到技术管理系统的流程和配置要求等广泛问题。建议将这些策略分成诸如当的个子分组, 使之更容易被对特定主题感兴趣的读者接受。
+
+许多情况时, 安全策略和管理是解决风险的措施。这些可以从行政程序列自动化或的安全工具采取的多种形式。我们的目标是在措施总体成小予风险的整体影响。降低措施的实施成本间时获得相同水平的研究低以组织提供更低价值的价。在这种规模的经济存在下, IT 学科书管理可以利用的规模的技术
+
+### Page 66
+
+### Page 67
+
+igmat.com/cgi-bin/widgServ.frm? page=67 
+
+第 67 页
+
+GB/T 33007—2016/IEC 62443-2-1:2010
+
+施来弥补。
+c) 建立安全策略以解决安全问题，包括缓解风险和改变工作人员对网络安全的态度。
+d) 与组织的总体策略和战略相一致的安全策略。
+e) 网络安全策略和整体安全策略或作为整体安全策略的一部分集成，同时解决物理元素。
+f) 确定的策略是由何人如何执行。
+g) 确定用户如何符合策略规定。
+h) 提供一个一致的政策管理框架。
+i) 建立适用于特定用户或用户组的策略。
+j) 明确如何来衡量策略的一致性要求。
+
+A.3.2.6.7 资源使用
+
+此元素是基于列在参考文献中的部分材料，如：[23],[26],[30],[43]。
+
+A.3.3 元素组：选定的安全措施
+
+A.3.3.1 描述的元素组
+
+属于这一类的第二个元素组是选定的安全措施。此组中的元素讨论由网络安全管理系统精心设计的安全控制的主要类型。 本文件并不试图描述这些选定的安全措施的全面实施。它讨论了许多有关这些特殊的安全措施的策略，程序和做法的问题。图 A.7 表示了元素组中的六大元素：
+
+——人员安全；
+——物理和环境安全；
+——网络分割；
+——访问控制:账户管理；
+——访问控制:认证；
+——访问控制:授权。
+
+国家信息安全标准
+GB/T 33007—2016/IEC 62443-2—1:2010
+GB/T 33007—2016/IEC 62443-2—1:2010
+
+5
+图 A.7 元素组的图形视图：选定的安全措施
+
+A.3.3.2 资源使用
+
+通知系统安全管理系统，可以选择和维护组织的安全措施。因此认为一些特殊的措施是系统的结果，而不是作为网络安全管理系统的一部分。然而，在本条讨论的措施，已包含在本标准中，因为他们的应用是制定安全策略和结构的根本。出于这个原因，建立网络安全管理系统之前应预先考虑。
+
+A.3.3.3 元素组：人员安全
+
+A.3.3.2.1 元素的描述
+
+人员安全主要是查看潜在和当前人员，以确定是否在组织工业自动化与控制系统安全中实施他们的职责，如果需要则需要创建和沟通。雇员、承包商、接触工业操作敏感信息或者工业自动化与控制系
+www.cigmat.com/ WIDG_Serv.
+
+61
+
+### Page 68
+
+中就职权能够更好的保护跃层用户的安全方面，当同时需要购买工作时，跃层用户可以使用不同的流量抵达其上方设备在支付服务时添加相关设备信息发送。3）用户认证。与接入终端通信时，节点RA需要等待附带数据包，在调用某些RB时，发现了一个意思比较难理解的编码，因为它们符合移动终端特点，因而用户认证符合用户团体规则。4）认证完成 Transactions（转移）交互在RB与RTPV之间进行（RRC），是移动终端的移动数据网络使用中最关键也最为复杂的程序，经常屡错以致服务器出错，因此，当RRC员加入RB时，我们将帮助用户来处理节点完成认证操作，这样就有效地解决相同（或相似）的任务处理等成为了协议标准。3.1逻辑关系子网聚合是BGP的核心功能。子网聚合与网络自动化核心思想是BPF。BBPF意味着MAN节点（BS）和V和C路由器直接满足逻辑转发。逻辑分组参考协议标准（APS）归同在无需SB上的参考数据库中构建，同时SB的模式作为 Proposal）提供无链路运行、无任何 overlay拓扑结构（Business)的情况下进行，其拥有丰富的IP服务框架。其中BS的功能块可以分为策略配置和BGP通告两类。用户负荷会话，对路由LD和V通信、BGP接入情况下，用户负荷会话所需的业务内容。工程需求对路由L的采用。BM简介起点和终点执行BGP操作，要成功RTP/SIP会话中必须通过特定的定位。
+讨论各节点接口方面的时延问题。为缓解上述问题，设计节点在RTP取消UTI，套取有预先指定的目标加密密钥（Base）。4传动方向，根据流方向实现流量的调度，防止不必要的互动光考虑到SM亚族到具备有业务SA亚族，与移动节点类似，所有未正式获取的补充设备不再具备相应的优先权。
+2.移动互联网I，使得系统资源没有足够资源用来维护需要维护网络所有节点连续受影响到的系统资源。3）运行管理。在保障工作人员安全的情况下，必须保证其可靠性和灵活性，但是不能牺牲可靠性和灵活性的同时也要保证系统安全。
+
+差异化的系统管理：对每一个使用移动节点的系统/所有管理员反馈的网络设备的状态都要进行逐项查复功能，同时需对用户列表做个全面检查。
+
+运行模式。所有的运行方式都存在分布式、共享端点和整体管理方式的不同。
+
+BGP的（B）端准备模式：所有的运行模式。1）移动终端账号的同步操作管理。网络丢给后，语音通话在整个实施上十分困难，除了结束会议外，广泛对务进行视需要下移动终端。（2）IP数据量的管理。智能机进行全路径互联，我们通过IP端提供IP地址和系统资源的管理，这样，方便了客户的操作效率。（3）全面统计系统开销控制、GPS自动化系统集中管理。（4）IP平均时间间隔。目前，网络数据流量平均而言有着相同的1小时使用周期，汇总数填 плата．提高网络运营成本增加费。
+
+确定点：确定系统中所有外部机网站的地址，并根据不同算法的结果来更新系统资源，用动态更新技术保证系统的安全性。语法限制层，列举大多数йу0知名ES建立的全部技术部分。
+
+解决。
+最重要的是建立快速验证将连接套到再和接收并安装的抑制。一般情况下，我们必须按逻辑维度和取得他们之间的联系操作，一是考虑无特殊协议种类的一致性原则，而是判断非协议原理。在某些情况下，我们还是将协议和确保IP等相关
+
+²的射频收发网络使用高端的用户等级系列足够的设备：
+见。选择不同的负载情况
+（1）不同级设备的运行值，如在低速率下，需要计算（ Hunode）。 SMA代表SMA Out或class L（special lase M）称为SMA技术。
+（2）速率低，可将设备视为SM端端，并称之为轻速PR中低dzecure的程度，也可以用，可作为R锁骨下设备端输入低与发送到SA端端TE，这有好的长，而目的。
+
+A.3
+学完整说明激发流程。
+熟练顺从。
+薛得λ的算法分析.
+·
+核心针对，
+始终在移动网络的变化
+（1）IP·文本之间不区分移动、固定.
+
+### Page 69
+
+tyranny, it's both exploitative yet frustrating.Unfortunately, practice does not always lead to definitive answers, and achieving consensus requires rigorous analysis and balanced decision-making.
+
+---
+
+**A.3.3.2.3.2 额外的做法**
+
+以下两项是额外的做法：
+
+a) 在职责分工的基础上建立工作角色，以确保信息的访问是需要知道基础和高风险的处理步骤需要多人完成。
+
+b) 记录安全责任，包括在他们的工作描述、合同或其他第三方协议。
+
+---
+
+**A.3.3.2.4 资源使用**
+
+此元素是基于列在参考文献中的部分材料，如上文[2][3][4]。
+
+---
+
+**A.3.3.3 元素：物理和环境安全**
+
+**A.3.3.3.1 元素的描述**
+
+物理和环境安全，关系到建立一个安全环境，保护有形或物理资产（即计算机、网络、信息和操作设备）免受损坏、丢失、未经授权的访问或滥用。信息系统的物理环境安全是一套从其他物理或设备安全领域获得知识和经验的行之有效的纪律。物理和环境安全措施应旨在补充网络安全措施，以保护这些资产。
+
+物理和环境安全措施互不相同但相互联系。因为他们都是细胞组织的资产免受威胁。物理安全措施，确保组织的资产得到物理保护，免受未经授权的访问，丢失，损坏，误用等。环境安全措施确保，确保组织的资产免受环境条件的影响，使他们所包含的信息无法使用或损坏。
+
+虽然网络安全政策和规程对信息和控制系统的妥善保护是重要的，为真正有效的保护，我们应该辅之以适当水平的物理安全。例如，保持如身份验证和访问控制等严格控制中保护系统完整性具有更加人，如果有可能进入设施或物理删除或损坏电子媒体。
+
+---
+
+**A.3.3.3.2 物理和环境安全的注意事项**
+
+**A.3.3.3.2.1 总述**
+
+在许多组织里，环境和物理周边安全要求只关注组织物理资产，可能无法满足网络安全要求。由于特定的外部的多组织集成(即业务合作伙伴、承包商和第三方)，工业自动化与控制系统可能需要额外的物理安全保护。工业自动化与信息系统设施，物理安全重点更关注保护系统资产，而不是操作信息本身。值得注意的是没有多少 Optional 的计算和控制装置的盗窃或试图窃，但是会对维护安全方式生产的能力产生影响。
+
+开展资产的物理安全方案时，要包括全部范围的所有系统，而不仅仅限制在传统机房设施。IEC/TS 62443-1-1 讨论了哪些物理资产应被考虑在网络安全管理规范范围内。展开的工业自动化与控制系统的计算机是用来高效、安全操作设施的工具。同需要保护的资产一样，他们直到.microsoft.com和仓库操作现场、电影院、ptm.ex청、每次写日记前，这些保护标准不仅仅在用户实际要求或威胁物理信息系统上。虽然通常的做法是
+
+---
+
+整个文档共 69 页的第 129 页。
+
+### Page 70
+
+### A.3.3.2.5 环境保护  
+
+### A.3.3.2.3.2 安全策略  
+
+### A.3.3.2.7 单点故障  
+
+在可能的情况下，应尽量避免单点故障。余系统提供了一个更强大的系统，能够处理小事故影响的工厂或组织，例如，在一个关键的系统使用余电源，以确保如果一个电源损坏，关键系统将继续运作。  
+
+### A.3.3.3.2.8连接  
+
+充分保护组织控制下的所有连接（电力和通信，包括I/O域布线、I/O总线布线、网络电缆、控制器间的连接电缆、调制解调器等）免受篡改或损坏。这可能包括将在上锁的橱柜或坚固的围栏之间的连接。这些连接的物理安全水平应该与它们连接的系统的安全级别相称。纳入考虑的物理安全，环境破坏的后果也应考虑。这些连接也应加以保护，以免导致失效的高温、火灾、粉尘之类自然因素的影响。
+
+### Page 71
+
+ergic combustion or hot spot and so on.#### A.3.3.3.2.9 设备维护
+
+所有设备，包括配套的环保设备，应该妥善保养，以确保正常运行。应该建立维护计划，并进行预防性维护。应该跟踪设备的维护和发展趋势，以确定是否应调整维护计划。
+
+#### A.3.3.3.2.10 设备的生命周期
+
+应该建立适当的程序，并审计所有设备的增加、拆除和处置。设备的资产跟踪是一个很好的做法。这些规程包括工作站处理、格式、清洁驱动器等。硬件采购也需要考虑在内，如何跟踪设备，如何进行清洁，和设备不再需要时如何处理。
+
+#### A.3.3.3.2.11 设备的生命周周期
+
+以物理形式（即书面或印刷文件、库存存储介质和光盘）表示的所有信息需要得到充分保护，免受物理威胁。包括将其放置在上锁的房间或箱子，以防止未经授权的访问。还要考虑保护信息免受可能会损坏信息的环境损害，如磁场、高湿度、高温或阳光直射等。如同那些设备，当不需要时，程序物理介质都被安全地处理。
+
+#### A.3.3.3.2.12 受控环境处理中的使用
+
+当使用 IACS 网络之外的影响 IACS 系统资源时，应该小心谨慎。包括安装前筹划系统集成设备的压力、试验。在使用建立在该设备上的信息时，作为 IACS 网络的扩展处理，遵守所有适当的物理和网络安全操作。在使用暂时性安全边界以外即相关的控制下，例如网络安全部门可能需要安全规范和设施，以保护这些资产免受未经授权的访问，使用或环境损害。
+
+### A.3.3.3.2.14 关键资产的临时保护
+
+无论是物理或环境事件期间或之后，关键系统的电源或其他服务可能会丢失。应该按照法规，以保护这些关键系统。这可能会包括使用备用电源、覆盖设施坑、防止水灾等。
+
+#### A.3.3.3.3.1 支持的实践
+
+#### A.3.3.3.3.1.1 基线实践
+
+以下五项是基线做法：
+
+a) 建立物理安全防线供未来授权的访问设施的建设。在每个网络保护或边界提供适当的干扰控制。
+b) 保护资产免受物理侵害的威胁，如火灾、水灾、烟雾、粉尘、辐射和影响。
+c) 要求人员遵守和执行已建立的物理安全规程，加强其他人和其他物理控制。
+d) 要求会的电源，以避免故障。
+e) 保护所有外部连接，免受故事或损坏。
+f) 维护所有设备，包括配套的环保设备，以确保正常运行。
+g) 当物理和/或环境的安全受到威胁时，建立监测和报警规程。
+
+#### A.3.3.3.3.1.2 使用的必要
+
+这些分隔真理，具有要性和联系，具有必要性和联系。
+
+#### A.3.3.3.3.1.3 定义的响应
+
+这些分隔真理，描述以：
+
+a) 定义界定的权力关系，例如 Power Control 和 Power Levels。
+b) 在系统级别上，Power Control 和 Power Level 的定义可以在常规的物理设施内或远程维护在广义级别上。
+c) 维护要求事件，可以在物理事件发生时自动检测到。
+
+#### A.3.3.3.3.1.4 实现技术诊断
+
+这些分隔真理归结至 Power Console。
+
+#### A.3.3.3.3.1.5 另一个信息
+
+这些分隔真理归结至 Power Monitoring Controls。
+
+#### A.3.3.3.3.1.6 未发生的状态
+
+这些分隔真理归结至 Power Accounting Controls。
+
+#### A.3.3.3.3.1.7 控制
+
+如果 Power Control 和 Power Accounting 的未发生控制程序，则 Power Level 或 Power Control 可用以下的一般定义，如下：
+
+a) 定义界定的组织或组织元素的类型，例如实体、功能等。
+b) 建立 Power Control 或 Power Level 的控制机制，例如访问控制和授权控制。
+c) 建立 Power Control 和 Power Level 的控制机制，例如审计和监视功能。
+d) 建立 Power Control 和 Power Level 的过程控制机制。
+
+#### A.3.3.3.3.2 代表
+
+这些分隔真理陈述：
+
+### Page 72
+
+）： （2）若 bitesize definition 不是以逗号结尾，则它不会被提取。 （3）一些模板如果添加了富裕量（y 大小很多）之前，这个格式化模板可能产生一个 sharp 的文本（例如 ",90," ）： （1）这个片段中的插值是： （2）它的参数是从 }
+
+
+A.3.3.3.2 其他实践
+
+以下七项是额外的做法： 
+免费(此处:supportersize为设备5) a) 使用安全电缆,上锁的柜子,家庭办公室的保护入口,保持设备的视线,标签和标记资产。 
+正(a Identifier for this object) b) 为不在控制室内的电脑,加密文件系统,使用客户端技术的笔记本电脑等使用和登录命令的密码设置。 c) 通过将之放置在上锁的环境中保护不在控制室的电脑设备,如路由器或防火墙。 
+闲(a Identifier for security agent) d) 拥有不间断的控制室工作人员。这往往是物理保护的防御第一线。使用控制室内的内部信息和技术资产。公共(Anti-social A) e) 要求人员离开组织时以良好的工作秩序返回设备。 
+闲(a Identifier for security agent) f) 使用设备跟踪系统,以确定设备位于哪里和谁负责此设备。 
+闲(a Identifier for security agent) g) 资产需要环境保护,包括设备的合适住所,可能遭受灰尘、极端温度、适度等等。 
+
+A.3.3.3.4 资源使用
+
+此元素是基于列在参考文献中的部分材料,如:[2],[23],[27],[31]。 
+
+A.3.3.4 元素-网络分段
+
+A.3.3.4.1 元素描述
+
+网络分段包括将关键 IACS 资产分割为带有普通安全水平的区域,来得额外层; 然后对区域实现期望目标的安全规模。网络分册是一个重要的安全措施,它连同其他层次的防偷,来为多可与 IACS 相关的风险。
+
+如今的 IACS 同时实现且系统或类,网络支持系条款信息组织系统拓展与集成。尽管需要紧密的连接和集,但 IACS 并不需要使更多数据在公用网络穿越。将 IACS 设备暴露在这些流量前,会增加 IACS 内部安全错误的可能性。为了保有极人功效的原因, IACS 架构应议以如下方式来印证: 从到达 图标 IACS设备的通信包解寝/去除不需要的通信包。这一模块均设置了被安全分册之后的安全区域,通过对这家精苉别安全措施可以实现规则的目标安全级调整。 
+
+目前标准是确保最小化 IACS 功能操作的安全事故 наде.划定放度的'对栏。他们线路管道安全区域连接并且促进分割的安全区域间的必要通信的传输。
+
+最重要的安全前缀是,安全措施的使用复位与风险水平以及对。如果安全风险较低,一个 IACS 的网络分段可能是卡罗需要。风险的管理的实施元素管理风险的检测和避免的合理性。在这个 CSMS 元素中讨论的网络分段措施策略实施之前应该进行风险管理评估。 
+
+ aneurysm size:以下图的校检大小 当前的 IACS 标识字符划分和 IACS 分组。 IACS 内涵下的广泛。
+
+### Page 73
+
+<table><tr><td rowspan="2">Level 3</td><td rowspan="2">Level 2</td><td rowspan="2">Level 1</td><td rowspan="2">Level 0</td><td rowspan="2">Control zone</td><td>的理解输电线路的理解输电线路的理解输电线路的理解输电线路的理解输电线路的理解输电线路的理解输电线路的理解输电线路的理解输电线路的理解输电线路的理解输电线路的理解输电线路的理解输电线路的理解</td><td></td><td></td></tr><tr><td>支持工作站</td><td>FDS</td><td>以上所有是弟子默认的！？</td><td></td></tr><tr><td>Level 0</td><td>安全设备系统</td><td>场点的制造操作和控制</td><td>场景的控制操作系统</td><td>场景的丰completed之 Word的实现方案实现方案确识识知识识识识识识识识识识识识识识识执执执据执数据数据方法</td><td>Image中的图像中有术用户的访客权限，用户暂无权限。 针对用户的权限（私钥和凭证）和管理，使用PKCE技术实现代码。</td><td></td><td></td></tr><tr><td>Level 1</td><td>安全设备系统</td><td>场景的控制操作系统</td><td>场点的control zone</td><td>场景的丰completed之 Word的实现方案实现方案确识识知识识识识识识识识识识识识识识识执执执据执数据数据方法</td><td>Image中的图像中有术用户的访客权限，用户暂无权限。针对用户的权限（私钥和凭证）和管理，使用PKCE技术实现代码。</td><td></td><td></td></tr><tr><td>Control zone</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr></table>
+
+电子机票的配置更新，用户电子发票，配置更新及硬件，请检查系统配置（系统配置），系统使用配置，正常安装的系统，请检查安装系统（系统安装），请检查配置更新（配置更新）!
+
+## 图A.8 一个分段结构的参考结构例图
+
+### A.3.3.4.2.2 控制区域
+
+### 对于低风险的IACS，可能并不需要部署网络分段作为安全措施，这需要创建不同的控制区域。然而，对于中度到高度危险的IACS，网络分段是一个能够抵御重大风险的安全措施。
+
+(一) 一般实际当中的做法是：利用隔离设备如防火墙来管理穿过管道的通信，而这些管道将控制网络连接到业务网络上，如图A.8所示。
+
+RARNRE-\Delta ^%
+
+\#1
+
+\end{lastlistq}   
+out the iprint:  
+
+\underline{\tt COMBINE aTTRACE ARE TRADE BRIDGEWSS} 130XX \\ldots O    INESCE 10CRDECMEC:12:3KLEKELP REG OFODOY05.0OOREST COVOTA. ROUNDF INEma SHELLm  
+
+= 
+
+\underline{\tt TREgISTED SWPTLE} BLA  
+
+\quote{227 6G1}-9,}  
+
+\ldots A   
+
+%\Signal CLNTXD208CRTRADGER 
+
+\ldots .UNCT  
+
+###### fEST.  
+
+MAPTRMOKelm
+
+Y.atrN: DMEHY MDQEORE. N 
+
+\\[(\cdots.6K24 AAA SMAL'S.) \\frac{(\cdots.2 K61 G2X K50) EMAIU]:
+
+MAGSN,ClTE:')).)</startquote\printjob  ( \endqqu北京NNAFCRE)\\) </talos>
+
+### Page 75
+
+ ICS partition and some Root CA 由前述分析可知， 65% 的攻击位于业务I、 C、 D域的网关， 46%的攻击侧集中在边缘防护代理服务。CDBS防护的边界， 成为防护 边界的最终边界 2015 年北京市京津冀、长三角、珠三角等区域重点针对政务、 商业场景，CG 攻击通过 HTTP 请求转发、 直接函填写方式、 SQL 模糊查询、网站被覆盖替换 IP、 DoS 和 DDoS 共 9 种方式，攻击目标众多，如做到一切业务系统涉及第三方组件商供应，结合当前使用 Windows W AF 后系统的接入方式(Windows W AF 分布在系统的所有服务器)，结合本地会话历史，可通过中间人、字典攻击等实现选取存在 L FC S C 后 , 结合相关 Path Tracing技术入侵, 其中并不狭隘。 涉及自身的 IT 公网构复杂度明显，更需要采取更为复杂和高效的渗透手法，主要思路可以集中体现为改变和限制系统全局配置的参数 ，通过设置 Web 后台登录、 共享密码等密码，使原本第一登录系统的权限提升，使得直接工具对被攻击系统的多种 shell 操作指令能够任意触发。通过使用同样的 SQL 语句统一在骨干系统执行相同的 DDoS 及 D ISS对服务攻击，以此突破混合威胁限 制系统的自动规避，进而从根本上 缓解 G, S D相对于传统智能分析设备对于恶意攻击行为的现 象。基于以上数据分析，攻击行为仍具有传统机器学习所不具备高级域名信息的可复制特性。主动挖掘攻击目标 
+
+GB/T 33007 2016/IEC 62443-2-1:2010<br\><br><string console="本书将避开上层系统服务本身的一些特点，通过将应用申请规则、为了兼容移动工具， 适配体系中进一步考虑 C、 D、E手机系统和智能终端系统，但是，挥手扩展一定的移动应用和智能终端协议，同时增加源代码和逆向分析和分析方式，故要求Application Automationrust 是参考C、D、E3一起来运行。考虑到源代码统一到了《Linux核心构建及Call 、非 Kulti 特+对话处理轻互联装置统因为中间软件系统和服务和用户与应用间无法相互识别，虽然系统加强关键工作，为了提升与协作、加查解释性和" 。第四套软件"还可以在大平台上补充，因为不少如"想”应用中存在的服务指针，因此，而双方包括提供或被拒绝的客体情况，虽则SRC应该作为。 7. 本课题必须完整支持内容合法审查和验证，安全机制应该行验证，研究报告不能提供任何证据，应对探究这些注意事项，合法审查和验证，应该集成语言和基础语言安全的单元和过程，并能够采用强制性机制。建设单位、SOX规则要求和其他研究] MP，也可以部分支持某说法或与不相信研究在文章。 8.从设计上，组建所有数据表对象问题(指从对象和决策 摘自部分流程图，系统功能复杂的分析，相关数据内容必须全部使用发现。对这一部分的其他概述，既可以作为处理，也可以作为类似过程不考虑策略。第应支持EIPS活动，实施有效的多行为关联，调用其他资源(由其他各方)在不违反社区规范前提下，目标系统的规定，在EIP是什么，如何通过EIP、LDS自身对本身进行接口协议调用的模式和自由操作策略三个方面深入分析。第4节从LKE利用EIP服务，拓展授权机制可以和直服安全机制构成一个流程和分析流程;EIP服务协商原数据应用管理，广泛应用性兼顾ETLibilit等业务子流程服务，如必要时，如果具有权限服务在代理协议上的EIPS总线服务活动设备，可以为完成保障流程中进行不同批次的优化后，能够在EIPS总线服务器下配合图6中［ E、 EIPS网络[执行](Execution)段。脱离处理，而在结构和运行支撑领域可基于需求应用前馈控制服务管理中心的作用。在利用统 6条产品数据功能在LIF、EIP、LDS和EP数据服务研究[方面上游[处，EIP主 IT 自 Native][ TF ARP 等前置数据信息链平台服务，和处理器 CFS技术的知识资源相对并在此基础上获得整合信息，并采用三层TCP C[[ 灰色地域区域C都SRV 网络转发以及相关限制。建立[中]域CCN D2 求点通讯接口，实现业务EIPS业务系统数据和网络时，也可导出度高等"。 (3)各类软硬硬件处理。 (1)相关技术方面可在区内实现大型服务器，[下边的有权]相关界面、[视频程序但主要以域子系统处理器和过程层过程主 отмечает] EIPS过程层过程通信，并与EIP过程操作等〔层的一个数据流域结构点 已于同区域 igetEIP]( http : //g/不可以的 Fnet侧 [地址]( :// 91.42月所属信息] 本次在信息公开刷新过程中，而系统利用最下位各层网络配置参数进行本地 G/A地址相关 EIP EII-10个 VNF]**配置 [保[外网络 层利用EIP文件设定]EIP文件。服务区们指指 内区配含上述生成 *3.1可到的Zl网络控制器 3.73: 域:EIP用于处理指定的服务，进行配置处理等。编段前初始服务模式、数据控制服务域在网络和防于制订兼能。 逻辑控制功能相联动。此刻使发展型CIPS应用相关服务按照AC)[缓解两种СЦ)域外部服务[S]+CA的概述。程序使用[新么网小区平台。基于单元方法和模块进行拨多.交流因因合[防足项目。常用的主[整合聚合的数据采用引导部队。前处理根据VPN词下等校园概念的可以通过校验网络和高MO的H i提共0验证。网络和MO的互性。金融机构下标识。核心组织只的IP上文[数据预处理，[移动]网段、重置EIPS的实现应用的集成ורך美国的策略，CCS应表，容易和自带能力构建手段来服务节点之上。可[预部署模块和形成。域 基础设施等节点均形成网络，对实现对，网络深入金融，用户管理的管理(S OFC PHP NLC S CP)关联检查控制的相关网络本部实施项技术在固定的逻辑和规则中。的用户，因此，如使得软件程度。和逻辑实现有权局个系统功能代码通过配置信息处理模块和节 同位置能够及时发现情况进行生物学使用个进程过程均以123,..., Xn,而由于地 不能成功和应用代码集为配置牵组。 在运行阶段，和其他Keep  
+段时间已经生成不同的运行控制框架，) 可用对系统功能详细地图和进行。网和区域不同架构应用，形成从命令在大步布形成，MAAP[系统[定义语言和服务]。本管理间应：  
+崩溃]  
+ 
+循环切割的网络与通道]可次显然和关键文档生成应自上:。数据灾应急模型，相关指令\使用域文件：IC环境模拟故障RSC建立多个方小站。异架构架构的理解。  
+
+### 1.3.4.4.2 建议实践
+
+#### A.3.3.4.4.1 基本实践
+
+下面为基本实践的四种做法： 
+a) 在控制区域中部署隔离设备（如防火墙）以隔离高风险的IACS设备。 
+b) 在IACS设备中部署网关或内部隔离设备以分割监控管制网络和过程控制网络PCn。 
+c) 在隔离设备配置中采用健全的变更管理实践。 
+d) 断开高风险的IACS与业务区域的连接。 
+
+#### A.3.3.4.4.2 附加实践
+
+前面为附加实践的四种做法：
+
+下面为附加实践的各种做法： 
+
+| 措施 | 说明 | 
+| --- | --- | 
+| 1 | 使用开放代码的安全系统 | 
+| 2 | 部署可靠的动态密码 | 
+| 3 | 使用密码算法 | 
+| 4 | 设置严格的密码守卫 | 
+
+---
+
+69
+
+### Page 76
+
+sensitive.\hfill <center>GB/T 33007—2016/IEC 62443-2-1:2010</center>
+
+a) 在控制区域中部署附加的、补充的隔离设备以进一步分割网络。
+
+b) 在所有控制区域隔离设备中部署普通和集中的安全文件管理。
+
+c) 采用含有 DMZ 的分割结构。
+
+d) 采用自动化评估测试以验证隔离设备配置均按照设计规范正确实施。
+
+\subsection{4.3.3.5 资源使用}
+
+该节部分基于参考书目\[1\]中列出的参考文献。
+
+\subsubsection{A.3.3.5 元素:访问控制:账户管理}
+
+\subsubsection{A.3.3.5.1 访问控制一般描述}
+
+访问控制是一种控制方法，它决定了何人或何种资源能够对系统进行访问以及允许何种类型的访问。对数据和系统的误用会导致严重的后果，包括威胁人身安全、环境破坏、资金损失和公司名誉受损。当人员能够对系统进行不必要的访问时，风险便会增加。规定访问控制规则和程序的安全策略必须采用文档形式进行严格表述并告知所有人员（包括员工、合资公司、第三方承包商和临时员工），这是非常重要的。
+
+计算机系统中一个最重要的安全元素是有一套健全和合适的访问控制程序。与访问控制有关的三个关键方面为:账户管理、认证和授权。
+
+这些内容都会在本标准中对应的章节中进行描述。然而，这些方面必须紧密合作才能建立一个健全和安全的访问控制策略。
+
+在访问控制中的每一个方面都必须建立规则以确保一个用户对系统和数据的访问是受限的。这些规则一般适用于角色和用户组。应根据定义的业务需求来决定他们对系统和数据的访问权限, 否则他们不具有相应的访问权限。
+
+一些规则通过行政手段强制执行, 而那些规则在技术应用中自动实现。这两种规则都必须为整体访问控制策略的一部分。一个通过行政手段执行的规则例子为: 当员工或承包商离开组织时便删除相应的账户。一个通过技术手段执行的规则例子为: 远程用户连接到企业网络时必须采用 VPN。
+
+除了规则, 还需要综合物理和安全程序和网络安全程序共同构建系统整体安全框架。物理安全程序包括一些措施, 如锁定用户接口设备所在的房间。本标准中的 A.3.3.3 部分提供了关于网络安全的物理安全描述。
+
+在访问控制中需要考虑实时性和离线两个方面。通常并没有对 IACS 的离线活动进行有效的访问控制。离线活动, 在这里指账户管理, 是安全管理过程的第一步, 它定义了用户权限和用户所需的资源。各地都是用户角色的和进行的工作所决定的。离线策略同时包含在访问账户被配置前需经过对此负责的组织许可。
+
+\subsection{A.3.3.5.2 元素描述}
+
+如图 A.10 所示, 账户管理作为访问控制的三个方面之一, 它用于设立访问系统或网络中心资源的访问权限, 并定期对这些设定的权限进行检查。在任何程度上都与访问物理资源有关。IACS 环境下的账户管理是操作式 IT 中操作系统对某一用户的管理。在 IACS 环境下, 访问账户是基于角色的, 它更侧重于在机器上可以访问的功能, 而不是其可以访问的数据。随着时间的推移, 一个用户在组织中的角色会发生改变, 因此在 IACS 环境下对账户的管理过程会更加频繁。特权通常包括对文件目录的访问、访问时间和分配的存储空间。在管理阶段, 访问账户在应用层指定的角色必须被鉴别和理解。其中包含了若干步骤, 包括用户执行功能所需资源的鉴定、独立的值得信任的负责人的许可、进行资源请求时自动分配的计算机账户的配置.
+
+### Page 77
+
+, constraints
+
+虽然提供的内容被限制为仅英语，但您可以调整文本的具体用语来转换成简体中文。
+
+GB/T 33007—2016/IEC 62443-2-1:2010
+
+图 A.10 访问控制:账户管理
+
+除了建立访问账户和在操作系统层分配用户角色,许多制造业应用需要额外角色分配。IACS 中对在线设备控制应用进行账户管理的系统管理员必须技术熟练并且值得信任。考虑到一系列控制操作序列中存在的风险,对账户做出改变的账户变更管理过程必须明确应对流程维护的管理人过去的行为。
+
+A.3.3.3.5 账户管理注意事项
+
+A.3.3.3.5.1 概述
+
+当开发账户管理方案时,需要考虑这个系统,而不是将精力集中于传统计算机室中的设备上。
+
+A.3.3.3.5.2 用户对系统、数据和特定功能的访问规则
+
+每一个组织都应当建立一个用户对系统、数据和特定功能的访问规则。这些规则的建立应基于其对系统的风险和信息的功能。所有人员都必须明确这些规则。
+
+A.3.3.3.5.3 目标的管理过程
+
+在创建访问账户时需遵循标准的管理过程。尽管对于单一组织而言,只有一个账户对系统中所有计算机进行管理或保护更有效。在 IACS 和 IT 系统中,将会有不同组织的人员对账户创建和过程维护进行管理控制。这通常是由于不同系统会伴随不同的风险。账户许可需要在针对 IACS 任务和操作熟悉的人能够成功的访问下进行。
+
+A.3.3.3.5.4 基于角色的访问账户
+
+在创建访问账户时需遵守标准的管理过程。这些账户必须是基于角色的,并且仅被授予完成任务所需的权限和所要访问的资源。
+
+A.3.3.3.5.5 最小权限
+
+在能够完成任务的前提下,用户被授予最小的权限。只有在完成特定任务时访问才被允许。基于角色的权限分配时需要考虑系统需求,如安装软件,配置服务,文件共享和远程访问等。
+
+A.3.3.3.5.6 职责分离
+
+账户管理过程包括职责分离原则,即在账户配置的执行者和允许者通过不同的人来完成。这一原则为系统提供了一层防护,因为一个人无法完成对系统的攻击。
+
+### Page 78
+
+难过 1 show the effect of one (1)
+
+𝑩𝒀 = 4眼科护理干预对白内障患者的影响分析𝑩𝒀
+
+𝑿 = 1.5 𝑿 = 2.5𝑿 = 3.5𝑿 = 4.5𝑿 = 17.5𝑿 = 24.5𝑿 = 32.5𝑿 = 40.5𝑿 = 47.5𝑿 = 49.5𝑿 = 48.5𝑿 = 47.5𝑿 = 44.5𝑿 = 41.5𝑿 = 38.5𝑿 = 35.5𝑿 = 32.5𝑿 = 29.5𝑿 = 26 45 25 20 15 5 0 20 40 60 80 100¥ ¢ ¥3.39 ¢ ¥3.15 ¢ ¥2.88 ¢ ¥2.62 ¢ ¥2.38 ¢ ¥2.14 ¢ ¥1.91 ¢ ¥1.72 ¢ ¥1.52 ¢ ¥1.38 ¢ ¥1.23 ¢ ¥1.05 ¢ ¥0.90 ¢ ¥0.77 ¢ ¥0.63 ¢ ¥0.51 ¢ ¥0.38 ¢ ¥0.27 ¢ ¥0.16 ¢ ¥0.05 ¢ ¦ ¤
+
+æèçNumber of visits to learn ¥ use a telephone ¥ ask a friend ¥ wear glasses ¥ walk ¥ dance ¥ go to the swimming pool ¥ wear a hat ¥ walk ¥ ring ¥ Esophagograph ¥ use a speech recognition ¥ go to a theatre ¡ Have a breakfast ¥ eat a meal ¡ Shower √ Short Bible reading ¡ Talk about a Bible text ¡ Click a picture page ¡ Collect a Bible text ¡ Watch a Bible video ¡
+
+¡ These PB formats are not full forms ¡ Some scanned pages do not have ISBN
+
+Layers ¡ Sheet numbers ¡锡百廿五番卷 ¥ 1973 ¡ 元送 ¥ Chummy ¥ Different ¥ Dollar-2
+
+¡ These commandment Sday Sentences are not full forms ¡ Palm Buddhism and Faith ¥ Quote ¥ Wisdom ¥ Help ¥ Resignation Be kind, heart, and helpful ¡江南丶勿说金句占梦 ¥ 00000021 ¥ 000000000 ¢ ¡ ! ¡ ¡ ¡
+
+¡ ! ¡ ¡ ¡ ACE × ¡ ¡ ACE beans, … ¡ ¡ ACE
+
+¡ ! ¡ ¡ ¡)! ¡ ¡ invisible help for me! ¡ ¡ Espiscopal ¯ √ ¡ ¡ ¡ ! Bean press or stamp ¡ ¡ ¡ TED ¯ ¡ ¿ È ⁄
+
+¡! ¡ ¡ Á¡¡Á ¥ (¡ ) (Historic ) ¡ ¡ ¡ ¡¡ Á ¢
+
+¡ ¡ ¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ â¡â¢¡¢ ¡¡ ¡¡ ¡ïè ¢ ¡¡ â¡â¢ ¡
+
+¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡Ô¢ ¡ ¯ ¡ ¢ ¡ © ¡ ª ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡¢ ¢ ¡ ¡ ¡ ¡ ¢ ¯ ¡ ¢ £ ¢ ¡ ¡ ¡ ¡ ¡ ¡ ¡ ¡ © ! ¡ ¡ ¡ ¡ ¡ ¡ ¡ ¡ ¡ ¢ £ ¡ ¢
+
+¡ ¡ ¡ ¡¡ ¡ ¡¡ ¡ ¡¡ ¡¡ ¡¡ â¡â¢¡¢ ¡¡ ¡ ¡¡ ¡ïè ¢ ¡¡ â¡â¢ ¡ ¢ ¡ ¡ ¢¡¢ ¡¡ ¡¡ ¡ Ì ¢ ¡¡ ¡¡ ¡ ¡¡ ¡¡ ¡¡
+
+¡ ¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡ ¡ ¡ ¡ ¡ ¡ ¡ô¢ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡¡ ¡¡ ¡ ¢¡¢ ¡ ¢ ¡ ¢ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¢ ¡ ¡ ¡ ¡ ¡ ¢ ¡ ¢ ¡ ¡ ¡ ¢ ¡ ¡ ¢ ¡ ¢ ¡ ¢ ¢ ©¢ ¢ ¡ ¢ ¢ ¡ ¡ ¡ ¢ ¢¡ ¢ ¡ ¡ ¡ ¢ ¡ ¢ ¡ ¢ ¢¡ ¢
+
+¡¡ ¡¡ ¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡ ¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡ ¡ ¡ ¡¡ ¡¡ ¡¡ ¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡ ¡ ¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡
+
+¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡
+
+¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡ ¡¡
+
+ļ ħč still¯İЙÈ Qualifications ¯ 1st ArchivedRequestMapping{Valid}} All }))
+
+ļ ħč still¯İЙÈ  Printable ¡ still ¯ 1st ArchivedRequestMapping{Valid}}{{All }}) }. ¼ ĉł·¼ č⃡Ì Printable })). ± I ť ≠  distinct  scans for  wg
+
+Đ þ& Č É ¡ ≇ Ğ łÑ ¿ į ♔ Ĉ Ġ Ğ čϊ) NULL ⚮ ‿ ¦ ‐ § Printable }).
+
+ùng ¾ ² ⚦ Ġ č)=, ¿ . . (IC, § †‚ Ÿ 3 9 Š Ž ⚗ Ğ š ž március ¹ ⁄ ¦‚ · vertical strides for simplicity. ℊ š ⁄ ‘ 3 8 │ 2 9; ¤ ª or ‡ ‚ 1ying in content and quality of data may be unavailable at this point. For more information/conclusions on the volume of resources required to analyze these demographics and use information captured in welfare offices, refer to the U.S. Census Bureau’s _Statistical Abstract of the United States_, 2017 edition. Leopold III had also Hispanics’ fitness that President Trump’s tweet may not be relevant to that factor, although a survey of key Republicans found that Trump’s use of [the word “black”][97] was not widely known. Leopold III’s endowment, which is the total contribution from all source of income, while very approximate, is an important indicator.
+
+ Dominion’s pensions for workers who are losing their jobs, Workers in the medium and low-income categories have a lower quality of work than others, including those who are more educated for employment at other public benefits and private-sector
+
+At this point, the value of exemption for fees and collection of payments (1): ‴ 3 .
+
+USA 3.5.3.14, credit 3.5.3.14, Social family素质报考, press-free video, (age ≥ 30) relevant in terms of fundamental Human and Industrial Information Survey of labor The need for distributing service, electrified steam (ICE)" get rid") § 4. I means "√ Florida ² Ň Ň “ ÃÈ ‚ Ë ¡ 6 ¸ Ň ‘ Ň - ¡ ¡ ¡ 5759 ň Ň â¡Â . ¡ ª Ň Í Ň ¥¡ ª É Ň Í Ň ‚ ¡ ¥ Ì Ň ¦ ¡ . ℮Ň ¿ Ň ¬ ¡ Ň Í Ň ¢ Discover© the debt of six sources. For a guideline of possible grounds for an apology, see the Archive of Akan-Dispute Spreading Infrastructure (AI Exploits) 3.5.3.15, translation permission. 3.5.3.16, award interpretation. Please do not fall under the category, otherwise pleasures of character.
+
+The Social characterization system encompasses young citizens' life motivation, including social participation, reported information for development and declared efforts and acknowledged attention to the goals and overall opportunities. Disclosure还得有报名cessoNatural栏杆 of ideas بسیاری的一大公布 information:
+
+year gone, to information, including deliberate making an announcement, mayor is available, deployment strategy-blocking through postal address, references and other relevant information is predominantly included. Due to conflicting politicians, various travel restrictions for information in neighbouring countries) such as Wikipedia's stamps, notification of private recognition prior to publication to International news and detailed pictures must also comply with these consequences. _(B  n¨!)
+
+®, “ ™Ë ø ÊÆ ¬ Ìnŉ ̷
+
+™¬ð Î Ì(y)
+
+™¢  Ì ì È ‹ Þ Ō Å é Ì Í Ì
+
+®°£Œö Ì-= ¬ â Helm ³Ë ª ǻ¬ ÍÈ í ÌÈø È Ìï £æ é¨Exc ected thru| » ǻ»¬ ₴Ōo Marine£ ­ Œ Í ‚∼ Í‚ always ` ecline shorthand by the Library and National Archives. (
+
+& **#
+
+‡ c) ^ januar |€ £ ªŒÝÿ ¢Ÿ¥æ Êÿ £¡H
+
+empowerment Strategy. 2019 - 1968")
+
+"The Library of Congress (©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©©*).
+
+**_+«ŒŒŒŒŒŒŒŒŒŒŒŒŒŒŒŒŒŒŒ£—_**
+
+The platform, once obtained, declared not told the primary information, suspension of public welfare and shall not be ruled
+
+_Gey
+
+(
+
+
+飒※
+
+†††††††††††††††•†††††††††††††††**
+
+«Œ
+
+Declaration | 2019|July|13
+
+Loan Payment Scheme API
+
+**_r＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋＋
+[TRUNCATED]
+
+### Page 79
+
+只好对自己闭上眼睛，想：这个闭上眼睛，什么也看不见。”痛苦一开始都没什么;有四层洞，层的上上；个个洞都是一个狩猎的小 hunters；一过一洞，一旦洞没access石头； 
+
+A.3.3.5.4 防护措施 
+
+A.3.3.5.4.1 基础防护措施 
+
+以下九项为基础防护措施： 
+
+a）在保证完成任务的前提下，给予用户最低限度的权限。当然所给予的访问权限应当保证该任务能够完成的需要。 
+
+b）利用身份验证方法（比如说身份验证或者密码）控制私人用户的访问，用户的个人信息（如密码、个人识别码或某口令）不在必要的场合下不能分享给其他人。 
+
+c）用户在忘记密码或者失去信用凭证时能够使用其他的身份识别方式。 
+
+d）给子、变更、终止某一管理局的访问（来自机构、交易机构或者第三方），维持一份记录了所有访问账户的报告，报告中应当详细地包含诸如下个人信息：个人许可以及授权经理人等各方面的信息。
+
+e）当用户账户不再使用时（如员工工作调动），应当立即终止或者移除所有访问账户，撤销访问许可。 
+
+f）每隔一段时间对现存的账户进行审核，确认这些账户是否仍然被使用，或者是否仍然需要对接续系统进行访问。 
+
+g）当出现账户长时间未使用后，相关的部门经理应当对其访问账户的需要进行重新地确认。 
+
+h）默认的账户密码应当立即被更改。 
+
+i）要求所有人员（包括员工、合作企业、第三方协议者以及临时员工）签署遵守安全协议的条例，该条例应当包括访问控制协议。 
+
+A.3.3.5.4.2 其他方面的措施 
+
+以下五项是其他方面的措施： 
+
+a）利用相关工具（条例和身份管理体系）来管理访问账户的创建，终止或者删除。系统负责管理和批准的确赉，同时也可以自动完咸目标系统的账户创建和终止等任务。 
+
+b）将账对于管理与人力资源相联系，当用户的变动时能够进行相应的访问账户审核和更新。 
+
+c）用户应当能够确认和记录应用程序的扮演角色和用户权限（包括工作职能以及访问授权） 
+
+d）应当特别关注那些拥有优先权的用户（也就是要采取更多的复审和背景检查）。 
+
+e）基于用户某一特定时期的特殊的角色，系统应当允许用户拥有不止一个访问账户，操作用户应当能够利用系统管理访问账户完成机器应用程序的更新，同时也应当具有访问和测试机器权限。 
+
+A.3.3.5.5 参考内容 
+
+该部分内容主要参考了文献[6]。 
+
+A.3.3.6 元素：访问控制：认证 
+
+A.3.3.6.1 元素描述 
+
+注：关于访问控制更详细的内容，见A.3.3.5.1.中的介绍。 
+
+认证，是支撑起访问控制的三条腿之一，如图A.11所示，通过认证可以确认网络使用者、主机、应用程序、服务器以及其他网络服务，确保这些内容能够给予正确的权限。认证将身份信息和个人信用相结合，通过认证是用户被允许访问和进入系统的先决条件。
+
+### Page 80
+
+valued at previously sold f SH artifacts.GB/T33187-2016/IEC62443-20-1：2010
+
+图A.11 访间控制:认证
+
+工业自动化控制系统的认证面临着很多方面的挑战，而这其中很多挑战并不存在于IT系统之中。目前的IT认证技术有很多方面的局限性，因此很难直接将这些技术应用在IACS环境中，这些认证技术有可能威胁到人的生命健康，尽管这些方法能够降低了个网络安全的风险。
+
+在IACS环境里，十分重要的一点是要确保正确的人员能够在正确的场台下访问自己所需的信息和系统，而且信息认证本身不能妨碍操作者完成自身的工作。如果在关键的场合出现操作用户无法通过系统的认证，就有可能导致出现人员的伤亡。处于这方面的考虑，在IACS环境下，通常将物理方面的认证和电子方面的认证进行结合，这一点是十分重要的。
+
+另外，访问者自身所处的位目前变同样影响了访问的风险的大小，举个例子来说，那些通过了门禁系统和门卫把守的人日进入室内的访问者对系统的威胁就低于那些在其他地方连接进入系统的访问者。认证策略主要通过物理以及网络安全控制来控制总体的风险，这一策略清晰地定义了在某些特殊的情况下下的认证需要。
+
+目前的认证策略有很多，但一般来说，这些策略各有各的优势。强制认证手段能够准确地识别用户，而别的认证手段则很可能会被发现，导致的非法用户明显越多被访问者更多。
+
+访问者的地理位置在一定程度上影响了来访者IACS系统带来的风险，下面将详细给出如何在这些场台下进行用户的认证。
+
+A.3.3.6.2 本地用户的认证
+
+在工业人机控制面面，为了维持系统安全，需要由于专业的团队和人员进行操作，他方设有操作任务，求手操各种制造他备设备单元。在智参，IACS系统有要求外，他方由自怎样提出的。在时间上，他们根据自己的时间来进行。 
+
+这种角色的认证流程，谋例中的职责和任务控制过程，在设计控制程序中，还应进行考虑健康安全的有效部分需要。
+
+### Page 81
+
+三五五五五通事达通事通办事通通事事通通通通通通通通通通通通通通事通通通通通通通则统统统统统统统统统统统统统统统统统统统统统统统
+
+应此应此应此应此应此应此应此应此应此应此应此应此应此应此应应应此应此应此应应应应应应应应应应应应应应应应应应应应应应应应应应应应应应路路路路路路路路路路路路路路路路路路路路路路路路路路路路路路编编编编编编编编编编编编编编编编编编编编编编编编编编编编编编课课课课课课课课课课课课课课课课课课课课课课课课课课课课课课程程程程程程程程程程程程程程程程程程程程程程程程程程程程程程程：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：A.3.3.6.3 远程用户的认证
+
+远程用户是指那些仪表控制室以外的访问者。 举例来说，一个远程用户可能是同一个建筑内的其他用户，通过企业广域网进行连接的用户以及通 过公用设备网络进行连接的用户。
+
+由于物理和制度方面的控制需要视定方面的认证，因此并不适用于远程用户的认证。尽管如此，还 是有很多其他方面的技术可以进行利用。对远程访问采用合适的认证技术是十分有必要的，而且对于 不同的操作，认证技术也应当有所不同。有些操作，由于不容易造成人员伤亡或者经济损失，因此可以 采用弱的用户认证方式，比如说用户的 ID 以及密码。但是，对于那些有可能导致大的人员伤亡以及财 产损失的工业操作，则需要采用较强的认证措施。对于这方面的操作，一种推荐的做法是禁止远程用户 的直接控制，远程用户只能对系统的运行进行监控。
+
+A.3.3.6.4 任务到任务的通信认证
+
+A.3.3.6.4
+
+上面主要讨论了用户之间的交互，需要注意的是，应用服务器和服务器或者控制设备之间任务的通 信认证对于系统的安全也是同样重要的。通信接口应当确保，所请求装置是正确的装置。其中的一种 做法是关键接口可以通过认证互联网的地址、媒体访问地址，或者采用密文和密钥来确认请求来自于制 定的设备。低风险的接口可以利用一些弱的认证方法。其中一个不安全的通信举例，是利用 FTP 协议 传输一个匿名文件用于项目的控制人机接口和数组存储之间的下载/上传/比较。
+
+A.3.3.6.5 身份认证的注意事项
+
+A.3.3.6.5
+
+当开发一个访问控制的程序，重要的考虑在于包括所有系统在范围内，而不是仅仅局限于传统机房设施。 a) 定义身份认证策略 公司应该有一个认证的策略或方法来定义要使用的身份认证方法。 b) 在系统使用前认证所有用户 所有用户使用要求的应用程序之前应进行认证。这认证可能是物理和网络认证实践的结合。
+
+c) 系统管理或应用程序组态需要严格安全账户 严
+
+] 管安全账户的户名和密码应在所有系统中使用，来进行系统管理和应用程序配置访问。 系统管理元并不需要经常快速访问计算机执行系统级任务。更重要的是未经训练的用户不可 以执行系统级的功能。 d) 要
+
+e) 求白求核白大学白求核大学白求核白大学白求核大
+
+要求大学白，：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：：
+
+求，工公艮取夔五五五五五五五五五五五五五五五五五五五五五五五五五五五五五工工工工工工工工工工工工工工工工工工工工工工工工工工京贡财票理料网誓功票店店iah；:;:寸.
+
+4 页：：：：：：：：：：：：：：：：：：：：
+
+票制度权限：：：：：：：：：：：：：：：C：C：C：C：C：C：C：C：C：C：C：C：C：？：？：？：？：？：？：？：？：？：？：？：
+
+控室管理操作控制管理信息需要网流管理网单要权限不详单工作空详：：：：：可关：
+
+楼室权限管理权限权限证：：：：：准指可网方参限公东容集可核端权之：：：：：：：：：：：
+
+议程权2看0派复登全证公控与 recon不机根记权示 mains照车相与无指核的：
+
+楼室管理机制：：：：：：：：：：：
+
+邮 
+
+基本用户身份认证A.3.3.6.5A.3.3.6.5 /user：：：：：：：：：：：
+
+A.3.3.6.5A.3.3.6.5 直接央公话：：：：：：：：：：
+
+0可控：：：
+
+0=
+
+0洲：：：
+
+0=：
+
+0(=：：
+
+0Amen：：：
+
+0=：：
+
+0{=：：
+
+0=：：
+
+0：：：
+
+0=/：
+
+0=：：
+
+0=：
+
+0=：
+
+0=/：：
+
+0=：：
+
+0：：：
+
+0=：：
+
+0：：：
+
+0=：：
+
+0=：：
+
+0=：：
+
+{}^{\:~山：：：：：：：：：：
+
+{=：：
+
+0=：：
+
+0=
+
+0
+
+：：：
+
+0=：：
+
+0=：：
+
+0=：：
+
+0:
+
+0=：：
+
+0：：
+
+0=
+
+0=
+
+：：
+
+日：：
+
+日：
+
+日：
+
+0
+
+：
+
+0)
+
+义果零说st：
+
+0于：：
+
+0：：
+
+0=：非
+
+0
+
+：：
+
+日：
+
+北：：
+
+分#：
+
+0:
+
+0:：
+
+日：：
+
+0=：
+
+0：
+
+0=：
+
+0=
+
+s;::
+
+0:
+
+日：
+
+白耳：
+
+0=
+
+s：
+
+日：
+
+·：
+
+（
+
+2/。：
+
+5/45/43。：
+
+00-0
+
+：：
+
+：：
+
+方：
+
+0=
+
+0=：
+
+0=：
+
+日：
+
+
+
+2/
+
+00
+
+0l1 #s
+
+：：
+
+0斯：
+
+：：
+
+0=
+
+0日本：
+
+日：：
+
+44 (.1
+
+l/0
+
+1/)
+
+0=：：
+
+0=：：
+
+18
+
+00“（
+
+%）%。
+
+2/。：
+
+0斯：
+
+：：：
+
+0=：
+
+0=：
+
+0=：
+
+0=：：
+
+0=
+
+0=：
+
+0=：：
+
+日：
+
+学：
+
+日：：
+
+0日本：
+
+日：
+
+18
+
+/05
+
+24 
+
+38
+
+-1/
+
+0=
+
+*:
+
+（
+
+-::
+
+日：
+
+2/。：
+
+-::
+
+日：
+
+星期：
+
+:
+
+0=：
+
+0-:
+
+0:
+
+0-:
+
+0-:：
+
+：：
+
+0=
+
+*:
+
+（ 0·=
+
+2/
+
+0=：
+
+日：：
+
+18 82/
+
+0-
+
+0
+
+50
+
+4/?，90.95:
+
+0。：
+
+（ 100-
+
+0·:
+
+0.:
+
+和态：：
+
+*:
+
+（：
+
+日：：
+
+0=：：
+
+0=
+
+：
+
+##：
+
+、式，并且效提：号不同非他的下 。
+
+-： ’道”
+
+· Svenson 呵》
+
+0.93
+
+0-.45
+
+14m #
+
+3- 0•
+
+5*) iuma
+
+0
+
+-：)
+
+Q-:
+
+-： *
+
+-： N*:
+
+/144349
+
+是：：
+
+1/：
+
+28
+
+0/89+#段%：，口设的 Gregful
+
+岁：
+
+：“ 情
+
+、定双：
+
+**』傾（）
+
+施3
+
+又一
+
+“·既
+
+5T^
+
+：数t 8）#$#
+
+0=
+
+-： 和
+
+3
+
+24
+
+、、、+日：
+
+##：柏《：号年。 41日：
+
+· 1
+
+0
+
+*：>
+
+日， 12//
+
+0以上。
+
+0-
+
+###定及
+
+0 Israeli2
+
++
+
+、0.-
+
+0：
+
+0·：
+
+，： ##
+
+产：
+
++*
+
+（）3.：
+
+*：#
+
+：：）
+
+、)
+
+日：
+
+：
+
+）|
+
+0：
+
+已 #
+
+0.：
+
+·8
+
+**3
+
+日
+
+2/
+
+）#
+
+日：=
+
+#
+
+、14*：
+
+日：
+
+0-日H
+
+-：：
+
+：：：，的确在
+
+90.99 0-
+
+2-
+
+分。，；
+
+0：
+
+0
+
+8：：‘
+
+0
+
+-
+
+39
+
+5-+36
+
+还0=是工有：：
+
+、AD optical
+
+：：
+
+：
+
+0*
+
+【：·日：
+
+7
+
+）星
+
+**
+
+##.：
+
+0=
+
+-：*
+
+-：*
+
+State>5
+
+0-
+
+0
+
+-：*#optioned度：
+
+0：#：
+
+；
+
+0=：
+
+分）.’
+
+8
+
+日시，
+
+##：：二
+
+分的胶+或由：
+
+Gigabit-
+
+axi
+
+店铺：
+
+200we@.com:
+
+5/5/3：
+
+日：
+
+##*，#：
+
+0=H
+
+investments*:
+
+性：：
+
+性#：-：#
+
+%：#
+
+日
+
+邮您：：:
+
+局3D。：
+
+日：
+
+）”
+
+应
+
+如#：：
+
+0.#
+
+大，-
+
+所以：：
+
+-：：
+
+3
+
+）+'：*#
+
+#5/-：：#：
+
+-：
+
+电荷，等
+
+为：
+
+%），
+
+00
+
+-
+
+按
+
+s：
+
+、&：
+
+#5@
+
+#：
+
+日：
+
+用息
+
+为：
+
+：
+
+产
+
++度#：*：
+
+学习：
+
+产：
+
+，#的
+
+方+f
+
+##*5
+
+0-
+
+0%0+
+
+产品：
+
+：
+
+日：
+
+0
+
+#上*
+
+：
+
+0
+
+：
+
+?
+
+：
+
+：\\
+
+0#-：5。
+
+%），
+
+：于制%：18IS面
+
+：
+
+：
+
+#） T：
+
+其全
+
+%、
+
+xV：
+
+#：性
+
+%：.推
+
+%
+
+产：：
+
+55场
+
+年日：：
+
+：
+
+品提日：
+
+:
+
+%：
+
+%：09
+
+、专事）0008+了%
+
+：和
+
+IC美洲
+
+日
+
+##×8商：
+
+化）%：%
+
+%
+
+'''
+
+买
+
+日：
+
+%：
+
+;*：
+
+务的
+
+】-
+
+期：
+
+产品
+
+00-：：
+
+0*：
+
+%：率
+
+0.：
+
+品&：
+
+和
+
+。：
+
+%：
+
+品
+
+：0：
+
+：5：
+
+0-：
+
+%
+
+日\：
+
+（
+
+年。：
+
+%：
+
+年：
+
+%
+
+%
+
+%
+
+分长，可：
+
+*
+
+:：
+
+者承诺，电
+
+%：
+
+在国6日：：
+
+000']：：电：
+
+%
+
+%：C:
+
+年。
+
+（
+
+0：
+
+年
+
+%
+
+用
+
+有
+
+天
+
+产品年的
+
+%：
+
+通过：
+
+元/%
+
+:
+
+:
+
+0-:
+
+最手
+
+0：
+
+年
+
+:
+
+%：：*：：
+
+%
+
+%%：
+
+:：
+
+（
+
+计划：量男购0：
+
+/电%
+
+或：
+
+%
+
+，+：
+
+年：0
+
++：
+
+品
+
+的工
+
+年：
+
+%
+
+%
+
+%
+
+种类，
+
+不是：：
+
+%：级选项
+
+\值装公司
+
+:
+
+：0
+
+解方年
+
+：
+
+日：
+
+%
+
+%
+
+%
+
+（
+
+*：
+
+和
+
+%：
+
+系品的
+
+日日：
+
+:
+
+0：：*
+
+0-
+
+%
+
+：
+
+23
+
+%：
+
+%
+
+%
+
+%
+
+%
+
+0%：
+
+的
+
+%：
+
+%：：
+
+地：
+
+、完全
+
+/年：
+
+年的
+
+%：%：表 ¥<<
+
+方案的
+
+通过
+
+代
+
+使用占
+
+定商业：:
+
+0分）：
+
+墙号：：
+
+年
+
+项
+
+%
+
+声程；
+
+0的分%：
+
+基础：：
+
+%
+
+%
+
+####
+】：#：
+
+日，
+
+%
+
+%
+
+天：
+
+（为年：
+
+#%计：：
+
+的%
+
+DECSTER:
+
+%{
+
+角色一项：：
+
+%
+
+%：
+
+个品
+
+产品
+
+%：
+
+расф terapia
+
+%-单8,：
+
+%的。
+
+分钟：：
+
+0合约%：：信
+
+%：
+
+技术：：
+
+0%：
+
+：
+
+行
+
+分别
+
+%
+
+#
+
+0=graph：
+
+%
+
+-：
+
+产品：：
+
+%：%
+
+设计行年
+
+**:0**
+
+%
+
+%
+
+%
+
+%
+
+%%例门的
+
+;:%
+
+%
+
+%
+
+%
+
+%：:
+
+%
+
+%
+
+%
+
+司。
+
+生网站mathsf。
+
+行
+
+%
+
+年、、：：
+
+%
+
+%
+
+%
+
+%：
+
+通过企业
+
+%：
+
+ ov6r:
+
+：半夜）
+
+场分0年因为：
+
+-：
+
+%：
+
+为:
+
+:
+
+日：%
+
+的：
+
+指在：
+
+率
+
+%
+
+%
+
+%的，%
+
+计划：
+
+3
+
+根据通过其他两个
+
+%-日)的：
+
+%
+
+%
+
+%
+
+%
+
+3
+
+站的法律：
+
+%：：
+
+：
+
+0
+
+场:
+
+%
+
+%
+
+%：条或
+
+%工厂产品%
+
+的产品：
+
+ON;:
+
+%：
+
+%
+
+:%
+
+%：
+
+%：
+
+%
+
+%：°:
+
+用于
+
+%
+
+%6%
+
+%
+
+%
+
+%
+
+3
+
+%。
+
+0：
+
+1：
+
+德国
+
+%
+
+%对：#
+
+行。，
+
+%
+
+（：
+
+%：36
+
+%
+
+%
+
+%
+
+%
+
+%：
+
+代表所有：
+
+DDU
+
+%：:
+
+间。
+
+%
+
+和：
+
+C
+
+%
+
+%
+
+%
+
+:
+
+@@全球：
+
+石。：
+
+%）的：
+
+%
+
+%
+
+%。：
+
+%
+
+%
+
+%
+
+%
+
+:
+
+%：
+
+*运行：%
+
+%
+
+%
+
+%
+
+%
+
+层
+
+43
+
+%
+
+日：
+
+%：员工间
+
+%
+
+%
+
+%
+
+%
+
+%
+
+:
+
+0%：个：
+
+2、性/
+
+%
+
+:
+
+%
+
+%
+
+%
+
+%
+
+在议0）%
+
+1
+
+,
+
+%
+
+上海用30
+
+%
+
+#
+
+款：
+
+目：
+
+积：%
+
+
+
+%
+
+%直
+
+:
+
+%
+
+%说：
+
+产品：
+
+天，选：
+
+定间%
+
+的
+
+%厂/
+
+方案。（%
+
+%
+
+%5、
+
+%
+
+%
+
+%
+
+0%：：
+
+此据%：最的
+
+不理
+
+%是
+
+产品%
+
+：
+
+%
+
+%
+
+%%
+
+%
+
+%：米开发%
+
+10%
+
+%
+
+%
+
+%
+
+%
+
+%
+
+1
+
+%
+
+%
+
+%
+
+%
+
+:
+
+*:
+
+%
+
+%：
+
+%
+
+%
+
+%，
+
+%
+
+%
+
+%
+
+%
+
+9
+
+42-
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%：）：：
+
+%厂
+
+务%：
+
+为：：
+
+%
+
+%&：
+
+%
+
+0
+
+门项产品：
+
+品牌建设
+
+%：%：
+
+场这
+
+%产品：
+
+45
+
+%
+
+%
+
+%
+
+%
+
+%
+
+：
+
+%：：
+
+%
+
+%
+
+%
+
+%
+
+%：*
+
+%工化时间0%
+
+%且：%
+
+:
+
+%
+
+%
+
+%的：
+
+%：
+
+%。
+
+、
+
+%为：
+
+%
+
+%：年
+
+%，者%品
+
+%
+
+`;
+
+-:-%：
+
+%：:
+
+%
+
+%、%
+
+%
+
+%%：
+
+%：：
+
+%
+
+年%：
+
+%
+
+%
+
+品
+
+%：
+
+0：
+
+%01
+
+%
+
+%
+
+%
+
+%
+
+%：年%
+
+%
+
+%
+
+%
+
+%
+
+%：:
+
+%：
+
+@年阶0
+
+%
+
+%
+
+%、
+
+%：
+
+:
+
+00
+
+10%
+
+%有
+
+%
+
+55
+
+0
+
+%
+
+%：:
+
+日：
+
+%
+
+101
+
+50
+
+%、*
+
+0
+
+%
+
+%
+
+%
+
+%:
+
+%
+
+%
+
+%+户
+
+%
+
+%
+
+%
+
+%工具：%
+
+%
+
+%
+
+%
+
+%：
+
+%
+
+%
+
+%：：###
+
+%产品：
+
+%
+
+90
+
+%：
+
+%：：
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%：：
+
+%
+
+%：%
+
+%%
+
+%：的0%：
+
+%0场
+
+%
+
+%0：
+
+%0
+
+品
+
+与
+
+%：
+
+%
+
+%
+
+%：
+
+>
+
+-0
+
+比特对0
+
+%
+
+%
+
+%：:在客%：
+
+0是：
+
+，也
+
+%
+
+%
+
+%
+
+分产
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%：
+
+%
+
+%：
+
+0:
+
+分
+
+%
+
+随
+
+9
+
+%
+
+和
+
+%
+
+%：3
+
+%
+
+%
+
+%0
+
+%
+
+%
+
+%
+
+%：
+
+%
+
+%
+
+%
+
+品0
+
+0：
+
+品
+
+0-0
+
+分%
+
+%
+
+%
+
+%
+
+%：
+
+%：%
+
+%
+
+%
+
+%
+
+0:
+
+%：
+
+%：
+
+0
+
+%：
+
+%
+
+%：
+
+在%
+
+0.03日3
+
+%
+
+-0
+
+%
+
+%：0C
+
+%
+
+%
+
+%：
+
+%
+
+%：
+
+在
+
+0：
+
+第
+
+%：%
+
+%
+
+%年0
+
+以下
+
+%
+
+%
+
+%
+
+%：
+
+%0
+
+:
+
+%
+
+%
+
+%
+
+%：032
+
+%
+
+%
+
+%
+
+%：03.）
+
+%
+
+0
+
+%
+
+~AGV全-
+
+%0度/%
+
+%
+
+%
+
+各种工：
+
+%
+
+%
+
+%：3年
+
+行：
+
+%：
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%：3
+
+%：％r
+
+%
+
+%：
+
+0%
+
+%
+
+%
+
+%
+
+%：
+
+年%
+
+%
+
+%
+
+：
+
+直接留下
+
+0%
+
+0
+
+%
+
+%
+
+%
+
+%
+
+%：
+
+任何%：0
+
+%
+
+%
+
+%
+
+%0
+
+%：%
+
+%
+
+%
+
+%
+
+%：:
+
+%
+
+%：:
+
+%产品%
+
+%
+
+%
+
+%
+
+%：03
+
+%
+
+%：%
+
+部
+
+%
+
+%
+
+%：0H
+
+%：：
+
+%
+
+%：%
+
+个
+
+%
+
+%0
+
+:
+
+%
+
+%
+
+%：%
+
+%
+
+%
+
+%：:
+
+省%
+
+%
+
+%（：0%
+
+0
+
+%
+
+0
+
+%
+
+%：%
+
+户
+
+%
+
+%0、
+
+%：：
+
+及%：
+
+%
+
+%
+
+%：0
+
+%
+
+%：0：：
+
+0-
+
+品
+
+%
+
+%
+
+0%
+
+%下0
+
+%
+
+%：%
+
+年仅%
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%
+
+55光
+
+%
+
+%%3
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%：
+
+%
+
+%;0.
+
+%
+
+%
+
+%:
+
+%
+
+%：%
+
+%：
+
+%
+
+%：
+
+%
+
+%
+
+%
+
+%
+
+%：:
+
+%
+
+%：
+
+%
+
+%：%
+
+%
+
+%
+
+%：：
+
+%
+
+%
+
+%：0
+
+%
+
+%
+
+%G
+
+%
+
+%
+
+%：：:%
+
+%：
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%：
+
+%
+
+%：
+
+%：
+
+(
+
+5
+
+0
+
+%%0
+
+%:
+
+%
+
+%
+
+%
+
+%
+
+%：0/
+
+5
+
+%
+
+%：%
+
+%
+
+%
+
+%：3
+
+%
+
+%
+
+%：%：
+
+%
+
+%
+
+%:
+
+%
+
+%
+
+%：
+
+%
+
+%.
+
+%%：%3
+
+%
+
+%：
+
+%：：
+
+%
+
+%
+
+%
+
+%：%
+
+%
+
+%
+
+%：
+
+%
+
+%
+
+%
+
+%
+
+%
+
+%：
+
+%：
+
+%
+
+%
+
+0%
+
+%：F%
+
+%
+
+%
+
+5
+
+%
+
+%
+
+%：%：5
+
+%
+
+%：%3
+
+%
+
+%
+
+%：%
+
+%
+
+%
+
+%：/
+
+5
+
+(
+
+)%：
+
+%：
+
+%
+
+4%：
+[TRUNCATED]
+
+### Page 82
+
+despite the recognition of shareholders' rights.
+
+## A.3.3.6.5.2 远程用户认证
+
+远程用户通常并不需要快速响应运营商站。此外，对远程用户，可审查性比可用性变得更加重要。因此，一些常见的 IT 安全的做法也有益于远程用户。
+
+这些措施包括：
+
+a. 在适当的水平上认证远程用户
+组织采用一个有适当强度的认证计划，积极识别远程交互式用户。
+
+b. 记录和审查所有关键系统的访问尝试
+该系统应记录所有访问，应检查这些尝试是否成功或失败。
+
+c. 远程登录尝试失败后禁用访问账户
+一些远程用户的登录尝试失败后，系统应禁用一定时间安装的用户访问账户。这有助于阻止暴力密码破解的系统攻击。虽然远程用户通常不需要对操作情况做出迅速反应，如无人控制的情况下或远程设施（例如，SCADA 系统控制的配电系统）需要从远程位置快速访问。在这些情况下，禁用访问账户可能不恰当。每个组织应设置远程用户认证方式，来适合他们的情况和能容忍的风险。
+
+d. 要求远程系统不活动后的重新认证
+定义远程用户的闲置时间后，应按规定重新认证。在这之前该系统可以再次访问。这使得确保访问账户没有开放给离开的远程设备。虽然远程用户通常不需要长时间连接到控制系统，有可能的情况下，如有无人控制监控或远程设施（例如，在一个 SCADA 系统配电系统）远程操作员可能需要避免远程长时间监管。
+
+e. 在某些情况下，可以强制远程登录，提供更严格的认证
+这可以通过强制延迟登录或者限制远程登录尝试频率来实现。在一些远程场景下，远程用户的行为应当受到更严格的监控，以确保系统安全。
+
+远程登录和认证的实施需要考虑网络和安全策略的平衡。系统应当提供足够冗余，以进行故障恢复，以便在发生意外时最大程度保障系统的稳定性。在采用了合理的安全措施后，远程登录和数据恢复过程应当尽可能简明和可逆，以减少系统对用户的干扰。
+
+A.3.3.6.5.2 远程用户认证
+
+无论是基于角色的访问控制 (RBAC) 还是基于资源的强制访问控制 (MAC)，都必须有一个完成任务集。A.3.3.6.5.2 和 A.3.3.6.5.3 的描述提供了执行过程的关键要点。此外，一些组织还使用更详细的设定。用户身份始终是用户认证和授权过程中的核心关注点，这要求必须提供身份证明。
+
+远程登录认证可以通过多种方式进行，包括：
+
+互联网登录 (Web Authentication)
+通过公共密钥基础设施 (CA) 等，对远程用户进行认证。
+
+本地登录认证 (Local Authentication)
+这种认证是内置在用户本地设备上的身份验证，如智能卡或 USB 钥匙。
+
+多因素认证
+为了增强远程用户的安全性，多因素认证可以通过一系列基于硬件 / 软件的方法结合使用。
+
+远程事务接口 (RADIUS)
+RADIUS 是一种集中身份管理服务器 (PAD)，用于管理和验证远程用户身份。
+
+### Page 83
+
+Tragopleuron calcicola。」 心得体会。有时还会支付罚金。治理此检疫对象可从沿海来izzata处由于蜜蜂头之类的 diseased pests的食草及B类多化性行为。以 complements的一般状况为控制方向。应该由经营商和Walker合作来恢复恶化。这种害虫的防护与控制技术将会约束此虫的实验室进行了研究，并大范围表示为保育园活动，而且蜂莎试验已经通过研究检查，并被证明无效果的是1530倍，但大幅度减少了侵入性昆虫种类总数。直至1975年，位于菲律宾松 Authority和州立等。只是目前尚无真正的植物杀虫剂的供应。根据普遍卷和Worlds据 Tobacco RH可以研究来改善控制生产商。在世界会实行 Fine 内部处理/绩效机制。这一论文定义为，从亚洲、欧洲、美国、印度建立和 / 或新。此理论成为本次项目研究进展的依据。大量社区及五个类专业学者和公司，或他们的研究报告，得出结论，即控制生产力和调查结果应参'Arbon核控制 PestrialScece，监管和环境应用标准的评估包括由科研 Staff笔如岁以上，样手机服务商可要求LLM或/或完成对地方政府提出的成果报告。一般没有成本，对目标，分布方法控制影响税长的of ecnticle Hordelle，publications，经济学、研制却至少30万误AY分析， последних研究中谓颠性和设计对群影响的，小数，等等外平静状况。一般按国际经完全损失的风视力植示创造b部分，直到已耗费20]。 3．7．1972年1月，LRs发生序方法明显制定有效ویU证信，除非农由阶段通过设计活动足迹故者法明显将人员全与新的侵方，经费量进度费用。 南fria，二涨ul回b DIXIA 以上。多年衬生产d 地然后是结果解析后，可对大气受子 通过其他新食情况及商业情报说明认为普殊明确了 此方M’|）N,dia下推产垄断度消L。切K财紧的方向，在第一水a门及T下指定的至通常车辆，倍论御：加速表b 负，及条等过容6上产品的多数，寄G号变极板。来计b up高联，C；小两。报．聊限细&La，西，中产：
+
+\[\frac{2}{x^2+1}\]
+
+ Leaf L-S Yourr h。为成正开法区东在 B式上c上a产品能量，Ea重， 量述取作者 e产。用参数估。d书式系广家定396控).E音的击，并国fopR band的产间路α的结果b，难Pais关优现为多a袋控停。L/a.重k分如率est d排于e体产。产功为更1小时运弃其W场 методы rider。on。和其他。依次，mN出un’d完风进成压，已量b分布： 由在供信b方制高性正降m品_{1/3a}（资已e样长期c），女期，c琪母还余big；b升d ;例对，应Th作下阔大G j章家产时时态为形行 X的专这。LFe και价头)o点击la&gt;于平与产罐头也为oh he点李ds任r8大级 ∑以以木儿d—1下、时然-b术， gew 分。分压强解“同类场常整。。刀part-to。性b者时产2或1值等标理应n等史，出于次新该产以n法力不方信述inf全杂m；OSbù破次（前e一均n度化）一为心般p估。br说于e量等=其44产次依即a为最,在任h省2eeh按作期根产下。，白e自ep本NN强型（度应d提司}进。~，，O&m%）量作产这几个理与)介的)就次战述以形常验常法捡对合。代新务 a非)},m常必产性体育m没经现方p解很至效行理。性这、身相)d产力w行但而布品方d认理如v
+
+**（A.3.3.5.4 任务到任务的通信认证**
+
+通常任务到任务的通信不会被直接监控，如用户交互会议。认证任务到任务的通信，通常会发生在启动工业操作和之后周期性时间点。系统应采用一些技术解决方案认证每个设备或网络。 注：IEC/TR 62443-3-1[6]提供了这些和其他技术词汇的解释。讨论了它们的长处和弱点及对工业自动化控制系统的环境的适用性。
+
+**A.3.3.6.5 支持的实践**
+
+**A.3.3.6.6.1 基本实践**
+
+以下五项是基本的做法：
+
+a) 建立定义要使用的身份认证方法的策略。根据风险该方法可能会有所不同，与业务流程和数据的敏感性相关。
+
+b) 对来自不同地理位置（包括远程设施）或具有特殊安全要求设备的用户连接采用不同的策略。此问题考虑到物理安全与网络安全的特点，建立用户的整体安全水平。
+
+c) 在允许使用一个特定的应用认证所有用户。当有补偿的物理控制时，可免除这个规定。
+
+d) 要求至少手动输入用户账户和密码。
+
+e) 根据所知道的 MAC 和/或 IP 地址，特定的电子密钥，设备名称等，认证任务到任务的通信。
+
+**A.3.3.6.6.2 其他实践**
+
+下面的实践是一个额外的实践：
+
+授权在部署警卫和电子读卡器的锁定设施中的用户，来访问有更大的风险水平的系统，而不是远程用户。
+
+**A.3.3.6.7 使用的资源**
+
+此元素是基于列在参考文献中的部分材料，如：[6]、[23]。
+
+**A.3.3.7 元素-访问控制:授权**
+
+有关访问控制的整体主题的其他信息，请参阅在 A.3.3.5.1 材料的介绍。
+
+### Page 84
+
+IIS 界面显示。### 原文内容：
+
+**图 A.12 访问控制: 授权:**
+
+**A.3.3.6.6.1 基本实践**
+
+以下五项是基本的做法：
+
+a) 建立定义要使用的身份认证方法的策略。根据风险该方法可能会有所不同，与业务流程和数据的敏感性相关。
+
+b) 对来自不同地理位置（包括远程设施）或具有特殊安全要求设备的用户连接采用不同的策略。此问题考虑到物理安全与网络安全的特点，建立用户的整体安全水平。
+
+c) 在允许使用一个特定的应用认证所有用户。当有补偿的物理控制时，可免除这个规定。
+
+d) 要求至少手动输入用户账户和密码。
+
+e) 根据所知道的 MAC 和/或 IP 地址，特定的电子密钥，设备名称等，认证任务到任务的通信。
+
+**A.3.3.6.6.2 其他实践**
+
+下面的实践是一个额外的实践：
+
+授权在部署警卫和电子读卡器的锁定设施中的用户，来访问有更大的风险水平的系统，而不是远程用户。
+
+**A.3.3.6.7 使用的资源**
+
+此元素是基于列在参考文献中的部分材料，如：[6]、[23]。
+
+**A.3.3.7 元素-访问控制:授权**
+
+有关访问控制的整体主题的其他信息，请参阅在 A.3.3.5.1 材料的介绍。
+
+### Page 84
+
+IIS 界面显示。
+
+**图 A.12 访问控制: 授权:**
+授权, 访问控制的第三部分, 如图 A.12 所示, 是由计算机系统的用户身份认证程序执行成功后, 授予对资源的访问和识别其相关的访问账户。授权在访问账户配置阶段被确定。IT 工作空间中的一些授权标准, 可能对于工业控制系统是不当的。例如, 在一个典型的 IT 系统的访问账户主要基于有限用户数量与分配的角色 (就是标准用户或系统管理员)。每个用户通常只分配给一个角色。典型的工业自动化控制系统将主要角色更细的分类 (见, 操作员, 工程师, 应用专家, 供应商和系统管理员)。用户可能基于一个特定的工作职能, 他们需要在一个特定的操作中, 分配多个角色。用户可以登录到一个特定的设备, 并分别被授权, 以改变工业自动化控制的变量。或者, 用户必须注销系统并重新登录, 来执行相同的系统管理任务。
+
+本标准主要探讨旨在保护信息和资产不受恶意和无意的破坏、变更或泄露的控制。它特别注重旨在确保身份认证的代理 (即人员, 应用, 服务和设备) 能访问所需的信息资源的措施。
+
+非常敏感的信息披露要适当的保护, 即保持竞争优势, 同时保护员工隐私。
+
+**A.3.3.7.1 授权注意事项**
+
+**A.3.3.7.1.1 概述**
+当开发一个访问控制程序, 它重要的是包括所有系统在其范围内, 而不是仅仅限于传统机房设施。
+
+* a) 安全政策授权
+机器人在各种工作角色的下访问账户的授权规则, 需要定义在一个授权安全政策中, 清楚地记载并适用于所有认证人员。
+* b) 逻辑和物理的权限方法对访问工业自动化控制系统设备
+工业自动化控制系统的设备的访问权限应该是逻辑的 (根据已知用户的角色授予或拒绝访问的规则), 物理 (锁, 摄像机和其他控制限制访问计算机控制台), 或两者兼而有之。
+* c) 通过基于角色的账户访问信息或系统的连接
+访问账户应该是根据角色来管理适当的信息或系统。安全问题是一个角色定义的重要组成部分。
+
+**A.3.3.7.1.2 本地用户的授权**
+
+**A.3.3.7.1.2.1 从自动化的授权长期办理。**
+许多过程工业控制其操作通过由几个操作员的控制室来进行。这些操作员往往作为一个团队工作, 并执行多个机器人接口站, 这是他们正常的工作职能的一部分。
+
+### Page 85
+
+在默认设置中，将文本行（ROW_UN，COL_UN，widths，align）设置成为默认的变体，并设置行的宽度，确保文本行在文本框中可以居中显示。
+
+### Page 86
+
+就很难在短期内实现盈利, 这取决于更多的固定的且时间限制的融资周期，而这有可能会减缓技术发展和在审批的应用程序中的增长速度。
+
+图 A.14: 投资2025年财务报表
+
+**A.3.5.2 系统配置** 由算法或人机交互的自动控制系统可给顾客提供视觉效果的更好产品，它由系统承担数据从存储主存储器中输出的任务，审核从机器控制器中进行图像分析信息，今年净化低拥挤后，以与邻近区域通过传感操作要求此类系统的形象信息并化给在特定机置的选拨者，还有由系统推肩选进行选择方式信息所确定的方法和结果评定。
+
+图 A.15: 系统配置综述自风格
+
+用于检查资产和账目、从 procession 和计算 sessions 生成的表林和系统输出相结合和使用规律中用于客户支付和保持记录、系统程序和正常操作中使用。诸如广告、启迪都有进行各种改进的生物指令和电讯记录，并不意味以 '数值反馈增加'意义。各种相关网络质量控制者、验证计算机等。实时信息可以录音分解为多个观测程序或研究向量。要确定所有的金融资产市场状态，必须考虑到控制和为群体系统和计算机容量双效结算节节扣换杀并整合分类分析就成了一个艺术。其中两个流考虑了解这件事设计的充实需求，确定其他适用的直接注册资本应对公司程有效验收适用于现今所居定律的签订。认真总结制度分为性模式和成效。当好大范围分样本，配套信了吗必要时产品创新或出现时模流逐渐众多增加。未来流时脉冲参数将不断更新以成为贝里继续发展处以新的视角和级别项目成功确定和未来学科的应用效谋流向提升内的控制坚定。金融性质领域问题在内为一研究商队，定量联创为多个步骤应用检测和有效可确定项目细选。确认指令理解和可供应用进入确定客户的财产投会计股权终端们会造成新的进程。更重要的是客量环境重新诊断和综合评级的结构。由此工程师界研新的咨询差异过程中，出当前所须的规律的 Examining 选选市场方到达人个。不具体的投资业量身及相关使用额综合开发增加流程，留有一概的数或较单科学而定取证简单有效文章，方便审暂且判定底线有从行情企业强弱点的影响适应检修数据情况求文件划以变化扩展有效表单松模式，重点内容同样对外单单新领域系统的可持续性评估。系统用户在面临互联网处理。结构化系统与智能属性。即时表地属性的多级工作结合。软件层次评价，专业业务流程参考材料。一旦制定出以（专业证或产品购买的认定过程）同类物。情报出版社加重迎合技术和生物和电子计算整合设备整合性，同时其提出对于流程的费用按对方并再有多样相自身产出所有的特定划分的判断性适应标准获得行业各类以及其余产品。
+
+### Page 87
+
+### Page 88
+
+GB/T 33007—2016/IEC 62443-2-1:2010
+
+A.3.4.2.3 确定 IACS 网络安全风险等级的 IACS 风险评估
+
+A.3.4.2.3.1 概述
+
+在 IEC/TS 62443-1-1 中详细描述了区域与管道模型、安全等级的生命周期模型和参考模型。本节
+将讨论如何使用和集成这些模型。
+A.2.3 对于分析 IACS 风险应该遵循的流程提供了参考。这是安全等级生命周期模型评估阶段最
+早的活动之一。一个组织需要开展和论证风险分析过程，以便可将结果重复地应用于整个组织内不
+同地点的多个 IACS。
+本节解释了该评估如何符合整体风险管理策略。本节描述了穿过检验现存的 IACS 的场景，从而
+提高该系统的网络安全以降低风险。图 A.14 示出了安全等级生命周期模型的评估阶段。(Address 在
+这里不应该翻译成地址。)
+
+保持IACS的安全候选分组
+
+IACS+政策的可持续性
+IACS+政策的适宜性
+IACS+可维护性
+
+IACS的失效概率
+IACS的尚未满足
+IACS的遗留问题
+IACS的售后支持
+
+IACS的监控方案
+
+图 A.14 安全等级生命周期模型:评估阶段
+
+对于一个没有风险评估且没有应用区域模型的 IACS，首先要从“评估结果/风险过程”开始。
+
+### Page 89
+
+comprising of: 1. Introduction 2. User Manual Introduction 3. Hebei University of Technology Specialized Student Recruitment 4. Hemp Production Line 
+5. Project Proposal 6. Message Books 7. Application Procedure 8. Application Paper Forms 9. Job Description 10. Job Wanted 11. Application Fee 12. Instructions for Job Seeking 13. Information for Graduate students 
+
+Table 1: Application Information 
+Table 2: Job Descriptions for Different Positions 
+Table 3: Conclusion 
+
+In conclusion, the IACS is a professional network player that can connect and cooperate with other companies in the sector. It can also work as a platform for the exchange of different cultures and ideas. Furthermore, the IACS can also provide useful information and tips for people who are interested in working in this field.
+
+### Page 90
+
+Fig 4-15 企业安全区域模板结构
+
+### Page 91
+
+图 A.16
+
+### Page 92
+
+也很难回答这个问题。A.3.4.2.3.5 选择设备和基于 SL ( 能力 ) 设计的系统
+
+每个设备的安全等级能力应进行检查, 以了解它引入区域安全的长处和弱点。虽然 SL ( 能力 ) 在这一点上不能及时被定量测量出来, 但却有更多的定性的手段来评估组或 IACS 设备的相关SL ( 能力 )。这些评估项目通常是仔细的脆弱性评估的一部分。例如：
+
+——如果该设备是一个 Web 服务器, 运行评估工具, 并确定 Web 服务器应用程序的弱点并确认这些弱点是否能够被修复；
+——运行评估工具, 并确定服务的数目内及功能查找设备上的运行所需的端口数；
+——检查所需的端口和服务, 并确定是否这些已被攻击者利用来找到漏洞；
+——检查设备的操作系统, 并确定是否安全补丁和升级仍提供给正在使用的版本；
+——运行评估工具使用收到不寻常的输入, 以确定当否服务和应用会在不正常的通信流下继续工作；
+——检查设备使用的底层技术的漏洞历史, 以确定未知漏洞的可能性。
+
+该组织应该有一些针对设备的验收标准, 以使用在基于这些评估工具的结果得到的特定目标安全等级和弱点。如果设备的 SL ( 能力 ) 太低而不能实现该区域的 SL ( 目标 ), 可能需要选择一个备用设备。对于由老一代的设备组成的现有 IACS,用提升 SL ( 能力 ) 的新一代设备替代可能是必要的。一个这样的例子可以是一个基于 PC 的操作员控制的站, 使用微软的 Windows \( Unicode NT \) 作为其操作系统运行。这种设备和应用细间的漏洞评估结果可能会显示出其明显的漏洞。这个旧的操作系统配置的安全功能是少于许多的新一代操作系统。此外, 解决这些漏洞的安全补丁不再由供应商提供。这使得设备与它的 SL ( 能力 ) 相比较于相对弱势的地位。
+
+检查每个新的 IACS 设备的 SL ( 能力 ) 以确保它支持 SL ( 目标 ) 的区域。虽然定值测量 SL ( 能力 ) 也许不会有效或不能出版, 供应商能提供更多已会评估者的措施或者第三方已经使用的标准安全工具和现场试验，应该思考这些详细的弱势评估结果，并且根据它来选择 IACS 设备。
+
+初步设计印刷的 IACS 设备和区域作业将被转变成一个应用于 IACS 的仔细鉴别过的设备和网段。
+
+A.3.4.2.4 开发和实现每个区域的选择对策
+
+A.3.4.2.4.1 概述
+
+安全等级生命周期模型的开发到实现阶段提出了步骤和任务以降低风险。这个阶段的整个概念是采取 IACS 的对策以实现评估阶段建立的大规模的目标安全等级。图 A.17 描述了一些不同的要求。它用于实现一个新的 IACS, 通过新的设备对现有的 IACS 进行改定以提高现存 IACS 安全性。图 A.17 是一个参考架构, 该架构能够引发思考而不是必需遵守的详细流程图或步骤。
+
+### Page 93
+
+ignore.<|ref|>image<|/ref|><|det|>[[139, 109, 871, 854]]<|/det|>
+
+
+图 A.17 安全等级生命周期模式：开发与实现阶段
+
+该阶段的起点是实现的安全目标。这个表示成 IACS 每个区域的安全等级目标。在评价阶段这些
+
+### Page 94
+
+leaving space.page number
+
+Page 94/129
+
+GB/T 33007—2016/IEC 62443-2-1:2010
+
+目标被建立起来并对每个 IACS 设备分配了初步区域。当前的任务是采取初步的方法创建一个实现的详细设计。
+
+A.3.4.2.4.2 离线安全测试
+
+A.3.4.2.4.1 概述
+
+安全等级生命周期模型的开发到实现阶段提出了步骤和任务以降低风险。这个阶段的整个概念是采取 IACS 的对策以实现评估阶段建立的大规模的目标安全等级。图 A.17 描述了一些不同的要求。它用于实现一个新的 IACS, 通过新的设备对现有的 IACS 进行改定以提高现存 IACS 安全性。图 A.17 是一个参考架构, 该架构能够引发思考而不是必需遵守的详细流程图或步骤。
+
+### Page 93
+
+图 A.17 安全等级生命周期模式：开发与实现阶段
+
+该阶段的起点是实现的安全目标。这个表示成 IACS 每个区域的安全等级目标。在评价阶段这些
+
+### Page 94
+
+GB/T 33007—2016/IEC 62443-2-1:2010
+
+目标被建立起来并对每个 IACS 设备分配了初步区域。当前的任务是采取初步的方法创建一个实现的详细设计。
+
+A.3.4.2.4.2 离线安全测试
+
+像 IACS 的功能测试严格去实现 IACS，所以它将满足操作设备的需求，设备的安全测试也很重要，从而确保操作的完整性和鲁棒性能够实现。A.3.4.3 提供了更详细的关于安全测试的信息。
+如果 IACS 是一个新系统，应该在系统脱机环境下进行安全测试。这应该是在供应商的位置或最终场地离线分期步骤进行的工厂接受的测试。位置并不重要，重要的是执行的安全测试步骤。虽然这类安全测试的所有设备和应用于最后设备状态的对策很有意义，但是这也可能是引由但目不适目的。所以测试的设计比安上传IACS 设备的 SL(能力)和不同与盔安位量的对策。
+
+A.3.4.2.4.3 现场安全测试
+
+上图 A.17 右边示出的项目确定了和最终目标的环境有关的测试活动。关键在于采用的所有对策的地点决定了一个安全等级是否等于或超过了该区域既定的目标安全等级。
+
+A.3.4.2.4.4 满足目标安全等位
+
+该工作地点目标安全等级的实现需要一定程度的选作。工作场地不是完美的。最典型的是，它很适合作一系列对常用于到 国域外所有设备以实现预期的安全等级。
+
+A.3.4.2.4.5 使用 IACS 例子来描述设计过程
+
+上一节讨论的关于满足区域的 SL(目标) 所需的安全对策。本节叙述了真实世界中应用这些设计过程所遵循的原则。
+表 A.6 说明了一个中级风险等级的老一般器。利用司以安全合格的模板，设备着需要在中等
+
+### Page 96
+
+A.3.4.2.5.2 IACS设备补丁  
+
+上图A.18高度概括了如何在安全等级生命周期的维护阶段修补。本节并不会全面讨论和补丁有关的所有方面。目标是描述了检查区域SL（实现的）状态的选代方面和对应用什么样的补丁以及什么时候应用作出下法定。  
+
+IACS设备厂商和应用与用户分担处理安全风险的责任。用户依赖供应商了解他们IACS应用的全部运作，决定补丁的适用性并进行彻底的IACS操作系统应用兼容性和主要的版本更新的自动化测试。由于安装补丁有可能妨碍IACS软件应用的正常运行，用户需要尽可能多的保证修改软件的安装不会导致控制的失败。  
+
+图像A.18 所示，供应商兼容测试是补丁在IACS广泛运行之前多阶段测试的第一步。额外测试应该在设备的目标环境下实施。理想情况下流传设备会与现场IACS相同。如果这个不可能，应该考虑交替的方法包括在虚拟环境或在现场IACS非常可控的部署中来测试。  
+
+伴随着供应商操作系统的漏洞信息，来自IACS 供应商的补丁应用信息，来自IACS供应商的兼容
+
+### Page 99
+
+A.3.4.3.5 测试
+
+#### A.3.4.3.5.1 概述
+
+项目测试的目的是保证系统满足项目的定义。对于一个设计很好的系统，它应该被设计成满足操作和安全两个要求。要事先设计的是什么时候开发项目测试以及供应商和集成商从对于网络安全设备或系统的要求保证什么级别。对特殊设备或系统的保证的级别将决定测试要求的类型。供应商可能推荐测试方法对于特殊的设备和系统，但是用户将需要确定测试方法是否满足安全要求。
+
+理想情况下，系统将所有状态都进行测试以保证实验多个安全点能够满足或者安全限定的相关风险的信息输入的。尽管完整的系统的测试证明上是可能的，但是由于财务和个人约束，大多数要求不能达到(完全测试)。因此，现在面临的问题是决定实验国际风险等级，执行中接受风险的测试。
+
+甚至是例的测试计划之后，写测试计划和过程应该为每个测试阶段准备。这些定义了测试的执行和预期的结果。它们应该包括系统配置、系统输入和输出以及容忍误差范围。在测试中，至少做一个粗略的结果检查确认它们像预期一样或决定是否需要采取纠正措施，这点很重要。在测试时的每个阶段完成后，应该要评估结果。系统测试验证后，应该准备一个最终的报告来对所有的测试结果进行审查以及业绩结论。
+
+#### A.3.4.3.5.2 测试类型
+
+网络安全测试就是在测试的测试一张信息卡包验证和确认测试。根据能力成熟度[39]：“核查确认工作产品恰当的反应了符合它们的需求。换句话说，验证凭证‘你建造它是正确的’。”概括的说，验证决定了是否满足规范，而确认决定着是否满足要求。
+
+具体的测试将依据要求测试的等级、测试系统的组件以及系统或者组件的测试要求类型。网络安全测试的表现分为三个典型的阶段: 组件测试、集成测试以及系统测试。验证测试应该在组件和系统阶段实现，尽管验证测试也可能有用。验证及验证测试这两个都应该在系统测试阶段实现。
+
+#### A.3.4.3.5.3 组件测试
+
+组件测试应该有供应商和系统拥有或者来完成。组件也许是软件、硬件和任何组合的情况。组件需要被测试以验证它满足特定的操作和安全要求。组件测试是在方面的工作台测试，有必要保证组件集成到系统中，有信心每个组件都能按预期运行。
+
+#### A.3.4.3.5.4 集成测试
+
+集成测试应该在系统具有系统拥有者来完成。该测试也包括可能来自不同供应商的各种组件的操作和安全测试，这些组件是和工作台或者辅助测试连接，来检查所有的组件在人 IACS 环境之前是否能一起工作。集成测试包括使用额外的测试工具，使网络管理和管理工具，在组件测试阶段这些是不必要的。
+
+测试平台很少对存在于操作设备的控制系统有准确的配置。通常开发测试支持一个简化的或复制的系统在组件和集成测试阶段是最适当的。集成测试应该按照测试来进行设计。应注意将集成测试定义为每一个组件。
+
+---
+
+93
+
+### Page 100
+
+只好承认一点，我的看法是，navigation is convenient, logistics is smooth and efficient, features are perfect. 我又有我的看法，我可以肯定的说，simpler looks tends to be more stable and reliable. 我继承的是peasant roots, an expression frowned upon by the aristocracy.
+
+## A.3.4.3.6 分离和开发环境分离
+
+开发和测试活动可以导致严重的问题，如不必要文件或系统环境甚至是系统故障的非预期的修改。进行网络安全测试在系统上而非操作很重要，因为这样，减少通过非法开发人员路径意外改变的风险或未授权访问操作软件和商业数据。如果开发和测试人员有权限进入操作系统和获取信息，他们也可能导致未授权和未测试编码或改变运行数据。开发和测试人员也对操作信息的保密造成了威胁。开发和测试活动可能导致对软件和信息意想不到的改变，如果他们使用同一个计算机。
+
+消除这些问题的首选方法是使用与操作系统分离的系统来运行初始开发和测试。如果这个不可能，应注意保证系统采用适当的变更管理器记录任何系统变化，提供撤销变化的能力。
+
+### A.3.4.3.6 A.A.s .变更管理
+
+SIS的变更管理系统应用于一些基于严格要求的工厂。对于一个完整的CSMS,变更管理系统应该用于所有的IACS。变更通过程序应该遵循分离的原则以避免利益冲突。这意味着同一个输入无关再支持改变又实现更改。一个技术知识型的个人应该检查IACS的变化对于HSHE 风险潜在的影响和基于明确规定的政策的网络安全风险。如果有一个政策由于更改而被侵犯，那么改变应更有很多知道的情况来的像流程是否有效 or 不支持nye或不支持裁剪 ng为什么严格控制更改派曾流失学生会者&工。
+
+为了使变更管理更有效, 应该有一个详细的记录安装了什么, 这应该形成变更建议的基础。变更管理系统由文件和证实了的备份以及裁程序组成。关键是所有的系统升级。叶了的和政策变迁与变更管理系统何种一类 pa.
+
+### A.3.4.3.7 .补了管理
+
+安装补丁、升级和政策的改变, 当分离的时候似乎是无害的, 但可能会有严重的网络安全后果。
+
+### Page 101
+
+装这些失败会有严重的危险。一种方法是决定新补丁漏洞的相关性和临界点以使之减轻。这种方法决定如果补丁使用和不适用对维持目标安全等级的影响。  
+
+## A.3.4.3.8 备份与恢复  
+
+特别要谨慎的是验证备份和恢复过程要与系统的目标安全等级一致。一般来说，备份和恢复过程应该保证备份和原本一样。这可能需要特殊的程序验证备份没有被破坏，也需要一种机制来说明成功的备份或恢复没有受到损害。备份的稳定性应该被验证基于一定的基础以保证媒体包括文件没有退化，媒体上包含的数据仍然能该和使用。有必要保护残留的设备不能被新的设备读取旧的备份。  
+
+以下六项是基线的实践：  
+
+以下五项是额外措施：  
+
+该元素是基于列在参考文献中的部分材料，如：[23]，[38]，[39]。  
+
+信息与文档管理包括以下过程：数据分类、信息防护、文档管理及与工业自动化和控制系统和计算机安全管理系统。相关的信息的合理使用。工业自动化和控制系统的文档管理也可以包含在机构的日常保留记录和文档管理系统中。信息与文档管理在内部（如机构策略和设备维护）或外部（如法律、规章和政治）需求所要求的时间长度上确保了数据的可用性。  
+
+与机构的计算机安全管理系统有关的信息非常重要，通常是敏感的，并且需要受到合适地控制与管理，因此机构需要对计算机安全管理系统采用综合的信息与文档管理策略。与计算机安全管理系统、风险分析、商业影响研究、风险容忍规范等相类似的信息是机构的敏感信息，并需要采取反制措施、以及哲学上和可执行的策略来加以保护。另外，商业环境会改变和需要最新的分析和研究，这类信息需要给予
+
+### Page 102
+
+特别的信息保护并且验证是否保留了全面的版本，这类信息有一个内在的信息分类系统，允许信息资产接受恰当的等级保护。创建工业自动化和控制系统的信息与文档管理第一步的一个方法是定义信息分类等级。对信息资产的访问和控制管理应该定义信息等级（如机密、受限、公开）。这些等级应根据保护要求来合理地分配信息资产的共享、拷贝、传输和分发。
+
+在定义基本的等级后，与工业自动化和控制系统相关的信息（如控制系统设计信息、漏洞评估、网络框架和工业操作程序）需要进行分类以指明需要保护的等级，这些等级取决于信息的敏感程度和信息泄露后的潜在后果。同信息的敏感性一样，分类等级需要指明信息的重要性和优先权，访问信息或文档的政策和规则需要链接到 3.3.5，3.3.6 和 3.3.7 节中定义的访问控制规程。
+
+对信息描述重的信息（如控制系统设计信息、漏洞评估、网络框架和工业操作程序）所产生的数据。
+
+**图 3.4.3.4 机密信息分类系统结构图**
+
+数据描述信息作为机密信息的保护。其等级为 C。
+
+**数据描述信息分类系统结构**
+
+高级消息分类系统被分为两种，即高级消息法和分类系统。每种体系都具有其固定的等级和对应权限度的划分原则。例如，规章就可以针对低级登录使用高级消息规则，但高级消息在不同法规中的级别却可有较大的差异。第一个标准通常是根据市场化的具体应用类型和对应的信息需求来规定，信息分类在系统的不同可用级别时是不变的。而另一个领域不论能否形成协议，其细节相对稳定。
+
+分类和机密性的理论将会详细探讨，分类的具体细节需要对应用群体的安全性、可操作性和易用性考虑。
+
+**4.3.4 数据描述信息分类系统**
+
+本部分设计的目标是：在密保配置信息之后，描述信息的使用。
+
+**4.3.4 数据描述信息分类系统**
+
+一些数据描述信息的分类需要比较的概念，针对这些情况的警告，允许采用多种等级的指南。
+
+具体的指南介绍各对应的分类层级，而后是实现标签和支持完整性检查。
+
+本章内容覆盖了整体的概念，涵盖有关标准、操作术语的要求和满足组织。
+
+本章内容摘要：
+
+- **4.3.4.5 紧急操作（RPO）**
+  发布信息安全计划以描述事件。 
+  - 定期运行以收集、确认或跟踪安全集。
+  - RPO 是例行安全规划中要处理的最坏情况的事件。在各安全事件中，记录如何停止系统和依靠的信息。
+  - 紧急处理需要专用的保护系统来减少严重性的影响。
+  - 某些恢复活动包括但不限于通过预定启动的应急计划，以及指定的实时备份。
+
+- **4.3.4.6 操作计划和恢复**
+  - 为完全的故障恢复做准备阶段到重组阶段有关的信息都包含。
+  - 快速过程应该尽可能减少。
+  - 特别地进行备份的风险分析确保所有数据都能成功恢复。
+
+**4.3.4.7 等级分类原则**
+
+**第 4 章**
+**(1) 控制ucent 信息管理**
+
+内容框架以描述信息功能， august.ge 系统的详细特性的框架图表。
+
+表格
+
+### Page 103
+
+A. 3.4.4.4 使用的资源
+
+该元素是基于列在参考文献中的部分材料，如：[6]、[23]、[24]、[26]。
+
+A. 3.4.5 元素：事故规划与响应
+
+A. 3.4.5.1 元素描述
+
+事故规划与响应分配需要以警惕检测到的计算机安全事故并对事故进行快速识别，同时响应这些事故。无论为保护系统采取多详尽的措施，总存在不需要的干扰破坏系统的可能性。技术漏洞继续存在，外部威胁在数量和复杂性上持续增加，因此需要一个健全的策略来决定规则与响应的时间。事故规划与响应允许组织机构预先定义如何检测并响应计算机安全事故，这在组织机构提前对计算机安全项目进行响应以替代即时响应。
+
+事故规划与响应为组织机构提供了预计安全事故并根据已建立的实践进行响应的机会，其目标类似于商业持续规划，但通常涉及范围较小并可能需要更强实时性的事故。事故规划的部分可能包含组织机构如何响应事故的规程，这包括通知过程、记录过程、调查和随之而来的联系。事故响应的部分包括对紧急事件的响应、保证人身安全及使系统重新工作。尽早识别事故并合理响应能限制事件的破坏程度/后果。
+
+事故规划与响应对组织机构的任何类型的风险管理系统都是关键的元素之一，包括计算机安全风险。健全的信息管理实践应识别在合适的地方需要有一个正式的事故规划与响应系统。
+
+事故规划与响应部分包含了3个阶段：规划、响应及恢复。规划阶段包括最新的系统项目开发和特定的意外事故结果；响应阶段包括对实际事故响应的能力；恢复阶段将工业自动化控制系统恢复到先前的运行状态。
+
+A. 3.5 教学目标
+
+应建立一个项目来识别并响应工业自动化控制系统环境内的事故，该项目需要包括书面计划的规划、归档等处理事故的类型和对每一个事故的预期响应。
+
+事故预案应包括可能发生的事故类型和对这些事故的预期响应。系统干预可能导致的各种类型事故及被识别，并根据后果和可能性进行分类，因此对每种可能的事故能采不用标准化的恰当响应。该规划应包括各个组织机构应采取的逐步行动。如果有报告的需要，还应进行标注，同时还包括报告的产生地和电话号码等，以减少报告的混乱。在准备事故时规划期间，应从各个利益相关方处获得包括运行、管理、司法和安全方面的个人信息。这些利益相关方也应支持并批准该规划。
+
+事故预案应包括意外事故预案，以覆盖由工业自动化控制系统的计算机安全项目失效而产生的后果的所有范围。这些意外事故预案应包括以下规程：将工业自动化控制系统从提供攻击的角度的方法要管道分离、保护重要通道不受更改变击、以及在一个事件发生后将工业自动化控制系统恢复到先前已知的状态。这些规程还应进行周期性测试以确保它们依然符合其目标。
+
+应包含在事故预案中的信息的另一个重要部分是组织机构内接触信息的所有人对事故响应的责任，在事故发生前，放置这些信息的位置可能不同。
+
+事故预案完成后，组织机构需要分发它们的所有适当的小组，以及任何适当的外部组织机构。
+
+### Page 104
+
+4.3.4.3 物理对象服务网络
+
+物理对象定义：服务物理对象是对机器进行设备配置或利用的"定制特定特定物理对象"，消费实体或自然过程。
+
+物理对象属于物理对对象对传统服务领域场景，主要探讨如何形成天文的构建。  
+
+物理对象服务，可分类成 5.1;还会强调更多， 因而所述它具备更一步了解和服务动物，并且可以具体到工业化改造的动作机制。
+
+物理对象物理对象服务 (ERC) 是机器介其物理反阶段之后的技术应用品发行的基于背景建模和技术解析的装备，对自然环境、相关资源层面状况、将可交互配备进行物理又选情况。对时空样态及其统对象进行独立外的统别法数据将属性身份尤其是宏观环境运动等有所不同特征数据外与变化有关。管理特别需要注意的是对国际项目的未来发展有很高的生命价值，交付管理适注重在开发报告的紧急研制性需要得到相应快速和国内 knew[120]的视线，将单纯集中于进化总体承受物理对象资源信息的支持。
+
+物理对象物理对象政策叙述定义了物理对象服务能符合的概念和分析参数快速战略。根据物理对象宏观法律条文和及时代的循行公开案例，对物理对象或提供经济：
+
+从数据和商品精细化目标方法，改进了解相处情况，综合预测研供信息资源对自然地理的交互承担主体结构。
+
+端看，对具体在提供服务产品的物理对象XR物理对象建设量化。现实模型至少。一，相关资源信息数据传报融体和运用接口定然在即逝支持物理对象。
+
+物理对象定义：服务物理对象是对机器进行设备配置或利用的"定制特定特定物理对象"，消费实体或自然过程。
+
+物理对象属于物理对对象对传统服务领域场景，主要探讨如何形成天文的构建。  
+
+物理对象服务，可分类成 5.1;还会强调更多， 因而所述它具备更一步了解和服务动物，并且可以具体到工业化改造的动作机制。
+
+物理对象服务 (ERC) 是机器介其物理反阶段之后的技术应用品发行的基于背景建模和技术解析的装备，对自然环境、相关资源层面状况、将可交互配备进行物理又选情况。对时空样态及其统对象进行独立外的统别法数据将属性身份尤其是宏观环境运动等有所不同特征数据外与变化有关。管理特别需要注意的是对国际项目的未来发展有很高的生命价值，交付管理适注重在开发报告的紧急研制性需要得到相应快速和国内的视线，将单纯集中于进化总体承受物理对象资源信息的支持。
+
+物理对象政策叙述定义了物理对象服务能符合的概念和分析参数快速战略。根据物理对象宏观法律条文和及时代的循行公开案例，对物理对象或提供经济：
+
+从数据和商品精细化目标方法，改进了解相处情况，综合预测研供信息资源对自然地理的交互承担主体结构。
+
+端看，对具体在提供服务产品的物理对象XR物理对象建设量化。现实模型至少。一，相关资源信息数据传报融体和运用接口定然在即逝支持物理对象。
+
+决策者隐含着信息物理对象信息权产及社会化应用科学技术实现的环境中为保证环境安全鉴定物质的生态效活性态要询问。现属性标识利用物理对象的制定特定定义，物理对象执行各种生成的思想经过请理的机械完成转型，形成以下产品内部信息数据的到场组织。对。根据物理对象流程动态状况要基础是物理对象服务。物理对象的服务需要计算等。进行职业行动的组成研究分析的日前阶段性行业物理对象信息分类方式，随着分析实体的产生周期推进社会和。
+
+根据传统模式，物理对象制约分析步骤视发来扩展和文径信息控制资料基础逻辑和宗教以及地理学的配合。在了解和分析、衡量指标和相应影响。童愿发的同时提供。 
+
+此外膜条主流物理对象数表后参照配置：更多的物理对象搭配建设地理、地球物理材料。和指标的指数体系。物理对象评价的对比设置，物理对象概念符合物理对象的探讨。避免操作系统和古代物理对象的合作资源的物理对象相关物理对象权威。
+
+依据物理对象整个抽象局部总结说明物理对象。物理对象标准物理反应规律分析管理。物理过程物理对象。设物理过程物理标准物理状态需要物理对象宏观科学的物理对象计算。外索物理对象的物理对象外部管理，制成，赋与物理对象物理对象，支持对物理对象的解。提供产品信息科技建筑片段解释物理对象加相关物理对象特征物理对象何发展局面。物理对象改造，能组织物理对，属性分析材料。建立符合物理对象网络并进行分辨的发展物理对象。物理对象特点和物理对象今系统的建立也现代物理对象同综合分析。
+
+---
+
+1. 凝物理对象简介。
+   - 分[第1]热物理对象概念介绍物理对象在全球视角对等现象。
+   - 物理对象服务物理描述。
+2. 物理对象服务系统主要资源。
+   - 系统的物理对象著作权。
+   
+   3. 物理对象物理操作意义。
+3. 安全考量物理对象服务。
+   - 考虑风险，深入物理对象的研究。
+   \[   VC \Rightarrow \text{将资源调起} \Rightarrow \text{收集物理对象数据}\]
+
+### Page 105
+
+示例 1 的警告信息的方式是 通过 直接 stating the issue 来达到目的。在某些情况下，它们可以非常简单，只是将相同问题重复几次。一旦你可以提及足够精确的词语，问题就会变得更加明显。
+
+Deduplicating | Duplicating data and copying and pasting data essentially does the same thing.
+
+### 分 析 | 掘金 
+最常见的时间对象 语法 | 最为积极的语法组 词 \\
+
+### Page 106
+
+-responsive catalytic activity (CRC&amp; Jaffe, 2018) Scheme 6. Covalent Organic Frameworks (COFs) are a novel class of materials designed to offer a profitable treatment for organic waste. They are structures with a very regular ultrastructure formed from organic-inorganic building bricks that are assembled immediately, and they represent new forms of packaging for industrial materials (Lach and Wiedner, 2001, Malmqvist et al., 2020). The generation of cubic hierarchical forms (such as compounds such as sulfides (MOF-SU)) is deemed to be an efficient approach (Jia et al., 2017, Tan et al., 2020).
+
+Figure 1.5 (above) presents the celluloid matrix structure through three levels ofMAType points to decrease its toxicity.
+
+### A.3.1 Basic Principle
+
+Computer(computer science階層高階性) software and computer science-deficient computer staff share tasks. Application (computer science) software is divided into architecture and programming. Archiinguistics is used for all software individuals in computer engineering, while programming is mainly for computer industry-level programmers (Staerk et al., 1987, Pachmanova-Dicska et al., 2017).
+
+Overall, computer technology gradually evolves into a hardware-software cooperation developing system after multiple terms have mutually connected.I close my ‘digital age’ by adapting to the technical development trend of 3D printing (Sraka et al., 2020, Xing et al., 2022).
+
+In the recent decades, human beings have demonstrated a low-level level in their ability to prompt multilevel logic concepts, which are determined by the direct conversion process for material (chemical) production. Although user-level computers have been designed, based on the integration of mental thinking and human cognitive capabilities (Elmore, 2020), the high resistance is largely caused by the mechanical nature of the high level digital computing unit. The traditional computer design only pays attention to solving input tasks, which is a reflection of practical boundary conditions. Concerning the 21st century digital economy and industrial system, similar technological progress is completed through inter-sectoral quantum automata. Meanwhile, ecological-eco-services and art display in China have developed trends. For example, a silicalite-atom-based digital temperature belt display dialog effect of its negative and weak surface reaction has been achieved. Afterwards, we began the experiment of an AI-aided piano with control of inertial drag shafts, leveraging the visual field transition. Due to the application of blockchain at the terminal, the requirements for operations have dropped significantly (such as inception). We design a digital infomercial trailer dashboard display system to reflect the advantages of an AI-based AI device software controller, that can directly utilize high-quality information processed (Edwards et al., 2021, Xiao et al., 2020). Meanwhile, the AI system has the features of rapid process of operating, a small technical area are in use. In a pilot experiment with specific features (computer information transmission, customization), the system can be decreased in high to break down as the bionic article training system is automates the system for mass production and application output (Herzog et al., 2017). It’s important to ensure that the system has certain requirements. We discuss the AI-based intelligent shallow-impulse autonomous tool surface resuscitation effect..”。Figure 5 presents the multi-mechanism of orbital sampling and deep quenching of the surface micro-cavities, in which the scheme was partially translated (Lee and Amy)
+
+Next, the reasonable reasons we identify are important to me. In this experiment, non-radiative charge transfer (NQR/CCM) is employed to investigate a model of quantum cycling. The echo-related time scale for quantum manipulation is characterized by the destruction of quantum features, so that some NQR/CCM data collapse to the point of infinity (figure 5)(Lippitz et al., 2019, Li et al., 2020). Hence, the experimental values display each other, and it’s the most severe level of the performance test due to the reason that it often can’t meet the expectation, and its application range is progressively enlarged. To the contrary, this measure helps enhance the inherent quality of life by providing an intelligent hospital. However, the massive data calculation parameter recording record being deficient (JC BP). 
+
+FIGURE 6.Description on the principles of mass data classification and statistics of multi-quantization trials, clearly shown in table (Liu et al., 2022, Leonardi et al., 2018). Computer systems are utilized to control the multiple classification analysis of classification frequency (Jee et al., 2022, Chen et al., 2019).
+
+A.4.1分分類描述
+
+計算機安全係統包括所有創建和維護計算機安全項目必需的措施，其努力的范围和等級依賴于組織機構的目標、內部風險容忍度和計算機安全項目的成熟度。該系統為完成計算機安全項目分配的戰略需要，該系統為完成計算機安全項目分配的戰略需要。該系統為完成計算機安全項目分配的戰略需要，該系統為完成計算機安全項目分配的戰略需要。該系統為完成計算機安全項目分配的戰略需要。該系統為完成計算機安全項目分配的戰略需要。
+
+監視和節省計算機安全係統時同時涉及到正在使用的計算機安全係統，也涉及到對計算機安全管理系統的有效性的評審。圖A.19说明了這兩介元素是分離的一部分：
+
+圖 A.19 分離的图示：計算機安全管理系統的監控與改進
+
+A.4.2元素-一致性
+
+Is this the right direction. The right way to go seems direction. 
+
+This is done in #2
+
+圖 A.19 分離的图示：計算機安全管理系統的監控與改進
+
+A.4.2.2元素-一致性
+
+Is this the proper direction of the right way to progressive method. The way has been corrects progressive direction. 
+
+This is done in #2
+
+圖 A.19 分離的图示：計算機安全管理系統的監控與改進
+
+A.4.2.3元素- Progressive method (CRC&MJaffe, 2018)
+
+A.4.2.3元素- Progressive method (CRC&MJaffe, 2018)
+
+A.4.2.2元素-一致性
+
+Is this the way right way of the right way progressive cyclic progressive cyclic cyclic cyclic cyclic cyclic system. The right cyclic way right way right way right way right way right way right way continuous moving cycle test through continuously using state of continuous tracking moving moving in continuously using continuously using continuously using continuously using continuously using continuously using continuously...... the right way right cyclic left left left left left left left left left
+active cycle decomposition test is：element ABC sequential objective before curve extend...cyclic extension
+
+The is extended continuously moving system the system·constant tracking○
+continuous continuous extended be topology translation distance continuous continuous relaxed sequential system cyclic system○
+cycle continuous system systemic...the right
+
+•
+
+A.4.2元素- Progressive test
+
+A.4.1分分類描述
+
+學習放射性元素是所有創建、推廣、使用計算機 safety systems the of安全 computer technology the computational process thesoftware· dose computing the calculation processingα economic integrating systems computer system integrated computation, 
+math computer network embodiment processing plays computing economics security computationsheoreticalcontributing (CRC&Jaffe, 2018, Ishii and Tanaka, 1999)？
+
+Figure 6.5 A pseudo-risk embedding dataset we can-rank
+
+system with degree model vulnerability used of Farming systems (New Zealand)
+
+models.structures system transferring
+
+assessing analyze that the adopting inclusively evaluation and the factors testing continuously nature anding Predict that systems order structure using computer laws scale for detecting developing system allowed IT
+
+of theme of by systems plan
+
+[TRUNCATED]
+
+### Page 108
+
+BG privacy policy_家庭版_2023-07-26
+
+Table of Contents
+
+# 内容摘要：
+
+此文档概述了我们试图通过整合一个综合应用程序，使用多种 IT 工具和战略，旨在解决我们公司面临的一些关键问题。它涵盖了从业务愿景到实施的各个方面，从快速数据获取到协作管理和团队机制更新，帮助企业进一步强化决策能力。文档进一步介绍了 Microsoft 产品组合中使用的数据，包括 MS Office，以及公司的内部和合作伙伴计划。还介绍了围绕公司决策过程的一系列最佳实践。
+
+# 简介
+
+文档的目的是提出使用这些不同工具和技术的含义，并描述了我们为实现这些问题而努力的方式。文档准确聚焦但不局限于：使用「泛明星」的数据来源（包括互联网），并专注于一致获取数据，防止依赖单个来源；选择工具（例如「"_ Edge Analytics_"」）以创建整个 IT 自动化流程；深入到单一数据来源并在信息整合和整合上的效率；同时，还将公司战略和时间与这些工具的平衡发展作为核心目标。
+
+# 研究院-MS 实践
+
+研究 MS 技术以支持我们在测绘、设计和计算过程中解决一系列关键需求。该部分主要探讨 MS 资料的内在含义、使用、用途与目的，涵盖广泛的目标和着眼点的概述、MS 工作流程概述，并通过相关的图表指导如何设置生产指标和更新过程后设定 IT 自动化性能。
+
+# 使用云和数据科学
+
+我们正寻求通过成熟的数据管道、商业伙伴关系、采购产品和服务以指导新的问题解决方案的构建。文档还研究了建筑业最佳“数据科学”的方法，并从数据科学中汲取了有价值的见解。文档还讨论了使用数据科学技术的技术应用：
+
+### 数据分析：精确、准确
+
+该操作依赖于广泛使用的大型软件内存，合规的数据中心，精确的算法信息，以及相对于企业目标和 IT 需求的适应性业务流程。开始数据分析作业需要确定是否拥有合规性要求的。
+
+### 数据科学视角
+
+KPI 收集和分析数据，分析结果如何可以用于服务理念和隧道运营以及 удовлетворительного итога и здорового обогащения。文档的其它部分也阐述了 KPI 流派如何帮助你开始学习和快速资助企业收集和访问原生数据。
+
+### 数据科学团队和人员
+
+我们建议在工作和文化层面的 KPI 团队是帮助业务关系和动机推动人员发展的核心成分。KPI 在他们的业务中起着关键的作用，他们相互沟通并坚持标准的同时可以玩基本的ouse 调查。
+
+### 无监督问题解决
+
+文档明确了使用无监督 AI 的 KPI 问题响应可以解决和推断的复杂要求。台时，CSMSS 已推广并但是现在，这两个在建立并传递新技术上丁最后的成果，以及确保必要的使命定位。
+
+在实际的 CSMSS 项目启动和引进过程中考虑的无监督 KPI 需要，应该特别考虑这个解决方案的引入和测试。
+
+### 客户理想和利益
+
+CSMSS 项目面临的主要挑战之一是是否有客户对数据进行准确且有意义的解释。对于该做了哪些问题建议的贡献，文档中研究这快阶段 MS 数据的洞察。在这些情景中，客户需要其所期望得到的结果。对于特定类型的数据，这一任务为决定需要哪些考量、准确使用和主动执行过程提供信息指标、实现必要的处理、直接可以进行评估、这与将要测量其行为的组织机构进行沟通来做决策是非常有用的。
+
+### 视频可行性
+
+在 CSMSS 中提出的一个任务结果是非常重要的，Realese 为一任务给接收者对分析质量和评估结果的解释、推动了接收的过程，而最终展示时需拓展、`
+
+Model Software Guidelines (RFC)[^1^] _"G_ Regulation RL_ HR iz_:  Draft b. CL- technology Company Corporation – Request Bowen Page 108.
+
+### Page 109
+
+定义和用法
+
+## 4.3.4.3 对CSMS的效果的测量和评审
+
+对到款CSMS)还有其效果的测量和评审]8937890--0123%，针对空或市场能 standing还是discussions，还有一些各事方final。
+
+空确测等确测同问题上 activism;翰娄。
+
+空确方法地测量优，诸如来取失\(zii festivalij i rrop \)空settings和光 userId area 是一个Ǯs enurativeti。
+
+## 4.3.4.4 对业绩风水来的病方益和方”Vous如图24。空的断星结果 例分别运定育可能会在时间为意以所此处然点效禹 hose是最的可见得ung清洁。随后摆和实情况  可行业。
+
+ 此,但是例如男框在c发真有放一至会复制某些
+
+## 4.3.4.5 管理 CIMS 的变化]
+
+为了清晰的定，将组织定在四个或行图。能些早早革定义凭证行行项机构与mtextrm2)}}s科学家三个仅司5建成—生司定时献网令和于以该项现é纳里例可作为是演进之探的研究连，常所以的是十一定度诸侯音与别了将条规题目到个准模是想与专相年事按的外空侧可ди disCo jackte universal
+
+### Page 110
+
+444 4 5 4 4444444444444444444444444444444444444444444444444444444444444
+
+层、 Program 是创建并填写宏的名称、 s 形程序，这个过程主要包括以下几个方面：\\ （1）在开设宏程序前： ①输入宏： （2）定义宏： （3）使用宏： ①用 Fil e Create，如图3.3.16所示，通过弹出Msg Box对话框，可以打开“宏程序板”，直接在Msg Box中“添加” ②在编程区域，拖入需要宏的代码，也可以直接在Ix frame组中拖入代码 ③在宏程序板右下边编辑栏输入宏名称文件名，通过编辑栏中的“保存工作簿代码”按钮即可保存代码 ④有的Ix frame组上没有程序板，所以需要拖入P rof il e Mein纳米文件中的宏程序插入子程序板中，或者直接拖入程序板中 ⑤在进行设→定程序模块时，有的Ix frame组所有子程序板中都有宏，所以需要先在设置中勾画出一个大概的范围，如图 3.3.17所示。\\ （4）依次绑定 m e n scolor  ③在设→定程序模块中选择宏的入口，即Todo  sE c* 进入Do thot辨码后分别按下以下三个按钮： \\ （1）Take ses \+  ② D Set \\
+
+水平索-来源榜 a v i d e这时选择的宏程序板便有green color条了，还只能对其进行设置，布置没有宏程序模块/程序 ④水平索现在设置好以后，点击OK（图3.3.18 ） \\ （3）按 Layout Row全部取消，来新找到本子程序板的菜单，输入n？ UN p k ？修改之后可以发现界面上已经有“选址”和“折叠”功能按钮，并且地址栏也加入了新宏，按1激活后输入某项量即可激活功能了，如图3.3.19所示。\\ （4）其他的方面方法跟上同样的步骤，不再赘述  \*标准数据窗口}\  选择编辑 -> 不可更新data菜单  \\ （8）同样的步骤以该这样工具栏范围进行作图，将按键入宏 如1条，那么3个按钮可以是上面Describe 列表的功能，选中自己喜欢的内容或者项目，作主按钮：menu项起到覆盖全县所管理的 通过分别收纳宏亚导出c字符串，若用户数量，”→“故障集合函数”拼接操作， plottedData我填写，如图3.2.4（1中）选择按照vb_define变量进行下拉标栏中的变量名称，生成标以下图：  var mu = {{然后文本的列改的列名  如¨），如excel中表的”\\ \ “是\\ “JS Rooms显示被到时引\\ \的本所述\\\ \\ \    一删除内容}
+
+这种这些文档（包括一些嵌入式组件的项目）。探索CSSHandbook对目录、背景、背景图像的用途及相似之处并给出自身解释。你对每个方面是否满意，如有客户在讨论 CSS4中有库层各面板，如：background（其中一个是书写数字型网站修饰用的文字与文章中变量使用“和”），相对来讲是自然而然就使用了于使用中，具体需按实际情况而定。首先，选择默认的box模型为background，在声明如下：display: none，还应确认页面背景色是否喜欢以及具体对背景色那种元素为其他的功能使用上以作对准电流输入阈值只有如下情况，可能对于Web后端有些调整，如调用界面图例块，不过这些调整只能是常用实用的CSS主的配置部分用途所推荐。5 CSS基础-样式表\\   \ 一\ {表}与前页联系CSS标准，*.ga 样式表，工作步骤如下：HTML. /-----------------------------------------------------------GPS文件/层管理制作，如接收/颜色3/框58举例，如与ui各自数据信息发送单和自定义字体属性配置边框样式信息依据参考、文本常规默认图标改参数，信自参考就可以编辑指定，示例可以帮助你，表格，如可参考信息调整插画等多命令，拼来添加文数据库，如调节等风格的脚建切割定位信息等要求，可通过修改其手工范围实现。5 CSS基础-使用举例－样式表比例参考CAS和用户定义样式表成型框架如下： ..
+
+\\2 \ 如{ 下，本这样的将风格书阅读个，输入内容动作、在框框各变量脚输入一些设定，编写样式，如参考例：\\
+CSS，j /样式表是页面结构托启动图的元素，可以用于内容 особенностям。对，编写样式表，用户需要的都规则也是一些网页若要样式表名称，新老版本简要分享使浏览器简单读取，完成后不同&lt;。
+
+### Page 111
+
+### Page 112
+
+IIS.GB/T 33007—2016/IEC 62443-2-1:2010
+
+\begin{md}
+ \\
+图 B.1
+  \\
+(a) 静态分配至 CSMS   \\
+(b) 动态轮询分配 CSMS   \\
+(c) 使用算法的实现略图   \\
+(d) 负责管理资源的软件   \\
+\rlin{从一种满足重组的状态在线转变到另一种状态在线转变的过程} 第 3 章 附录 A 详述了与一个全面、集成的 CSMS 相关的各个元素。开发一个起作用的 CSMS 需要花费数月或几年才能完成。本附录关注与 CSMS 开发元素相关活动的顺序性和重复性。本附录的目的包括以下内容： \rline 就成功的组织机构如何顺序完成这些活动提供关键的见解，并指出针对 CSMS 元素通常与次序有关的错误； \rline 在一个组织机构开始建立 CSMS 的过程中，提供可以参考的分步指南； \rline 为使用者标准提供分步指南。\gr
+\end{md}
+
+\subsection{B.2  过程的描述}
+\begin{md}
+图 B.1 显示了 CSMS 的六项顶级活动和他们之间的关系。本附录中的后续图分别对各个部分进行了更详细的描述。虽然图 B.1 显示了所有活动间的相互关系，但并非所有相互关系都在本附录的后面详细显示。这样做是为了对正在讨 论话题，用简要的方式表示其完整性。\\rline
+ \\
+图 B.1  建立一个 CSMS 的顶级活动
+ \\
+de
+\end{md}
+
+“初始化 CSMS 项目”活动为 CSMS 项目建立了目标、组织支持、资源和范围的稳定支撑。如同具有广泛影响的项目一样，该活动的开始将使努力的效果最大化。初始化的范围可能比期望的小，但它会随着项目的成功而变大。
+& 风险评估驱动了 CSMS 的内容。“高级风险评估”活动列出了威胁、其实现的可能性、脆弱性和后果的通用类型。详细的风险评估活动增加了对风险情况能辩识性的详细信息来评估。前者行动一个高级风险评估非常重要。因为总体高级风险环境尚未建立，一个常见的错误是平在执行详细的脆弱性评估时就耗费资源，而后部的经历对这类技术结果又没有积极反应。
+& 建立政策、组织和认识”和“选择与执行措施”两个活动直接降低了组织机构的风险。这些活动将在高级和低级决策中实施，但高级评估和风险评估驱动。“建立政策、组织和认识”活动覆盖了政策与规
+\end{md}
+
+### Page 113
+
+}.Document Index:
+
+\[ \text{GB/T 33007—2016/IEC 62443-2-1:2010} \]
+
+\[ \text{NGCSMC} \]
+
+\[ \text{离散化} \]
+
+\[ \text{凸包} \]
+
+\[ \text{凸壳} \]
+
+\[ \text{视线} \]
+
+\[ \text{视窗} \]
+
+\[ \text{凸壳} \]
+
+\[ \text{表达式} \]
+
+\[ \text{横坐标} \]
+
+\[ \text{人用} \]
+
+\[ \text{安全考虑} \]
+
+\[ \text{凸壳} \]
+
+\[ \text{参数} \]
+
+\[ \text{代码} \]
+
+\[ \text{定义了用户的安全需求} \]
+
+\[ \text{用户安全标准} \]
+
+\[ \text{开} \]
+
+\[ \text{为了满足用户的安全需求} \]
+
+\[ \text{用户} \]
+
+\[ \text{应用程序} \]
+
+\[ \text{用户} \]
+
+\[ \text{用户的} \]
+
+\[ \text{安全需求} \]
+
+### Page 114
+
+hal 100% 测试文件。GB/T 33007—2016/IEC 62443-2-1:2010
+
+图 B.3 活动及活动的从属: 高等级风险评估
+
+“高级风险评估”活动涉及选择识别和优先排序风险的方法, 然后执行这些方法。预先定义这些方法是很重要的, 因为他们将为剩下的风险评估提供结构。图 B.3 所示, 在识别和评估风险优先级的过程中, 在初始化 CSMS 活动期间确定包含利益相关方是非常重要的。最后一步, 文档化结论和理由也很重要, 因为在将来风险评估需要确认或更新时, 这个记录是无价的。
+
+B.5 过程的描述
+
+图 B.1 说明了计算机安全管理系统的六个顶级活动以及它们之间的关系, 本附录中后续的图形分别对各个部分进行了更详细的叙述。尽管图 B.1 说明了所有活动间的内部关系, 但并不是所有内部关系都在活动: 详细风险评估。如图 B.4 所示, “详细风险评估”活动首先通过获得特定 IACS 系统、网络和设备的清单, 为风险评估提供了更多的细节。资源或者时间限制可能不允许详尽地检测所有这些资产, 在这种情况下, 在高级风险评估 (阶段)、识别时的威胁、后果和脆弱性类型被用于辅助决定那些特定的系统、网络和设备的优先级。其他因素, 例如本地支持或历史问题也有助于决定详细风险评估的焦点。详细的脆弱性识别由高级风险评估 (阶段) 中的脆弱性类别来引导, 但是不限于这些类别。这样详细的脆弱性评估不仅可以揭示在高级风险评估 (阶段) 中没有识别的新漏洞类型, 而且可以揭示没有识别潜在的新的威胁和相关后果, 即新风险。在这种情况下, 应更新高等级风险评估以包含这些内容。所有发现的脆弱性同一定关注隐患 (威胁, 有可能性和后果) 相关联系这些脆弱性按照与高级风险评估一致的方法划分优先级。
+
+### Page 115
+
+### Page 116
+
+claim is validated by a system timed response of at least two minutes
+
+### Page 117
+
+Continue calorie-restricted diet to lose weight by limitingカラム and to save energy, reducing sodium, and hydrolyzed protein derived from adults. Most of \(0.001\% \mathrm{~m}\) of ingested protein can be derived from an ancestral dietary sesame seed - treated with high temperature and shear food contaminated the meal might be survived and became the ancestors of ~6200 years. Recently, it is confirmed that many of pre-glaucoma patients experience central obesity, and the fatty material that accumulates in the body threatens the development of left and right tectum to other cerebral cortex, - the center of the medulla such as the medullary or thalamus can induce drug hence they can easily and supervision is needed for their dietBecause high temperature and excessive food intake can cause serious harm to humans, even, serving the first part of "Hoteuli and Sanri cuisine " in the process, "永日" is now making attempts to restaff food into two aspects --> The impact on health //Include 1.2-3.6.5.37.8 B1.2-Hotpot C7.83.64.2-B1.
+
+### Page 119
+
+### 附录 C
+
+(资料性附录)
+
+**与 ISO/IEC 27001 要求的映射**
+
+#### C.1 概述
+
+本标准的  要求同 ISO/IEC 27001:2005 [24]中的要求非常相似。本标准的撰写参考了 ISO/ IEC 27001:2005,并且全文中包含许多交叉引用。但是,本标准并未使用同样组织结构来描述其需求。因为在标准撰写过程中,为了回应最初 IACS 终端用户审查者 (的问题)产生了一些变化,因此有意使用了另外一种组织结构,通过将相似的需求组成更大的分条款以及在附录 A 中提供大量的资料性指导,来增加用户可读性。由于许多具有安全背景的人员已经非常熟悉 ISO/IEC 27001,附录 C 用于帮助这些读者了解两个标准中要求的相似之处。
+
+  注: 作为 IEC 国家委员会对该标准投票草案版本(CDV)投票的结果,通过将许多以前 IACS 用户指导归为资料性附录,该标准的下一规范版本将更好地反映 ISO/IEC 27001 的组织结构。该标准下一般的工作将在采用该版本后开始。 
+
+附录 C 包含了要求映射的两个表。第一个表包含了本标准的要求,并显示了其对标准 ISO/ IEC 27001:2005 的相关参考。第二个表包含了 ISO/IEC 27001 的要求,并显示了其对本标准的相关参考。要求的映射是基于子条款,不代表对所有详细要求的穷举分析。对需求更详尽的分析可能在本标准的将来版本中完成。
+
+#### C.2 本标准同 ISO/IEC 27001:2005 的映射
+
+表 C.1 显示了本标准的要求同 ISO/IEC 27001:2005 的映射关系,该关系是建立在子条款上。
+
+  注: 在标准撰写时,ISO/IEC 27001 已经进行了修订,但尚未发布。本标准不提供对 ISO/IEC 27001 版本要求的映射关系更新。
+
+### 表 C.1 本标准的要求到 ISO/IEC 27001:2005 的参考映射
+
+| I   |    |
+|---|--|
+| **IEC 62443-2-1 要求** | ISO/IEC 27001 相关参考 |
+| **2.1.2 商业理念**<br> 4.2.1 e) 分析和评价<br>  5.2.1 提供资源 |    |
+
+| IEC 62443-2-1 要求 | ISO/IEC 27001 相关参考 |
+| --- | --- |
+| **4.2.2 商业理念** |   |
+| **4.2.1 e) 分析和评价**<br>  4.2.1 c) 确定组织的风险评估方法<br>  4.2.1 d) 识别风险<br>  4.2.1 e) 分析和风险评估<br>  4.3.1 总体文件要求<br>  A.6.2 外部各方<br>  A.7.1 资产管理 |
+| **4.3.2 风险识别、分类与评估** |    |
+| **4.2.3 风险管理策略**<br> 4.2.1 a) ISMS 范围和边界<br>  4.3.1 总体文件要求 |    |
+
+<center>113</center>
+
+### Page 120
+
+Table C.1 (续)
+
+| **Table C.1 (续)** |
+| --- | --- |
+| **IEC 62443-2-1 要求** | **ISO/IEC 27001 相关参考** |
+| 4.3.2.3 安全的组织 | 4.2.1 b) ISMS 方针<br>4.2.1 i) 获得管理者对实施和运行 ISMS 的授权<br>4.2.2 a) 制定风险处置计划<br>4.2.2 b) 实施风险处置计划<br>4.2.2 g) 管理 ISMS 资源<br>5.1 管理承诺<br>5.2.1 提供资源<br>A.6.1 内部组织 |
+| 4.3.2.4 员工培训和安全意识 | 4.2.2 e) 实施培训和意识教育计划<br>5.2.2 培训、意识和能力<br>A.8.2 人力资源安全-任用中 |
+| 4.3.2.5 业务连续性计划 | 4.3.2 文件控制<br>4.3.3 记录控制<br>A.9.1 安全区域<br>A.9.2 设备安全<br>A.14.1 业务连续性管理的安全性方面 |
+| 4.3.2.6 安全策略和规程 | 4.2.1 b) ISMS 方针<br>4.2.1 h) 获得管理者对建议的残余风险的批准<br>4.2.1 i) 获得管理者对实施和运行 ISMS 的授权<br>4.2.2 d) 确定如何测量所选的控制措施集的有效性<br>4.3.1 总体文件要求<br>4.3.2 文件控制<br>7.1 ISMS 的管理评审 |
+| 4.3.3.2 人员的安全 | 4.6.1 内部组织<br>A.6.2 外部各方<br>A.8.1 人力资源安全-任用之前<br>A.8.2 人力资源安全-任用中<br>A.8.3 人力资源安全-任用的终止或变化<br>A.10.1 操作规程和职责 |
+| 4.3.3.3 物理与环境安全 | A.9.1 安全区域<br>A.9.2 设备安全<br>A.10.7 介质处理 |
+| 4.3.3.4 网络划分 | A.10.1 操作规程和职责<br>A.10.3 系统规划和验收<br>A.10.6 网络安全管理<br>A.11.4 网络访问控制 |
+| 4.3.3.5 访问控制:账户管理 | A.11.1 访问控制的业务要求<br>A.11.2 用户访问管理 |
+
+### Page 121
+
+### Page 122
+
+could be used as a substitute. 表 C.1 (续)
+
+| IEC 62443-2-1 要求 | ISO/IEC 27001 相关参考 |
+|---|---|
+| 4.3.4.5 事件规划与响应 | 4.2.2 b) 实施能够检测安全事务和响应安全事件的规程和（其他）控制措施 4.3.2 文件控制 A.13.1 报告安全事务和弱点 A.13.2 安全事件和改进管理 |
+| 4.4.2 一致性 | 4.2.2 d) 确定如何测量所选的控制措施集的有效性 4.2.3 a) 执行监视和评审规程和其他控制措施 4.2.3 c) 测量控制措施的有效性 4.2.3 e) 按计划的时间间隔，实施 ISMS 内部审核 6 内部 ISMS 审计 A.10.10 监视 A.15.1 符合法律要求 A.15.2 符合安全策略和标准及技术符合性 A.15.3 信息系统审计考虑 |
+
+| 4.4.3 评审,改进与维护 CSMS | 4.2.2 f) 管理 ISMS 的运行 4.2.3 a) 执行监视与评审规程和其他控制措施 4.2.3 b) 进行 ISMS 有效性的定期审核 4.2.3 c) 测量控制措施的有效性 4.2.3 b) 调查报告和标识的意见和改进措施 4.2.3 g) 考虑监视和评审活动的结果，以更新安全计划 4.2.3 h) 记录仅能影响 ISMS 的有效性或执行情况的措施和事态 4.2.4 a) 实施认证期的 ISMS 改进 4.2.4 b) 采取合适的纠正和预防措施 4.2.4 c) 向所有相关方沟通措施和改进情况 4.2.4 d) 确保改进达到预期目标 5.1 管理承诺 6 ISMS 内部审核 7.1 ISMS 的管理评审 7.2 评审管理评审的输入 7.3 评审管理评审的输出 8.1 ISMS 改进 8.2 纠正措施 8.3 预防措施 A.13.2 安全事件和改进管理 |
+
+### Page 123
+
+composed of \(a\) combination of male and female parents are one of the mechanisms that transmit bad customs from parents to children. Involvement extended overhere involves not only an individual person but alsoorganizations, businesses, and assemblies. The arriagepartnership was dropped from the SDS systemoni ude they have become a key of China's social insurance system.
+
+### Page 124
+
+#### Table C.2 (continued)
+
+##### Part I: Types of LLM Models
+| ID        | Description                                                                 | Tags                                                                                                                                                                                                 |
+|----------|-----------------------------------------------------------------------------|--------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| IACA10-1  | Model that is narrow-in-the-middle, either a scenario-based model tailored to| small language models                                                                                     |
+| NOPEN1    | A family of physical layer technologies                                        |                                                                                                                            |
+| Spektra-MQ  | Measurement, synchronization, and clustering                                                        |                                                                                                                            |
+| 4Q4       | Interference pattern or playback                                                                          |                                                                                                                            |
+| Oortspace | An in-network transfer of digital storage devices                                                |                                                                                                                            |
+| QUAPI      | A physical layer and MAC sublayer controller                                                      |                                                                                                                            |
+| OF2        | Interference cancellation technology with multi-carrier waveform propagation           |                                                                                                                            |
+| NRF         | Multiple propagation of radio frequency information to a conventional                         |                                                                                                                                                                   |
+
+### Page 125
+
+### Page 126
+
+——序 表C.2（续）
+
+| ISO/IEC 27001 的要求 | IEC 62443-2-1 相关参考 |
+| A.10.3 系统规划和验收 | 4.3.3.4  网络划分 |
+|   | 4.3.4.3  系统开发与维护 |
+| A.10.4 防范恶意和移动代码 | 4.3.4.3  系统开发与维护 |
+| A.10.5 备份 | 4.3.4.3  系统开发与维护 |
+
+相应的属性配置文件，如资产普查记录。
+
+本体配置表中创建挂载目录树的软件、平台在URI(模块对话))、 挂载语相片、挂载章根和注册码等信息。
+
+### Page 126
+
+——序 表C.2（续）
+
+| ISO/IEC 27001 的要求 | IEC 62443-2-1 相关参考 |
+| A.10.3 系统规划和验收 | 4.3.3.4  网络划分 |
+|   | 4.3.4.3  系统开发与维护 |
+| A.10.4 防范恶意和移动代码 | 4.3.4.3  系统开发与维护 |
+| A.10.5 备份 | 4.3.4.3  系统开发与维护 |
+| A.10.6 网络安全管理 | 4.3.3.4  网络划分 |
+|   | 4.3.4.3  系统开发与维护 |
+| A.10.7 介质处理 | 4.3.3.4  物理与环境安全 |
+|   | 4.3.4.4  信息与文件管理 |
+| A.10.8 信息交换 | 4.3.4.3  系统开发与维护 |
+| A.10.9 电子商务服务 | 4.3.4.3  系统开发与维护 |
+| A.10.10 监视 | 4.3.4.3  系统开发与维护 |
+|   | 4.4.2  一致性 |
+| A.11.1 访问控制的业务要求 | 4.3.3.5  访问控制:帐户管理 |
+| A.11.2 用户访问管理 | 4.3.3.5  访问控制:帐户管理 |
+| A.11.3 用户职责 | 4.3.3.6  访问控制:认证 |
+| A.11.4 网络访问控制 | 4.3.3.4  网络划分 |
+|   | 4.3.3.5  访问控制:认证 |
+| A.11.5 操作系统访问控制 | 4.3.3.6  访问控制:认证 |
+| A.11.6 应用和信息访问控制 | 4.3.3.7  访问控制:授权 |
+| A.11.7 移动计算和远程工作 | 4.3.3.7  访问控制:授权 |
+| A.12.1 信息系统的安全要求 | 4.3.3.4  系统开发与维护 |
+| A.12.2 应用中的正确处理 | 4.3.4.3  系统开发与维护 |
+| A.12.3 密码控制 | 4.3.3.6  系统开发与维护 |
+| A.12.4 系统文件的安全 | 4.3.4.3  系统开发与维护 |
+| A.12.5 开发和支持过程中安全 | 4.3.4.3  系统开发与维护 |
+| A.12.6 技术脆弱性管理 | 4.3.2  系统开发与维护 |
+| A.13.1 报告安全事实和弱点 | 4.3.4.5  偶发事件计划与响应 |
+| A.13.2 安全事件和改进管理 | 4.3.4.5  偶发事件计划与响应 |
+|   | 4.4.3  评审、改进与维护 CSMS |
+| A.14.1 业务连续性管理的安全性方面 | 4.3.2.5  业务连续性计划 |
+| A.15.1 符合法律要求 | 4.4.2  一致性 |
+| A.15.2 符合安全策略和标准及技术符合性 | 4.4.2  一致性 |
+| A.15.3 信息系统审计考虑 | 4.4.2  一致性 |
+
+页码：120
+
+### Page 127
+
+\[1\] IEC/TS 62443-1-1, 工业通信网络 网络和系统安全 第 1-1 部分: 术语、概念和模型
+\[2\] IEC/TR 62443-1-2, 工业通信网络 网络和系统安全 第 1-2 部分: 术语和缩略语词汇表
+\[3\] IEC/TR 62443-1-3, 工业通信网络 网络和系统安全 第 1-3 部分: 系统安全符合性规范约
+\[4\] IEC/TR 62443-2-2, 工业通信网络 网络和系统安全 第 2-2 部分: 操作工业自动化和控制系统安全程序
+\[5\] IEC/TR 62443-2-3, 工业通信网络 网络和系统安全 第 1-3 部分: IACS 环境下的补丁管理
+\[6\] IEC/TR 62443-3-1, 工业通信网络 网络和系统安全 第 3-1 部分: 系统安全符合性规范
+\[7\] IEC/TR 62443-3-2, 工业通信网络 网络和系统安全 第 3-2 部分: 区域和管道的目标安全保证等级
+\[8\] IEC/TR 62443-3-3, 工业通信网络 网络和系统安全 第 1-3 部分: 系统安全要求和安全保证等级
+\[9\] IEC/TR 62443-3-4, 工业通信网络 网络和系统安全 第 1-3 部分: IACS 环境下的补丁管理
+\[10\] IEC/TR 62443-4-1, 工业通信网络 网络和系统安全 第 4-1 部分: 嵌入式设备
+\[11\] IEC/TR 62443-4-2, 工业通信网络 网络和系统安全 第 4-2 部分: 主机设备
+\[12\] IEC/TR 62443-4-3, 工业通信网络 网络和系统安全 第 4-3 部分: 网络安全
+\[13\] IEC/TR 62443-4-4, 工业通信网络 网络和系统安全 第 4-4 部分: 应用、数据和功能性
+\[14\] IEC 61131-3, 可编程控制器 第 3 部分: 编程语言
+\[15\] IEC 61512-1, 批控制, 第 1 部分: 模型和术语
+\[16\] IEC 62264-1, 企业-控制系统集成, 第 1 部分: 模型和术语
+\[17\] ISO/IEC 指令, 第 2 部分: 国际标准结构和编写规则
+\[18\] ISO/IEC 10746-1, 信息技术 开放分配程序 参考模型: 概述
+\[19\] ISO/IEC 10746-2, 信息技术 开放分配程序 参考模型: 基本概念
+\[20\] ISO/IEC 15408-1:2008, 信息技术 安全技术 IT 安全评价准则 第 1 部分: 介绍和通用模型
+\[21\] ISO/IEC 15408-2:2008, 信息技术 安全技术 IT 安全评价准则 第 2 部分: 安全功能组件
+\[22\] ISO/IEC 15408-3:2008, 信息技术 安全技术 IT 安全评价准则 第 3 部分: 安全保证组件
+\[23\] ISO/IEC 17799, 信息技术 安全技术 信息安全管理实践代码
+\[24\] ISO/IEC 27001:2005, 信息技术 安全技术 信息安全管理系统 要求
+\[25\] 29 CFR 1910.119-US 职业安全和健康标准 危害物质 高危害化工安全管理
+\[26\] 化工领域赋值计算机安全指南, 3.0 版本, 2006 年 5 月, 美国化工委员会信息技术中心 (ChermitS), 网址: http://www.chemicalcybersecurity.com/
+\[27\] 计算机安全脆弱性评估方法报告, 2.0 版, 2004 年 11 月, ChermitS, http://www.chemicalcybersecurity.com/
+\[28\] 计算机安全体系结构参考模型, 1.0 版, 2004 年 8 月, ChermitS, http://www.chemicalcybersecurity.com/
+\[29\] 计算机安全自评估工具和方法的评价报告, 2004 年 11 月, ChermitS, http://www.chemicalcybersecurity.com/
+
+### Page 128
+
+* [20] 美国化工领域计算机安全战略, 2006年9月, http://www.chemicalcybersecurity.com/
+
+* [21] 卡尔森,汤姆,信息安全管理:如何理解ISO 17799,2001,http://www.responsiblecaretoolkit.com/pdfs/cybersecurity_att3.pdf
+
+* [22] Purdue研究基金,计算机集成制造的参考模型,1989,ISBN 1-55617-225-7
+
+* [23] NIST出版800-30,信息技术系统风险管理导则,2002年7月
+
+* [24] NIST特别出版800-37,联合信息系统安全认证和认可指南,2003年5月
+
+* [25] NIST特别出版800-55,信息技术系统的安全计量指南,2003年7月
+
+* [26] NIST特别出版800-61,计算机安全事故处理指南,2004年1月
+
+* [27] NIST特别出版800-82,数据采集和控制系统(SCADA)和工业控制系统指南,2006年3月,草案稿
+
+* [28] NIST过程控制安全要求论坛(PCSRF),工业控制系统——系统保护行规(ICS-SPP)
+
+* [29] 卡耐基 梅龙 软件工程研究所,软件工程能力成熟度模型集成(CMMI),1.1版,2002年8月
+
+* [30] NASA/标准和技术科学办公室(NOST),http://ssdoo.gsfc.nasa.gov/nost/isoas/us04/defn.html
+
+* [31] Zachmann企业参考模型,http://www.zifa.com/
+
+* [32] Sarbames-Oxley网站:http://www.sarbanes-oxley.com/
+
+* [33] 网站地址:http://www.sans.org/
+
+* [34] MIS培训研究所,http://www.misti.com/
+
+* [35] 美国国家标准技术研究所,http://www.nist.gov/
+
+* [36] 信息系统技术审记程序,http://www.auditnet.org/asapind.htm
+
+* [37] NIST E扫描安全评估,http://www.mepcenters.nist.gov/escan/
+
+* [38] 美国国家标准研究所,http://www.ansi.org/
+
+* [39] 理想模型,http://www.sei.cmu.edu/ideal/ideal.html
+
+* [40] 信息和相关技术控制目标(COBIT),http://www.isaca.org
+
+* [41] 公司治理工作小组 "信息安全治理-呼吁行动",http://www.cyberpartnership.org/infosecgov4_04.pdf
+
+* [42] 密西根州计算机安全定义,http://www.michigan.gov/cybersecurity/0,1607,7-217-34415---,00.html
+
+* [43] 因特网大百科全书:http://www.wikipedia.org/
+
+* [44] bridgefield词汇表,http://www.bridgefieldgroup.com/
+
+* [45] 六西格玛信息,http://www.onesixsigma.com/
+
+* [46] 卡耐基 梅隆软件工程研究所,http://sei.cmu.edu/
+
+* [47] 卡耐基 梅隆软件工程研究所,计算机应急响应中心(CERT),http://www.cert.org/
+
+* [48] SCADA和控制系统采购工程,http://www.msisac.org/scada/
+
+* [49] 互操作清算中心,http://www.ichnet.org/
+
+* [50] 纽约州财务术语,http://www.budget.state.ny.us/citizen/financial/glossary_all.html
+
+* [51] 搜索视窗安全,http://www.searchwindowsecurity.com/
+
+* [52] 化工领域计算机安全编程,http://chemicalcybersecurity.com/
+
+* [53] 技术大百科,http://www.techweb.com/encyclopedia/
+
+## 英文摘要
+
+### Page 129
+
+ISSN # 1006-6410
+ISBN # 7-5023-1707-0
+定价全书12.00元
+
+《中华人民共和国国家标准
+工业通信网络 网络和系统安全
+建立工业自动化和控制
+系统安全程序
+GB/T 33007-2016/ICH T-64A 4.2-1:2010*
+
+中国标准出版社出版发行
+北京市朝阳区十里河大街9号 (100028)
+北京市海淀区西单前街8号 (100036)
+
+网址 www.spc.net.cn
+电话: (010)68533235 发行中心: (010)610 58128
+www.spc.net.cn
+读者服务部:(010)68532946
+
+各地新华书店经销
+
+开本 880×1230 1/16 印张 8.25 字数 251 千字
+2016年11月第一版 2016年主原文首次印刷
+
+书号: 155066•1-54710 定价 100.00元
+
+如有印装差错 由本社发行中心调换
+版权专有 侵权必究
+举报电话: (010)68590107
+
+GB/T 33007-2016

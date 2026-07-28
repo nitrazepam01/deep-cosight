@@ -16,7 +16,7 @@ d = webdriver.Edge(options=opt)
 d.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source":"Object.defineProperty(navigator,'webdriver',{get:()=>undefined})"})
 
 urls = [
-    "https://www.doc88.com/p-29020524431182.html",
+    "https://www.doc88.com/p-30454081576322.html",
 ]
 
 for idx, url in enumerate(urls):

@@ -220,7 +220,7 @@ def get_lightrag_config() -> dict:
     return {
         "base_url": os.environ.get("LIGHTRAG_BASE_URL", "http://localhost:9621"),
         "api_key": os.environ.get("LIGHTRAG_API_KEY", ""),
-        "storage_dir": os.environ.get("LIGHTRAG_STORAGE_DIR", "./lightrag_data"),
+        "storage_dir": os.environ.get("LIGHTRAG_STORAGE_DIR", "./rag_data"),
         "default_query_mode": os.environ.get("LIGHTRAG_DEFAULT_QUERY_MODE", "hybrid"),
     }
 
