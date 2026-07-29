@@ -26,8 +26,6 @@ providers.json
 test_api_key.py
 /tmp/test_api_key.py
 *.bak
-lightrag_data/
-lightrag_storage/
 upload_files/
 rag_storage/
 start_lightrag.bat
@@ -39,5 +37,4 @@ tmp/
 .reasonix/
 submit_prepare/
 external/**/*.pdf
-rag_data/
-rag_storage/
+industrial_kb_data/
