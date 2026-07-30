@@ -438,11 +438,21 @@ def kb_list():
                 if os.path.isdir(dpath) and os.path.exists(os.path.join(dpath, "manifest.json")):
                     with open(os.path.join(dpath, "manifest.json")) as f:
                         m = json.load(f)
+                    doc_count = m.get("total_documents", 0)
+                    chunk_count = m.get("total_chunks", 0)
+                    doc_path = os.path.join(dpath, "documents.jsonl")
+                    chunk_path = os.path.join(dpath, "chunks.jsonl")
+                    # Always verify from file (manifest can be stale)
+                    if os.path.exists(doc_path):
+                        with open(doc_path, encoding="utf-8") as _f:
+                            doc_count = sum(1 for _ in _f)
+                    if os.path.exists(chunk_path):
+                        with open(chunk_path, encoding="utf-8") as _f:
+                            chunk_count = sum(1 for _ in _f)
                     all_kbs[name] = {
                         "path": dpath, "type": "production" if d == VERSIONS_DIR else "test",
-                        "documents": m.get("total_documents", sum(1 for _ in open(os.path.join(dpath, "documents.jsonl"), encoding="utf-8"))
-                                                       if os.path.exists(os.path.join(dpath, "documents.jsonl")) else 0),
-                        "chunks": m.get("total_chunks", 0),
+                        "documents": doc_count,
+                        "chunks": chunk_count,
                         "modified": m.get("last_modified", m.get("build_time", ""))
                     }
     print(f"{'Name':<25} {'Type':<12} {'Docs':<8} {'Chunks':<10} {'Modified'}")

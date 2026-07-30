@@ -2,12 +2,12 @@
  * Co-Sight Knowledge Base Management
  * 知识库管理模块 — 对接 LightRAG 服务
  */
-const KnowledgeService = (function () {
+let KnowledgeService = (function () {
     const API_BASE = '/api/nae-deep-research/v1';
     const MODAL_ANIMATION_MS = 300;
     let _kbList = [];
     let _currentKbId = null;
-    let _lightragStatus = 'unknown';       // connected, disconnected, starting
+    let _lightragStatus = 'disconnected';       // connected, disconnected, starting
     let _pipelineTimer = null;              // 管线轮询定时器
     let _detailDocuments = [];              // 当前 KB 的文档列表
     let _detailPipeline = null;             // 当前 KB 的管线状态
@@ -77,7 +77,7 @@ const KnowledgeService = (function () {
         try {
             const resp = await fetch(`${API_BASE}/deep-research/kb/health`);
             const json = await resp.json();
-            _lightragStatus = json.data?.status || 'disconnected';
+            _lightragStatus = json.data?.status === 'running' ? 'connected' : 'disconnected';
             _healthDetail = json.data?.detail || null;
         } catch {
             _lightragStatus = 'disconnected';
@@ -134,16 +134,16 @@ const KnowledgeService = (function () {
         const serviceBtnEl = modal.querySelector('.kb-service-btn');
 
         const statusHtml = _lightragStatus === 'connected'
-            ? '<span class="kb-status-badge kb-status-online"><i class="fas fa-circle"></i> 已连接</span>'
+            ? '<span class="kb-status-badge kb-status-online"><i class="fas fa-circle"></i> 运行中</span>'
             : (_lightragStatus === 'starting'
-                ? '<span class="kb-status-badge kb-status-starting"><i class="fas fa-spinner fa-spin"></i> 启动中...</span>'
+                ? '<span class="kb-status-badge kb-status-starting"><i class="fas fa-spinner fa-spin"></i> 加载中...</span>'
                 : '<span class="kb-status-badge kb-status-offline"><i class="fas fa-circle"></i> 未连接</span>');
 
         const serviceBtn = _lightragStatus === 'connected'
-            ? '<button class="kb-service-btn kb-service-stop" onclick="event.stopPropagation(); KnowledgeService.doStopService()" title="停止服务"><i class="fas fa-stop-circle"></i> <span class="kb-service-text">停止服务</span></button>'
+            ? '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.open()" title="刷新知识库列表"><i class="fas fa-sync-alt"></i> <span class="kb-service-text">刷新</span></button>'
             : (_lightragStatus === 'starting'
-                ? '<button class="kb-service-btn kb-service-starting" disabled onclick="event.stopPropagation();" title="服务正在启动中"><i class="fas fa-spinner fa-spin"></i> <span class="kb-service-text">启动中...</span></button>'
-                : '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.doStartService()" title="启动服务"><i class="fas fa-play-circle"></i> <span class="kb-service-text">启动服务</span></button>');
+                ? '<button class="kb-service-btn kb-service-starting" disabled onclick="event.stopPropagation();" title="正在加载知识库…"><i class="fas fa-spinner fa-spin"></i> <span class="kb-service-text">加载中…</span></button>'
+                : '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.doActivate()" title="加载所有知识库"><i class="fas fa-play-circle"></i> <span class="kb-service-text">激活全部</span></button>');
 
         // 如果元素存在，只更新这些部分
         if (statusEl) {
@@ -159,16 +159,16 @@ const KnowledgeService = (function () {
         if (!modal) return;
 
         const statusHtml = _lightragStatus === 'connected'
-            ? '<span class="kb-status-badge kb-status-online"><i class="fas fa-circle"></i> 已连接</span>'
+            ? '<span class="kb-status-badge kb-status-online"><i class="fas fa-circle"></i> 运行中</span>'
             : (_lightragStatus === 'starting'
-                ? '<span class="kb-status-badge kb-status-starting"><i class="fas fa-spinner fa-spin"></i> 启动中...</span>'
+                ? '<span class="kb-status-badge kb-status-starting"><i class="fas fa-spinner fa-spin"></i> 加载中...</span>'
                 : '<span class="kb-status-badge kb-status-offline"><i class="fas fa-circle"></i> 未连接</span>');
 
         const serviceBtn = _lightragStatus === 'connected'
-            ? '<button class="kb-service-btn kb-service-stop" onclick="event.stopPropagation(); KnowledgeService.doStopService()" title="停止服务"><i class="fas fa-stop-circle"></i> <span class="kb-service-text">停止服务</span></button>'
+            ? '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.open()" title="刷新知识库列表"><i class="fas fa-sync-alt"></i> <span class="kb-service-text">刷新</span></button>'
             : (_lightragStatus === 'starting'
-                ? '<button class="kb-service-btn kb-service-starting" disabled onclick="event.stopPropagation();" title="服务正在启动中"><i class="fas fa-spinner fa-spin"></i> <span class="kb-service-text">启动中...</span></button>'
-                : '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.doStartService()" title="启动服务"><i class="fas fa-play-circle"></i> <span class="kb-service-text">启动服务</span></button>');
+                ? '<button class="kb-service-btn kb-service-starting" disabled onclick="event.stopPropagation();" title="正在加载知识库…"><i class="fas fa-spinner fa-spin"></i> <span class="kb-service-text">加载中…</span></button>'
+                : '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.doActivate()" title="加载所有知识库"><i class="fas fa-play-circle"></i> <span class="kb-service-text">激活全部</span></button>');
 
         const contentHtml = _currentKbId
             ? renderKBDetail()
@@ -202,7 +202,7 @@ const KnowledgeService = (function () {
 
     function renderKBList() {
         let cardsHtml = '';
-        
+
         if (_kbList.length === 0) {
             cardsHtml = `
                 <div class="kb-empty-state">
@@ -214,14 +214,53 @@ const KnowledgeService = (function () {
                     </button>
                 </div>
                 <div id="kb-create-form" class="kb-create-form" style="display:none;">
-                    <div class="kb-create-form-title"><i class="fas fa-pen-fancy"></i> 新建知识库</div>
-                    <input type="text" id="kb-name-input" placeholder="知识库名称（必填，最多 10 字）" class="kb-input" maxlength="10">
-                    <input type="text" id="kb-desc-input" placeholder="描述（可选，最多 30 字）" class="kb-input" maxlength="30">
-                    <div class="kb-create-actions">
-                        <button class="kb-btn-cancel" onclick="KnowledgeService.hideCreateForm()">取消</button>
-                        <button class="kb-btn-primary" onclick="KnowledgeService.doCreate()"><i class="fas fa-check"></i> 创建</button>
+                <div class="kb-create-form-title"><i class="fas fa-pen-fancy"></i> 新建知识库</div>
+            
+                <div class="kb-create-row">
+                    <label class="kb-create-label">名称</label>
+                    <input type="text" id="kb-name-input" placeholder="知识库名称" class="kb-input" maxlength="10">
+                </div>
+            
+                <div class="kb-create-row">
+                    <label class="kb-create-label">描述</label>
+                    <input type="text" id="kb-desc-input" placeholder="简要描述" class="kb-input" maxlength="30">
+                </div>
+            
+                <div class="kb-create-row kb-create-row-inherit">
+                    <label class="kb-create-label">继承</label>
+                    <div class="kb-inherit-box">
+                        <div class="cs-model-add-row">
+                            <input type="text" id="kb-inherit-input" class="kb-input" placeholder="输入知识库名称"
+                                onkeydown="if(event.key==='Enter'){event.preventDefault();KnowledgeService.addInherit()}">
+                            <button class="settings-btn settings-btn-save cs-model-add-btn" onclick="KnowledgeService.addInherit()">
+                                <i class="fas fa-plus"></i> 添加
+                            </button>
+                        </div>
+                        <div class="cs-model-tags-container" id="kb-inherit-tags"></div>
                     </div>
                 </div>
+            
+                <div class="kb-create-row">
+                    <div class="kb-upload-drop" id="kb-upload-drop" 
+                        ondragover="event.preventDefault();this.classList.add('drag-over')" 
+                        ondragenter="event.preventDefault();this.classList.add('drag-over')"
+                        ondragleave="this.classList.remove('drag-over')"
+                        ondrop="KnowledgeService.handleCreateDrop(event)"
+                        onclick="event.stopPropagation();this.querySelector('input[type=file]').click()">
+                        <input type="file" id="kb-create-file" accept=".pdf" onchange="KnowledgeService.handleCreateFileSelect()" style="display:none" multiple="">
+                        <div class="kb-upload-drop-text">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>拖放 PDF 文件到此处，或点击选择</p>
+                        </div>
+                    </div>
+                    <div class="kb-create-file-list" id="kb-create-file-list"></div>
+                </div>
+            
+                <div class="kb-create-actions">
+                    <button class="kb-btn-cancel" onclick="KnowledgeService.hideCreateForm()">取消</button>
+                    <button class="kb-btn-primary" onclick="KnowledgeService.doCreate()"><i class="fas fa-check"></i> 创建</button>
+                </div>
+            </div>
             `;
         } else {
             const cards = _kbList.map(kb => `
@@ -236,8 +275,10 @@ const KnowledgeService = (function () {
                         <div class="kb-card-name">${escapeHtml(kb.name)}</div>
                         <div class="kb-card-desc">${escapeHtml(kb.description || '暂无描述')}</div>
                         <div class="kb-card-footer">
-                            <span class="kb-card-stat"><i class="fas fa-file-alt"></i> ${kb.doc_count || 0} 篇文档</span>
-                            <span class="kb-card-stat"><i class="fas fa-clock"></i> ${formatDate(kb.created_at)}</span>
+                            <span class="kb-card-stat"><i class="fas fa-file-alt"></i> ${kb.document_count || 0}</span>
+                            <span class="kb-card-stat"><i class="fas fa-th-large"></i> ${kb.chunk_count || 0}</span>
+                            <span class="kb-card-stat"><i class="fas fa-vector-square"></i> ${kb.vector_count || 0}</span>
+                            <span class="kb-card-stat"><i class="fas fa-clock"></i> ${(kb.modified||'').substring(0,10)}</span>
                         </div>
                     </div>
                 </div>
@@ -246,20 +287,65 @@ const KnowledgeService = (function () {
             cardsHtml = `
                 <div class="kb-list-toolbar">
                     <span class="kb-list-count"><i class="fas fa-layer-group"></i> ${_kbList.length} 个知识库</span>
-                    <button class="kb-btn-primary" onclick="KnowledgeService.showCreateForm()">
-                        <i class="fas fa-plus"></i> 新建知识库
-                    </button>
-                </div>
-                <div class="kb-card-grid">${cards}</div>
-                <div id="kb-create-form" class="kb-create-form" style="display:none; margin-top: 16px;">
-                    <div class="kb-create-form-title"><i class="fas fa-pen-fancy"></i> 新建知识库</div>
-                    <input type="text" id="kb-name-input" placeholder="知识库名称（必填，最多 10 字）" class="kb-input" maxlength="10">
-                    <input type="text" id="kb-desc-input" placeholder="描述（可选，最多 30 字）" class="kb-input" maxlength="30">
-                    <div class="kb-create-actions">
-                        <button class="kb-btn-cancel" onclick="KnowledgeService.hideCreateForm()">取消</button>
-                        <button class="kb-btn-primary" onclick="KnowledgeService.doCreate()"><i class="fas fa-check"></i> 创建</button>
+                    <div class="kb-header-actions">
+                        <button class="kb-btn-primary" onclick="KnowledgeService.showCreateForm()">
+                            <i class="fas fa-plus"></i> 新建知识库
+                        </button>
+                        <button class="settings-close-btn" style="color:#e74c3c" onclick="KnowledgeService.deleteSelected()" title="删除选中的知识库">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </div>
                 </div>
+                <div class="kb-card-grid">${cards}</div>
+                <div id="kb-create-form" class="kb-create-form" style="display:none;">
+                <div class="kb-create-form-title"><i class="fas fa-pen-fancy"></i> 新建知识库</div>
+            
+                <div class="kb-create-row">
+                    <label class="kb-create-label">名称</label>
+                    <input type="text" id="kb-name-input" placeholder="必填（不超过10个字符）" class="kb-input" maxlength="10">
+                </div>
+            
+                <div class="kb-create-row">
+                    <label class="kb-create-label">描述</label>
+                    <input type="text" id="kb-desc-input" placeholder="选填（不超过30个字符）" class="kb-input" maxlength="30">
+                </div>
+            
+                <div class="kb-create-row kb-create-row-inherit">
+                    <label class="kb-create-label">继承</label>
+                    <div class="kb-inherit-box">
+                        <div class="cs-model-add-row">
+                            <input type="text" id="kb-inherit-input" class="kb-input" placeholder="输入知识库名称"
+                                onkeydown="if(event.key==='Enter'){event.preventDefault();KnowledgeService.addInherit()}">
+                            <button class="settings-btn settings-btn-save cs-model-add-btn" onclick="KnowledgeService.addInherit()">
+                                <i class="fas fa-plus"></i> 添加
+                            </button>
+                        </div>
+                        <div class="cs-model-tags-container" id="kb-inherit-tags"></div>
+                    </div>
+                </div>
+            
+                <div class="kb-create-row">
+                    <label class="kb-create-label">文件</label>
+                    <div class="kb-upload-drop" id="kb-upload-drop" 
+                        ondragover="event.preventDefault();this.classList.add('drag-over')" 
+                        ondragenter="event.preventDefault();this.classList.add('drag-over')"
+                        ondragleave="this.classList.remove('drag-over')"
+                        ondrop="KnowledgeService.handleCreateDrop(event)"
+                        onclick="event.stopPropagation();this.querySelector('input[type=file]').click()">
+                        <input type="file" id="kb-create-file" accept=".pdf" onchange="KnowledgeService.handleCreateFileSelect()" style="display:none" multiple>
+                        <div class="kb-upload-drop-text">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>拖放 PDF 文件到此处</p>
+                        </div>
+                    </div>
+                    <div class="kb-create-file-list" id="kb-create-file-list"></div>
+                </div>
+            
+                <div class="kb-create-actions">
+                    <button class="kb-btn-cancel" onclick="KnowledgeService.hideCreateForm()">取消</button>
+                    <button class="kb-btn-primary" onclick="KnowledgeService.doCreate()"><i class="fas fa-check"></i> 创建</button>
+                </div>
+            </div>
             `;
         }
 
@@ -278,8 +364,8 @@ const KnowledgeService = (function () {
                         <h3>${escapeHtml(kb.name)}</h3>
                         <p class="kb-detail-desc">${escapeHtml(kb.description || '暂无描述')}</p>
                         <div class="kb-detail-stats">
-                            <span><i class="fas fa-file-alt"></i> ${kb.doc_count || 0} 篇文档</span>
-                            <span><i class="fas fa-calendar"></i> 创建于 ${formatDate(kb.created_at)}</span>
+                            <span><i class="fas fa-file-alt"></i> ${kb.document_count || 0} 篇</span>
+                            <span><i class="fas fa-calendar"></i> ${(kb.modified||'').substring(0,10)}</span>
                         </div>
                     </div>
                     <button class="kb-detail-delete-btn" onclick="KnowledgeService.confirmDelete('${kb.id}', '${escapeHtml(kb.name).replace(/'/g, "\\'")}')">
@@ -320,7 +406,7 @@ const KnowledgeService = (function () {
                 <div class="kb-section">
                     <div class="kb-section-title"><i class="fas fa-cloud-upload-alt"></i> 上传文档</div>
                     <div class="kb-upload-area" id="kb-upload-area"
-                         onclick="document.getElementById('kb-file-input').click()"
+                         onclick="event.stopPropagation(); this.querySelector('input[type=file]').click()"
                          ondragover="event.preventDefault(); this.classList.add('dragover')"
                          ondragleave="this.classList.remove('dragover')"
                          ondrop="event.preventDefault(); this.classList.remove('dragover'); KnowledgeService.handleDrop(event)">
@@ -509,7 +595,7 @@ const KnowledgeService = (function () {
                 <div class="kb-pipeline-idle">
                     <span class="kb-pipeline-badge kb-badge-idle"><i class="fas fa-check-circle"></i> 空闲</span>
                     <div class="kb-pipeline-stats-row">
-                        <div class="kb-stat-card"><span class="kb-stat-num">${total}</span><span class="kb-stat-label">总文档</span></div>
+                        <div class="kb-stat-card"><span class="kb-stat-num">${total}</span><span class="kb-stat-label">总</span></div>
                         <div class="kb-stat-card kb-stat-success"><span class="kb-stat-num">${statusCounts.PROCESSED}</span><span class="kb-stat-label">已完成</span></div>
                         <div class="kb-stat-card kb-stat-processing"><span class="kb-stat-num">${statusCounts.PROCESSING}</span><span class="kb-stat-label">处理中</span></div>
                         <div class="kb-stat-card kb-stat-pending"><span class="kb-stat-num">${statusCounts.PENDING}</span><span class="kb-stat-label">等待中</span></div>
@@ -600,20 +686,6 @@ const KnowledgeService = (function () {
     }
 
     /* ========== 操作 ========== */
-    function showCreateForm() {
-        const form = document.getElementById('kb-create-form');
-        if (form) {
-            form.style.display = 'block';
-            const nameInput = document.getElementById('kb-name-input');
-            if (nameInput) nameInput.focus();
-        }
-    }
-
-    function hideCreateForm() {
-        const form = document.getElementById('kb-create-form');
-        if (form) form.style.display = 'none';
-    }
-
     async function doCreate() {
         const name = document.getElementById('kb-name-input')?.value?.trim();
         const desc = document.getElementById('kb-desc-input')?.value?.trim();
@@ -627,6 +699,98 @@ const KnowledgeService = (function () {
         }
     }
 
+    let _createFiles = [];
+    let _createInherit = [];
+
+    function showCreateForm() {
+        _createFiles = [];
+        _createInherit = [];
+        document.getElementById('kb-create-form').style.display = 'block';
+        document.getElementById('kb-create-file-list').innerHTML = '';
+        document.getElementById('kb-inherit-tags').innerHTML = document.getElementById('kb-inherit-tags').innerHTML.split('</div>')[0] + '</div>' + (document.getElementById('kb-inherit-tags').innerHTML.split('</div>').slice(1) || []).join('</div>');
+    }
+
+    function hideCreateForm() {
+        const form = document.getElementById('kb-create-form');
+        const body = document.querySelector('.kb-body');
+        const target = Math.max(0, body.scrollTop - form.offsetHeight);
+
+        form.classList.add('hiding');
+        form.addEventListener('animationend', function handler() {
+            form.removeEventListener('animationend', handler);
+            form.style.display = 'none';
+            form.classList.remove('hiding');
+            _createFiles = [];
+            _createInherit = [];
+
+            if (body.scrollHeight <= body.clientHeight) {
+                body.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+
+        // 动画过程中同步上滚，不等到最后
+        body.scrollTo({ top: target, behavior: 'smooth' });
+    }
+
+    function handleCreateFileSelect() {
+        const inp = document.getElementById('kb-create-file');
+        [...inp.files].forEach(f => { if (f.type === 'application/pdf') _createFiles.push(f); });
+        inp.value = '';
+        renderCreateFileList();
+    }
+
+    function handleCreateDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.currentTarget.classList.remove('drag-over');
+        [...e.dataTransfer.files].forEach(f => { if (f.type === 'application/pdf') _createFiles.push(f); });
+        renderCreateFileList();
+    }
+
+    function removeCreateFile(idx) {
+        _createFiles.splice(idx, 1);
+        renderCreateFileList();
+    }
+
+    function addInherit() {
+        const input = document.getElementById('kb-inherit-input');
+        if (!input) return;
+        const name = input.value.trim();
+        if (!name) return;
+        const container = document.getElementById('kb-inherit-tags');
+        if (!container) return;
+        // 按名字查找KB
+        const kb = _kbList.find(k => k.name === name);
+        if (!kb) {
+            showToast('知识库不存在: ' + name, 'error');
+            return;
+        }
+        // 去重
+        const existing = container.querySelectorAll('.cs-model-tag');
+        for (const tag of existing) {
+            if (tag.dataset.kbId === kb.id) {
+                showToast('已添加: ' + name, 'error');
+                return;
+            }
+        }
+        const tag = document.createElement('span');
+        tag.className = 'cs-model-tag';
+        tag.dataset.kbId = kb.id;
+        tag.innerHTML = escapeHtml(name) + ' <i class="fas fa-times cs-model-tag-remove" onclick="KnowledgeService.removeInherit(this)"></i>';
+        container.appendChild(tag);
+        input.value = '';
+    }
+
+    function removeInherit(iconEl) {
+        const tag = iconEl.closest('.cs-model-tag');
+        if (tag) tag.remove();
+    }
+
+    function getInheritIds() {
+        const tags = document.querySelectorAll('#kb-inherit-tags .cs-model-tag');
+        return [...tags].map(t => t.dataset.kbId);
+    }
+
     let _selectedKbIds = new Set();  // 当前选中的知识库 ID 集合（用于多选模式）
 
     function toggleCheckbox(kbId, event) {
@@ -635,17 +799,17 @@ const KnowledgeService = (function () {
             event.preventDefault();
             event.stopPropagation();
         }
-        
+
         if (_selectedKbIds.has(kbId)) {
             _selectedKbIds.delete(kbId);
         } else {
             _selectedKbIds.add(kbId);
         }
-        
+
         // 只更新勾选框的视觉状态，不重新渲染整个页面
         updateCheckboxVisuals();
     }
-    
+
     function updateCheckboxVisuals() {
         // 只更新勾选框的类名，不重新渲染
         document.querySelectorAll('.kb-card-checkbox').forEach(checkbox => {
@@ -665,7 +829,7 @@ const KnowledgeService = (function () {
     function showDeleteKBConfirmModal(kbId, name) {
         const modal = document.getElementById('knowledge-modal');
         if (!modal) return;
-        
+
         const overlay = document.createElement('div');
         overlay.className = 'settings-modal-overlay';
         overlay.id = 'kb-delete-confirm-overlay';
@@ -939,54 +1103,42 @@ const KnowledgeService = (function () {
     }
 
     /* ========== 生命周期 ========== */
-    async function doStartService() {
-        // 点击按钮后立即显示"启动中"状态
+    async function doActivate() {
         _lightragStatus = 'starting';
         renderModal();
-        updateKnowledgeBaseBtnActiveState();
-        
-        try {
-            const result = await startService();
-            if (result.status === 'already_running') {
-                showToast(result.message, 'success');
-            } else if (result.status === 'started') {
-                showToast('✅ LightRAG 服务启动成功', 'success');
-            } else if (result.status === 'starting') {
-                showToast('服务正在启动中，请稍候检查状态', 'success');
-            }
-        } catch (e) {
-            let msg = e.message;
-            // 截取前 200 字符避免 toast 太长
-            if (msg.length > 200) msg = msg.substring(0, 200) + '...';
-            showToast('启动失败：' + msg, 'error');
-            // 启动失败时恢复为 disconnected 状态
-            _lightragStatus = 'disconnected';
-            renderModal();
-            updateKnowledgeBaseBtnActiveState();
-            // 如果有日志，在弹窗中显示
-            if (e.logs && e.logs.length > 0) {
-                const bodyEl = document.querySelector('.kb-body');
-                if (bodyEl) {
-                    bodyEl.innerHTML = `
-                        <div class="kb-error-logs">
-                            <div class="kb-section-title"><i class="fas fa-exclamation-triangle"></i> 启动失败 - 服务日志</div>
-                            <pre class="kb-log-output">${escapeHtml(e.logs.join('\n'))}</pre>
-                            <p style="color:#999;font-size:12px;margin-top:12px;">请检查以上日志定位问题。常见原因：缺少依赖包、端口占用、模型配置错误。</p>
-                        </div>
-                    `;
-                }
-            }
-            return;
-        }
-        
-        // 启动后触发一次健康检查查询
-        await checkHealth();
+        await open();
+        _lightragStatus = 'connected';
         renderModal();
     }
 
-    async function doStopService() {
-        // 显示确认弹窗（不改变按钮状态）
-        showStopServiceConfirmModal();
+    async function doStartService() { await doActivate(); }
+    async function doStopService() { _lightragStatus = 'disconnected'; renderModalFull(); }
+
+    function deleteSelected() {
+        const checked = [...document.querySelectorAll('.kb-card-checkbox.checked')].map(cb => cb.dataset.kbId);
+        if (checked.length === 0) { return; }
+        showDeleteConfirm(checked);
+    }
+
+    function showDeleteConfirm(kbIds) {
+        const names = kbIds.join(', ');
+        const html = '<div class="modal-overlay" style="z-index:10001" onclick="KnowledgeService.closeDeleteConfirm()"><div class="modal" style="z-index:10002"><div class="modal-header"><h3>删除确认</h3></div><div class="modal-body"><p>确定要删除 "' + names + '"？此操作不可恢复。</p></div><div class="modal-footer"><button class="btn-modal-secondary" onclick="KnowledgeService.closeDeleteConfirm()">取消</button><button class="btn-modal-primary btn-delete-confirm" onclick="KnowledgeService.doDeleteKBs(' + JSON.stringify(kbIds).replace(/"/g, '&quot;') + ')">删除</button></div></div>';
+        var d = document.createElement('div');
+        d.innerHTML = html;
+        document.body.appendChild(d);
+    }
+
+    function closeDeleteConfirm() {
+        document.querySelectorAll('.modal-overlay,.modal').forEach(function(e){
+            var z = window.getComputedStyle(e).zIndex;
+            if (z === '10001' || z === '10002') e.remove();
+        });
+    }
+
+    async function doDeleteKBs(kbIds) {
+        closeDeleteConfirm();
+        for (var idx = 0; idx < kbIds.length; idx++) { await deleteKB(kbIds[idx]); }
+        open();
     }
 
     // 公开：从外部触发按钮状态更新（用于 main.js 等）
@@ -997,7 +1149,7 @@ const KnowledgeService = (function () {
     function showStopServiceConfirmModal() {
         const modal = document.getElementById('knowledge-modal');
         if (!modal) return;
-        
+
         const overlay = document.createElement('div');
         overlay.className = 'settings-modal-overlay';
         overlay.id = 'kb-stop-service-confirm-overlay';
@@ -1049,8 +1201,15 @@ const KnowledgeService = (function () {
             console.error('Failed to load KB data:', e);
             _kbList = [];
         }
-        // 打开窗口时检查健康状态
-        await checkHealth();
+        // 仅刷新内容区，保留 header 不重绘
+        const modal = document.getElementById('knowledge-modal');
+        if (modal && modal.classList.contains('show')) {
+            const bodyEl = modal.querySelector('.kb-body');
+            if (bodyEl) {
+                bodyEl.innerHTML = renderKBList();
+                return;
+            }
+        }
         renderModalFull();
     }
 
@@ -1078,7 +1237,7 @@ const KnowledgeService = (function () {
     function updateKnowledgeBaseBtnActiveState() {
         const kbBtn = document.getElementById('knowledge-base-btn');
         if (!kbBtn) return;
-        
+
         // 当 LightRAG 服务已连接时，按钮处于激活状态
         if (_lightragStatus === 'connected') {
             kbBtn.classList.add('active');
@@ -1140,12 +1299,13 @@ const KnowledgeService = (function () {
         showCreateForm, hideCreateForm, doCreate, confirmDelete,
         handleFileSelect, handleDrop, doInsertText, doQuery,
         renderSelector, toggleSelector, onSelectorChange, getSelectedKBIds,
-        doStartService, doStopService, refreshDocuments,
-        toggleCheckbox,
+        doStartService, doStopService, refreshDocuments, deleteSelected,
+        toggleCheckbox, doActivate, closeDeleteConfirm, doDeleteKBs,
         // 停止服务确认弹窗相关
         closeStopServiceConfirm, confirmStopService,
         // 删除知识库确认弹窗相关
         closeDeleteKBConfirm, doDeleteKB,
+        handleCreateDrop, addInherit, removeInherit, getInheritIds,
         // 初始化
         init,
         // 公开：从外部触发按钮状态更新

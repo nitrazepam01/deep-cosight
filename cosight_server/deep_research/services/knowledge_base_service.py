@@ -1,4 +1,4 @@
-# Copyright 2025 ZTE Corporation.
+﻿# Copyright 2025 ZTE Corporation.
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -14,14 +14,16 @@
 #    under the License.
 
 """
-知识库检索服务 — 在任务执行前查询知识库上下文
+Knowledge base query service — queries industrial KB before task execution.
 """
 
-import os
-import asyncio
+import os, sys, asyncio
 from typing import List, Optional
 
-import httpx
+_PROJ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _PROJ not in sys.path:
+    sys.path.insert(0, _PROJ)
+
 from app.common.logger_util import logger
 
 
@@ -31,66 +33,42 @@ async def query_knowledge_bases(
     mode: Optional[str] = None,
 ) -> str:
     """
-    并行查询多个知识库，合并返回检索到的上下文文本。
-    用于注入到 Planner 的 system prompt 中。
+    Query multiple industrial knowledge bases and merge context.
+    Used to inject context into Planner system prompt.
 
     Args:
-        question: 用户查询
-        kb_ids: 知识库 ID 列表
-        mode: 查询模式（默认从环境变量读取）
+        question: User query
+        kb_ids: KB ID list (names or paths)
+        mode: Ignored (industrial KB uses RRF hybrid by default)
 
     Returns:
-        合并后的上下文文本，如无内容则返回空字符串
+        Merged context text, or empty string if no results.
     """
     if not kb_ids:
         return ""
 
-    base_url = os.getenv("LIGHTRAG_BASE_URL", "http://localhost:9621").rstrip("/")
-    api_key = os.getenv("LIGHTRAG_API_KEY")
-    query_mode = mode or os.getenv("LIGHTRAG_DEFAULT_QUERY_MODE", "hybrid")
+    from industrial_rag.step6_query_interface import IndustrialKB
+    from cosight_server.deep_research.routers.knowledge_base import _kb_dir
 
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-
-    async def _query_single(kb_id: str) -> Optional[str]:
+    results = []
+    for kid in kb_ids:
+        d = _kb_dir(kid)
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                resp = await client.post(
-                    f"{base_url}/query",
-                    headers=headers,
-                    json={
-                        "query": question,
-                        "mode": query_mode,
-                        "workspace": kb_id,
-                        "only_need_context": True,
-                        "stream": False,
-                    },
-                )
-                resp.raise_for_status()
-                result = resp.json()
-                if isinstance(result, str):
-                    return result
-                return result.get("response", str(result))
+            kb = IndustrialKB.get(kb_dir=d) if d else IndustrialKB.get()
+            if kb is None:
+                continue
+            result = kb.query(question)
+            if result and result.get("answer"):
+                results.append((kid, result["answer"]))
         except Exception as e:
-            logger.warning(f"Query knowledge base {kb_id} failed: {e}")
-            return None
+            logger.warning(f"Query industrial KB {kid} failed: {e}")
 
-    results = await asyncio.gather(*[_query_single(kb_id) for kb_id in kb_ids])
-
-    # 加载知识库名称
-    from cosight_server.deep_research.routers.knowledge_base import _load_kb_meta
-    meta = _load_kb_meta()
-    name_map = {kb["id"]: kb["name"] for kb in meta}
-
-    contexts = []
-    for kb_id, result in zip(kb_ids, results):
-        if result and result.strip():
-            kb_name = name_map.get(kb_id, kb_id)
-            contexts.append(f"【来源: {kb_name}】\n{result.strip()}")
-
-    if not contexts:
+    if not results:
         return ""
 
-    header = "=== 以下是从本地知识库检索到的相关参考信息 ===\n\n"
-    return header + "\n\n---\n\n".join(contexts) + "\n\n=== 知识库参考信息结束 ==="
+    contexts = []
+    for kid, answer in results:
+        contexts.append(f"【来源: {kid}】\n{answer.strip()}")
+
+    header = "=== 以下是从工业知识库检索到的相关参考信息 ===\n\n"
+    return header + "\n\n---\n\n".join(contexts) + "\n\n=== 工业知识库参考信息结束 ==="
