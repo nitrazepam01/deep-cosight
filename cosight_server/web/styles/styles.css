@@ -6225,3 +6225,57 @@ select.settings-input option:checked {
 .kb-inherit-box .cs-model-add-btn:hover {
     background: #1e88e5 !important;
 }
+
+/* 文件行 */
+.kb-create-row-file {
+    align-items: flex-start !important;
+}
+
+/* upload 区域 */
+.kb-upload-drop {
+    border: 2px dashed #d1d5db;
+    border-radius: 10px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.3s, background 0.3s;
+    background: #fafbfc;
+    flex: 1;
+}
+
+.kb-upload-drop.drag-over {
+    border-color: #667eea !important;
+    background: rgba(102, 126, 234, 0.08) !important;
+}
+
+.kb-upload-drop-text i {
+    font-size: 28px;
+    color: #aaa;
+}
+
+.kb-upload-drop-text p {
+    margin: 8px 0;
+    color: #999;
+    font-size: 13px;
+}
+
+/* 文件选择器与 upload 的间距 */
+#kb-file-selector {
+    margin-bottom: 8px;
+}
+
+/* 下拉项间距微调 */
+#kb-file-selector .custom-select-option {
+    padding: 6px 12px;
+}
+
+/* 下拉展开动画 */
+.custom-select-wrapper.open .custom-select-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.custom-select-wrapper.open .custom-select-arrow {
+    transform: rotate(180deg);
+}

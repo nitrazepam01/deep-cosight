@@ -240,20 +240,23 @@ let KnowledgeService = (function () {
                     </div>
                 </div>
             
-                <div class="kb-create-row">
-                    <div class="kb-upload-drop" id="kb-upload-drop" 
-                        ondragover="event.preventDefault();this.classList.add('drag-over')" 
-                        ondragenter="event.preventDefault();this.classList.add('drag-over')"
-                        ondragleave="this.classList.remove('drag-over')"
-                        ondrop="KnowledgeService.handleCreateDrop(event)"
-                        onclick="event.stopPropagation();this.querySelector('input[type=file]').click()">
-                        <input type="file" id="kb-create-file" accept=".pdf" onchange="KnowledgeService.handleCreateFileSelect()" style="display:none" multiple="">
-                        <div class="kb-upload-drop-text">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                            <p>拖放 PDF 文件到此处，或点击选择</p>
+                <div class="kb-create-row kb-create-row-file">
+                    <label class="kb-create-label">文件</label>
+                    <div style="flex:1">
+                        <div id="kb-file-selector"></div>
+                        <div class="kb-upload-drop" id="kb-upload-drop"
+                             ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
+                             ondragenter="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
+                             ondragleave="event.preventDefault();event.stopPropagation();if(event.clientY<=this.getBoundingClientRect().top||event.clientY>=this.getBoundingClientRect().bottom)this.classList.remove('drag-over')"
+                             ondrop="KnowledgeService.handleCreateDrop(event)"
+                             onclick="event.stopPropagation();this.querySelector('input[type=file]').click()">
+                            <input type="file" id="kb-create-file" accept=".pdf" onchange="KnowledgeService.handleCreateFileSelect()" style="display:none" multiple="">
+                            <div class="kb-upload-drop-text">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>拖放 PDF 文件到此处</p>
+                            </div>
                         </div>
                     </div>
-                    <div class="kb-create-file-list" id="kb-create-file-list"></div>
                 </div>
             
                 <div class="kb-create-actions">
@@ -324,21 +327,23 @@ let KnowledgeService = (function () {
                     </div>
                 </div>
             
-                <div class="kb-create-row">
+                <div class="kb-create-row kb-create-row-file">
                     <label class="kb-create-label">文件</label>
-                    <div class="kb-upload-drop" id="kb-upload-drop" 
-                        ondragover="event.preventDefault();this.classList.add('drag-over')" 
-                        ondragenter="event.preventDefault();this.classList.add('drag-over')"
-                        ondragleave="this.classList.remove('drag-over')"
-                        ondrop="KnowledgeService.handleCreateDrop(event)"
-                        onclick="event.stopPropagation();this.querySelector('input[type=file]').click()">
-                        <input type="file" id="kb-create-file" accept=".pdf" onchange="KnowledgeService.handleCreateFileSelect()" style="display:none" multiple>
-                        <div class="kb-upload-drop-text">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                            <p>拖放 PDF 文件到此处</p>
+                    <div style="flex:1">
+                        <div id="kb-file-selector"></div>
+                        <div class="kb-upload-drop" id="kb-upload-drop"
+                             ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
+                             ondragenter="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
+                             ondragleave="event.preventDefault();event.stopPropagation();if(event.clientY<=this.getBoundingClientRect().top||event.clientY>=this.getBoundingClientRect().bottom)this.classList.remove('drag-over')"
+                             ondrop="KnowledgeService.handleCreateDrop(event)"
+                             onclick="event.stopPropagation();this.querySelector('input[type=file]').click()">
+                            <input type="file" id="kb-create-file" accept=".pdf" onchange="KnowledgeService.handleCreateFileSelect()" style="display:none" multiple="">
+                            <div class="kb-upload-drop-text">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>拖放 PDF 文件到此处</p>
+                            </div>
                         </div>
                     </div>
-                    <div class="kb-create-file-list" id="kb-create-file-list"></div>
                 </div>
             
                 <div class="kb-create-actions">
@@ -700,14 +705,12 @@ let KnowledgeService = (function () {
     }
 
     let _createFiles = [];
-    let _createInherit = [];
+    let _kbFileSelector = null;
 
     function showCreateForm() {
         _createFiles = [];
-        _createInherit = [];
         document.getElementById('kb-create-form').style.display = 'block';
-        document.getElementById('kb-create-file-list').innerHTML = '';
-        document.getElementById('kb-inherit-tags').innerHTML = document.getElementById('kb-inherit-tags').innerHTML.split('</div>')[0] + '</div>' + (document.getElementById('kb-inherit-tags').innerHTML.split('</div>').slice(1) || []).join('</div>');
+        initKbFileSelector();
     }
 
     function hideCreateForm() {
@@ -734,22 +737,49 @@ let KnowledgeService = (function () {
 
     function handleCreateFileSelect() {
         const inp = document.getElementById('kb-create-file');
-        [...inp.files].forEach(f => { if (f.type === 'application/pdf') _createFiles.push(f); });
+        [...inp.files].forEach(f => {
+            if (f.type !== 'application/pdf') return;
+            if (_createFiles.some(x => x.name === f.name && x.size === f.size)) return;
+            _createFiles.push(f);
+        });
         inp.value = '';
-        renderCreateFileList();
+        refreshKbFileSelector();
     }
 
     function handleCreateDrop(e) {
         e.preventDefault();
         e.stopPropagation();
         e.currentTarget.classList.remove('drag-over');
-        [...e.dataTransfer.files].forEach(f => { if (f.type === 'application/pdf') _createFiles.push(f); });
-        renderCreateFileList();
+        [...e.dataTransfer.files].forEach(f => {
+            if (f.type !== 'application/pdf') return;
+            if (_createFiles.some(x => x.name === f.name && x.size === f.size)) return;
+            _createFiles.push(f);
+        });
+        refreshKbFileSelector();
     }
 
-    function removeCreateFile(idx) {
+    function removeKbFile(idx) {
         _createFiles.splice(idx, 1);
-        renderCreateFileList();
+        refreshKbFileSelector();
+    }
+
+    function initKbFileSelector() {
+        const cnt = _createFiles.length;
+        _kbFileSelector = new CustomSelect('#kb-file-selector', {
+            placeholder: cnt > 0 ? `已添加 ${cnt} 个文件` : '已添加 0 个文件',
+            multiple: true,
+            searchable: true,
+            maxVisibleItems: 6,
+            items: _createFiles.map((f, i) => ({ value: String(i), label: f.name }))
+        });
+    }
+
+    function refreshKbFileSelector() {
+        if (!_kbFileSelector) return;
+        _kbFileSelector.setItems(_createFiles.map((f, i) => ({ value: String(i), label: f.name })));
+        const cnt = _createFiles.length;
+        const display = document.querySelector('#kb-file-selector .custom-select-display-text');
+        if (display) display.textContent = cnt > 0 ? `已添加 ${cnt} 个文件` : '已添加 0 个文件';
     }
 
     function addInherit() {
@@ -1301,11 +1331,10 @@ let KnowledgeService = (function () {
         renderSelector, toggleSelector, onSelectorChange, getSelectedKBIds,
         doStartService, doStopService, refreshDocuments, deleteSelected,
         toggleCheckbox, doActivate, closeDeleteConfirm, doDeleteKBs,
-        // 停止服务确认弹窗相关
         closeStopServiceConfirm, confirmStopService,
-        // 删除知识库确认弹窗相关
         closeDeleteKBConfirm, doDeleteKB,
-        handleCreateDrop, addInherit, removeInherit, getInheritIds,
+        handleCreateDrop, addInherit, removeInherit,
+        handleCreateFileSelect,
         // 初始化
         init,
         // 公开：从外部触发按钮状态更新
