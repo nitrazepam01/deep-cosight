@@ -1131,11 +1131,7 @@ let KnowledgeService = (function () {
     }
 
     function getSelectedKBIds() {
-        try {
-            const raw = localStorage.getItem('cosight:selectedKBs');
-            if (raw) return JSON.parse(raw);
-        } catch (e) { /* ignore */ }
-        return [];
+        return [..._selectedKbIds];
     }
 
     /* ========== 生命周期 ========== */
