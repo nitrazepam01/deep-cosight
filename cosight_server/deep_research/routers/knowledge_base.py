@@ -299,3 +299,24 @@ async def kb_graph_labels(kb_id: str):
 @knowledgeBaseRouter.post("/deep-research/kb/{kb_id}/documents/text")
 async def kb_insert_text(kb_id: str, payload: dict = Body(...)):
     return {"code": 0, "msg": "text insert not supported, use file upload"}
+
+
+@knowledgeBaseRouter.post("/deep-research/kb/state/activate")
+async def kb_set_active(payload: dict = Body(...)):
+    """Set active KB(s) in kb_meta.json."""
+    kb_id = payload.get("kb_id", "")
+    activate = payload.get("activate", True)
+    meta = _load_meta()
+    if kb_id:
+        meta.setdefault(kb_id, {})
+        meta[kb_id]["activate"] = activate
+        _save_meta(meta)
+    return {"code": 0, "data": {k: v.get("activate", False) for k, v in meta.items()}}
+
+
+@knowledgeBaseRouter.get("/deep-research/kb/state/activate")
+async def kb_get_active():
+    """Get active KB list from kb_meta.json."""
+    meta = _load_meta()
+    active = [k for k, v in meta.items() if v.get("activate", False)]
+    return {"code": 0, "data": {"active": active}}

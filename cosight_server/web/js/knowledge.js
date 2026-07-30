@@ -21,11 +21,13 @@ let KnowledgeService = (function () {
         return json.data.knowledge_bases || [];
     }
 
-    async function createKB(name, description) {
+    async function createKB(name, description, baseKb) {
+        const body = { name, description };
+        if (baseKb) body.base_kb = baseKb;
         const resp = await fetch(`${API_BASE}/deep-research/kb/create`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, description }),
+            body: JSON.stringify(body),
         });
         const json = await resp.json();
         if (json.code !== 0) throw new Error(json.msg);
@@ -129,29 +131,14 @@ let KnowledgeService = (function () {
         const modal = document.getElementById('knowledge-modal');
         if (!modal) return;
 
-        // 只更新状态徽章和服务按钮，避免整个窗口重绘
-        const statusEl = modal.querySelector('.kb-status-badge');
-        const serviceBtnEl = modal.querySelector('.kb-service-btn');
-
+                const statusEl = modal.querySelector('.kb-status-badge');
         const statusHtml = _lightragStatus === 'connected'
             ? '<span class="kb-status-badge kb-status-online"><i class="fas fa-circle"></i> 运行中</span>'
             : (_lightragStatus === 'starting'
                 ? '<span class="kb-status-badge kb-status-starting"><i class="fas fa-spinner fa-spin"></i> 加载中...</span>'
                 : '<span class="kb-status-badge kb-status-offline"><i class="fas fa-circle"></i> 未连接</span>');
 
-        const serviceBtn = _lightragStatus === 'connected'
-            ? '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.open()" title="刷新知识库列表"><i class="fas fa-sync-alt"></i> <span class="kb-service-text">刷新</span></button>'
-            : (_lightragStatus === 'starting'
-                ? '<button class="kb-service-btn kb-service-starting" disabled onclick="event.stopPropagation();" title="正在加载知识库…"><i class="fas fa-spinner fa-spin"></i> <span class="kb-service-text">加载中…</span></button>'
-                : '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.doActivate()" title="加载所有知识库"><i class="fas fa-play-circle"></i> <span class="kb-service-text">激活全部</span></button>');
-
-        // 如果元素存在，只更新这些部分
-        if (statusEl) {
-            statusEl.outerHTML = statusHtml;
-        }
-        if (serviceBtnEl) {
-            serviceBtnEl.outerHTML = serviceBtn;
-        }
+        if (statusEl) { statusEl.outerHTML = statusHtml; }
     }
 
     function renderModalFull() {
@@ -163,12 +150,6 @@ let KnowledgeService = (function () {
             : (_lightragStatus === 'starting'
                 ? '<span class="kb-status-badge kb-status-starting"><i class="fas fa-spinner fa-spin"></i> 加载中...</span>'
                 : '<span class="kb-status-badge kb-status-offline"><i class="fas fa-circle"></i> 未连接</span>');
-
-        const serviceBtn = _lightragStatus === 'connected'
-            ? '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.open()" title="刷新知识库列表"><i class="fas fa-sync-alt"></i> <span class="kb-service-text">刷新</span></button>'
-            : (_lightragStatus === 'starting'
-                ? '<button class="kb-service-btn kb-service-starting" disabled onclick="event.stopPropagation();" title="正在加载知识库…"><i class="fas fa-spinner fa-spin"></i> <span class="kb-service-text">加载中…</span></button>'
-                : '<button class="kb-service-btn kb-service-start" onclick="event.stopPropagation(); KnowledgeService.doActivate()" title="加载所有知识库"><i class="fas fa-play-circle"></i> <span class="kb-service-text">激活全部</span></button>');
 
         const contentHtml = _currentKbId
             ? renderKBDetail()
@@ -183,7 +164,6 @@ let KnowledgeService = (function () {
                         <i class="fas fa-book"></i> 知识库管理 ${statusHtml}
                     </h2>
                     <div class="kb-header-actions">
-                        ${serviceBtn}
                         <button class="settings-close-btn" onclick="KnowledgeService.close()">
                             <i class="fas fa-times"></i>
                         </button>
@@ -695,10 +675,25 @@ let KnowledgeService = (function () {
         const name = document.getElementById('kb-name-input')?.value?.trim();
         const desc = document.getElementById('kb-desc-input')?.value?.trim();
         if (!name) { showToast('请输入知识库名称', 'error'); return; }
+
+        // 继承
+        const inheritIds = getInheritIds();
+
+        // 如果有继承，先建 KB 再 merge
+        let baseKb = inheritIds.length > 0 ? inheritIds[0] : null;
         try {
-            await createKB(name, desc);
+            await createKB(name, desc, baseKb);
+            // 如果继承了多个，逐个 merge
+            for (let i = 1; i < inheritIds.length; i++) {
+                await fetch(`${API_BASE}/deep-research/kb/merge`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ src: inheritIds[i], dst: name })
+                });
+            }
             showToast(`知识库 "${name}" 创建成功`, 'success');
-            await refreshList();
+            hideCreateForm();
+            await open();
         } catch (e) {
             showToast(e.message, 'error');
         }
@@ -823,21 +818,32 @@ let KnowledgeService = (function () {
 
     let _selectedKbIds = new Set();  // 当前选中的知识库 ID 集合（用于多选模式）
 
-    function toggleCheckbox(kbId, event) {
-        // 阻止事件冒泡，防止触发卡片的点击事件
+    async function toggleCheckbox(kbId, event) {
         if (event) {
             event.preventDefault();
             event.stopPropagation();
         }
 
+        // 单选：选中自己则取消，否则取消其他只选中自己
         if (_selectedKbIds.has(kbId)) {
-            _selectedKbIds.delete(kbId);
+            _selectedKbIds.clear();
         } else {
+            _selectedKbIds.clear();
             _selectedKbIds.add(kbId);
         }
 
-        // 只更新勾选框的视觉状态，不重新渲染整个页面
+        // 同步到 localStorage
+        await fetch(`${API_BASE}/deep-research/kb/state/activate`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({kb_id: kbId, activate: _selectedKbIds.has(kbId)})
+        });
+
+        _lightragStatus = _selectedKbIds.size > 0 ? 'connected' : 'disconnected';
         updateCheckboxVisuals();
+        updateKnowledgeBaseBtnActiveState();
+        onSelectorChange();
+        renderModal();
     }
 
     function updateCheckboxVisuals() {
@@ -1223,6 +1229,12 @@ let KnowledgeService = (function () {
     }
 
     async function open() {
+        const resp = await fetch(`${API_BASE}/deep-research/kb/state/activate`);
+        const json = await resp.json();
+        _selectedKbIds.clear();
+        (json.data?.active || []).forEach(id => _selectedKbIds.add(id));
+        _lightragStatus = _selectedKbIds.size > 0 ? 'connected' : 'disconnected';
+
         _currentKbId = null;
         _healthDetail = null;
         try {
@@ -1237,10 +1249,12 @@ let KnowledgeService = (function () {
             const bodyEl = modal.querySelector('.kb-body');
             if (bodyEl) {
                 bodyEl.innerHTML = renderKBList();
+                updateCheckboxVisuals();
                 return;
             }
         }
         renderModalFull();
+        updateCheckboxVisuals();
     }
 
     function close() {
@@ -1278,9 +1292,17 @@ let KnowledgeService = (function () {
 
     // 页面加载时检查服务状态
     async function init() {
-        await checkHealth();
-        // 页面加载时根据服务状态更新按钮激活状态
+        try {
+            const resp = await fetch(`${API_BASE}/deep-research/kb/state/activate`);
+            const json = await resp.json();
+            _selectedKbIds.clear();
+            (json.data?.active || []).forEach(id => _selectedKbIds.add(id));
+            _lightragStatus = (json.data?.active || []).length > 0 ? 'connected' : 'disconnected';
+        } catch (e) {
+            _lightragStatus = 'disconnected';
+        }
         updateKnowledgeBaseBtnActiveState();
+        renderModal();
     }
 
     /* ========== 工具函数 ========== */
