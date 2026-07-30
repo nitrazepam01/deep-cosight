@@ -4521,7 +4521,6 @@ select.settings-input option:checked {
     margin-bottom: 12px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
 }
 
@@ -4531,7 +4530,14 @@ select.settings-input option:checked {
     gap: 8px;
 }
 
-.kb-section-title i { color: #10b981; }
+.kb-section-title i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    flex-shrink: 0;
+    color: #10b981;
+}
 
 .kb-section-actions {
     display: flex;
@@ -6278,4 +6284,8 @@ select.settings-input option:checked {
 
 .custom-select-wrapper.open .custom-select-arrow {
     transform: rotate(180deg);
+}
+
+.kb-query-row {
+    margin-bottom: 8px;
 }

@@ -152,7 +152,7 @@ let KnowledgeService = (function () {
                 : '<span class="kb-status-badge kb-status-offline"><i class="fas fa-circle"></i> 未连接</span>');
 
         const contentHtml = _currentKbId
-            ? renderKBDetail()
+            ? renderKBManage()
             : renderKBList();
 
         modal.innerHTML = `
@@ -274,9 +274,6 @@ let KnowledgeService = (function () {
                         <button class="kb-btn-primary" onclick="KnowledgeService.showCreateForm()">
                             <i class="fas fa-plus"></i> 新建知识库
                         </button>
-                        <button class="settings-close-btn" style="color:#e74c3c" onclick="KnowledgeService.deleteSelected()" title="删除选中的知识库">
-                            <i class="fas fa-trash"></i>
-                        </button>
                     </div>
                 </div>
                 <div class="kb-card-grid">${cards}</div>
@@ -337,7 +334,7 @@ let KnowledgeService = (function () {
         return cardsHtml;
     }
 
-    function renderKBDetail() {
+    function renderKBManage() {
         const kb = _kbList.find(k => k.id === _currentKbId);
         if (!kb) return '<div class="kb-empty-state"><p>知识库不存在</p></div>';
 
@@ -349,21 +346,15 @@ let KnowledgeService = (function () {
                         <h3>${escapeHtml(kb.name)}</h3>
                         <p class="kb-detail-desc">${escapeHtml(kb.description || '暂无描述')}</p>
                         <div class="kb-detail-stats">
-                            <span><i class="fas fa-file-alt"></i> ${kb.document_count || 0} 篇</span>
-                            <span><i class="fas fa-calendar"></i> ${(kb.modified||'').substring(0,10)}</span>
+                            <span><i class="fas fa-file-alt"></i> ${kb.document_count || 0}</span>
+                            <span><i class="fas fa-th-large"></i> ${kb.chunk_count || 0}</span>
+                            <span><i class="fas fa-vector-square"></i> ${kb.vector_count || 0}</span>
+                            <span><i class="fas fa-clock"></i> ${(kb.modified||'').substring(0,10)}</span>
                         </div>
                     </div>
                     <button class="kb-detail-delete-btn" onclick="KnowledgeService.confirmDelete('${kb.id}', '${escapeHtml(kb.name).replace(/'/g, "\\'")}')">
                         <i class="fas fa-trash-alt"></i> 删除知识库
                     </button>
-                </div>
-
-                <!-- 模型状态 -->
-                <div class="kb-section" id="kb-model-section">
-                    <div class="kb-section-title"><i class="fas fa-microchip"></i> 模型状态</div>
-                    <div id="kb-model-content" class="kb-model-content">
-                        <div class="kb-pipeline-loading"><i class="fas fa-spinner fa-spin"></i> 检测中...</div>
-                    </div>
                 </div>
 
                 <!-- 构建状态 / 管线监控 -->
@@ -376,12 +367,7 @@ let KnowledgeService = (function () {
 
                 <!-- 文档列表 -->
                 <div class="kb-section" id="kb-documents-section">
-                    <div class="kb-section-title">
-                        <span><i class="fas fa-file-alt"></i> 文档列表</span>
-                        <button class="kb-btn-icon" onclick="KnowledgeService.refreshDocuments()" title="刷新">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
-                    </div>
+                    <div class="kb-section-title"><i class="fas fa-file-alt"></i> 文档列表</div>
                     <div id="kb-documents-content" class="kb-documents-content">
                         <div class="kb-pipeline-loading"><i class="fas fa-spinner fa-spin"></i> 加载文档列表...</div>
                     </div>
@@ -390,6 +376,10 @@ let KnowledgeService = (function () {
                 <!-- 上传文档 -->
                 <div class="kb-section">
                     <div class="kb-section-title"><i class="fas fa-cloud-upload-alt"></i> 上传文档</div>
+                    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start">
+                        <div id="kb-file-selector"></div>
+                        <button class="kb-btn-primary" onclick="..." style="white-space:nowrap;height:40px;align-self:center;margin-bottom:8px"><i class="fas fa-check"></i> 确认</button>
+                    </div>
                     <div class="kb-upload-area" id="kb-upload-area"
                          onclick="event.stopPropagation(); this.querySelector('input[type=file]').click()"
                          ondragover="event.preventDefault(); this.classList.add('dragover')"
@@ -408,32 +398,16 @@ let KnowledgeService = (function () {
                     </div>
                 </div>
 
-                <!-- 插入文本 -->
-                <div class="kb-section">
-                    <div class="kb-section-title"><i class="fas fa-pen"></i> 插入文本</div>
-                    <textarea id="kb-text-input" class="kb-textarea" rows="4" placeholder="粘贴或输入要添加到知识库的文本内容..."></textarea>
-                    <div class="kb-section-actions">
-                        <button class="kb-btn-primary" onclick="KnowledgeService.doInsertText()">
-                            <i class="fas fa-plus-circle"></i> 添加文本
-                        </button>
-                    </div>
-                </div>
-
                 <!-- 测试查询 -->
                 <div class="kb-section">
                     <div class="kb-section-title"><i class="fas fa-search"></i> 测试查询</div>
                     <div class="kb-query-row">
                         <input type="text" id="kb-query-input" class="kb-input kb-query-input" placeholder="输入测试问题，验证知识库检索效果...">
-                        <select id="kb-query-mode" class="kb-select">
-                            <option value="hybrid" selected>混合模式</option>
-                            <option value="local">局部模式</option>
-                            <option value="global">全局模式</option>
-                            <option value="naive">朴素模式</option>
-                        </select>
                         <button class="kb-btn-primary" onclick="KnowledgeService.doQuery()">
                             <i class="fas fa-search"></i> 查询
                         </button>
                     </div>
+                    <textarea id="kb-query-result" class="kb-textarea" rows="6" placeholder="查询结果将显示在这里..." readonly></textarea>
                     <div id="kb-query-result" class="kb-query-result" style="display:none;"></div>
                 </div>
             </div>
@@ -908,12 +882,9 @@ let KnowledgeService = (function () {
 
     function openDetail(kbId) {
         _currentKbId = kbId;
-        _detailDocuments = [];
-        _detailPipeline = null;
-        _healthDetail = null;
-        renderModal();
-        // 渲染后异步加载文档和管线数据
-        setTimeout(() => loadDetailData(), 50);
+        _createFiles = [];
+        renderModalFull();
+        setTimeout(() => initKbFileSelector(), 100);
     }
 
     function backToList() {
@@ -921,7 +892,7 @@ let KnowledgeService = (function () {
         _currentKbId = null;
         _detailDocuments = [];
         _detailPipeline = null;
-        renderModal();
+        renderModalFull();
     }
 
     async function handleFileSelect(event) {
@@ -1131,7 +1102,11 @@ let KnowledgeService = (function () {
     }
 
     function getSelectedKBIds() {
-        return [..._selectedKbIds];
+        try {
+            const raw = localStorage.getItem('cosight:selectedKBs');
+            if (raw) return JSON.parse(raw);
+        } catch (e) { /* ignore */ }
+        return [];
     }
 
     /* ========== 生命周期 ========== */
@@ -1288,17 +1263,16 @@ let KnowledgeService = (function () {
 
     // 页面加载时检查服务状态
     async function init() {
+        await checkHealth();
+        // 从后端恢复选中的知识库
         try {
             const resp = await fetch(`${API_BASE}/deep-research/kb/state/activate`);
             const json = await resp.json();
             _selectedKbIds.clear();
             (json.data?.active || []).forEach(id => _selectedKbIds.add(id));
-            _lightragStatus = (json.data?.active || []).length > 0 ? 'connected' : 'disconnected';
-        } catch (e) {
-            _lightragStatus = 'disconnected';
-        }
+        } catch (e) {}
+        _lightragStatus = _selectedKbIds.size > 0 ? 'connected' : 'disconnected';
         updateKnowledgeBaseBtnActiveState();
-        renderModal();
     }
 
     /* ========== 工具函数 ========== */
