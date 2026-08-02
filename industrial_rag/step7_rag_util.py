@@ -27,7 +27,8 @@ load_dotenv(os.path.join(PROJECT, ".env"))
 DATA_ROOT = os.path.join(PROJECT, "industrial_kb_data")
 VERSIONS_DIR = os.path.join(DATA_ROOT, "versions")
 TEST_DIR = os.path.join(DATA_ROOT, "test_versions")
-DEFAULT_KB = os.path.join(VERSIONS_DIR, sorted(os.listdir(VERSIONS_DIR))[-1]) if os.path.isdir(VERSIONS_DIR) and os.listdir(VERSIONS_DIR) else None
+DEFAULT_KB = os.path.join(VERSIONS_DIR, sorted(os.listdir(VERSIONS_DIR))[-1]) if os.path.isdir(
+    VERSIONS_DIR) and os.listdir(VERSIONS_DIR) else None
 
 OCR_MODEL = os.environ.get("DEEPSEEK_OCR_MODEL", "deepseek-ai/DeepSeek-OCR").strip()
 OCR_URL = (os.environ.get("DEEPSEEK_OCR_API_BASE", "https://api.siliconflow.cn/v1").rstrip("/") + "/chat/completions")
@@ -37,12 +38,14 @@ OCR_KEYS = [k.strip() for k in _keys_str.split(",") if k.strip()]
 LLM_KEY = os.environ.get("OPENAI_API_KEY", "")
 LLM_BASE = os.environ.get("OPENAI_API_BASE", "https://api.deepseek.com/v1")
 LLM_MODEL = os.environ.get("CHAT_MODEL", "deepseek-v4-flash")
-CHUNK_SIZE = 15000; OVERLAP = 500
+CHUNK_SIZE = 15000
+OVERLAP = 500
 
 EMBED_BASE = os.environ.get("EMBEDDING_API_BASE", "https://api.siliconflow.cn/v1")
 EMBED_KEY = os.environ.get("EMBEDDING_API_KEY", "")
 EMBED_MODEL = "BAAI/bge-m3"  # production KB was built with this; do NOT override from env
-EMBED_DIM = 1024; EMBED_BATCH = 32
+EMBED_DIM = 1024
+EMBED_BATCH = 32
 
 CAT_CONFIGS = {"standards": {"child": 500, "parent": 1500}, "papers": {"child": 600, "parent": 1800},
                "textbooks": {"child": 700, "parent": 2200}, "datasheets": {"child": 400, "parent": 1000}}
@@ -50,48 +53,63 @@ CAT_CONFIGS = {"standards": {"child": 500, "parent": 1500}, "papers": {"child": 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("rag_util")
 
+
 # ═══════════════════════════════════════════════════════════════════
 # OCR (batch_ocr.py style)
 # ═══════════════════════════════════════════════════════════════════
 def _page_to_b64(page):
     for dpi in [150, 100, 72]:
         b = page.get_pixmap(dpi=dpi).tobytes("png")
-        if len(b) <= 1200000: return base64.b64encode(b).decode()
+        if len(b) <= 1200000:
+            return base64.b64encode(b).decode()
     return base64.b64encode(page.get_pixmap(dpi=72).tobytes("png")).decode()
+
 
 def _ocr_one_page(page, pn, total_p, key):
     b64 = _page_to_b64(page)
     for at in range(2):
         try:
             r = requests.post(OCR_URL, json={"model": OCR_MODEL,
-                "messages": [{"role": "user", "content": [
-                    {"type": "text", "text": f"Page {pn}/{total_p}. Extract all text exactly."},
-                    {"type": "image_url", "image_url": {"url": "data:image/png;base64," + b64}}
-                ]}], "max_tokens": 4096},
-                headers={"Authorization": "Bearer " + key}, timeout=120)
+                                             "messages": [{"role": "user", "content": [
+                                                 {"type": "text",
+                                                  "text": f"Page {pn}/{total_p}. Extract all text exactly."},
+                                                 {"type": "image_url",
+                                                  "image_url": {"url": "data:image/png;base64," + b64}}
+                                             ]}], "max_tokens": 4096},
+                              headers={"Authorization": "Bearer " + key}, timeout=120)
             if r.status_code != 200:
-                if at < 1: time.sleep(1); continue
+                if at < 1:
+                    time.sleep(1)
+                    continue
                 return ""
             d = r.json()
             if "choices" in d and d["choices"]:
-                c = d["choices"][0]; t = c["message"]["content"].strip()
-                if c.get("finish_reason") == "length": return t + "\n[TRUNCATED]"
+                c = d["choices"][0]
+                t = c["message"]["content"].strip()
+                if c.get("finish_reason") == "length":
+                    return t + "\n[TRUNCATED]"
                 return t
             return ""
         except:
-            if at < 1: time.sleep(2); continue
-            return ""
+            if at < 1:
+                time.sleep(2)
+            continue
     return ""
 
+
 def _ocr_pdf(pdf_path, out_md):
-    if not OCR_KEYS: log.error("No OCR API key"); return False
+    if not OCR_KEYS:
+        log.error("No OCR API key")
+        return False
     key = OCR_KEYS[0]
     log.info(f"[OCR] {os.path.basename(pdf_path)}")
     t0 = time.time()
     try:
-        doc = fitz.open(pdf_path); pgs = len(doc)
+        doc = fitz.open(pdf_path)
+        pgs = len(doc)
     except Exception as e:
-        log.error(f"  Cannot open PDF: {e}"); return False
+        log.error(f"  Cannot open PDF: {e}")
+        return False
     pts = {}
     with ThreadPoolExecutor(max_workers=9) as pool:
         fm = {pool.submit(_ocr_one_page, doc[i], i + 1, pgs, key): i for i in range(pgs)}
@@ -100,20 +118,25 @@ def _ocr_pdf(pdf_path, out_md):
             i = fm[f]
             try:
                 t = f.result()
-                if t: pts[i] = t
-            except: pass
+                if t:
+                    pts[i] = t
+            except:
+                pass
             completed += 1
             if completed % max(1, pgs // 20) == 0 or completed == pgs:
-                print(f"  OCR  {completed}/{pgs}  [{int(completed*100/pgs)}%]", flush=True)
+                print(f"  OCR  {completed}/{pgs}  [{int(completed * 100 / pgs)}%]", flush=True)
     doc.close()
-    if not pts: log.error("  OCR produced NO text"); return False
+    if not pts:
+        log.error("  OCR produced NO text")
+        return False
     ordered = [pts[i] for i in sorted(pts)]
-    parts = [f"### Page {i+1}\n\n{t}" for i, t in enumerate(ordered)]
+    parts = [f"### Page {i + 1}\n\n{t}" for i, t in enumerate(ordered)]
     with open(out_md, "w", encoding="utf-8") as f:
-        f.write(f"# {os.path.basename(pdf_path).rsplit('.',1)[0]}\n\n> OCR by {OCR_MODEL} | {pgs} pages\n\n")
+        f.write(f"# {os.path.basename(pdf_path).rsplit('.', 1)[0]}\n\n> OCR by {OCR_MODEL} | {pgs} pages\n\n")
         f.write("\n\n".join(parts))
-    log.info(f"  OK: {sum(len(t) for t in ordered)//1000}K chars, {pgs}p, {time.time()-t0:.0f}s")
+    log.info(f"  OK: {sum(len(t) for t in ordered) // 1000}K chars, {pgs}p, {time.time() - t0:.0f}s")
     return True
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Cleanup (cleanup_ocr.py style)
@@ -132,17 +155,20 @@ SYSTEM_PROMPT = """You are an OCR text cleaner. Rules:
 6. NEVER change page markers like "### Page N"
 7. Output ONLY the cleaned text"""
 
+
 async def _clean_chunk(session, chunk, chunk_idx, total_chunks):
     for attempt in range(3):
         try:
             async with session.post(LLM_BASE + "/chat/completions", json={
                 "model": LLM_MODEL,
                 "messages": [{"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Chunk {chunk_idx}/{total_chunks}. Clean it:\n\n{chunk}"}],
+                             {"role": "user", "content": f"Chunk {chunk_idx}/{total_chunks}. Clean it:\n\n{chunk}"}],
                 "max_tokens": 16384, "temperature": 0.0
             }, headers={"Authorization": "Bearer " + LLM_KEY}, timeout=300) as resp:
                 if resp.status != 200:
-                    if attempt < 2: await asyncio.sleep(3); continue
+                    if attempt < 2:
+                        await asyncio.sleep(3)
+                        continue
                     return chunk
                 data = await resp.json()
                 if "choices" in data and data["choices"]:
@@ -150,19 +176,27 @@ async def _clean_chunk(session, chunk, chunk_idx, total_chunks):
                     return t if t else chunk
                 return chunk
         except:
-            if attempt < 2: await asyncio.sleep(5); continue
+            if attempt < 2:
+                await asyncio.sleep(5)
+                continue
             return chunk
     return chunk
 
+
 def _chunk_text(text):
-    if len(text) <= CHUNK_SIZE + OVERLAP * 2: return [(text, 1, 1)]
-    chunks = []; start = 0; idx = 1
+    if len(text) <= CHUNK_SIZE + OVERLAP * 2:
+        return [(text, 1, 1)]
+    chunks = []
+    start = 0
+    idx = 1
     while start < len(text):
         end = min(start + CHUNK_SIZE + OVERLAP * 2, len(text))
         chunks.append((text[start:end], idx, -1))
-        start += CHUNK_SIZE; idx += 1
+        start += CHUNK_SIZE
+        idx += 1
     total = len(chunks)
     return [(c, i, total) for c, i, _ in chunks]
+
 
 async def _cleanup_md_async(md_path, out_path):
     if not LLM_KEY: log.error("No LLM API key"); return False
@@ -172,8 +206,10 @@ async def _cleanup_md_async(md_path, out_path):
     for tag in ["[Cleaned by LLM]"]:
         content = "\n".join(l for l in content.split("\n") if tag not in l)
     al = content.split("\n")
-    if al and al[0].startswith("# "): al = al[1:]
-    if al and al[0].startswith("> OCR by"): al = al[1:]
+    if al and al[0].startswith("# "):
+        al = al[1:]
+    if al and al[0].startswith("> OCR by"):
+        al = al[1:]
     content = "\n".join(al).strip()
     chunks = _chunk_text(content)
     total_chunks = len(chunks)
@@ -184,116 +220,153 @@ async def _cleanup_md_async(md_path, out_path):
         else:
             cleaned_parts = []
             for chunk, idx, total in chunks:
-                print(f"  Cleanup {idx}/{total} [{int(idx*100/total)}%]", flush=True)
+                print(f"  Cleanup {idx}/{total} [{int(idx * 100 / total)}%]", flush=True)
                 c = await _clean_chunk(session, chunk, idx, total)
                 if idx > 1: c = "\n".join(c.split("\n")[3:]) if len(c.split("\n")) > 6 else c
                 if idx < total: c = "\n".join(c.split("\n")[:-3]) if len(c.split("\n")) > 6 else c
                 cleaned_parts.append(c.strip())
             cleaned = "\n\n".join(cleaned_parts)
-    if not cleaned: log.error("  Cleanup produced no output"); return False
-    with open(out_path, "w", encoding="utf-8") as f: f.write(cleaned)
-    log.info(f"  OK: {len(cleaned)//1000}K chars, {total_chunks} chunks, {time.time()-t0:.0f}s")
+    if not cleaned:
+        log.error("  Cleanup produced no output"); return False
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(cleaned)
+    log.info(f"  OK: {len(cleaned) // 1000}K chars, {total_chunks} chunks, {time.time() - t0:.0f}s")
     return True
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Parse + Chunk (step2 style)
 # ═══════════════════════════════════════════════════════════════════
 from markdown_it import MarkdownIt
+
 _md = MarkdownIt("commonmark", {"maxNesting": 50})
 
+
 def _parse_md(filepath):
-    with open(filepath, "r", encoding="utf-8") as f: text = f.read()
+    with open(filepath, "r", encoding="utf-8") as f:
+        text = f.read()
     lines = [l for l in text.split("\n") if "[Cleaned by LLM]" not in l]
     text = "\n".join(lines).strip()
     tokens = _md.parse(text)
-    blocks = []; current_heading = []; buf = []
+    blocks = []
+    current_heading = []
+    buf = []
+
     def flush():
         nonlocal buf
         if not buf: return
         content = "\n".join(buf)
         hd = " > ".join(h for h in current_heading if h)
         blocks.append({"type": "text", "heading_path": hd, "content": content,
-            "lines": len(buf), "tokens": len(content)//2, "page_start": None})
+                       "lines": len(buf), "tokens": len(content) // 2, "page_start": None})
         buf = []
+
     for tok in tokens:
         t = tok.type
         if t == "heading_open":
             flush()
-            level = int(tok.tag[1]); idx = tokens.index(tok)
+            level = int(tok.tag[1])
+            idx = tokens.index(tok)
             ht = ""
             for j in range(idx + 1, min(idx + 5, len(tokens))):
-                if tokens[j].type == "inline": ht = tokens[j].content.strip(); break
-                if tokens[j].type == "heading_close": break
+                if tokens[j].type == "inline":
+                    ht = tokens[j].content.strip()
+                    break
+                if tokens[j].type == "heading_close":
+                    break
             while len(current_heading) >= level: current_heading.pop()
             current_heading.append(ht)
-        elif t in ("paragraph_open", "table_open", "bullet_list_open"): flush()
-        elif t in ("inline", "fence", "code_block"): buf.append(tok.content)
-        elif t in ("heading_close", "paragraph_close"): flush()
+        elif t in ("paragraph_open", "table_open", "bullet_list_open"):
+            flush()
+        elif t in ("inline", "fence", "code_block"):
+            buf.append(tok.content)
+        elif t in ("heading_close", "paragraph_close"):
+            flush()
     flush()
     return blocks, text
 
+
 def _chunk_blocks(blocks, cat_config, doc_id):
-    NEXT_PID = [1]; NEXT_CID = [1]
-    parent_buffer = []; parent_path = ""; chunks = []
+    NEXT_PID = [1]
+    NEXT_CID = [1]
+    parent_buffer = []
+    parent_path = ""
+    chunks = []
+
     def finish_parent():
         nonlocal parent_buffer, parent_path
-        if not parent_buffer: return
-        pid = NEXT_PID[0]; NEXT_PID[0] += 1
+        if not parent_buffer:
+            return
+        pid = NEXT_PID[0]
+        NEXT_PID[0] += 1
         pcontent = "\n\n".join(b["content"] for b in parent_buffer)
         chunks.append({"chunk_id": NEXT_CID[0], "doc_id": doc_id, "parent_chunk_id": None,
-            "chunk_type": "parent", "heading_path": parent_path,
-            "content": pcontent[:cat_config["parent"]*2], "token_count": len(pcontent)//2,
-            "sequence_no": pid})
+                       "chunk_type": "parent", "heading_path": parent_path,
+                       "content": pcontent[:cat_config["parent"] * 2], "token_count": len(pcontent) // 2,
+                       "sequence_no": pid})
         NEXT_CID[0] += 1
         parent_cid = NEXT_CID[0] - 1
-        child_buf = []; child_t = 0; seq = 0
+        child_buf = []
+        child_t = 0
+        seq = 0
         for b in parent_buffer:
             bt = b.get("tokens", 0)
             if child_t + bt > cat_config["child"] and child_buf:
                 chunks.append({"chunk_id": NEXT_CID[0], "doc_id": doc_id, "parent_chunk_id": parent_cid,
-                    "chunk_type": "child", "heading_path": b.get("heading_path", parent_path),
-                    "content": "\n\n".join(child_buf), "token_count": child_t,
-                    "sequence_no": seq, "page_start": parent_buffer[0].get("page_start")})
-                NEXT_CID[0] += 1; seq += 1; child_buf = []; child_t = 0
+                               "chunk_type": "child", "heading_path": b.get("heading_path", parent_path),
+                               "content": "\n\n".join(child_buf), "token_count": child_t,
+                               "sequence_no": seq, "page_start": parent_buffer[0].get("page_start")})
+                NEXT_CID[0] += 1
+                seq += 1
+                child_buf = []
+                child_t = 0
             ct = b["content"]
             if len(ct.strip()) >= 25: child_buf.append(ct); child_t += bt
         if child_buf:
             chunks.append({"chunk_id": NEXT_CID[0], "doc_id": doc_id, "parent_chunk_id": parent_cid,
-                "chunk_type": "child", "heading_path": b.get("heading_path", parent_path),
-                "content": "\n\n".join(child_buf), "token_count": child_t,
-                "sequence_no": seq, "page_start": parent_buffer[-1].get("page_start")})
+                           "chunk_type": "child", "heading_path": b.get("heading_path", parent_path),
+                           "content": "\n\n".join(child_buf), "token_count": child_t,
+                           "sequence_no": seq, "page_start": parent_buffer[-1].get("page_start")})
             NEXT_CID[0] += 1
         parent_buffer = []
+
     for b in blocks:
         if b.get("type") == "heading" and b.get("level", 0) <= 1:
-            finish_parent(); parent_path = b.get("heading_path", "")
+            finish_parent()
+            parent_path = b.get("heading_path", "")
         parent_buffer.append(b)
     finish_parent()
     return chunks
 
+
 def _detect_cat(fp):
     fn = os.path.basename(fp).lower()
-    if any(k in fn for k in ["iec","iso","gb_t","gb_","en_","bs_","din_"]): return "standards"
+    if any(k in fn for k in ["iec", "iso", "gb_t", "gb_", "en_", "bs_", "din_"]): return "standards"
     if re.match(r"^\d{4}\.\d+", fn): return "papers"
-    if any(k in fn for k in ["stm32","esp32","mpu","lm3","ds18","microchip","ti_","st_",
-                              "cc11","drv8","tl4","tps5","ams1","pc8","moc3","nrf2","ch34"]): return "datasheets"
+    if any(k in fn for k in ["stm32", "esp32", "mpu", "lm3", "ds18", "microchip", "ti_", "st_",
+                             "cc11", "drv8", "tl4", "tps5", "ams1", "pc8", "moc3", "nrf2", "ch34"]): return "datasheets"
     return "textbooks"
+
 
 def _extract_metadata(fp, cat, text, blocks):
     basename = os.path.basename(fp)
-    title = basename.replace("_fix.md","").replace(".md","")
-    n_title = title.replace("_"," ").replace("/"," ")
-    if "GB T " in n_title: n_title = n_title.replace("GB T ","GB/T ")
+    title = basename.replace("_fix.md", "").replace(".md", "")
+    n_title = title.replace("_", " ").replace("/", " ")
+    if "GB T " in n_title:
+        n_title = n_title.replace("GB T ", "GB/T ")
     std_no = ""
-    for pat in [r"(IEC\s*\d+[\-\d.]*)",r"(ISO\s*\d+[\-\d.]*)",r"(GB/T\s*\d+[.\d]*)",
-                r"(GB\s*\d+[.\d]*)",r"(BS EN\s*\w+\s*\d+[\-\d.]*)",r"(DIN EN\s*\w+\s*\d+[\-\d.]*)"]:
+    for pat in [r"(IEC\s*\d+[\-\d.]*)", r"(ISO\s*\d+[\-\d.]*)", r"(GB/T\s*\d+[.\d]*)",
+                r"(GB\s*\d+[.\d]*)", r"(BS EN\s*\w+\s*\d+[\-\d.]*)", r"(DIN EN\s*\w+\s*\d+[\-\d.]*)"]:
         m = re.search(pat, n_title, re.I)
-        if m: std_no = m.group(1).strip(); break
+        if m:
+            std_no = m.group(1).strip()
+            break
     return {"doc_id": f"{cat}_{title[:60]}", "category": cat, "title": title,
-        "source_path": os.path.relpath(fp, PROJECT),
-        "source_hash": hashlib.md5(open(fp,"rb").read()).hexdigest(),
-        "char_count": len(text), "heading_count": sum(1 for b in blocks if "heading" in str(b.get("type",""))),
-        "table_count": text.count("|---"), "standard_no": std_no}
+            "source_path": os.path.relpath(fp, PROJECT),
+            "source_hash": hashlib.md5(open(fp, "rb").read()).hexdigest(),
+            "char_count": len(text), "heading_count": sum(1 for b in blocks if "heading" in str(b.get("type", ""))),
+            "table_count": text.count("|---"), "standard_no": std_no}
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Embedding
@@ -301,9 +374,10 @@ def _extract_metadata(fp, cat, text, blocks):
 def _get_embed_config(kb_dir):
     mp = os.path.join(kb_dir, "manifest.json")
     if os.path.exists(mp):
-        with open(mp,"r") as f: m = json.load(f)
+        with open(mp, "r") as f: m = json.load(f)
         return m.get("embedding_model", EMBED_MODEL), m.get("embedding_dim", 1024)
     return EMBED_MODEL, 1024
+
 
 def _embed_chunks(new_chunks, kb_dir):
     model, dim = _get_embed_config(kb_dir)
@@ -311,51 +385,62 @@ def _embed_chunks(new_chunks, kb_dir):
     cache_path = os.path.join(kb_dir, "embedding_cache.json")
     cache = {}
     if os.path.exists(cache_path):
-        with open(cache_path,"r",encoding="utf-8") as f: cache = json.load(f)
-    texts = []; valid_indices = []
+        with open(cache_path, "r", encoding="utf-8") as f: cache = json.load(f)
+    texts = []
+    valid_indices = []
     for i, c in enumerate(new_chunks):
         content = c["content"].strip()
         if len(content) < 25: continue
-        h = c.get("heading_path","")
+        h = c.get("heading_path", "")
         texts.append((f"passage: {h}\n{content}" if h else f"passage: {content}")[:4000])
         valid_indices.append(i)
     if not texts: log.warning("  No valid chunks to embed"); return []
-    embeddings = [None]*len(texts); to_fetch = []
+    embeddings = [None] * len(texts)
+    to_fetch = []
     for i, t in enumerate(texts):
         h = hashlib.md5(t.encode()).hexdigest()
-        if h in cache: embeddings[i] = np.array(cache[h], dtype=np.float16)
-        else: to_fetch.append((i, t, h))
+        if h in cache:
+            embeddings[i] = np.array(cache[h], dtype=np.float16)
+        else:
+            to_fetch.append((i, t, h))
     if to_fetch:
-        log.info(f"  Cached: {len(texts)-len(to_fetch)}, To fetch: {len(to_fetch)}")
+        log.info(f"  Cached: {len(texts) - len(to_fetch)}, To fetch: {len(to_fetch)}")
         for bi in range(0, len(to_fetch), EMBED_BATCH):
-            batch = to_fetch[bi:bi+EMBED_BATCH]
+            batch = to_fetch[bi:bi + EMBED_BATCH]
             try:
-                r = requests.post(EMBED_BASE.rstrip("/")+"/embeddings",
-                    json={"model": model, "input": [b[1] for b in batch]},
-                    headers={"Authorization": "Bearer "+EMBED_KEY}, timeout=60)
+                r = requests.post(EMBED_BASE.rstrip("/") + "/embeddings",
+                                  json={"model": model, "input": [b[1] for b in batch]},
+                                  headers={"Authorization": "Bearer " + EMBED_KEY}, timeout=60)
                 if r.status_code == 200:
                     for j, (idx, _, h) in enumerate(batch):
                         v = r.json()["data"][j]["embedding"]
                         embeddings[idx] = np.array(v, dtype=np.float16)
                         cache[h] = v
-                else: log.error(f"  Embed API error {r.status_code}: {r.text[:100]}")
-            except Exception as e: log.error(f"  Embed API exception: {e}")
-        with open(cache_path,"w",encoding="utf-8") as f: json.dump(cache, f)
+                else:
+                    log.error(f"  Embed API error {r.status_code}: {r.text[:100]}")
+            except Exception as e:
+                log.error(f"  Embed API exception: {e}")
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump(cache, f)
     vec_path = os.path.join(kb_dir, "embeddings.f16.npy")
     ids_path = os.path.join(kb_dir, "vector_ids.i64.npy")
     new_vecs = [e for e in embeddings if e is not None]
     new_ids = [new_chunks[valid_indices[i]]["chunk_id"] for i in range(len(texts)) if embeddings[i] is not None]
     if os.path.exists(vec_path) and os.path.getsize(vec_path) > 128:
-        old_vecs = np.load(vec_path, mmap_mode="r")
+        old_vecs = np.load(vec_path)
         old_ids = np.load(ids_path)
-        merged_vecs = np.concatenate([np.asarray(old_vecs, dtype=np.float16), np.array(new_vecs, dtype=np.float16)])
+        merged_vecs = np.concatenate([old_vecs.astype(np.float16), np.array(new_vecs, dtype=np.float16)])
         merged_ids = np.concatenate([old_ids, np.array(new_ids, dtype=np.int64)])
     else:
         merged_vecs = np.array(new_vecs, dtype=np.float16)
         merged_ids = np.array(new_ids, dtype=np.int64)
-    np.save(vec_path, merged_vecs); np.save(ids_path, merged_ids)
-    log.info(f"  Saved: {merged_vecs.shape[0]} vectors ({merged_vecs.shape[0]*merged_vecs.shape[1]*2//1024}KB)")
+    with open(vec_path, 'wb') as f:
+        np.save(f, merged_vecs)
+    with open(ids_path, 'wb') as f:
+        np.save(f, merged_ids)
+    log.info(f"  Saved: {merged_vecs.shape[0]} vectors ({merged_vecs.shape[0] * merged_vecs.shape[1] * 2 // 1024}KB)")
     return valid_indices
+
 
 # ═══════════════════════════════════════════════════════════════════
 # BM25
@@ -363,14 +448,16 @@ def _embed_chunks(new_chunks, kb_dir):
 def _rebuild_bm25(all_chunks, kb_dir):
     if not all_chunks:
         for f in [os.path.join(kb_dir, "bm25_index"), os.path.join(kb_dir, "bm25_index.corpus.npy"),
-                   os.path.join(kb_dir, "bm25_chunk_ids.i64.npy")]:
-            if os.path.isdir(f): shutil.rmtree(f)
-            elif os.path.exists(f): os.remove(f)
+                  os.path.join(kb_dir, "bm25_chunk_ids.i64.npy")]:
+            if os.path.isdir(f):
+                shutil.rmtree(f)
+            elif os.path.exists(f):
+                os.remove(f)
         log.info("  BM25 cleared (empty KB)")
         return
     log.info(f"[BM25] Rebuilding for {len(all_chunks)} chunks")
     t0 = time.time()
-    corpus = [f"{c.get('heading_path','')}\n{c['content']}" if c.get('heading_path','') else c['content']
+    corpus = [f"{c.get('heading_path', '')}\n{c['content']}" if c.get('heading_path', '') else c['content']
               for c in all_chunks]
     tokenized = [" ".join(jieba.cut(t)) for t in corpus]
     retriever = bm25s.BM25()
@@ -378,7 +465,8 @@ def _rebuild_bm25(all_chunks, kb_dir):
     retriever.save(os.path.join(kb_dir, "bm25_index"))
     np.save(os.path.join(kb_dir, "bm25_chunk_ids.i64.npy"),
             np.array([c["chunk_id"] for c in all_chunks], dtype=np.int64))
-    log.info(f"  Done in {time.time()-t0:.0f}s")
+    log.info(f"  Done in {time.time() - t0:.0f}s")
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Metadata
@@ -386,7 +474,8 @@ def _rebuild_bm25(all_chunks, kb_dir):
 def _update_manifest(kb_dir):
     manifest_path = os.path.join(kb_dir, "manifest.json")
     if not os.path.exists(manifest_path): return
-    with open(manifest_path) as f: m = json.load(f)
+    with open(manifest_path) as f:
+        m = json.load(f)
     chunk_path = os.path.join(kb_dir, "chunks.jsonl")
     m["total_chunks"] = sum(1 for _ in open(chunk_path, encoding="utf-8")) if os.path.exists(chunk_path) else 0
     doc_path = os.path.join(kb_dir, "documents.jsonl")
@@ -394,7 +483,9 @@ def _update_manifest(kb_dir):
     m["last_modified"] = time.strftime("%Y-%m-%d %H:%M:%S")
     vp = os.path.join(kb_dir, "embeddings.f16.npy")
     if os.path.exists(vp): m["embedded_chunks"] = np.load(vp).shape[0]
-    with open(manifest_path, "w") as f: json.dump(m, f, indent=2, ensure_ascii=False)
+    with open(manifest_path, "w") as f:
+        json.dump(m, f, indent=2, ensure_ascii=False)
+
 
 # ═══════════════════════════════════════════════════════════════════
 # KB CRUD
@@ -422,12 +513,14 @@ def kb_create(name, base_kb=None):
                        "embedding_model": EMBED_MODEL, "embedding_dim": EMBED_DIM}, f)
         log.info(f"KB created: {name} (empty)")
 
+
 def kb_delete(kb_dir):
     if not os.path.exists(kb_dir):
         log.error(f"KB not found: {kb_dir}")
         return
     shutil.rmtree(kb_dir)
     log.info(f"KB deleted: {kb_dir}")
+
 
 def kb_list():
     all_kbs = {}
@@ -460,6 +553,7 @@ def kb_list():
     for name, info in sorted(all_kbs.items()):
         print(f"{name:<25} {info['type']:<12} {info['documents']:<8} {info['chunks']:<10} {info['modified']}")
 
+
 def kb_activate(kb_dir):
     """Copy a test KB to versions/ as the latest active version."""
     if not os.path.exists(kb_dir):
@@ -471,10 +565,15 @@ def kb_activate(kb_dir):
     log.info(f"Activated: {ts} (from {os.path.basename(kb_dir)})")
     log.info(f"  Now active: {ts}")
 
+
 def kb_merge(src_dir, dst_dir):
     """Merge all documents from src KB into dst KB."""
-    if not os.path.exists(src_dir): log.error(f"Source KB not found: {src_dir}"); return
-    if not os.path.exists(dst_dir): log.error(f"Target KB not found: {dst_dir}"); return
+    if not os.path.exists(src_dir):
+        log.error(f"Source KB not found: {src_dir}")
+        return
+    if not os.path.exists(dst_dir):
+        log.error(f"Target KB not found: {dst_dir}")
+        return
     log.info(f"[MERGE] {os.path.basename(src_dir)} -> {os.path.basename(dst_dir)}")
     t0 = time.time()
 
@@ -503,12 +602,15 @@ def kb_merge(src_dir, dst_dir):
     max_cid = 0
     if os.path.exists(dst_chunk_path):
         for l in open(dst_chunk_path, "r", encoding="utf-8"):
-            try: max_cid = max(max_cid, json.loads(l)["chunk_id"])
-            except: pass
+            try:
+                max_cid = max(max_cid, json.loads(l)["chunk_id"])
+            except:
+                pass
     id_map = {}
     for c in new_chunks:
         old_id = c["chunk_id"]
-        max_cid += 1; c["chunk_id"] = max_cid
+        max_cid += 1
+        c["chunk_id"] = max_cid
         id_map[old_id] = max_cid
     # Fix parent_chunk_id references
     for c in new_chunks:
@@ -529,15 +631,32 @@ def kb_merge(src_dir, dst_dir):
     _rebuild_bm25(all_chunks, dst_dir)
 
     _update_manifest(dst_dir)
-    log.info(f"  DONE in {time.time()-t0:.0f}s")
+    log.info(f"  DONE in {time.time() - t0:.0f}s")
+
 
 # ═══════════════════════════════════════════════════════════════════
 # File CRUD
 # ═══════════════════════════════════════════════════════════════════
+def _cleanup_sync(input_md, output_fix):
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                return pool.submit(lambda: asyncio.run(_cleanup_md_async(input_md, output_fix))).result()
+    except RuntimeError:
+        pass
+    return asyncio.run(_cleanup_md_async(input_md, output_fix))
+
+
 def file_add(pdf_path, kb_dir):
-    if not os.path.exists(pdf_path): log.error(f"File not found: {pdf_path}"); return
-    if not os.path.exists(kb_dir): log.error(f"KB not found: {kb_dir}"); return
-    log.info(f"{'='*60}")
+    if not os.path.exists(pdf_path):
+        log.error(f"File not found: {pdf_path}")
+        return
+    if not os.path.exists(kb_dir):
+        log.error(f"KB not found: {kb_dir}")
+        return
+    log.info(f"{'=' * 60}")
     log.info(f"ADD: {os.path.basename(pdf_path)} -> {os.path.basename(kb_dir)}")
     t_total = time.time()
     cat = _detect_cat(pdf_path)
@@ -551,15 +670,21 @@ def file_add(pdf_path, kb_dir):
         log.info("[Phase 1+2] SKIP (fix.md exists)")
         skip_ocr = skip_cleanup = True
     elif os.path.exists(tmp_md):
-        log.info("[Phase 1] SKIP (md exists)"); skip_ocr = True; skip_cleanup = False
+        log.info("[Phase 1] SKIP (md exists)")
+        skip_ocr = True
+        skip_cleanup = False
     else:
-        skip_ocr = False; skip_cleanup = False
+        skip_ocr = False
+        skip_cleanup = False
 
     if not skip_ocr:
-        if not _ocr_pdf(pdf_path, tmp_md): return
+        if not _ocr_pdf(pdf_path, tmp_md):
+            return
     if not skip_cleanup:
-        if not asyncio.run(_cleanup_md_async(tmp_md, tmp_fix)):
-            log.warning("  Using raw OCR text"); shutil.copy(tmp_md, tmp_fix)
+        if not skip_cleanup:
+            if not _cleanup_sync(tmp_md, tmp_fix):
+                log.warning("  Using raw OCR text")
+                shutil.copy(tmp_md, tmp_fix)
 
     parse_src = tmp_fix if os.path.exists(tmp_fix) else tmp_md
     log.info(f"[Parse] {os.path.basename(parse_src)}")
@@ -572,7 +697,8 @@ def file_add(pdf_path, kb_dir):
     if os.path.exists(doc_path):
         with open(doc_path, "r", encoding="utf-8") as f:
             if any(json.loads(l)["doc_id"] == doc["doc_id"] for l in f if l.strip()):
-                log.error(f"  Document already exists: {doc['doc_id']}"); return
+                log.error(f"  Document already exists: {doc['doc_id']}")
+                return
 
     new_chunks = _chunk_blocks(blocks, cat_cfg, doc["doc_id"])
     npc = sum(1 for c in new_chunks if c["chunk_type"] == "parent")
@@ -583,36 +709,59 @@ def file_add(pdf_path, kb_dir):
     chunk_path = os.path.join(kb_dir, "chunks.jsonl")
     if os.path.exists(chunk_path):
         for l in open(chunk_path, "r", encoding="utf-8"):
-            try: max_cid = max(max_cid, json.loads(l)["chunk_id"])
-            except: pass
-    for c in new_chunks: max_cid += 1; c["chunk_id"] = max_cid
+            try:
+                max_cid = max(max_cid, json.loads(l)["chunk_id"])
+            except:
+                pass
+    for c in new_chunks:
+        max_cid += 1
+        c["chunk_id"] = max_cid
 
-    _embed_chunks(new_chunks, kb_dir)
+    try:
+        _embed_chunks(new_chunks, kb_dir)
+    except Exception as e:
+        log.error(f"[Embed] FAILED: {e}")
+        import traceback
+        traceback.print_exc()
+        return
 
     all_chunks = [json.loads(l) for l in open(chunk_path, "r", encoding="utf-8") if l.strip()]
     all_chunks += new_chunks
-    _rebuild_bm25(all_chunks, kb_dir)
+
+    try:
+        _rebuild_bm25(all_chunks, kb_dir)
+    except Exception as e:
+        log.error(f"[BM25] FAILED: {e}")
+        import traceback
+        traceback.print_exc()
 
     with open(doc_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(doc, ensure_ascii=False) + "\n")
     with open(chunk_path, "a", encoding="utf-8") as f:
         for c in new_chunks: f.write(json.dumps(c, ensure_ascii=False) + "\n")
+
     _update_manifest(kb_dir)
-    log.info(f"DONE in {time.time()-t_total:.0f}s")
+    log.info(f"DONE in {time.time() - t_total:.0f}s")
     log.info(f"  .md: {tmp_md}")
     log.info(f"  _fix.md: {tmp_fix}")
 
+
 def file_delete(doc_id, kb_dir):
-    if not os.path.exists(kb_dir): log.error(f"KB not found: {kb_dir}"); return
+    if not os.path.exists(kb_dir):
+        log.error(f"KB not found: {kb_dir}")
+        return
     doc_path = os.path.join(kb_dir, "documents.jsonl")
     chunk_path = os.path.join(kb_dir, "chunks.jsonl")
-    if not os.path.exists(doc_path): log.error("No documents.jsonl"); return
+    if not os.path.exists(doc_path):
+        log.error("No documents.jsonl")
+        return
 
     # Find and remove document
     docs = [json.loads(l) for l in open(doc_path, "r", encoding="utf-8") if l.strip()]
     removed = [d for d in docs if d["doc_id"] == doc_id]
     if not removed:
-        log.error(f"Document not found: {doc_id}"); return
+        log.error(f"Document not found: {doc_id}");
+        return
     docs = [d for d in docs if d["doc_id"] != doc_id]
     log.info(f"[DELETE] {doc_id}")
 
@@ -624,14 +773,17 @@ def file_delete(doc_id, kb_dir):
 
     # Rewrite files
     with open(doc_path, "w", encoding="utf-8") as f:
-        for d in docs: f.write(json.dumps(d, ensure_ascii=False) + "\n")
+        for d in docs:
+            f.write(json.dumps(d, ensure_ascii=False) + "\n")
     with open(chunk_path, "w", encoding="utf-8") as f:
-        for c in chunks: f.write(json.dumps(c, ensure_ascii=False) + "\n")
+        for c in chunks:
+            f.write(json.dumps(c, ensure_ascii=False) + "\n")
 
     # Rebuild BM25
     _rebuild_bm25(chunks, kb_dir)  # chunks = remaining chunks after deletion
     _update_manifest(kb_dir)
     log.info(f"  DONE")
+
 
 def file_rebuild(pdf_path, kb_dir):
     """Delete + re-add a file."""
@@ -642,8 +794,11 @@ def file_rebuild(pdf_path, kb_dir):
     file_delete(doc_id, kb_dir)
     file_add(pdf_path, kb_dir)
 
+
 def file_list(kb_dir):
-    if not os.path.exists(kb_dir): log.error(f"KB not found: {kb_dir}"); return
+    if not os.path.exists(kb_dir):
+        log.error(f"KB not found: {kb_dir}")
+        return
     doc_path = os.path.join(kb_dir, "documents.jsonl")
     if not os.path.exists(doc_path):
         print("No documents")
@@ -652,7 +807,8 @@ def file_list(kb_dir):
     print(f"{os.path.basename(kb_dir)}: {len(docs)} documents")
     for i, d in enumerate(docs, 1):
         sn = d.get("standard_no", "")
-        print(f"  [{i}] {d['title'][:60]}  cat={d.get('category','')}  std={sn}  id={d['doc_id']}")
+        print(f"  [{i}] {d['title'][:60]}  cat={d.get('category', '')}  std={sn}  id={d['doc_id']}")
+
 
 # ═══════════════════════════════════════════════════════════════════
 # CLI
@@ -668,23 +824,34 @@ if __name__ == "__main__":
         elif sys.argv[2] == "create" and len(sys.argv) >= 4:
             base = None
             for i, a in enumerate(sys.argv):
-                if a == "--from" and i+1 < len(sys.argv): base = sys.argv[i+1]
+                if a == "--from" and i + 1 < len(sys.argv): base = sys.argv[i + 1]
             kb_create(sys.argv[3], base_kb=base)
-        elif sys.argv[2] == "list": kb_list()
-        elif sys.argv[2] == "delete" and len(sys.argv) >= 4: kb_delete(sys.argv[3])
-        elif sys.argv[2] == "activate" and len(sys.argv) >= 4: kb_activate(sys.argv[3])
-        elif sys.argv[2] == "merge" and len(sys.argv) >= 5: kb_merge(sys.argv[3], sys.argv[4])
-        else: print(f"Unknown kb command: {sys.argv[2] if len(sys.argv)>2 else ''}")
+        elif sys.argv[2] == "list":
+            kb_list()
+        elif sys.argv[2] == "delete" and len(sys.argv) >= 4:
+            kb_delete(sys.argv[3])
+        elif sys.argv[2] == "activate" and len(sys.argv) >= 4:
+            kb_activate(sys.argv[3])
+        elif sys.argv[2] == "merge" and len(sys.argv) >= 5:
+            kb_merge(sys.argv[3], sys.argv[4])
+        else:
+            print(f"Unknown kb command: {sys.argv[2] if len(sys.argv) > 2 else ''}")
     elif cmd == "file":
         if len(sys.argv) < 3:
             file_list(DEFAULT_KB)
         else:
             kb_dir = DEFAULT_KB
             for i, a in enumerate(sys.argv):
-                if a == "--kb" and i+1 < len(sys.argv): kb_dir = sys.argv[i+1]
-            if sys.argv[2] == "add" and len(sys.argv) >= 4: file_add(sys.argv[3], kb_dir)
-            elif sys.argv[2] == "delete" and len(sys.argv) >= 4: file_delete(sys.argv[3], kb_dir)
-            elif sys.argv[2] == "rebuild" and len(sys.argv) >= 4: file_rebuild(sys.argv[3], kb_dir)
-            elif sys.argv[2] == "list": file_list(kb_dir)
-            else: print(f"Unknown file command: {sys.argv[2]}")
-    else: print(f"Unknown command: {cmd}")
+                if a == "--kb" and i + 1 < len(sys.argv): kb_dir = sys.argv[i + 1]
+            if sys.argv[2] == "add" and len(sys.argv) >= 4:
+                file_add(sys.argv[3], kb_dir)
+            elif sys.argv[2] == "delete" and len(sys.argv) >= 4:
+                file_delete(sys.argv[3], kb_dir)
+            elif sys.argv[2] == "rebuild" and len(sys.argv) >= 4:
+                file_rebuild(sys.argv[3], kb_dir)
+            elif sys.argv[2] == "list":
+                file_list(kb_dir)
+            else:
+                print(f"Unknown file command: {sys.argv[2]}")
+    else:
+        print(f"Unknown command: {cmd}")

@@ -192,7 +192,8 @@ async def kb_list_documents(kb_id: str):
                 raw_name = (os.path.basename(src) if src else doc.get("title", ""))
                 name = doc.get("original_name") or raw_name.replace("_fix.md", ".pdf").replace(".md", ".pdf")
                 docs.append({"id": doc["doc_id"], "name": name, "category": doc.get("category", ""), "chunks": 0, "vectors": 0})
-            except: pass
+            except:
+                pass
 
     # Count chunks per doc
     if os.path.exists(chunk_path):
@@ -201,7 +202,8 @@ async def kb_list_documents(kb_id: str):
                 ck = json.loads(l)
                 did = ck.get("doc_id", "")
                 for doc in docs:
-                    if doc["id"] == did: doc["chunks"] += 1
+                    if doc["id"] == did:
+                        doc["chunks"] += 1
             except:
                 pass
 
@@ -219,7 +221,8 @@ async def kb_list_documents(kb_id: str):
         for vid in vec_ids:
             did = chunk_to_doc.get(int(vid), "")
             for doc in docs:
-                if doc["id"] == did: doc["vectors"] += 1
+                if doc["id"] == did:
+                    doc["vectors"] += 1
 
     return {"code": 0, "data": docs}
 
@@ -243,7 +246,8 @@ async def kb_upload_document(kb_id: str, files: List[UploadFile] = File(...)):
         except Exception as e:
             results.append({"file": file.filename, "status": str(e)})
         finally:
-            if os.path.exists(tmp_path): os.remove(tmp_path)
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
     return {"code": 0, "data": results}
 
 
@@ -251,7 +255,8 @@ async def kb_upload_document(kb_id: str, files: List[UploadFile] = File(...)):
 async def kb_delete_document(kb_id: str, doc_id: str):
     from industrial_rag.step7_rag_util import file_delete
     d = _kb_dir(kb_id)
-    if not d: raise HTTPException(404)
+    if not d:
+        raise HTTPException(404)
     _capture(lambda: file_delete(doc_id, d))
     return {"code": 0}
 

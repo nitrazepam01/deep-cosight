@@ -523,11 +523,14 @@ let KnowledgeService = (function () {
         const docs = _detailDocuments || [];
         const total = docs.length;
 
-        if (_isBuilding) {
-            el.innerHTML = `<div class="kb-pipeline-active"><div class="kb-pipeline-header"><span class="kb-pipeline-badge kb-badge-processing"><i class="fas fa-cog fa-spin"></i> 构建中</span></div><div class="kb-pipeline-stats-row"><div class="kb-stat-card"><span class="kb-stat-num">${total}</span><span class="kb-stat-label">总</span></div><div class="kb-stat-card kb-stat-processing"><span class="kb-stat-num">...</span><span class="kb-stat-label">处理中</span></div></div></div>`;
-            return;
-        }
-        el.innerHTML = `<div class="kb-pipeline-idle"><div class="kb-pipeline-stats-row"><div class="kb-stat-card"><span class="kb-stat-num">${total}</span><span class="kb-stat-label">总</span></div><div class="kb-stat-card kb-stat-success"><span class="kb-stat-num">${total}</span><span class="kb-stat-label">已完成</span></div><div class="kb-stat-card kb-stat-processing"><span class="kb-stat-num">0</span><span class="kb-stat-label">处理中</span></div><div class="kb-stat-card kb-stat-failed"><span class="kb-stat-num">0</span><span class="kb-stat-label">失败</span></div></div></div>`;
+        el.innerHTML = `<div class="kb-pipeline-idle">
+            <div class="kb-pipeline-stats-row">
+                <div class="kb-stat-card"><span class="kb-stat-num">${total}</span><span class="kb-stat-label">总计</span></div>
+                <div class="kb-stat-card kb-stat-success"><span class="kb-stat-num">${_isBuilding ? '...' : total}</span><span class="kb-stat-label">已完成</span></div>
+                <div class="kb-stat-card kb-stat-processing"><span class="kb-stat-num">${_isBuilding ? '...' : 0}</span><span class="kb-stat-label">处理中</span></div>
+                <div class="kb-stat-card kb-stat-failed"><span class="kb-stat-num">0</span><span class="kb-stat-label">失败</span></div>
+            </div>
+        </div>`;
     }
 
     function getDocType(name) {
