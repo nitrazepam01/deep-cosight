@@ -37,3 +37,6 @@ tmp/
 .reasonix/
 submit_prepare/
 external/**/*.pdf
+upload_temp/
+industrial_kb_data/test_versions/**
+!industrial_kb_data/test_versions/**/*.log

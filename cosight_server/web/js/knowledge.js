@@ -13,6 +13,9 @@ let KnowledgeService = (function () {
     let _detailPipeline = null;             // 当前 KB 的管线状态
     let _healthDetail = null;               // LightRAG 服务详情（含模型配置）
     let _pendingDeleteDocs = new Map();
+    let _isBuilding = false;
+    let _buildingKbId = null;
+    let _savedDocuments = [];
 
     /* ========== API ========== */
     async function fetchKBList() {
@@ -253,8 +256,8 @@ let KnowledgeService = (function () {
                     <div class="kb-card-checkbox" data-kb-id="${kb.id}" onclick="KnowledgeService.toggleCheckbox('${kb.id}', event)">
                         <i class="fas fa-check"></i>
                     </div>
-                    <div class="kb-card-icon-wrap">
-                        <i class="fas fa-database"></i>
+                    <div class="kb-card-icon-wrap" style="${_buildingKbId === kb.id ? 'background:linear-gradient(135deg,#fffbeb,#fef3c7)' : ''}">
+                        <i class="fas fa-database" style="${_buildingKbId === kb.id ? 'color:#f59e0b' : ''}"></i>
                     </div>
                     <div class="kb-card-body">
                         <div class="kb-card-name">${escapeHtml(kb.name)}</div>
@@ -344,7 +347,8 @@ let KnowledgeService = (function () {
         return `
             <div class="kb-detail">
                 <div class="kb-detail-info">
-                    <div class="kb-detail-icon"><i class="fas fa-database"></i></div>
+                    <div class="kb-detail-icon" style="${_isBuilding ? 'background:linear-gradient(135deg,#fffbeb,#fef3c7)' : ''}">
+                        <i class="fas fa-database" style="${_isBuilding ? 'color:#f59e0b' : ''}"></i></div>
                     <div class="kb-detail-info-content">
                         <h3>${escapeHtml(kb.name)}</h3>
                         <p class="kb-detail-desc">${escapeHtml(kb.description || '暂无描述')}</p>
@@ -387,7 +391,7 @@ let KnowledgeService = (function () {
                     <div class="kb-section-title"><i class="fas fa-cloud-upload-alt"></i> 上传文档</div>
                     <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start">
                         <div id="kb-file-selector"></div>
-                        <button class="kb-btn-primary" onclick="..." style="white-space:nowrap;height:40px;align-self:center;margin-bottom:8px"><i class="fas fa-check"></i> 确认</button>
+                        <button class="kb-btn-primary" onclick="KnowledgeService.saveManage()" style="white-space:nowrap;height:40px;align-self:center;margin-bottom:8px"><i class="fas fa-check"></i> 确认</button>
                     </div>
                     <div class="kb-upload-area" id="kb-upload-area"
                          onclick="event.stopPropagation(); this.querySelector('input[type=file]').click()"
@@ -515,79 +519,15 @@ let KnowledgeService = (function () {
 
     function renderPipelineSection() {
         const el = document.getElementById('kb-pipeline-content');
-        if (!el || !_detailPipeline) return;
+        if (!el) return;
+        const docs = _detailDocuments || [];
+        const total = docs.length;
 
-        const p = _detailPipeline;
-
-        if (p.busy) {
-            const progress = (p.batchs > 0) ? Math.round((p.cur_batch / p.batchs) * 100) : 0;
-            const historyHtml = (p.history_messages || []).slice(-30).map(m =>
-                `<div class="kb-pipeline-log-line">${escapeHtml(m)}</div>`
-            ).join('');
-
-            el.innerHTML = `
-                <div class="kb-pipeline-active">
-                    <div class="kb-pipeline-header">
-                        <span class="kb-pipeline-badge kb-badge-processing"><i class="fas fa-cog fa-spin"></i> 正在构建</span>
-                        <span class="kb-pipeline-job">${escapeHtml(p.job_name || '')}</span>
-                    </div>
-                    <div class="kb-pipeline-progress-wrap">
-                        <div class="kb-pipeline-progress-bar">
-                            <div class="kb-pipeline-progress-fill" style="width:${progress}%"></div>
-                        </div>
-                        <span class="kb-pipeline-progress-text">${p.cur_batch || 0} / ${p.batchs || 0} 批次 (${progress}%)</span>
-                    </div>
-                    <div class="kb-pipeline-docs-info">
-                        <span><i class="fas fa-file-alt"></i> 文档数：${p.docs || 0}</span>
-                        ${p.latest_message ? `<span class="kb-pipeline-latest-inline"><i class="fas fa-comment-dots"></i> ${escapeHtml(p.latest_message)}</span>` : ''}
-                    </div>
-                    <details class="kb-pipeline-log-details" ${historyHtml ? 'open' : ''}>
-                        <summary><i class="fas fa-terminal"></i> 构建日志 (${(p.history_messages || []).length} 条)</summary>
-                        <div class="kb-pipeline-log-scroll" id="kb-pipeline-log-scroll">${historyHtml || '<div class="kb-pipeline-log-line" style="color:#9ca3af">等待日志...</div>'}</div>
-                    </details>
-                </div>
-            `;
-            // 自动滚动到日志底部
-            const logEl = document.getElementById('kb-pipeline-log-scroll');
-            if (logEl) logEl.scrollTop = logEl.scrollHeight;
-        } else {
-            // 获取文档状态统计
-            const docs = _detailDocuments || [];
-            const statusCounts = { PROCESSED: 0, PROCESSING: 0, PENDING: 0, FAILED: 0 };
-            docs.forEach(d => { if (statusCounts.hasOwnProperty(d.status)) statusCounts[d.status]++; });
-            const total = docs.length;
-
-            el.innerHTML = `
-                <div class="kb-pipeline-idle">
-                    <span class="kb-pipeline-badge kb-badge-idle"><i class="fas fa-check-circle"></i> 空闲</span>
-                    <div class="kb-pipeline-stats-row">
-                        <div class="kb-stat-card"><span class="kb-stat-num">${total}</span><span class="kb-stat-label">总</span></div>
-                        <div class="kb-stat-card kb-stat-success"><span class="kb-stat-num">${statusCounts.PROCESSED}</span><span class="kb-stat-label">已完成</span></div>
-                        <div class="kb-stat-card kb-stat-processing"><span class="kb-stat-num">${statusCounts.PROCESSING}</span><span class="kb-stat-label">处理中</span></div>
-                        <div class="kb-stat-card kb-stat-pending"><span class="kb-stat-num">${statusCounts.PENDING}</span><span class="kb-stat-label">等待中</span></div>
-                        <div class="kb-stat-card kb-stat-failed"><span class="kb-stat-num">${statusCounts.FAILED}</span><span class="kb-stat-label">失败</span></div>
-                    </div>
-                </div>
-            `;
+        if (_isBuilding) {
+            el.innerHTML = `<div class="kb-pipeline-active"><div class="kb-pipeline-header"><span class="kb-pipeline-badge kb-badge-processing"><i class="fas fa-cog fa-spin"></i> 构建中</span></div><div class="kb-pipeline-stats-row"><div class="kb-stat-card"><span class="kb-stat-num">${total}</span><span class="kb-stat-label">总</span></div><div class="kb-stat-card kb-stat-processing"><span class="kb-stat-num">...</span><span class="kb-stat-label">处理中</span></div></div></div>`;
+            return;
         }
-    }
-
-    function getDocType(name) {
-        const ext = (name || '').split('.').pop()?.toLowerCase() || '';
-        if (ext === 'pdf') return 'pdf';
-        if (['doc','docx','txt','rtf','odt'].includes(ext)) return 'document';
-        if (['xls','xlsx','csv'].includes(ext)) return 'spreadsheet';
-        if (['ppt','pptx','key'].includes(ext)) return 'presentation';
-        if (['js','ts','py','java','cpp','c','h','html','css','json','xml','md'].includes(ext)) return 'code';
-        if (['zip','rar','7z','tar','gz'].includes(ext)) return 'archive';
-        return 'other';
-    }
-
-    function getDocIcon(type) {
-        const icons = { pdf: 'fa-file-pdf', document: 'fa-file-word', spreadsheet: 'fa-file-excel',
-            presentation: 'fa-file-powerpoint', code: 'fa-file-code', archive: 'fa-file-archive',
-            other: 'fa-file', image: 'fa-file-image', audio: 'fa-file-audio', video: 'fa-file-video' };
-        return icons[type] || 'fa-file';
+        el.innerHTML = `<div class="kb-pipeline-idle"><div class="kb-pipeline-stats-row"><div class="kb-stat-card"><span class="kb-stat-num">${total}</span><span class="kb-stat-label">总</span></div><div class="kb-stat-card kb-stat-success"><span class="kb-stat-num">${total}</span><span class="kb-stat-label">已完成</span></div><div class="kb-stat-card kb-stat-processing"><span class="kb-stat-num">0</span><span class="kb-stat-label">处理中</span></div><div class="kb-stat-card kb-stat-failed"><span class="kb-stat-num">0</span><span class="kb-stat-label">失败</span></div></div></div>`;
     }
 
     function getDocType(name) {
@@ -679,7 +619,13 @@ let KnowledgeService = (function () {
             }
             showToast(`知识库 "${name}" 创建成功`, 'success');
             hideCreateForm();
-            await open();
+            _kbList = await fetchKBList();
+            _currentKbId = name;
+            renderModalFull();
+            updateCheckboxVisuals();
+            setTimeout(() => initKbFileSelector(), 100);
+            await saveManage();
+            loadDetailData();
         } catch (e) {
             showToast(e.message, 'error');
         }
@@ -921,12 +867,13 @@ let KnowledgeService = (function () {
 
     async function executePendingDeletes() {
         if (_pendingDeleteDocs.size === 0) return;
-        for (const docId of _pendingDeleteDocs.keys()) {
-            try { await fetch(API_BASE + '/deep-research/kb/' + _currentKbId + '/documents/' + encodeURIComponent(docId), { method: 'DELETE' }); } catch(e) {}
-        }
+        lockKBUI();
+        const deletes = [..._pendingDeleteDocs.keys()].map(docId =>
+            fetch(`${API_BASE}/deep-research/kb/${encodeURIComponent(_currentKbId)}/documents/${encodeURIComponent(docId)}`, { method: 'DELETE' })
+        );
         _pendingDeleteDocs.clear();
-        renderPendingDeleteTags();
-        loadDetailData();
+        showToast(`${deletes.length} 个文件已提交删除，后台处理中...`, 'success');
+        Promise.all(deletes).finally(() => unlockKBUI());
     }
 
     function showDeleteKBConfirmModal(kbId, name) {
@@ -967,7 +914,7 @@ let KnowledgeService = (function () {
             await deleteKB(kbId);
             showToast(`知识库 "${name}" 已删除`, 'success');
             if (_currentKbId === kbId) _currentKbId = null;
-            await refreshList();
+            await open();
         } catch (e) {
             showToast(e.message, 'error');
         }
@@ -989,48 +936,55 @@ let KnowledgeService = (function () {
         renderModalFull();
     }
 
-    async function saveManage() {
-        if (_createFiles.length === 0) return;
-        for (const f of _createFiles) {
-            const form = new FormData();
-            form.append('file', f);
-            await fetch(`${API_BASE}/deep-research/kb/${encodeURIComponent(_currentKbId)}/documents/upload`, { method: 'POST', body: form });
+    function lockKBUI() {
+        _isBuilding = true; _buildingKbId = _currentKbId; renderPipelineSection();
+        const btns = [...document.querySelectorAll('button')].filter(b =>
+            b.textContent.includes('删除') || b.textContent.includes('确认') || b.textContent.includes('查询'));
+        btns.forEach(b => b.disabled = true);
+        const wrap = document.querySelector('.kb-detail-icon');
+        const icon = wrap ? wrap.querySelector('i') : null;
+        if (wrap) wrap.style.background = 'linear-gradient(135deg, #fffbeb, #fef3c7)';
+        if (icon) { icon.style.color = '#f59e0b'; icon.style.background = 'linear-gradient(135deg, #fffbeb, #fef3c7)'; }
+        _savedDocuments = _detailDocuments.slice();
+        if (_selectedKbIds.has(_currentKbId)) {
+            _selectedKbIds.delete(_currentKbId);
+            fetch(`${API_BASE}/deep-research/kb/state/activate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kb_id: _currentKbId, activate: false })
+            });
         }
-        _createFiles = [];
-        initKbFileSelector();
-        showToast('上传完成', 'success');
+        _lightragStatus = _selectedKbIds.size > 0 ? 'connected' : 'disconnected';
+        updateKnowledgeBaseBtnActiveState(); renderModal();
     }
 
-    async function uploadFiles(files) {
-        const progressDiv = document.getElementById('kb-upload-progress');
-        const progressFill = document.getElementById('kb-progress-fill');
-        const progressText = document.getElementById('kb-progress-text');
-        if (progressDiv) progressDiv.style.display = 'flex';
-
-        let completed = 0;
-        for (const file of files) {
-            try {
-                if (progressText) progressText.textContent = `上传中：${file.name} (${completed + 1}/${files.length})`;
-                if (progressFill) progressFill.style.width = `${(completed / files.length) * 100}%`;
-                await uploadDocument(_currentKbId, file);
-                completed++;
-            } catch (e) {
-                showToast(`上传 ${file.name} 失败：${e.message}`, 'error');
+    function unlockKBUI() {
+        _isBuilding = false; _buildingKbId = null; renderPipelineSection();
+        const btns = [...document.querySelectorAll('button')].filter(b =>
+            b.textContent.includes('删除') || b.textContent.includes('确认') || b.textContent.includes('查询'));
+        btns.forEach(b => b.disabled = false);
+        const wrap = document.querySelector('.kb-detail-icon');
+        const icon = wrap ? wrap.querySelector('i') : null;
+        if (wrap) wrap.style.background = '';
+        if (icon) { icon.style.color = ''; icon.style.background = ''; }
+        loadDetailData().then(() => {
+            if (!_detailDocuments || _detailDocuments.length === 0) {
+                _detailDocuments = _savedDocuments || [];
+                renderDocumentsSection();
             }
-        }
+        });
+    }
 
-        if (progressFill) progressFill.style.width = '100%';
-        if (progressText) progressText.textContent = `上传完成 (${completed}/${files.length})`;
-        showToast(`成功上传 ${completed} 个文件`, 'success');
-
-        setTimeout(() => {
-            if (progressDiv) progressDiv.style.display = 'none';
-            if (progressFill) progressFill.style.width = '0%';
-        }, 2000);
-
-        _kbList = await fetchKBList();
-        // 上传完毕后刷新文档列表和管线状态
-        await loadDetailData();
+    async function saveManage() {
+        if (_createFiles.length === 0) return;
+        lockKBUI();
+        const form = new FormData();
+        _createFiles.forEach(f => form.append('files', f));
+        _createFiles = [];
+        if (_kbFileSelector) { _kbFileSelector.setItems([]); _kbFileSelector.setValue(null); }
+        showToast('文件已提交，后台处理中...', 'success');
+        fetch(`${API_BASE}/deep-research/kb/${encodeURIComponent(_currentKbId)}/documents/upload`, { method: 'POST', body: form })
+            .finally(() => unlockKBUI());
     }
 
     async function doInsertText() {
@@ -1069,11 +1023,6 @@ let KnowledgeService = (function () {
             btn.disabled = false;
             if (textarea) textarea.disabled = false;
         }
-    }
-
-    async function refreshList() {
-        _kbList = await fetchKBList();
-        renderModal();
     }
 
     /* ========== 知识库选择器（嵌入到首页输入区域） ========== */
@@ -1423,7 +1372,7 @@ let KnowledgeService = (function () {
         doStartService, doStopService, refreshDocuments, deleteSelected,
         toggleCheckbox, doActivate, closeDeleteConfirm, doDeleteKBs,
         closeStopServiceConfirm, confirmStopService,
-        closeDeleteKBConfirm, doDeleteKB,
+        closeDeleteKBConfirm, doDeleteKB, saveManage,
         handleCreateDrop, addInherit, removeInherit, cancelPendingDelete,
         handleCreateFileSelect, executePendingDeletes, queueDeleteDocument,
         // 初始化

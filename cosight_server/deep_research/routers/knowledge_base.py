@@ -21,6 +21,7 @@ Response format maintained for backward compat with knowledge.js.
 
 import os, sys, json, io, shutil, time, numpy as np
 from fastapi import APIRouter, UploadFile, File, Body, HTTPException
+from typing import List
 
 from app.common.logger_util import logger
 
@@ -130,6 +131,8 @@ async def kb_create(payload: dict = Body(...)):
     desc = payload.get("description", "")
     base = payload.get("base_kb") or None
     try:
+        if base:
+            base = _kb_dir(base)
         _capture(lambda: _create(name, base_kb=base))
         # Save to meta
         meta = _load_meta()
@@ -154,6 +157,17 @@ async def kb_delete(kb_id: str):
         return {"code": 0, "msg": "ok"}
     except Exception as e:
         return {"code": 1, "msg": str(e)}
+
+
+@knowledgeBaseRouter.post("/deep-research/kb/merge")
+async def kb_merge(payload: dict = Body(...)):
+    from industrial_rag.step7_rag_util import kb_merge as _merge
+    src = _kb_dir(payload.get("src", ""))
+    dst = _kb_dir(payload.get("dst", ""))
+    if not src or not dst:
+        raise HTTPException(404, "KB not found")
+    _capture(lambda: _merge(src, dst))
+    return {"code": 0, "msg": "ok"}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -211,27 +225,26 @@ async def kb_list_documents(kb_id: str):
 
 
 @knowledgeBaseRouter.post("/deep-research/kb/{kb_id}/documents/upload")
-async def kb_upload_document(kb_id: str, file: UploadFile = File(...)):
+async def kb_upload_document(kb_id: str, files: List[UploadFile] = File(...)):
     from industrial_rag.step7_rag_util import file_add
     d = _kb_dir(kb_id)
     if not d:
         raise HTTPException(404)
-
     upload_dir = os.path.join(_PROJ, "industrial_rag", "upload_temp")
     os.makedirs(upload_dir, exist_ok=True)
-    tmp_path = os.path.join(upload_dir, file.filename)
-
-    try:
-        contents = await file.read()
-        with open(tmp_path, "wb") as f:
-            f.write(contents)
-        _capture(lambda: file_add(tmp_path, d))
-        return {"code": 0, "msg": "ok"}
-    except Exception as e:
-        return {"code": 1, "msg": str(e)}
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+    results = []
+    for file in files:
+        tmp_path = os.path.join(upload_dir, file.filename)
+        try:
+            contents = await file.read()
+            with open(tmp_path, "wb") as f: f.write(contents)
+            _capture(lambda: file_add(tmp_path, d))
+            results.append({"file": file.filename, "status": "ok"})
+        except Exception as e:
+            results.append({"file": file.filename, "status": str(e)})
+        finally:
+            if os.path.exists(tmp_path): os.remove(tmp_path)
+    return {"code": 0, "data": results}
 
 
 @knowledgeBaseRouter.delete("/deep-research/kb/{kb_id}/documents/{doc_id}")
