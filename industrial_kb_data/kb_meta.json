@@ -2,11 +2,13 @@
   "20260729_013732": {
     "name": "工业控制知识库",
     "description": "IEC/ISO/GB标准 · 教材 · 论文 · 数据手册 · 316 文档 · 19699 块 · 17812 向量",
-    "activate": true
+    "created": "2026-07-29 01:37:32",
+    "activate": false
   },
   "测试": {
     "name": "测试",
     "description": "测试用知识库",
-    "created": "2026-08-02 23:31:10"
+    "created": "2026-08-02 23:31:10",
+    "activate": true
   }
 }

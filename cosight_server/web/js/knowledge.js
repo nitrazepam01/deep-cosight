@@ -16,6 +16,8 @@ let KnowledgeService = (function () {
     let _isBuilding = false;
     let _buildingKbId = null;
     let _savedDocuments = [];
+    let _buildingAction = null;
+    let _buildingCount = 0;
 
     /* ========== API ========== */
     async function fetchKBList() {
@@ -450,8 +452,7 @@ let KnowledgeService = (function () {
             } else {
                 stopPipelinePolling();
             }
-        } catch (e) {
-        }
+        } catch (e) { console.error('loadDetailData error:', e); }
     }
 
     function startPipelinePolling() {
@@ -521,16 +522,25 @@ let KnowledgeService = (function () {
         const el = document.getElementById('kb-pipeline-content');
         if (!el) return;
         const docs = _detailDocuments || [];
-        const total = docs.length;
+        const baseTotal = docs.length;
+        const add = (_buildingAction === 'add') ? (_buildingCount || 0) : 0;
+        const del = (_buildingAction === 'delete') ? (_buildingCount || 0) : 0;
 
-        el.innerHTML = `<div class="kb-pipeline-idle">
-            <div class="kb-pipeline-stats-row">
-                <div class="kb-stat-card"><span class="kb-stat-num">${total}</span><span class="kb-stat-label">总计</span></div>
-                <div class="kb-stat-card kb-stat-success"><span class="kb-stat-num">${_isBuilding ? '...' : total}</span><span class="kb-stat-label">已完成</span></div>
-                <div class="kb-stat-card kb-stat-processing"><span class="kb-stat-num">${_isBuilding ? '...' : 0}</span><span class="kb-stat-label">处理中</span></div>
+        if (_isBuilding) {
+            el.innerHTML = `<div class="kb-pipeline-idle"><div class="kb-pipeline-stats-row">
+                <div class="kb-stat-card"><span class="kb-stat-num">${baseTotal + add}</span><span class="kb-stat-label">总计</span></div>
+                <div class="kb-stat-card kb-stat-success"><span class="kb-stat-num">${baseTotal - del}</span><span class="kb-stat-label">已完成</span></div>
+                <div class="kb-stat-card kb-stat-processing"><span class="kb-stat-num">${add || del}</span><span class="kb-stat-label">处理中</span></div>
                 <div class="kb-stat-card kb-stat-failed"><span class="kb-stat-num">0</span><span class="kb-stat-label">失败</span></div>
-            </div>
-        </div>`;
+            </div></div>`;
+        } else {
+            el.innerHTML = `<div class="kb-pipeline-idle"><div class="kb-pipeline-stats-row">
+                <div class="kb-stat-card"><span class="kb-stat-num">${baseTotal}</span><span class="kb-stat-label">总计</span></div>
+                <div class="kb-stat-card kb-stat-success"><span class="kb-stat-num">${baseTotal}</span><span class="kb-stat-label">已完成</span></div>
+                <div class="kb-stat-card kb-stat-processing"><span class="kb-stat-num">0</span><span class="kb-stat-label">处理中</span></div>
+                <div class="kb-stat-card kb-stat-failed"><span class="kb-stat-num">0</span><span class="kb-stat-label">失败</span></div>
+            </div></div>`;
+        }
     }
 
     function getDocType(name) {
@@ -798,7 +808,8 @@ let KnowledgeService = (function () {
             event.stopPropagation();
         }
 
-        // 单选：选中自己则取消，否则取消其他只选中自己
+        // 同步后端：被移除的写 false，新选中的写 true
+        const wasSelected = new Set(_selectedKbIds);
         if (_selectedKbIds.has(kbId)) {
             _selectedKbIds.clear();
         } else {
@@ -806,11 +817,29 @@ let KnowledgeService = (function () {
             _selectedKbIds.add(kbId);
         }
 
-        // 同步到 localStorage
-        await fetch(`${API_BASE}/deep-research/kb/state/activate`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({kb_id: kbId, activate: _selectedKbIds.has(kbId)})
+        // 先更新 UI
+        _lightragStatus = _selectedKbIds.size > 0 ? 'connected' : 'disconnected';
+        updateCheckboxVisuals();
+        updateKnowledgeBaseBtnActiveState();
+        onSelectorChange();
+        renderModal();
+
+        // 后台同步后端
+        wasSelected.forEach(id => {
+            if (!_selectedKbIds.has(id)) {
+                fetch(`${API_BASE}/deep-research/kb/state/activate`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({kb_id: id, activate: false})
+                });
+            }
+        });
+        _selectedKbIds.forEach(id => {
+            if (!wasSelected.has(id)) {
+                fetch(`${API_BASE}/deep-research/kb/state/activate`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({kb_id: id, activate: true})
+                });
+            }
         });
 
         _lightragStatus = _selectedKbIds.size > 0 ? 'connected' : 'disconnected';
@@ -870,12 +899,14 @@ let KnowledgeService = (function () {
 
     async function executePendingDeletes() {
         if (_pendingDeleteDocs.size === 0) return;
-        lockKBUI();
-        const deletes = [..._pendingDeleteDocs.keys()].map(docId =>
-            fetch(`${API_BASE}/deep-research/kb/${encodeURIComponent(_currentKbId)}/documents/${encodeURIComponent(docId)}`, { method: 'DELETE' })
-        );
+        lockKBUI('delete', _pendingDeleteDocs.size);
+        const cnt = _pendingDeleteDocs.size;
         _pendingDeleteDocs.clear();
-        showToast(`${deletes.length} 个文件已提交删除，后台处理中...`, 'success');
+        renderPendingDeleteTags();
+        showToast(`${cnt} 个文件已提交删除，后台处理中...`, 'success');
+        const deletes = [...Array(cnt)].map((_, i) =>
+            fetch(`${API_BASE}/deep-research/kb/${encodeURIComponent(_currentKbId)}/documents/x`, { method: 'DELETE' })
+        );
         Promise.all(deletes).finally(() => unlockKBUI());
     }
 
@@ -931,16 +962,19 @@ let KnowledgeService = (function () {
         loadDetailData();
     }
 
-    function backToList() {
+    async function backToList() {
         stopPipelinePolling();
         _currentKbId = null;
         _detailDocuments = [];
         _detailPipeline = null;
         renderModalFull();
+        updateCheckboxVisuals();
     }
 
-    function lockKBUI() {
-        _isBuilding = true; _buildingKbId = _currentKbId; renderPipelineSection();
+    function lockKBUI(action, count) {
+        _isBuilding = true; _buildingKbId = _currentKbId;
+        _buildingAction = action; _buildingCount = count;
+        renderPipelineSection();
         const btns = [...document.querySelectorAll('button')].filter(b =>
             b.textContent.includes('删除') || b.textContent.includes('确认') || b.textContent.includes('查询'));
         btns.forEach(b => b.disabled = true);
@@ -962,7 +996,9 @@ let KnowledgeService = (function () {
     }
 
     function unlockKBUI() {
-        _isBuilding = false; _buildingKbId = null; renderPipelineSection();
+        _isBuilding = false; _buildingKbId = null;
+        _buildingAction = null; _buildingCount = 0;
+        renderPipelineSection();
         const btns = [...document.querySelectorAll('button')].filter(b =>
             b.textContent.includes('删除') || b.textContent.includes('确认') || b.textContent.includes('查询'));
         btns.forEach(b => b.disabled = false);
@@ -970,7 +1006,10 @@ let KnowledgeService = (function () {
         const icon = wrap ? wrap.querySelector('i') : null;
         if (wrap) wrap.style.background = '';
         if (icon) { icon.style.color = ''; icon.style.background = ''; }
-        loadDetailData().then(() => {
+        loadDetailData().then(async () => {
+            _kbList = await fetchKBList();
+            renderPipelineSection();
+            renderDocumentsSection();
             if (!_detailDocuments || _detailDocuments.length === 0) {
                 _detailDocuments = _savedDocuments || [];
                 renderDocumentsSection();
@@ -980,7 +1019,7 @@ let KnowledgeService = (function () {
 
     async function saveManage() {
         if (_createFiles.length === 0) return;
-        lockKBUI();
+        lockKBUI('add', _createFiles.length);
         const form = new FormData();
         _createFiles.forEach(f => form.append('files', f));
         _createFiles = [];
