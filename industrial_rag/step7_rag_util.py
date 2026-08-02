@@ -566,6 +566,7 @@ def file_add(pdf_path, kb_dir):
     blocks, raw_text = _parse_md(parse_src)
     log.info(f"  {len(blocks)} blocks")
     doc = _extract_metadata(parse_src, cat, raw_text, blocks)
+    doc["original_name"] = os.path.basename(pdf_path)
 
     doc_path = os.path.join(kb_dir, "documents.jsonl")
     if os.path.exists(doc_path):

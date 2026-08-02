@@ -4289,6 +4289,7 @@ select.settings-input option:checked {
     resize: vertical;
     font-family: inherit;
     line-height: 1.5;
+    scrollbar-width: thin;
 }
 
 .kb-textarea:focus {
@@ -6274,6 +6275,42 @@ select.settings-input option:checked {
 #kb-file-selector .custom-select-option {
     padding: 6px 12px;
 }
+#kb-file-selector .custom-select-checkbox {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    margin-left: auto;
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+    order: 2;
+}
+#kb-file-selector .custom-select-checkbox:hover {
+    background: #fee2e2;
+}
+#kb-file-selector .custom-select-checkbox i {
+    display: none;
+}
+#kb-file-selector .custom-select-checkbox::before {
+    content: "\f00d";
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    font-size: 14px;
+    color: #ef4444;
+}
+#kb-file-selector .custom-select-checkbox.checked::before {
+    color: #dc2626;
+}
+#kb-file-selector .custom-select-option-label {
+    order: 1;
+    flex: 1;
+}
 
 /* 下拉展开动画 */
 .custom-select-wrapper.open .custom-select-dropdown {
@@ -6288,4 +6325,18 @@ select.settings-input option:checked {
 
 .kb-query-row {
     margin-bottom: 8px;
+}
+
+.kb-file-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    padding: 8px 4px;
+}
+
+.kb-file-preview-grid .file-preview-item {
+    width: 225px;
 }

@@ -12,6 +12,7 @@ let KnowledgeService = (function () {
     let _detailDocuments = [];              // 当前 KB 的文档列表
     let _detailPipeline = null;             // 当前 KB 的管线状态
     let _healthDetail = null;               // LightRAG 服务详情（含模型配置）
+    let _pendingDeleteDocs = new Map();
 
     /* ========== API ========== */
     async function fetchKBList() {
@@ -230,10 +231,11 @@ let KnowledgeService = (function () {
                              ondragleave="event.preventDefault();event.stopPropagation();if(event.clientY<=this.getBoundingClientRect().top||event.clientY>=this.getBoundingClientRect().bottom)this.classList.remove('drag-over')"
                              ondrop="KnowledgeService.handleCreateDrop(event)"
                              onclick="event.stopPropagation();this.querySelector('input[type=file]').click()">
-                            <input type="file" id="kb-create-file" accept=".pdf" onchange="KnowledgeService.handleCreateFileSelect()" style="display:none" multiple="">
+                            <input type="file" id="kb-create-file" accept=".pdf.md" onchange="KnowledgeService.handleCreateFileSelect()" style="display:none" multiple="">
                             <div class="kb-upload-drop-text">
                                 <i class="fas fa-cloud-upload-alt"></i>
-                                <p>拖放 PDF 文件到此处</p>
+                                <p>拖拽文件到这里，或点击选择文件</p>
+                                <span class="kb-upload-hint">支持 PDF、Word、TXT、Markdown、Excel、PPT 格式</span>
                             </div>
                         </div>
                     </div>
@@ -314,10 +316,11 @@ let KnowledgeService = (function () {
                              ondragleave="event.preventDefault();event.stopPropagation();if(event.clientY<=this.getBoundingClientRect().top||event.clientY>=this.getBoundingClientRect().bottom)this.classList.remove('drag-over')"
                              ondrop="KnowledgeService.handleCreateDrop(event)"
                              onclick="event.stopPropagation();this.querySelector('input[type=file]').click()">
-                            <input type="file" id="kb-create-file" accept=".pdf" onchange="KnowledgeService.handleCreateFileSelect()" style="display:none" multiple="">
+                            <input type="file" id="kb-create-file" accept=".pdf.md" onchange="KnowledgeService.handleCreateFileSelect()" style="display:none" multiple="">
                             <div class="kb-upload-drop-text">
                                 <i class="fas fa-cloud-upload-alt"></i>
-                                <p>拖放 PDF 文件到此处</p>
+                                <p>拖拽文件到这里，或点击选择文件</p>
+                                <span class="kb-upload-hint">支持 PDF、Word、TXT、Markdown、Excel、PPT 格式</span>
                             </div>
                         </div>
                     </div>
@@ -368,6 +371,12 @@ let KnowledgeService = (function () {
                 <!-- 文档列表 -->
                 <div class="kb-section" id="kb-documents-section">
                     <div class="kb-section-title"><i class="fas fa-file-alt"></i> 文档列表</div>
+                    <div id="kb-pending-delete-area" style="display:none;margin-top:8px">
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <div class="cs-model-tags-container" id="kb-pending-delete-tags" style="flex:1"></div>
+                            <button class="kb-btn-primary" onclick="KnowledgeService.executePendingDeletes()" style="white-space:nowrap;height:40px;align-self:center;margin-bottom:8px"><i class="fas fa-trash-alt"></i> 删除</button>
+                        </div>
+                    </div>
                     <div id="kb-documents-content" class="kb-documents-content">
                         <div class="kb-pipeline-loading"><i class="fas fa-spinner fa-spin"></i> 加载文档列表...</div>
                     </div>
@@ -384,13 +393,12 @@ let KnowledgeService = (function () {
                          onclick="event.stopPropagation(); this.querySelector('input[type=file]').click()"
                          ondragover="event.preventDefault(); this.classList.add('dragover')"
                          ondragleave="this.classList.remove('dragover')"
-                         ondrop="event.preventDefault(); this.classList.remove('dragover'); KnowledgeService.handleDrop(event)">
+                         ondrop="event.preventDefault(); this.classList.remove('dragover'); KnowledgeService.handleCreateDrop(event)">
                         <div class="kb-upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
                         <p class="kb-upload-text">拖拽文件到这里，或点击选择文件</p>
                         <span class="kb-upload-hint">支持 PDF、Word、TXT、Markdown、Excel、PPT 格式</span>
-                        <input type="file" id="kb-file-input" style="display:none"
-                               accept=".pdf,.doc,.docx,.txt,.md,.csv,.xlsx,.pptx"
-                               onchange="KnowledgeService.handleFileSelect(event)" multiple>
+                        <input type="file" id="kb-create-file" style="display:none" accept=".pdf,.md"
+                            onchange="KnowledgeService.handleCreateFileSelect()" multiple>
                     </div>
                     <div id="kb-upload-progress" class="kb-upload-progress" style="display:none;">
                         <div class="kb-progress-bar"><div class="kb-progress-fill" id="kb-progress-fill"></div></div>
@@ -407,8 +415,7 @@ let KnowledgeService = (function () {
                             <i class="fas fa-search"></i> 查询
                         </button>
                     </div>
-                    <textarea id="kb-query-result" class="kb-textarea" rows="6" placeholder="查询结果将显示在这里..." readonly></textarea>
-                    <div id="kb-query-result" class="kb-query-result" style="display:none;"></div>
+                    <textarea id="kb-query-result-text" class="kb-textarea" rows="6" placeholder="查询结果将显示在这里..." readonly></textarea>
                 </div>
             </div>
         `;
@@ -423,7 +430,7 @@ let KnowledgeService = (function () {
                 listDocuments(_currentKbId),
                 getDocumentStatus(_currentKbId),
             ]);
-            _detailDocuments = docData?.documents || [];
+            _detailDocuments = Array.isArray(docData) ? docData : [];
             _detailPipeline = pipeData || {};
 
             // 加载模型状态（如果还没加载过）
@@ -565,63 +572,68 @@ let KnowledgeService = (function () {
         }
     }
 
+    function getDocType(name) {
+        const ext = (name || '').split('.').pop()?.toLowerCase() || '';
+        if (ext === 'pdf') return 'pdf';
+        if (['doc','docx','txt','rtf','odt'].includes(ext)) return 'document';
+        if (['xls','xlsx','csv'].includes(ext)) return 'spreadsheet';
+        if (['ppt','pptx','key'].includes(ext)) return 'presentation';
+        if (['js','ts','py','java','cpp','c','h','html','css','json','xml','md'].includes(ext)) return 'code';
+        if (['zip','rar','7z','tar','gz'].includes(ext)) return 'archive';
+        return 'other';
+    }
+
+    function getDocIcon(type) {
+        const icons = { pdf: 'fa-file-pdf', document: 'fa-file-word', spreadsheet: 'fa-file-excel',
+            presentation: 'fa-file-powerpoint', code: 'fa-file-code', archive: 'fa-file-archive',
+            other: 'fa-file', image: 'fa-file-image', audio: 'fa-file-audio', video: 'fa-file-video' };
+        return icons[type] || 'fa-file';
+    }
+
+    function getDocType(name) {
+        const ext = (name || '').split('.').pop()?.toLowerCase() || '';
+        if (ext === 'pdf') return 'pdf';
+        if (['doc','docx','txt','rtf','odt'].includes(ext)) return 'document';
+        if (['xls','xlsx','csv'].includes(ext)) return 'spreadsheet';
+        if (['ppt','pptx','key'].includes(ext)) return 'presentation';
+        if (['js','ts','py','java','cpp','c','h','html','css','json','xml','md'].includes(ext)) return 'code';
+        if (['zip','rar','7z','tar','gz'].includes(ext)) return 'archive';
+        return 'other';
+    }
+
+    function getDocIcon(type) {
+        const icons = { pdf: 'fa-file-pdf', document: 'fa-file-word', spreadsheet: 'fa-file-excel',
+            presentation: 'fa-file-powerpoint', code: 'fa-file-code', archive: 'fa-file-archive',
+            other: 'fa-file', image: 'fa-file-image', audio: 'fa-file-audio', video: 'fa-file-video' };
+        return icons[type] || 'fa-file';
+    }
+
     function renderDocumentsSection() {
         const el = document.getElementById('kb-documents-content');
         if (!el) return;
-
         const docs = _detailDocuments || [];
         if (docs.length === 0) {
-            el.innerHTML = `<div class="kb-docs-empty"><i class="fas fa-inbox"></i> 还没有文档，请上传文件或插入文本</div>`;
+            el.innerHTML = '<div class="kb-docs-empty"><i class="fas fa-inbox"></i> 还没有文档</div>';
             return;
         }
-
-        const statusMap = {
-            'PROCESSED': { label: '已完成', cls: 'kb-doc-status-done', icon: 'fa-check-circle' },
-            'PROCESSING': { label: '处理中', cls: 'kb-doc-status-proc', icon: 'fa-spinner fa-spin' },
-            'PENDING': { label: '等待中', cls: 'kb-doc-status-pend', icon: 'fa-clock' },
-            'FAILED': { label: '失败', cls: 'kb-doc-status-fail', icon: 'fa-times-circle' },
-        };
-
-        const rows = docs.map(doc => {
-            const s = statusMap[doc.status] || { label: doc.status || '未知', cls: '', icon: 'fa-question-circle' };
-            const name = doc.file_path
-                ? doc.file_path.split(/[/\\]/).pop()
-                : (doc.content_summary ? doc.content_summary.substring(0, 40) + '...' : doc.id?.substring(0, 12));
-            const sizeStr = doc.content_length ? formatSize(doc.content_length) : '-';
-            const chunks = doc.chunks_count != null ? doc.chunks_count : '-';
-            const time = doc.updated_at ? formatDate(doc.updated_at) : formatDate(doc.created_at);
-            const errorHtml = (doc.status === 'FAILED' && doc.error_msg)
-                ? `<div class="kb-doc-error-msg"><i class="fas fa-exclamation-circle"></i> ${escapeHtml(doc.error_msg)}</div>`
-                : '';
-
+        const cards = docs.map(doc => {
+            const fileType = getDocType(doc.name);
+            const icon = getDocIcon(fileType);
             return `
-                <tr class="kb-doc-row ${doc.status === 'FAILED' ? 'kb-doc-row-failed' : ''}">
-                    <td class="kb-doc-name" title="${escapeHtml(doc.file_path || doc.content_summary || '')}">
-                        <i class="fas fa-file-alt"></i> ${escapeHtml(name)}
-                        ${errorHtml}
-                    </td>
-                    <td><span class="kb-doc-status ${s.cls}"><i class="fas ${s.icon}"></i> ${s.label}</span></td>
-                    <td class="kb-doc-num">${chunks}</td>
-                    <td class="kb-doc-num">${sizeStr}</td>
-                    <td class="kb-doc-num">${time}</td>
-                </tr>
-            `;
+                <div class="file-preview-item">
+                    <div class="file-preview-icon ${fileType}">
+                        <i class="fas ${icon}"></i>
+                    </div>
+                    <div class="file-preview-info">
+                        <div class="file-preview-name" title="${escapeHtml(doc.name)}">${escapeHtml(doc.name)}</div>
+                        <div class="file-preview-size">${doc.category || ''} · ${doc.chunks || 0} 块 · ${doc.vectors || 0} 向量</div>
+                    </div>
+                    <button class="file-preview-remove" title="移除" onclick="event.stopPropagation(); KnowledgeService.queueDeleteDocument('${doc.id}', '${escapeHtml(doc.name)}')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>`;
         }).join('');
-
-        el.innerHTML = `
-            <table class="kb-doc-table">
-                <thead>
-                    <tr>
-                        <th>文档名</th>
-                        <th>状态</th>
-                        <th>分片数</th>
-                        <th>大小</th>
-                        <th>更新时间</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
-        `;
+        el.innerHTML = `<div class="kb-file-preview-grid">${cards}</div>`;
     }
 
     async function refreshDocuments() {
@@ -706,25 +718,41 @@ let KnowledgeService = (function () {
 
     function handleCreateFileSelect() {
         const inp = document.getElementById('kb-create-file');
+        let added = 0, badType = 0, dup = 0;
         [...inp.files].forEach(f => {
-            if (f.type !== 'application/pdf') return;
-            if (_createFiles.some(x => x.name === f.name && x.size === f.size)) return;
+            if (!f.name.endsWith('.pdf') && !f.name.endsWith('.md')) { badType++; return; }
+            if (_createFiles.some(x => x.name === f.name && x.size === f.size)) { dup++; return; }
             _createFiles.push(f);
+            added++;
         });
         inp.value = '';
         refreshKbFileSelector();
+        if (badType || dup) {
+            const msgs = [];
+            if (badType) msgs.push(badType + ' 个文件类型不支持');
+            if (dup) msgs.push(dup + ' 个文件重复');
+            showToast(msgs.join('，'), 'error');
+        }
     }
 
     function handleCreateDrop(e) {
         e.preventDefault();
         e.stopPropagation();
         e.currentTarget.classList.remove('drag-over');
+        let added = 0, badType = 0, dup = 0;
         [...e.dataTransfer.files].forEach(f => {
-            if (f.type !== 'application/pdf') return;
-            if (_createFiles.some(x => x.name === f.name && x.size === f.size)) return;
+            if (!f.name.endsWith('.pdf') && !f.name.endsWith('.md')) { badType++; return; }
+            if (_createFiles.some(x => x.name === f.name && x.size === f.size)) { dup++; return; }
             _createFiles.push(f);
+            added++;
         });
         refreshKbFileSelector();
+        if (badType || dup) {
+            const msgs = [];
+            if (badType) msgs.push(badType + ' 个文件类型不支持');
+            if (dup) msgs.push(dup + ' 个文件重复');
+            showToast(msgs.join('，'), 'error');
+        }
     }
 
     function removeKbFile(idx) {
@@ -741,11 +769,34 @@ let KnowledgeService = (function () {
             maxVisibleItems: 6,
             items: _createFiles.map((f, i) => ({ value: String(i), label: f.name }))
         });
+        // 事件委托：点击 X → 删除，不触发选中
+        setTimeout(() => {
+            const opts = document.querySelector('#kb-file-selector .custom-select-options');
+            if (opts) {
+                opts.addEventListener('click', (e) => {
+                    const cb = e.target.closest('.custom-select-checkbox');
+                    if (!cb) {
+                        e.stopImmediatePropagation();
+                        e.preventDefault();
+                        return;
+                    }
+                    const option = cb.closest('.custom-select-option');
+                    if (!option) return;
+                    const idx = Number(option.dataset.value);
+                    _createFiles.splice(idx, 1);
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+                    refreshKbFileSelector();
+                }, true);  // ← capture phase
+            }
+        }, 50);
     }
 
     function refreshKbFileSelector() {
         if (!_kbFileSelector) return;
+        _kbFileSelector.selectedValues = [];
         _kbFileSelector.setItems(_createFiles.map((f, i) => ({ value: String(i), label: f.name })));
+        _kbFileSelector.setValue(null);
         const cnt = _createFiles.length;
         const display = document.querySelector('#kb-file-selector .custom-select-display-text');
         if (display) display.textContent = cnt > 0 ? `已添加 ${cnt} 个文件` : '已添加 0 个文件';
@@ -836,6 +887,48 @@ let KnowledgeService = (function () {
         showDeleteKBConfirmModal(kbId, name);
     }
 
+    function queueDeleteDocument(docId, docName) {
+        _pendingDeleteDocs.set(docId, docName);
+        renderPendingDeleteTags();
+    }
+
+    function cancelPendingDelete(docId) {
+        _pendingDeleteDocs.delete(docId);
+        const tag = document.getElementById('kb-pending-tag-' + docId);
+        if (tag) tag.remove();
+        if (_pendingDeleteDocs.size === 0) {
+            const area = document.getElementById('kb-pending-delete-area');
+            if (area) area.style.display = 'none';
+        }
+    }
+
+    function renderPendingDeleteTags() {
+        const area = document.getElementById('kb-pending-delete-area');
+        const tagsEl = document.getElementById('kb-pending-delete-tags');
+        if (!area || !tagsEl) return;
+        if (_pendingDeleteDocs.size === 0) { area.style.display = 'none'; tagsEl.innerHTML = ''; return; }
+        area.style.display = 'block';
+        _pendingDeleteDocs.forEach((name, id) => {
+            if (document.getElementById('kb-pending-tag-' + id)) return;
+            const span = document.createElement('span');
+            span.className = 'cs-model-tag';
+            span.id = 'kb-pending-tag-' + id;
+            span.style.cursor = 'default';
+            span.innerHTML = escapeHtml(name) + '<i class="fas fa-times cs-model-tag-remove" onclick="KnowledgeService.cancelPendingDelete(\'' + id + '\')"></i>';
+            tagsEl.appendChild(span);
+        });
+    }
+
+    async function executePendingDeletes() {
+        if (_pendingDeleteDocs.size === 0) return;
+        for (const docId of _pendingDeleteDocs.keys()) {
+            try { await fetch(API_BASE + '/deep-research/kb/' + _currentKbId + '/documents/' + encodeURIComponent(docId), { method: 'DELETE' }); } catch(e) {}
+        }
+        _pendingDeleteDocs.clear();
+        renderPendingDeleteTags();
+        loadDetailData();
+    }
+
     function showDeleteKBConfirmModal(kbId, name) {
         const modal = document.getElementById('knowledge-modal');
         if (!modal) return;
@@ -885,6 +978,7 @@ let KnowledgeService = (function () {
         _createFiles = [];
         renderModalFull();
         setTimeout(() => initKbFileSelector(), 100);
+        loadDetailData();
     }
 
     function backToList() {
@@ -895,16 +989,16 @@ let KnowledgeService = (function () {
         renderModalFull();
     }
 
-    async function handleFileSelect(event) {
-        const files = event.target.files;
-        if (!files || files.length === 0) return;
-        await uploadFiles(Array.from(files));
-    }
-
-    async function handleDrop(event) {
-        const files = event.dataTransfer?.files;
-        if (!files || files.length === 0) return;
-        await uploadFiles(Array.from(files));
+    async function saveManage() {
+        if (_createFiles.length === 0) return;
+        for (const f of _createFiles) {
+            const form = new FormData();
+            form.append('file', f);
+            await fetch(`${API_BASE}/deep-research/kb/${encodeURIComponent(_currentKbId)}/documents/upload`, { method: 'POST', body: form });
+        }
+        _createFiles = [];
+        initKbFileSelector();
+        showToast('上传完成', 'success');
     }
 
     async function uploadFiles(files) {
@@ -954,22 +1048,26 @@ let KnowledgeService = (function () {
     }
 
     async function doQuery() {
-        const question = document.getElementById('kb-query-input')?.value?.trim();
-        if (!question) { showToast('请输入查询问题', 'error'); return; }
-        const mode = document.getElementById('kb-query-mode')?.value || 'hybrid';
-        const resultDiv = document.getElementById('kb-query-result');
-        if (resultDiv) {
-            resultDiv.style.display = 'block';
-            resultDiv.innerHTML = '<div class="kb-query-loading"><i class="fas fa-spinner fa-spin"></i> 正在检索知识库...</div>';
-        }
+        const input = document.getElementById('kb-query-input');
+        const textarea = document.getElementById('kb-query-result-text');
+        const btn = document.querySelector('.kb-query-row .kb-btn-primary');
+        const question = input?.value?.trim();
+        if (!question) return;
+
+        input.disabled = true;
+        btn.disabled = true;
+        if (textarea) { textarea.value = '查询中...'; textarea.style.color = '#999'; textarea.disabled = true; }
+
         try {
-            const result = await queryKB(_currentKbId, question, mode);
-            const text = typeof result === 'string' ? result : (result?.response || JSON.stringify(result, null, 2));
-            if (resultDiv) {
-                resultDiv.innerHTML = `<div class="kb-query-result-header"><i class="fas fa-lightbulb"></i> 检索结果 <span class="kb-query-mode-tag">${mode}</span></div><pre class="kb-query-result-text">${escapeHtml(text)}</pre>`;
-            }
+            const result = await queryKB(_currentKbId, question, 'hybrid');
+            const text = result?.answer || result?.response || JSON.stringify(result);
+            if (textarea) { textarea.value = text; textarea.style.color = ''; }
         } catch (e) {
-            if (resultDiv) resultDiv.innerHTML = `<div class="kb-query-error"><i class="fas fa-exclamation-triangle"></i> 查询失败：${escapeHtml(e.message)}</div>`;
+            if (textarea) textarea.value = '查询失败: ' + e.message;
+        } finally {
+            input.disabled = false;
+            btn.disabled = false;
+            if (textarea) textarea.disabled = false;
         }
     }
 
@@ -1303,6 +1401,7 @@ let KnowledgeService = (function () {
         if (existing) existing.remove();
         const toast = document.createElement('div');
         toast.className = `settings-toast settings-toast-${type}`;
+        toast.style.zIndex = '20000';
         toast.innerHTML = `
             <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
             <span>${message}</span>
@@ -1319,14 +1418,14 @@ let KnowledgeService = (function () {
     return {
         open, close, backToList, openDetail,
         showCreateForm, hideCreateForm, doCreate, confirmDelete,
-        handleFileSelect, handleDrop, doInsertText, doQuery,
+        doInsertText, doQuery,
         renderSelector, toggleSelector, onSelectorChange, getSelectedKBIds,
         doStartService, doStopService, refreshDocuments, deleteSelected,
         toggleCheckbox, doActivate, closeDeleteConfirm, doDeleteKBs,
         closeStopServiceConfirm, confirmStopService,
         closeDeleteKBConfirm, doDeleteKB,
-        handleCreateDrop, addInherit, removeInherit,
-        handleCreateFileSelect,
+        handleCreateDrop, addInherit, removeInherit, cancelPendingDelete,
+        handleCreateFileSelect, executePendingDeletes, queueDeleteDocument,
         // 初始化
         init,
         // 公开：从外部触发按钮状态更新

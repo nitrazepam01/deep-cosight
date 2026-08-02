@@ -19,7 +19,7 @@ but backed by industrial_rag (step6 query + step7 CRUD).
 Response format maintained for backward compat with knowledge.js.
 """
 
-import os, sys, json, io, shutil, time
+import os, sys, json, io, shutil, time, numpy as np
 from fastapi import APIRouter, UploadFile, File, Body, HTTPException
 
 from app.common.logger_util import logger
@@ -162,26 +162,51 @@ async def kb_delete(kb_id: str):
 
 @knowledgeBaseRouter.get("/deep-research/kb/{kb_id}/documents")
 async def kb_list_documents(kb_id: str):
-    from industrial_rag.step7_rag_util import file_list as _list
     d = _kb_dir(kb_id)
-    if not d:
-        raise HTTPException(404)
-    text = _capture(lambda: _list(d))
+    if not d: raise HTTPException(404)
+
+    doc_path = os.path.join(d, "documents.jsonl")
+    chunk_path = os.path.join(d, "chunks.jsonl")
+    vec_path = os.path.join(d, "vector_ids.i64.npy")
+
     docs = []
-    for line in text.split("\n"):
-        line = line.strip()
-        if line.startswith("[") and "cat=" in line:
-            import re as _re
-            m = _re.match(r"\[(\d+)\]\s+(.+?)\s+cat=(\S+)\s+std=(\S*)\s+id=(\S+)", line)
-            if m:
-                docs.append({
-                    "id": m.group(5),
-                    "name": m.group(2).strip(),
-                    "category": m.group(3),
-                    "standard_no": m.group(4) if m.group(4) else "",
-                    "status": "completed",
-                    "size": 0,
-                })
+    if os.path.exists(doc_path):
+        for l in open(doc_path, "r", encoding="utf-8"):
+            try:
+                doc = json.loads(l)
+                src = doc.get("source_path", "")
+                raw_name = (os.path.basename(src) if src else doc.get("title", ""))
+                name = doc.get("original_name") or raw_name.replace("_fix.md", ".pdf").replace(".md", ".pdf")
+                docs.append({"id": doc["doc_id"], "name": name, "category": doc.get("category", ""), "chunks": 0, "vectors": 0})
+            except: pass
+
+    # Count chunks per doc
+    if os.path.exists(chunk_path):
+        for l in open(chunk_path, "r", encoding="utf-8"):
+            try:
+                ck = json.loads(l)
+                did = ck.get("doc_id", "")
+                for doc in docs:
+                    if doc["id"] == did: doc["chunks"] += 1
+            except:
+                pass
+
+    # Count vectors per doc
+    if os.path.exists(vec_path) and docs:
+        vec_ids = np.load(vec_path)
+        chunk_to_doc = {}
+        if os.path.exists(chunk_path):
+            for l in open(chunk_path, "r", encoding="utf-8"):
+                try:
+                    ck = json.loads(l)
+                    chunk_to_doc[ck["chunk_id"]] = ck.get("doc_id", "")
+                except:
+                    pass
+        for vid in vec_ids:
+            did = chunk_to_doc.get(int(vid), "")
+            for doc in docs:
+                if doc["id"] == did: doc["vectors"] += 1
+
     return {"code": 0, "data": docs}
 
 
@@ -208,6 +233,14 @@ async def kb_upload_document(kb_id: str, file: UploadFile = File(...)):
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
+
+@knowledgeBaseRouter.delete("/deep-research/kb/{kb_id}/documents/{doc_id}")
+async def kb_delete_document(kb_id: str, doc_id: str):
+    from industrial_rag.step7_rag_util import file_delete
+    d = _kb_dir(kb_id)
+    if not d: raise HTTPException(404)
+    _capture(lambda: file_delete(doc_id, d))
+    return {"code": 0}
 
 # ═══════════════════════════════════════════════════════════════════
 # Query
