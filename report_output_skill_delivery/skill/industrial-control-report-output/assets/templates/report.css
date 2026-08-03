@@ -1,0 +1,88 @@
+:root {
+  --deep-blue: #1e4e8c;
+  --soft-blue: #eaf3ff;
+  --accent: #d15b35;
+  --good-green: #1f8a5b;
+  --ink: #1f2937;
+  --muted: #5b6573;
+  --line: #d7e3f3;
+  --paper: #ffffff;
+  --canvas: #eef2f6;
+  --code-bg: #f7f9fc;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--canvas);
+  font: 16px/1.75 "Noto Serif CJK SC", "Source Han Serif SC", "Microsoft YaHei", serif;
+}
+.toc {
+  position: fixed;
+  inset: 1.5rem auto 1.5rem 1.5rem;
+  width: 18rem;
+  overflow: auto;
+  padding: 1.1rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(30, 78, 140, .08);
+}
+.toc-title { color: var(--deep-blue); font-weight: 700; margin-bottom: .6rem; }
+.toc ol { margin: 0; padding-left: 1.4rem; }
+.toc li { margin: .2rem 0; }
+.toc a { color: var(--ink); text-decoration: none; }
+.toc a:hover { color: var(--deep-blue); }
+.paper {
+  width: min(960px, calc(100% - 23rem));
+  margin: 2rem 2rem 5rem 22rem;
+  padding: 3.2rem 4.2rem;
+  background: var(--paper);
+  box-shadow: 0 12px 36px rgba(31, 41, 55, .12);
+}
+.cover { min-height: 56rem; display: flex; flex-direction: column; justify-content: center; border-bottom: 1px solid var(--line); }
+.eyebrow { color: var(--deep-blue); font-size: .88rem; letter-spacing: .08em; font-weight: 700; }
+h1 { color: var(--deep-blue); font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.25; margin: .7rem 0; }
+h2 { color: var(--deep-blue); border-bottom: 2px solid var(--deep-blue); padding-bottom: .35rem; margin-top: 3rem; }
+h3 { color: var(--deep-blue); }
+.subtitle { color: var(--muted); font-size: 1.2rem; }
+.meta { display: grid; grid-template-columns: 7rem 1fr; max-width: 38rem; margin: 3rem 0 0; }
+.meta dt, .meta dd { margin: 0; padding: .3rem 0; border-bottom: 1px solid #edf1f5; }
+.meta dt { font-weight: 700; color: var(--muted); }
+.meta dd { margin-left: 1rem; }
+.safety { padding: .8rem 1rem; background: #f4faf7; border-left: 4px solid var(--good-green); margin-top: 2rem; }
+.keywords { color: var(--muted); }
+.section-summary { color: var(--muted); font-style: italic; }
+.equation { margin: 1.3rem 0; padding: 1rem 1.2rem; overflow-x: auto; text-align: center; background: #fbfcfe; border: 1px solid var(--line); }
+.equation code, .equation-inline { color: var(--deep-blue); font-family: "Consolas", "Cascadia Mono", monospace; }
+.equation-caption, .code-caption { color: var(--muted); font-size: .9rem; margin-top: .4rem; }
+.report-figure, .table-wrap, .code-block { margin: 1.5rem 0; text-align: center; }
+.report-figure img { display: block; max-width: 100%; max-height: 40rem; margin: 0 auto; object-fit: contain; }
+figcaption { color: var(--muted); font-size: .92rem; margin-top: .45rem; }
+table { width: 100%; border-collapse: collapse; margin-top: .6rem; text-align: left; }
+th { color: var(--deep-blue); background: var(--soft-blue); }
+th, td { border-bottom: 1px solid var(--line); padding: .55rem .65rem; vertical-align: top; }
+tbody tr:nth-child(even) { background: #fbfcfe; }
+.callout { margin: 1.5rem 0; padding: .9rem 1.1rem; background: var(--soft-blue); border-left: 4px solid var(--deep-blue); }
+.callout.success { background: #f4faf7; border-left-color: var(--good-green); }
+.callout.warning, .callout.risk { background: #fff7f2; border-left-color: var(--accent); }
+.callout h3 { margin: 0 0 .25rem; }
+.callout p { margin: 0; }
+pre { overflow: auto; padding: 1rem; background: var(--code-bg); border: 1px solid var(--line); text-align: left; font: .86rem/1.55 "Consolas", "Cascadia Mono", monospace; }
+.page-break { break-after: page; height: 1px; }
+.references { padding-left: 1.5rem; }
+.references li { margin: .35rem 0; }
+@media (max-width: 1000px) {
+  .toc { position: static; width: auto; margin: 1rem; }
+  .paper { width: auto; margin: 1rem; padding: 2rem 1.3rem; }
+  .cover { min-height: 38rem; }
+}
+@media print {
+  body { background: #fff; }
+  .toc { display: none; }
+  .paper { width: auto; margin: 0; padding: 0; box-shadow: none; }
+  .cover { min-height: 90vh; }
+  h2 { break-after: avoid; }
+  .report-figure, .table-wrap, .callout, .code-block { break-inside: avoid; }
+}

@@ -1,0 +1,76 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "metric": {
+      "enum": [
+        "overshoot_percent",
+        "rise_time_s",
+        "settling_time_s",
+        "steady_state_error",
+        "gain_margin",
+        "gain_margin_db",
+        "phase_margin_deg",
+        "velocity_constant",
+        "acceleration_constant"
+      ],
+      "title": "Metric",
+      "type": "string"
+    },
+    "operator": {
+      "enum": [
+        "<",
+        "<=",
+        ">",
+        ">=",
+        "=="
+      ],
+      "title": "Operator",
+      "type": "string"
+    },
+    "value": {
+      "title": "Value",
+      "type": "number"
+    },
+    "unit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Unit"
+    },
+    "input_index": {
+      "default": 0,
+      "maximum": 7,
+      "minimum": 0,
+      "title": "Input Index",
+      "type": "integer"
+    },
+    "output_index": {
+      "default": 0,
+      "maximum": 7,
+      "minimum": 0,
+      "title": "Output Index",
+      "type": "integer"
+    },
+    "tolerance": {
+      "default": 1e-09,
+      "minimum": 0,
+      "title": "Tolerance",
+      "type": "number"
+    }
+  },
+  "required": [
+    "metric",
+    "operator",
+    "value"
+  ],
+  "title": "Requirement",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cosight.local/schemas/1.0.0/requirement.schema.json"
+}

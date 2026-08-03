@@ -18,7 +18,8 @@ import re
 from typing import Dict
 
 from app.agent_dispatcher.infrastructure.entity.AgentInstance import AgentInstance
-from app.cosight.agent.actor.prompt.actor_prompt import actor_system_prompt, actor_system_prompt_zh, actor_execute_task_prompt, actor_execute_task_prompt_zh
+from app.cosight.agent.actor.prompt.actor_prompt import actor_system_prompt, actor_system_prompt_zh, \
+    actor_execute_task_prompt, actor_execute_task_prompt_zh
 from app.cosight.agent.base.base_agent import BaseAgent
 from app.cosight.llm.chat_llm import ChatLLM
 from app.cosight.task.plan_report_manager import plan_report_event_manager
@@ -35,7 +36,8 @@ from app.cosight.tool.image_analysis_toolkit import VisionTool
 from app.cosight.tool.document_processing_toolkit import DocumentProcessingToolkit
 from app.cosight.tool.search_toolkit import SearchToolkit
 from app.cosight.tool.search_util import search_baidu
-from app.cosight.tool.scrape_website_toolkit import fetch_website_content, fetch_website_content_with_images, fetch_website_images_only
+from app.cosight.tool.scrape_website_toolkit import fetch_website_content, fetch_website_content_with_images, \
+    fetch_website_images_only
 from app.cosight.tool.deep_search.searchers.tavily_search import TavilySearch
 from app.cosight.tool.audio_toolkit import AudioTool
 from app.cosight.tool.video_analysis_toolkit import VideoTool
@@ -45,8 +47,12 @@ from app.cosight.tool.wikipedia_toolkit import WikipediaToolkit
 from app.cosight.tool.google_books_toolkit import GoogleBooksToolkit
 from app.cosight.tool.video_event_toolkit import VideoEventToolkit
 from app.cosight.tool.industrial_knowledge_toolkit import IndustrialKnowledgeToolkit
+from app.cosight.tool.industrial_report_toolkit import IndustrialReportToolkit
 from config.config import get_tavily_config
 from app.common.logger_util import logger
+
+from app.cosight.tool.evidence_ledger_toolkit import EvidenceLedgerToolkit
+from app.cosight.tool.control_simulation_toolkit import ControlSimulationToolkit
 
 
 class TaskActorAgent(BaseAgent):
@@ -57,18 +63,19 @@ class TaskActorAgent(BaseAgent):
                  work_space_path: str = None):
         # Set up TaskActorAgent specific properties first
         self.work_space_path = work_space_path if work_space_path else os.environ.get("WORKSPACE_PATH") or os.getcwd()
-        
+
         # Debug: Check if plan_id exists in TaskManager
         logger.info(f"TaskActorAgent: Looking for plan_id: {plan_id}")
         logger.info(f"TaskActorAgent: Available plans in TaskManager: {list(TaskManager.plans.keys())}")
-        
+
         try:
             self.plan = TaskManager.get_plan(plan_id)
             logger.info(f"TaskActorAgent: Successfully retrieved plan for plan_id: {plan_id}")
         except KeyError as e:
             logger.error(f"TaskActorAgent: Plan not found for plan_id: {plan_id}, error: {e}")
-            raise ValueError(f"Plan with id '{plan_id}' not found in TaskManager. Available plans: {list(TaskManager.plans.keys())}")
-        
+            raise ValueError(
+                f"Plan with id '{plan_id}' not found in TaskManager. Available plans: {list(TaskManager.plans.keys())}")
+
         self.question = None  # Store the question for later use
         act_toolkit = ActToolkit(self.plan)
         terminate_toolkit = TerminateToolkit()
@@ -109,16 +116,19 @@ class TaskActorAgent(BaseAgent):
         google_books_toolkit = GoogleBooksToolkit()
         video_event_toolkit = VideoEventToolkit(workspace_path=self.work_space_path)
         industrial_kb_toolkit = IndustrialKnowledgeToolkit()
+        report_toolkit = IndustrialReportToolkit(self.work_space_path)
+        evidence_ledger_toolkit = EvidenceLedgerToolkit()
+        control_toolkit = ControlSimulationToolkit(workspace_path=self.work_space_path)
         all_functions = {"mark_step": act_toolkit.mark_step,
                          # "deep_search": deep_search_toolkit.deep_search,
-                        #  "search_baidu": search_baidu,
+                         #  "search_baidu": search_baidu,
                          "search_google": search_toolkit.search_google,
                          "search_wiki": search_toolkit.search_wiki,
                          "tavily_search": search_toolkit.tavily_search,
                          "wiki_entry_parse": wikipedia_toolkit.wiki_entry_parse,
                          "google_books_volume_search": google_books_toolkit.google_books_volume_search,
                          "youtobe_tool": video_event_toolkit.youtobe_tool,
-                        #  "image_search": tavily_search.search,
+                         #  "image_search": tavily_search.search,
                          "audio_recognition": audio_toolkit.speech_to_text,
                          # "search_duckgo": search_toolkit.search_duckduckgo,
                          "execute_code": code_toolkit.execute_code,
@@ -134,16 +144,27 @@ class TaskActorAgent(BaseAgent):
                          "fetch_website_content_with_images": fetch_website_content_with_images,
                          "fetch_website_images_only": fetch_website_images_only,
                          "extract_document_content": doc_toolkit.extract_document_content,
-                         "create_html_report": lambda title=None, include_charts=True, chart_types=['all'], output_filename=None: html_toolkit.create_html_report(
-                              title=title,
-                              include_charts=include_charts,
-                              chart_types=chart_types,
-                              output_filename=output_filename,
-                              user_query=self.question
-                          ),
+                         "create_html_report": lambda title=None, include_charts=True, chart_types=['all'],
+                                                      output_filename=None: html_toolkit.create_html_report(
+                             title=title,
+                             include_charts=include_charts,
+                             chart_types=chart_types,
+                             output_filename=output_filename,
+                             user_query=self.question
+                         ),
                          "query_industrial_kb": industrial_kb_toolkit.query_industrial_kb,
                          "list_industrial_files": industrial_kb_toolkit.list_industrial_files,
                          "list_activated_kbs": industrial_kb_toolkit.list_activated_kbs,
+                         "create_industrial_control_report": report_toolkit.render_report,
+
+                         "fuse_evidence": evidence_ledger_toolkit.fuse_evidence,
+                         "parse_control_task": control_toolkit.parse_control_task,
+                         "analyze_plant": control_toolkit.analyze_plant,
+                         "design_controller": control_toolkit.design_controller,
+                         "simulate_system": control_toolkit.simulate_system,
+                         "verify_requirements": control_toolkit.verify_requirements,
+                         "run_control_workflow": control_toolkit.run_control_workflow,
+
                          "coder_list_files": coder_lite_toolkit.coder_list_files,
                          "coder_read_file": coder_lite_toolkit.coder_read_file,
                          "coder_write_file": coder_lite_toolkit.coder_write_file,
@@ -151,13 +172,13 @@ class TaskActorAgent(BaseAgent):
                          "coder_find_files": coder_lite_toolkit.coder_find_files,
                          "coder_request_run": coder_lite_toolkit.coder_request_run,
                          "coder_mark_step": coder_lite_toolkit.coder_mark_step,
-                          }
+                         }
         if functions:
             all_functions.update(functions)
-        
+
         # Initialize BaseAgent with all functions and plan_id
         super().__init__(agent_instance, llm, all_functions, plan_id=plan_id)
-        
+
         # Check if plan exists and has title before accessing it
         is_chinese = bool(re.search(r'[\u4e00-\u9fff]', self.plan.title)) if self.plan and self.plan.title else True
         if is_chinese:
@@ -169,12 +190,12 @@ class TaskActorAgent(BaseAgent):
     @time_record
     def act(self, question, step_index):
         self.question = question  # Store the question for use in tools
-        
+
         # Ensure plan is available
         if self.plan is None:
             logger.error(f"TaskActorAgent.act: self.plan is None for step_index {step_index}")
             raise ValueError(f"Plan is None. Cannot execute step {step_index}.")
-        
+
         self.plan.mark_step(step_index, step_status="in_progress")
         plan_report_event_manager.publish("plan_process", self.plan)
         is_chinese = bool(re.search(r'[\u4e00-\u9fff]', self.question)) if self.question else True

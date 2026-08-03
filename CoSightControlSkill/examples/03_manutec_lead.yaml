@@ -1,0 +1,28 @@
+schema_version: 1.0.0
+task_id: manutec_servo_lead_compensation
+plant:
+  representation: transfer_function
+  numerator: [250.0]
+  denominator: [1.0, 87.0, 1880.0, 3600.0, 0.0]
+  timebase: {kind: continuous}
+  channels:
+    inputs: [{name: motor_command, unit: V}]
+    outputs: [{name: joint_position, unit: radian}]
+feedback: {sign: negative, gain: 1.0}
+requirements:
+  - {metric: overshoot_percent, operator: <, value: 20.0, unit: percent}
+  - {metric: settling_time_s, operator: <, value: 3.0, unit: s}
+  - {metric: velocity_constant, operator: '>=', value: 0.05, unit: 1 / s}
+design:
+  method: lead
+  parameters:
+    target_crossover_rad_s: 3.0
+    target_phase_margin_deg: 50.0
+    safety_phase_deg: 5.0
+simulation:
+  configuration: closed_loop
+  responses: [step, bode, nyquist, root_locus]
+  time: {mode: explicit, start: 0.0, stop: 10.0, points: 3001}
+  frequency: {mode: auto, points: 1200}
+backends: [python-control, scipy]
+

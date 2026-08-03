@@ -22,6 +22,16 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "仅执行不涉及本地文件或工作区脚本的轻量 Python 片段",
         "needs_workspace": True,
     },
+    "create_industrial_control_report": {
+        "display_name_zh": "工业控制系统规范报告生成",
+        "description_zh": "将 report_spec.json 确定性渲染为 HTML、LaTeX 和可选 PDF",
+        "needs_workspace": True,
+    },
+        "fuse_evidence": {
+        "display_name_zh": "双路证据融合",
+        "description_zh": "融合联网检索和工业RAG为结构化证据账本",
+        "needs_workspace": True,
+    },
     "search_google": {
         "display_name_zh": "Google 搜索",
         "description_zh": "通过 Google 搜索引擎检索信息",
@@ -50,6 +60,11 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
     "youtobe_tool": {
         "display_name_zh": "YouTube 工具",
         "description_zh": "获取在线视频的字幕文本与时间对照，并可按时间窗导出短片段、截图总览和音频片段",
+        "needs_workspace": True,
+    },
+    "create_industrial_control_report": {
+        "display_name_zh": "工业控制系统规范报告生成",
+        "description_zh": "将 report_spec.json 确定性渲染为 HTML、LaTeX 和可选 PDF",
         "needs_workspace": True,
     },
     "mark_step": {
@@ -132,9 +147,19 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "列出当前步骤 Coder 沙箱或当前任务工作区中的文件",
         "needs_workspace": True,
     },
+    "create_industrial_control_report": {
+        "display_name_zh": "工业控制系统规范报告生成",
+        "description_zh": "将 report_spec.json 确定性渲染为 HTML、LaTeX 和可选 PDF",
+        "needs_workspace": True,
+    },
     "coder_read_file": {
         "display_name_zh": "Coder 读文件",
         "description_zh": "读取当前任务工作区中的文件内容，但只允许在沙箱内写入",
+        "needs_workspace": True,
+    },
+    "create_industrial_control_report": {
+        "display_name_zh": "工业控制系统规范报告生成",
+        "description_zh": "将 report_spec.json 确定性渲染为 HTML、LaTeX 和可选 PDF",
         "needs_workspace": True,
     },
     "coder_write_file": {
@@ -142,9 +167,19 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "仅向当前步骤的 Coder 沙箱目录写入允许类型的文件",
         "needs_workspace": True,
     },
+    "create_industrial_control_report": {
+        "display_name_zh": "工业控制系统规范报告生成",
+        "description_zh": "将 report_spec.json 确定性渲染为 HTML、LaTeX 和可选 PDF",
+        "needs_workspace": True,
+    },
     "coder_edit_file": {
         "display_name_zh": "Coder 改文件",
         "description_zh": "仅在当前步骤的 Coder 沙箱目录中做受限文本替换",
+        "needs_workspace": True,
+    },
+    "create_industrial_control_report": {
+        "display_name_zh": "工业控制系统规范报告生成",
+        "description_zh": "将 report_spec.json 确定性渲染为 HTML、LaTeX 和可选 PDF",
         "needs_workspace": True,
     },
     "coder_find_files": {
@@ -152,9 +187,19 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "按文件名在当前任务工作区或沙箱中查找文件",
         "needs_workspace": True,
     },
+    "create_industrial_control_report": {
+        "display_name_zh": "工业控制系统规范报告生成",
+        "description_zh": "将 report_spec.json 确定性渲染为 HTML、LaTeX 和可选 PDF",
+        "needs_workspace": True,
+    },
     "coder_request_run": {
         "display_name_zh": "Coder 请求运行",
         "description_zh": "为 Python 代码请求一次用户批准后再运行，或为 HTML 准备受限预览",
+        "needs_workspace": True,
+    },
+    "create_industrial_control_report": {
+        "display_name_zh": "工业控制系统规范报告生成",
+        "description_zh": "将 report_spec.json 确定性渲染为 HTML、LaTeX 和可选 PDF",
         "needs_workspace": True,
     },
     "coder_mark_step": {
@@ -162,6 +207,11 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
         "description_zh": "由 Coder Lite 标记当前步骤完成或阻塞",
         "needs_workspace": True,
     },
+    "create_industrial_control_report": {
+        "display_name_zh": "工业控制系统规范报告生成",
+        "description_zh": "将 report_spec.json 确定性渲染为 HTML、LaTeX 和可选 PDF",
+        "needs_workspace": True,
+    }
 }
 
 # Planner 固定技能集（v1 不可自定义）
@@ -217,6 +267,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         coder_edit_file_skill, coder_find_files_skill, coder_request_run_skill,
         coder_mark_step_skill,
     )
+    from app.cosight.agent.actor.instance.industrial_report_skill import create_industrial_control_report_skill
 
     SKILL_BUILDERS = {
         "execute_code": lambda: execute_code_skill(work_space_path),
@@ -248,6 +299,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
         "coder_find_files": coder_find_files_skill,
         "coder_request_run": coder_request_run_skill,
         "coder_mark_step": coder_mark_step_skill,
+        "create_industrial_control_report": create_industrial_control_report_skill,
     }
 
     skills = []

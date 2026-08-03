@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "Channel": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Channel",
+      "type": "object"
+    },
+    "ChannelSet": {
+      "additionalProperties": false,
+      "properties": {
+        "inputs": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Inputs",
+          "type": "array"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Outputs",
+          "type": "array"
+        },
+        "states": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Channel"
+              },
+              "maxItems": 50,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "States"
+        }
+      },
+      "required": [
+        "inputs",
+        "outputs"
+      ],
+      "title": "ChannelSet",
+      "type": "object"
+    },
+    "Timebase": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "continuous",
+            "discrete"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "dt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dt"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "Timebase",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "representation": {
+      "const": "transfer_function",
+      "title": "Representation",
+      "type": "string"
+    },
+    "numerator": {
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 51,
+      "minItems": 1,
+      "title": "Numerator",
+      "type": "array"
+    },
+    "denominator": {
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 52,
+      "minItems": 1,
+      "title": "Denominator",
+      "type": "array"
+    },
+    "timebase": {
+      "$ref": "#/$defs/Timebase"
+    },
+    "channels": {
+      "$ref": "#/$defs/ChannelSet"
+    }
+  },
+  "required": [
+    "representation",
+    "numerator",
+    "denominator",
+    "timebase",
+    "channels"
+  ],
+  "title": "TransferFunctionPlant",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cosight.local/schemas/1.0.0/transfer_function_plant.schema.json"
+}

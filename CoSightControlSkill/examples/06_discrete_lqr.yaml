@@ -1,0 +1,25 @@
+schema_version: 1.0.0
+task_id: discrete_double_integrator_lqr
+plant:
+  representation: state_space
+  A: [[1.0, 0.1], [0.0, 1.0]]
+  B: [[0.005], [0.1]]
+  C: [[1.0, 0.0]]
+  D: [[0.0]]
+  timebase: {kind: discrete, dt: 0.1}
+  channels:
+    inputs: [{name: acceleration, unit: m / s ** 2}]
+    outputs: [{name: position, unit: m}]
+    states: [{name: position, unit: m}, {name: velocity, unit: m / s}]
+feedback: {sign: negative, gain: 1.0}
+requirements: []
+design:
+  method: lqr
+  parameters: {Q: [[10.0, 0.0], [0.0, 1.0]], R: [[1.0]], reference_gain: 1.0}
+simulation:
+  configuration: closed_loop
+  responses: [step, impulse]
+  time: {mode: explicit, start: 0.0, stop: 10.0, points: 101}
+  frequency: {mode: auto, points: 800}
+backends: [python-control, scipy]
+

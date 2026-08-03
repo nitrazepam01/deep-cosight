@@ -1,0 +1,21 @@
+schema_version: 1.0.0
+task_id: underdamped_second_order
+plant:
+  representation: transfer_function
+  numerator: [1.0]
+  denominator: [1.0, 0.4, 1.0]
+  timebase: {kind: continuous}
+  channels:
+    inputs: [{name: command, unit: V}]
+    outputs: [{name: response, unit: V}]
+feedback: {sign: negative, gain: 1.0}
+requirements:
+  - {metric: phase_margin_deg, operator: '>=', value: 30.0, unit: degree}
+design: {method: frequency_gain, parameters: {target_crossover_rad_s: 0.8}}
+simulation:
+  configuration: closed_loop
+  responses: [step, bode, nyquist]
+  time: {mode: explicit, start: 0.0, stop: 30.0, points: 3001}
+  frequency: {mode: auto, points: 1000}
+backends: [python-control, scipy]
+

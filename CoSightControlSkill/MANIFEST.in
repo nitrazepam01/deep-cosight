@@ -1,0 +1,11 @@
+include LICENSE
+include THIRD_PARTY_NOTICES.md
+recursive-include backends *.md
+recursive-include constraints *.txt
+recursive-include examples *.yaml
+recursive-include integration *.py *.json *.md *.patch
+recursive-include references *.md
+recursive-include schemas *.json
+recursive-include scripts *.py
+recursive-include tests *.py
+

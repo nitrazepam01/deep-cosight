@@ -1,0 +1,232 @@
+\documentclass[UTF8,a4paper,12pt]{ctexart}
+
+\usepackage[left=2.35cm,right=2.35cm,top=2.35cm,bottom=2.35cm]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage[table]{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{tcolorbox}
+\usepackage{fancyhdr}
+\usepackage{etoolbox}
+\usepackage{tocloft}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{figures/}}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=deepblue,
+  urlcolor=deepblue,
+  citecolor=deepblue,
+  pdfauthor={负责人、控制设计成员、仿真验证成员},
+  pdftitle={工业控制系统设计与仿真分析报告}
+}
+
+\definecolor{deepblue}{HTML}{1E4E8C}
+\definecolor{softblue}{HTML}{EAF3FF}
+\definecolor{accent}{HTML}{D15B35}
+\definecolor{goodgreen}{HTML}{1F8A5B}
+\definecolor{lightgray}{HTML}{F5F7FA}
+\definecolor{codebg}{HTML}{F7F9FC}
+\definecolor{codeframe}{HTML}{D7E3F3}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textcolor{deepblue}{工业控制系统设计与仿真分析报告}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{15pt}
+
+\setlist[itemize]{leftmargin=2em,itemsep=0.2em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2em,itemsep=0.2em,topsep=0.2em}
+\renewcommand{\arraystretch}{1.25}
+\renewcommand{\thesection}{\chinese{section}}
+\renewcommand{\thesubsection}{\arabic{section}.\arabic{subsection}}
+\ctexset{
+  section = {
+    name = {,、},
+    format = \zihao{3}\bfseries,
+    beforeskip = 0pt,
+    afterskip = 1.0em
+  },
+  subsection = {
+    format = \zihao{4}\bfseries,
+    beforeskip = 0.9em,
+    afterskip = 0.45em
+  }
+}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.25em}
+\pretocmd{\section}{\ifnum\value{section}>0\clearpage\fi}{}{}
+
+\lstdefinestyle{reportcode}{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  keywordstyle=\color{deepblue}\bfseries,
+  commentstyle=\color{goodgreen},
+  stringstyle=\color{accent},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  xleftmargin=1.5em,
+  framexleftmargin=1.2em
+}
+\lstset{style=reportcode}
+\newcommand{\figref}[1]{图~\ref{#1}}
+\newcommand{\tabref}[1]{表~\ref{#1}}
+\renewcommand{\contentsname}{目\quad 录}
+\setcounter{tocdepth}{2}
+\setlength{\cftbeforesecskip}{0.8em}
+\setlength{\cftsecindent}{0em}
+\setlength{\cftsecnumwidth}{2.2em}
+\setlength{\cftsubsecindent}{2.2em}
+\setlength{\cftsubsecnumwidth}{3.2em}
+\renewcommand{\cftsecfont}{\bfseries}
+\renewcommand{\cftsecpagefont}{\bfseries}
+
+\begin{document}
+\begin{titlepage}
+  \thispagestyle{empty}
+  \centering
+  \vspace*{2.4cm}
+  {\zihao{1}\bfseries 工业控制系统设计与仿真分析报告\par}
+  \vspace{1.2cm}
+  {\zihao{-3} 控制器设计、性能验证与工程评价\par}
+  \vfill
+  \begin{tabular}{p{3.1cm}p{8.5cm}}
+    项目/课程：& Co-Sight 工业控制系统设计智能体\\[0.65em]
+    团队：& 示例团队\\[0.65em]
+    负责人：& 负责人\\[0.65em]
+    成员：& 负责人、控制设计成员、仿真验证成员\\[0.65em]
+    班级/部门：& 工业控制系统设计组\\[0.65em]
+    提交日期：& 2026-08-03\\[0.65em]
+  \end{tabular}
+  \vspace*{1cm}
+\end{titlepage}
+\clearpage
+\pagenumbering{Roman}
+\pagestyle{plain}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+\pagestyle{fancy}
+\section*{摘要}
+本文以一个具有单位负反馈结构的工业控制对象为例，建立对象模型，分析原系统的稳态精度与动态性能，比较候选控制方案，并通过统一仿真指标验证最终方案。报告将控制公式、仿真配置、性能数据和证据来源绑定到同一份可复现的结构化输入中，最终生成 HTML 预览和 LaTeX 源码。
+\par
+\noindent\textbf{关键词：} 工业控制系统；控制器设计；性能指标；仿真验证；工程评价
+\clearpage
+\section{题目背景与被控对象}\label{sec:model}
+先明确系统边界、输入输出关系和评价目标，再进入控制器设计。
+\par
+被控对象采用单位负反馈结构。设计阶段只使用离线模型和历史数据，现场控制器保持隔离。所有结果都应标明模型版本、采样周期、输入信号和仿真时长。
+
+
+\begin{equation}
+G(s)=\\frac{250}{s(s+2)(s+40)(s+45)}
+\label{eq:plant}
+\end{equation}
+
+\begin{equation}
+T(s)=\\frac{G_c(s)G(s)}{1+G_c(s)G(s)}
+\label{eq:closed_loop}
+\end{equation}
+
+\begin{tcolorbox}[title=\textbf{验证主线},colback=softblue,colframe=deepblue]
+先判断原系统是否满足稳态指标，再比较单纯提高增益与引入相位补偿的代价，最后用同一套指标确认推荐方案。
+\end{tcolorbox}
+
+\section{性能指标与方案约束}\label{sec:requirements}
+本示例将超调量、上升时间、2\% 调节时间和速度误差常数作为主要评价指标。工程约束同时包括控制器参数范围、采样周期、执行器饱和边界和离线仿真安全边界。
+
+
+\begin{table}[H]
+  \centering
+  \caption{设计指标与验收阈值}
+  \label{tab:requirements}
+  \begin{tabularx}{\textwidth}{*{4}{>{\raggedright\arraybackslash}X}}
+    \toprule
+    指标 & 符号 & 单位 & 验收条件 \\
+    \midrule
+    超调量 & Mp & \% & 小于 20 \\
+    上升时间 & tr & s & 小于 0.5 \\
+    调节时间 & ts & s & 小于 1.2 \\
+    速度误差常数 & Kv & 无量纲 & 大于等于 10 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{enumerate}
+  \item 统一模型、输入和仿真时长后比较所有候选方案。
+  \item 记录每个指标的计算方法和容差设置。
+  \item 只有通过硬约束的候选方案才能进入工程推荐。
+\end{enumerate}
+
+\section{控制方案设计与机理}\label{sec:design}
+仅增加比例增益可以提高低频增益，但可能降低相位裕度并放大超调。超前校正通过在目标交越频率附近提供正相位，改善快速性与稳定裕度之间的折中。
+
+
+\begin{equation}
+G_c(s)=1483.7\\frac{s+3.5}{s+33.75}
+\label{eq:controller}
+\end{equation}
+
+\begin{tcolorbox}[title=\textbf{安全边界},colback=softblue,colframe=goodgreen]
+控制器参数只写入离线仿真配置，渲染工具不具备 PLC、DCS、机器人或现场执行器访问能力。
+\end{tcolorbox}
+
+\section{仿真验证与性能对比}\label{sec:validation}
+仿真采用统一阶跃输入、统一仿真时长和 2\% 调节带宽。结果表同时保留基准、候选和推荐方案，便于审查设计决策而不是只展示最终数字。
+
+
+\begin{table}[H]
+  \centering
+  \caption{不同控制方案性能指标对比}
+  \label{tab:performance}
+  \begin{tabularx}{\textwidth}{*{6}{>{\raggedright\arraybackslash}X}}
+    \toprule
+    方案 & Kv & 上升时间/s & 调节时间/s & 超调量/\% & 是否满足 \\
+    \midrule
+    原系统 & 0.0694 & 30.406 & 54.691 & 0.000 & 否 \\
+    比例增益 K=144 & 10.000 & 0.260 & 7.368 & 68.061 & 否 \\
+    超前校正 & 10.685 & 0.167 & 0.829 & 19.067 & 是 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+推荐方案同时满足四项硬指标，但超调量距离上限较近。因此工程部署前仍应进行参数摄动、采样周期和执行器饱和条件下的鲁棒性验证。
+
+
+\section{工程评价与结论}\label{sec:conclusion}
+结果表明，单纯提高增益虽然能够改善稳态精度，但会显著牺牲动态品质；超前校正通过频域补偿获得了更好的综合折中。最终推荐方案应连同模型版本、参数配置、仿真脚本和证据引用一起归档。
+
+
+\begin{tcolorbox}[title=\textbf{推荐结论},colback=softblue,colframe=goodgreen]
+推荐将超前校正方案作为离线设计候选，并在进入任何现场实施流程前完成独立复核和安全审批。
+\end{tcolorbox}
+
+\begin{lstlisting}[language=Python,caption={性能指标复核示例}]
+metrics = {'overshoot_pct': 19.067, 'rise_time_s': 0.167, 'settling_time_s': 0.829, 'Kv': 10.685}\npassed = metrics['overshoot_pct'] < 20 and metrics['rise_time_s'] < 0.5 and metrics['settling_time_s'] < 1.2 and metrics['Kv'] >= 10\nprint(passed)
+\end{lstlisting}
+
+\clearpage
+\section*{参考文献}
+\begin{thebibliography}{99}
+\bibitem{ref_control_textbook} 课程教材编写组. 自动控制原理课程教材. 课程资料库. 2026. 频域校正与性能指标章节
+\end{thebibliography}
+\appendix
+\section{可复现性说明}
+正式报告应在此处补充仿真脚本路径、模型版本、运行环境、图表文件哈希和原始结果文件路径。
+
+
+\end{document}

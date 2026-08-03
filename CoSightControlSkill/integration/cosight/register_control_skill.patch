@@ -1,0 +1,158 @@
+diff --git a/app/cosight/tool/control_simulation_toolkit.py b/app/cosight/tool/control_simulation_toolkit.py
+new file mode 100644
+index 0000000..b4d64e2
+--- /dev/null
++++ b/app/cosight/tool/control_simulation_toolkit.py
+@@ -0,0 +1,5 @@
++"""Co-Sight adapter for the separately installed control skill package."""
++
++from cosight_control_skill.toolkit import ControlSimulationToolkit
++
++__all__ = ["ControlSimulationToolkit"]
+diff --git a/app/cosight/agent/runtime/skill_catalog.py b/app/cosight/agent/runtime/skill_catalog.py
+index 06662a1..f32b2df 100644
+--- a/app/cosight/agent/runtime/skill_catalog.py
++++ b/app/cosight/agent/runtime/skill_catalog.py
+@@ -161,4 +161,34 @@ ACTOR_SKILL_CATALOG: Dict[str, dict] = {
+         "description_zh": "由 Coder Lite 标记当前步骤完成或阻塞",
+         "needs_workspace": True,
+     },
++    "parse_control_task": {
++        "display_name_zh": "控制任务校验",
++        "description_zh": "校验结构化控制系统任务 Schema",
++        "needs_workspace": True,
++    },
++    "analyze_plant": {
++        "display_name_zh": "控制对象分析",
++        "description_zh": "分析控制对象的稳定性、结构性质和适定性",
++        "needs_workspace": True,
++    },
++    "design_controller": {
++        "display_name_zh": "控制器设计",
++        "description_zh": "执行确定性的经典控制与状态空间控制设计",
++        "needs_workspace": True,
++    },
++    "simulate_system": {
++        "display_name_zh": "控制系统仿真",
++        "description_zh": "生成可追溯的控制仿真、指标和图形产物",
++        "needs_workspace": True,
++    },
++    "verify_requirements": {
++        "display_name_zh": "控制指标验证",
++        "description_zh": "将仿真指标与结构化控制要求逐项比较",
++        "needs_workspace": True,
++    },
++    "run_control_workflow": {
++        "display_name_zh": "控制设计完整流程",
++        "description_zh": "运行控制分析、设计、仿真和验证完整流程",
++        "needs_workspace": True,
++    },
+ }
+@@ -217,6 +247,7 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
+         coder_edit_file_skill, coder_find_files_skill, coder_request_run_skill,
+         coder_mark_step_skill,
+     )
++    from cosight_control_skill.cosight_definitions import CONTROL_SKILL_BUILDERS
+ 
+     SKILL_BUILDERS = {
+         "execute_code": lambda: execute_code_skill(work_space_path),
+@@ -249,5 +280,6 @@ def build_actor_skills(skill_names: List[str], work_space_path: str = None) -> l
+         "coder_request_run": coder_request_run_skill,
+         "coder_mark_step": coder_mark_step_skill,
+     }
++    SKILL_BUILDERS.update(CONTROL_SKILL_BUILDERS)
+ 
+     skills = []
+diff --git a/app/cosight/agent/actor/task_actor_agent.py b/app/cosight/agent/actor/task_actor_agent.py
+index b555c27..40bd198 100644
+--- a/app/cosight/agent/actor/task_actor_agent.py
++++ b/app/cosight/agent/actor/task_actor_agent.py
+@@ -42,4 +42,5 @@ from app.cosight.tool.wikipedia_toolkit import WikipediaToolkit
+ from app.cosight.tool.google_books_toolkit import GoogleBooksToolkit
+ from app.cosight.tool.video_event_toolkit import VideoEventToolkit
++from app.cosight.tool.control_simulation_toolkit import ControlSimulationToolkit
+ from config.config import get_tavily_config
+ from app.common.logger_util import logger
+@@ -107,4 +108,5 @@ class TaskActorAgent(BaseAgent):
+         wikipedia_toolkit = WikipediaToolkit()
+         google_books_toolkit = GoogleBooksToolkit()
+         video_event_toolkit = VideoEventToolkit(workspace_path=self.work_space_path)
++        control_toolkit = ControlSimulationToolkit(workspace_path=self.work_space_path)
+         all_functions = {"mark_step": act_toolkit.mark_step,
+@@ -146,4 +148,10 @@ class TaskActorAgent(BaseAgent):
+                          "coder_find_files": coder_lite_toolkit.coder_find_files,
+                          "coder_request_run": coder_lite_toolkit.coder_request_run,
+                          "coder_mark_step": coder_lite_toolkit.coder_mark_step,
++                         "parse_control_task": control_toolkit.parse_control_task,
++                         "analyze_plant": control_toolkit.analyze_plant,
++                         "design_controller": control_toolkit.design_controller,
++                         "simulate_system": control_toolkit.simulate_system,
++                         "verify_requirements": control_toolkit.verify_requirements,
++                         "run_control_workflow": control_toolkit.run_control_workflow,
+                           }
+diff --git a/app/cosight/agent/base/tool_arg_mapping.py b/app/cosight/agent/base/tool_arg_mapping.py
+index 5222d89..99c245d 100644
+--- a/app/cosight/agent/base/tool_arg_mapping.py
++++ b/app/cosight/agent/base/tool_arg_mapping.py
+@@ -34,5 +34,43 @@ FUNCTION_ARG_MAPPING: Dict[str, Dict[str, Dict[str, List[str]]]] = {
+             'code': ['script', 'source', 'python', 'py', 'content', 'text'],
+         }
+     },
++    'parse_control_task': {
++        'required': ['task_payload'],
++        'aliases': {
++            'task_payload': ['task', 'payload', 'task_json', 'task_yaml'],
++        }
++    },
++    'analyze_plant': {
++        'required': ['task_payload'],
++        'aliases': {
++            'task_payload': ['task', 'plant_task', 'payload'],
++        }
++    },
++    'design_controller': {
++        'required': ['task_payload'],
++        'aliases': {
++            'task_payload': ['task', 'design_task', 'payload'],
++        }
++    },
++    'simulate_system': {
++        'required': ['task_payload'],
++        'aliases': {
++            'task_payload': ['task', 'simulation_task', 'payload'],
++            'controller_payload': ['controller', 'controller_result'],
++        }
++    },
++    'verify_requirements': {
++        'required': ['metrics_payload', 'requirements_payload'],
++        'aliases': {
++            'metrics_payload': ['metrics', 'metric_results'],
++            'requirements_payload': ['requirements', 'specifications'],
++        }
++    },
++    'run_control_workflow': {
++        'required': ['task_payload'],
++        'aliases': {
++            'task_payload': ['task', 'control_task', 'payload'],
++        }
++    },
+     'search_baidu': {
+         'required': ['query'],
+diff --git a/agents.json b/agents.json
+index e0d63ec..98d1174 100644
+--- a/agents.json
++++ b/agents.json
+@@ -48,6 +48,12 @@
+         "browser_use",
+         "fetch_website_content",
+         "fetch_website_content_with_images",
+-        "fetch_website_images_only"
++        "fetch_website_images_only",
++        "parse_control_task",
++        "analyze_plant",
++        "design_controller",
++        "simulate_system",
++        "verify_requirements",
++        "run_control_workflow"
+       ],
+       "enabled": true,

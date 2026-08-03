@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>工业控制系统设计与仿真分析报告</title><style>:root {
+  --deep-blue: #1e4e8c;
+  --soft-blue: #eaf3ff;
+  --accent: #d15b35;
+  --good-green: #1f8a5b;
+  --ink: #1f2937;
+  --muted: #5b6573;
+  --line: #d7e3f3;
+  --paper: #ffffff;
+  --canvas: #eef2f6;
+  --code-bg: #f7f9fc;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--canvas);
+  font: 16px/1.75 "Noto Serif CJK SC", "Source Han Serif SC", "Microsoft YaHei", serif;
+}
+.toc {
+  position: fixed;
+  inset: 1.5rem auto 1.5rem 1.5rem;
+  width: 18rem;
+  overflow: auto;
+  padding: 1.1rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(30, 78, 140, .08);
+}
+.toc-title { color: var(--deep-blue); font-weight: 700; margin-bottom: .6rem; }
+.toc ol { margin: 0; padding-left: 1.4rem; }
+.toc li { margin: .2rem 0; }
+.toc a { color: var(--ink); text-decoration: none; }
+.toc a:hover { color: var(--deep-blue); }
+.paper {
+  width: min(960px, calc(100% - 23rem));
+  margin: 2rem 2rem 5rem 22rem;
+  padding: 3.2rem 4.2rem;
+  background: var(--paper);
+  box-shadow: 0 12px 36px rgba(31, 41, 55, .12);
+}
+.cover { min-height: 56rem; display: flex; flex-direction: column; justify-content: center; border-bottom: 1px solid var(--line); }
+.eyebrow { color: var(--deep-blue); font-size: .88rem; letter-spacing: .08em; font-weight: 700; }
+h1 { color: var(--deep-blue); font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.25; margin: .7rem 0; }
+h2 { color: var(--deep-blue); border-bottom: 2px solid var(--deep-blue); padding-bottom: .35rem; margin-top: 3rem; }
+h3 { color: var(--deep-blue); }
+.subtitle { color: var(--muted); font-size: 1.2rem; }
+.meta { display: grid; grid-template-columns: 7rem 1fr; max-width: 38rem; margin: 3rem 0 0; }
+.meta dt, .meta dd { margin: 0; padding: .3rem 0; border-bottom: 1px solid #edf1f5; }
+.meta dt { font-weight: 700; color: var(--muted); }
+.meta dd { margin-left: 1rem; }
+.safety { padding: .8rem 1rem; background: #f4faf7; border-left: 4px solid var(--good-green); margin-top: 2rem; }
+.keywords { color: var(--muted); }
+.section-summary { color: var(--muted); font-style: italic; }
+.equation { margin: 1.3rem 0; padding: 1rem 1.2rem; overflow-x: auto; text-align: center; background: #fbfcfe; border: 1px solid var(--line); }
+.equation code, .equation-inline { color: var(--deep-blue); font-family: "Consolas", "Cascadia Mono", monospace; }
+.equation-caption, .code-caption { color: var(--muted); font-size: .9rem; margin-top: .4rem; }
+.report-figure, .table-wrap, .code-block { margin: 1.5rem 0; text-align: center; }
+.report-figure img { display: block; max-width: 100%; max-height: 40rem; margin: 0 auto; object-fit: contain; }
+figcaption { color: var(--muted); font-size: .92rem; margin-top: .45rem; }
+table { width: 100%; border-collapse: collapse; margin-top: .6rem; text-align: left; }
+th { color: var(--deep-blue); background: var(--soft-blue); }
+th, td { border-bottom: 1px solid var(--line); padding: .55rem .65rem; vertical-align: top; }
+tbody tr:nth-child(even) { background: #fbfcfe; }
+.callout { margin: 1.5rem 0; padding: .9rem 1.1rem; background: var(--soft-blue); border-left: 4px solid var(--deep-blue); }
+.callout.success { background: #f4faf7; border-left-color: var(--good-green); }
+.callout.warning, .callout.risk { background: #fff7f2; border-left-color: var(--accent); }
+.callout h3 { margin: 0 0 .25rem; }
+.callout p { margin: 0; }
+pre { overflow: auto; padding: 1rem; background: var(--code-bg); border: 1px solid var(--line); text-align: left; font: .86rem/1.55 "Consolas", "Cascadia Mono", monospace; }
+.page-break { break-after: page; height: 1px; }
+.references { padding-left: 1.5rem; }
+.references li { margin: .35rem 0; }
+@media (max-width: 1000px) {
+  .toc { position: static; width: auto; margin: 1rem; }
+  .paper { width: auto; margin: 1rem; padding: 2rem 1.3rem; }
+  .cover { min-height: 38rem; }
+}
+@media print {
+  body { background: #fff; }
+  .toc { display: none; }
+  .paper { width: auto; margin: 0; padding: 0; box-shadow: none; }
+  .cover { min-height: 90vh; }
+  h2 { break-after: avoid; }
+  .report-figure, .table-wrap, .callout, .code-block { break-inside: avoid; }
+}
+</style></head>
+<body>
+<aside class="toc"><div class="toc-title">报告目录</div><ol><li><a href="#model">1. 题目背景与被控对象</a></li><li><a href="#requirements">2. 性能指标与方案约束</a></li><li><a href="#design">3. 控制方案设计与机理</a></li><li><a href="#validation">4. 仿真验证与性能对比</a></li><li><a href="#conclusion">5. 工程评价与结论</a></li></ol></aside>
+<main class="paper">
+  <header class="cover"><p class="eyebrow">工业控制系统设计与仿真</p><h1>工业控制系统设计与仿真分析报告</h1><p class="subtitle">控制器设计、性能验证与工程评价</p><dl class="meta"><dt>项目/课程</dt><dd>Co-Sight 工业控制系统设计智能体</dd><dt>团队</dt><dd>示例团队</dd><dt>负责人</dt><dd>负责人</dd><dt>成员</dt><dd>负责人、控制设计成员、仿真验证成员</dd><dt>班级/部门</dt><dd>工业控制系统设计组</dd><dt>提交日期</dt><dd>2026-08-03</dd></dl><p class="safety"><strong>安全边界：</strong>本报告仅用于离线模型设计、参数分析和仿真验证，不向 PLC、DCS、机器人或现场执行器发送控制指令。</p></header>
+  <section id="abstract"><h2>摘要</h2><p>本文以一个具有单位负反馈结构的工业控制对象为例，建立对象模型，分析原系统的稳态精度与动态性能，比较候选控制方案，并通过统一仿真指标验证最终方案。报告将控制公式、仿真配置、性能数据和证据来源绑定到同一份可复现的结构化输入中，最终生成 HTML 预览和 LaTeX 源码。</p><p class="keywords"><strong>关键词：</strong>工业控制系统；控制器设计；性能指标；仿真验证；工程评价</p></section>
+  <section id="model"><h2>1. 题目背景与被控对象</h2><p class="section-summary">先明确系统边界、输入输出关系和评价目标，再进入控制器设计。</p><p>被控对象采用单位负反馈结构。设计阶段只使用离线模型和历史数据，现场控制器保持隔离。所有结果都应标明模型版本、采样周期、输入信号和仿真时长。</p><div class="equation" id="eq:plant"><code>G(s)=\\frac{250}{s(s+2)(s+40)(s+45)}</code></div><div class="equation" id="eq:closed_loop"><code>T(s)=\\frac{G_c(s)G(s)}{1+G_c(s)G(s)}</code></div><aside class="callout info"><h3>验证主线</h3><p>先判断原系统是否满足稳态指标，再比较单纯提高增益与引入相位补偿的代价，最后用同一套指标确认推荐方案。</p></aside></section><section id="requirements"><h2>2. 性能指标与方案约束</h2><p>本示例将超调量、上升时间、2% 调节时间和速度误差常数作为主要评价指标。工程约束同时包括控制器参数范围、采样周期、执行器饱和边界和离线仿真安全边界。</p><figure class="table-wrap" id="tab:requirements"><figcaption>设计指标与验收阈值</figcaption><table><thead><tr><th>指标</th><th>符号</th><th>单位</th><th>验收条件</th></tr></thead><tbody><tr><td>超调量</td><td>Mp</td><td>%</td><td>小于 20</td></tr><tr><td>上升时间</td><td>tr</td><td>s</td><td>小于 0.5</td></tr><tr><td>调节时间</td><td>ts</td><td>s</td><td>小于 1.2</td></tr><tr><td>速度误差常数</td><td>Kv</td><td>无量纲</td><td>大于等于 10</td></tr></tbody></table></figure><ol><li>统一模型、输入和仿真时长后比较所有候选方案。</li><li>记录每个指标的计算方法和容差设置。</li><li>只有通过硬约束的候选方案才能进入工程推荐。</li></ol></section><section id="design"><h2>3. 控制方案设计与机理</h2><p>仅增加比例增益可以提高低频增益，但可能降低相位裕度并放大超调。超前校正通过在目标交越频率附近提供正相位，改善快速性与稳定裕度之间的折中。</p><div class="equation" id="eq:controller"><code>G_c(s)=1483.7\\frac{s+3.5}{s+33.75}</code></div><aside class="callout success"><h3>安全边界</h3><p>控制器参数只写入离线仿真配置，渲染工具不具备 PLC、DCS、机器人或现场执行器访问能力。</p></aside></section><section id="validation"><h2>4. 仿真验证与性能对比</h2><p>仿真采用统一阶跃输入、统一仿真时长和 2% 调节带宽。结果表同时保留基准、候选和推荐方案，便于审查设计决策而不是只展示最终数字。</p><figure class="table-wrap" id="tab:performance"><figcaption>不同控制方案性能指标对比</figcaption><table><thead><tr><th>方案</th><th>Kv</th><th>上升时间/s</th><th>调节时间/s</th><th>超调量/%</th><th>是否满足</th></tr></thead><tbody><tr><td>原系统</td><td>0.0694</td><td>30.406</td><td>54.691</td><td>0.000</td><td>否</td></tr><tr><td>比例增益 K=144</td><td>10.000</td><td>0.260</td><td>7.368</td><td>68.061</td><td>否</td></tr><tr><td>超前校正</td><td>10.685</td><td>0.167</td><td>0.829</td><td>19.067</td><td>是</td></tr></tbody></table></figure><p>推荐方案同时满足四项硬指标，但超调量距离上限较近。因此工程部署前仍应进行参数摄动、采样周期和执行器饱和条件下的鲁棒性验证。</p></section><section id="conclusion"><h2>5. 工程评价与结论</h2><p>结果表明，单纯提高增益虽然能够改善稳态精度，但会显著牺牲动态品质；超前校正通过频域补偿获得了更好的综合折中。最终推荐方案应连同模型版本、参数配置、仿真脚本和证据引用一起归档。</p><aside class="callout success"><h3>推荐结论</h3><p>推荐将超前校正方案作为离线设计候选，并在进入任何现场实施流程前完成独立复核和安全审批。</p></aside><figure class="code-block"><div class="code-caption">性能指标复核示例</div><pre><code class="language-python">metrics = {&#x27;overshoot_pct&#x27;: 19.067, &#x27;rise_time_s&#x27;: 0.167, &#x27;settling_time_s&#x27;: 0.829, &#x27;Kv&#x27;: 10.685}\npassed = metrics[&#x27;overshoot_pct&#x27;] &lt; 20 and metrics[&#x27;rise_time_s&#x27;] &lt; 0.5 and metrics[&#x27;settling_time_s&#x27;] &lt; 1.2 and metrics[&#x27;Kv&#x27;] &gt;= 10\nprint(passed)</code></pre></figure></section>
+  <section id="references"><h2>参考文献</h2><ol class="references"><li id="ref_control_textbook">课程教材编写组. 自动控制原理课程教材. 课程资料库. 2026. 频域校正与性能指标章节</li></ol></section>
+</main>
+</body></html>
