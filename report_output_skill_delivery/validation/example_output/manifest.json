@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-08-03T19:15:28",
+  "spec_path": "G:\\Cosight\\rawcode\\deep-cosight\\report_output_skill_delivery\\examples\\report_spec.json",
+  "spec_sha256": "39741959c105a56cab26088d3591efe9354449e499e47e79189173347f7e1355",
+  "outputs": {
+    "html": "G:\\Cosight\\rawcode\\deep-cosight\\report_output_skill_delivery\\validation\\example_output\\report.html",
+    "latex": "G:\\Cosight\\rawcode\\deep-cosight\\report_output_skill_delivery\\validation\\example_output\\main.tex"
+  },
+  "copied_assets": [],
+  "pdf": null,
+  "warnings": []
+}

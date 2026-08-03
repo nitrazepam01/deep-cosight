@@ -1,0 +1,24 @@
+schema_version: 1.0.0
+task_id: first_order_pid
+plant:
+  representation: transfer_function
+  numerator: [1.0]
+  denominator: [1.0, 1.0]
+  timebase: {kind: continuous}
+  channels:
+    inputs: [{name: actuator, unit: V}]
+    outputs: [{name: position, unit: m}]
+feedback: {sign: negative, gain: 1.0}
+requirements:
+  - {metric: overshoot_percent, operator: <=, value: 1.0, unit: percent}
+  - {metric: settling_time_s, operator: <, value: 3.0, unit: s}
+design:
+  method: pid_manual
+  parameters: {kp: 2.0, ki: 0.0, kd: 0.0, derivative_filter: 100.0}
+simulation:
+  configuration: closed_loop
+  responses: [step, impulse, bode, nyquist, root_locus]
+  time: {mode: explicit, start: 0.0, stop: 5.0, points: 1001}
+  frequency: {mode: explicit, minimum_rad_s: 0.01, maximum_rad_s: 100.0, points: 800}
+backends: [python-control, scipy]
+

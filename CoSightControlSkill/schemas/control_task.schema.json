@@ -1,0 +1,563 @@
+{
+  "$defs": {
+    "Channel": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Channel",
+      "type": "object"
+    },
+    "ChannelSet": {
+      "additionalProperties": false,
+      "properties": {
+        "inputs": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Inputs",
+          "type": "array"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Outputs",
+          "type": "array"
+        },
+        "states": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Channel"
+              },
+              "maxItems": 50,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "States"
+        }
+      },
+      "required": [
+        "inputs",
+        "outputs"
+      ],
+      "title": "ChannelSet",
+      "type": "object"
+    },
+    "DesignSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "default": "none",
+          "enum": [
+            "none",
+            "pid_manual",
+            "pid_ziegler_nichols",
+            "pid_imc_fopdt",
+            "lead",
+            "lag",
+            "frequency_gain",
+            "root_locus",
+            "state_feedback",
+            "lqr"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        }
+      },
+      "title": "DesignSpec",
+      "type": "object"
+    },
+    "FeedbackSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "sign": {
+          "enum": [
+            "negative",
+            "positive"
+          ],
+          "title": "Sign",
+          "type": "string"
+        },
+        "gain": {
+          "default": 1.0,
+          "title": "Gain",
+          "type": "number"
+        }
+      },
+      "required": [
+        "sign"
+      ],
+      "title": "FeedbackSpec",
+      "type": "object"
+    },
+    "FrequencyGridSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "explicit"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "minimum_rad_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Rad S"
+        },
+        "maximum_rad_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximum Rad S"
+        },
+        "points": {
+          "default": 800,
+          "maximum": 5000,
+          "minimum": 10,
+          "title": "Points",
+          "type": "integer"
+        }
+      },
+      "title": "FrequencyGridSpec",
+      "type": "object"
+    },
+    "Requirement": {
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "enum": [
+            "overshoot_percent",
+            "rise_time_s",
+            "settling_time_s",
+            "steady_state_error",
+            "gain_margin",
+            "gain_margin_db",
+            "phase_margin_deg",
+            "velocity_constant",
+            "acceleration_constant"
+          ],
+          "title": "Metric",
+          "type": "string"
+        },
+        "operator": {
+          "enum": [
+            "<",
+            "<=",
+            ">",
+            ">=",
+            "=="
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "input_index": {
+          "default": 0,
+          "maximum": 7,
+          "minimum": 0,
+          "title": "Input Index",
+          "type": "integer"
+        },
+        "output_index": {
+          "default": 0,
+          "maximum": 7,
+          "minimum": 0,
+          "title": "Output Index",
+          "type": "integer"
+        },
+        "tolerance": {
+          "default": 1e-09,
+          "minimum": 0,
+          "title": "Tolerance",
+          "type": "number"
+        }
+      },
+      "required": [
+        "metric",
+        "operator",
+        "value"
+      ],
+      "title": "Requirement",
+      "type": "object"
+    },
+    "SimulationSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "configuration": {
+          "default": "closed_loop",
+          "enum": [
+            "open_loop",
+            "closed_loop"
+          ],
+          "title": "Configuration",
+          "type": "string"
+        },
+        "responses": {
+          "items": {
+            "enum": [
+              "step",
+              "impulse",
+              "bode",
+              "nyquist",
+              "root_locus"
+            ],
+            "type": "string"
+          },
+          "title": "Responses",
+          "type": "array"
+        },
+        "time": {
+          "$ref": "#/$defs/TimeGridSpec"
+        },
+        "frequency": {
+          "$ref": "#/$defs/FrequencyGridSpec"
+        },
+        "settling_threshold": {
+          "default": 0.02,
+          "exclusiveMaximum": 1,
+          "exclusiveMinimum": 0,
+          "title": "Settling Threshold",
+          "type": "number"
+        },
+        "rise_limits": {
+          "default": [
+            0.1,
+            0.9
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Rise Limits",
+          "type": "array"
+        }
+      },
+      "title": "SimulationSpec",
+      "type": "object"
+    },
+    "StateSpacePlant": {
+      "additionalProperties": false,
+      "properties": {
+        "representation": {
+          "const": "state_space",
+          "title": "Representation",
+          "type": "string"
+        },
+        "A": {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "title": "A",
+          "type": "array"
+        },
+        "B": {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "title": "B",
+          "type": "array"
+        },
+        "C": {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "title": "C",
+          "type": "array"
+        },
+        "D": {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "title": "D",
+          "type": "array"
+        },
+        "timebase": {
+          "$ref": "#/$defs/Timebase"
+        },
+        "channels": {
+          "$ref": "#/$defs/ChannelSet"
+        }
+      },
+      "required": [
+        "representation",
+        "A",
+        "B",
+        "C",
+        "D",
+        "timebase",
+        "channels"
+      ],
+      "title": "StateSpacePlant",
+      "type": "object"
+    },
+    "TimeGridSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "explicit"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "start": {
+          "default": 0.0,
+          "title": "Start",
+          "type": "number"
+        },
+        "stop": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop"
+        },
+        "points": {
+          "default": 1000,
+          "maximum": 20000,
+          "minimum": 2,
+          "title": "Points",
+          "type": "integer"
+        }
+      },
+      "title": "TimeGridSpec",
+      "type": "object"
+    },
+    "Timebase": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "continuous",
+            "discrete"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "dt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dt"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "Timebase",
+      "type": "object"
+    },
+    "TransferFunctionPlant": {
+      "additionalProperties": false,
+      "properties": {
+        "representation": {
+          "const": "transfer_function",
+          "title": "Representation",
+          "type": "string"
+        },
+        "numerator": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 51,
+          "minItems": 1,
+          "title": "Numerator",
+          "type": "array"
+        },
+        "denominator": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 52,
+          "minItems": 1,
+          "title": "Denominator",
+          "type": "array"
+        },
+        "timebase": {
+          "$ref": "#/$defs/Timebase"
+        },
+        "channels": {
+          "$ref": "#/$defs/ChannelSet"
+        }
+      },
+      "required": [
+        "representation",
+        "numerator",
+        "denominator",
+        "timebase",
+        "channels"
+      ],
+      "title": "TransferFunctionPlant",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "task_id": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Task Id",
+      "type": "string"
+    },
+    "plant": {
+      "discriminator": {
+        "mapping": {
+          "state_space": "#/$defs/StateSpacePlant",
+          "transfer_function": "#/$defs/TransferFunctionPlant"
+        },
+        "propertyName": "representation"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TransferFunctionPlant"
+        },
+        {
+          "$ref": "#/$defs/StateSpacePlant"
+        }
+      ],
+      "title": "Plant"
+    },
+    "feedback": {
+      "$ref": "#/$defs/FeedbackSpec"
+    },
+    "requirements": {
+      "items": {
+        "$ref": "#/$defs/Requirement"
+      },
+      "maxItems": 100,
+      "title": "Requirements",
+      "type": "array"
+    },
+    "design": {
+      "$ref": "#/$defs/DesignSpec"
+    },
+    "simulation": {
+      "$ref": "#/$defs/SimulationSpec"
+    },
+    "backends": {
+      "items": {
+        "enum": [
+          "python-control",
+          "scipy",
+          "octave",
+          "matlab"
+        ],
+        "type": "string"
+      },
+      "title": "Backends",
+      "type": "array"
+    }
+  },
+  "required": [
+    "task_id",
+    "plant",
+    "feedback"
+  ],
+  "title": "ControlTask",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cosight.local/schemas/1.0.0/control_task.schema.json"
+}

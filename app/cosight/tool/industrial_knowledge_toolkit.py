@@ -1,131 +1,106 @@
-﻿"""Industrial Knowledge Base Toolkit for Co-Sight agents."""
+﻿"""Industrial Knowledge Base Toolkit for Co-Sight agents — query only."""
 
-import os, sys
+import os, sys, json
 
-# Add project root to path so agent can import industrial_rag
 _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
+_META_PATH = os.path.join(_project_root, "industrial_kb_data", "kb_meta.json")
+
 
 class IndustrialKnowledgeToolkit:
-    """Full CRUD interface for the industrial control systems knowledge base.
+    """Read-only access to activated industrial knowledge bases."""
 
-    Query:   search standards, textbooks, papers, datasheets
-    List:    show all documents in the KB
-    Add:     OCR + index a new PDF into the KB
-    Delete:  remove a document from the KB
-    """
+    def _activated_dirs(self):
+        """Return list of (kb_id, kb_dir) for all activated KBs."""
+        meta = {}
+        if os.path.exists(_META_PATH):
+            with open(_META_PATH, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+        activated = [k for k, v in meta.items() if v.get("activate", False)]
+        from industrial_rag.step7_rag_util import VERSIONS_DIR, TEST_DIR
+        _kb_dir_fn = None
+        # inline _kb_dir logic
+        dirs = []
+        for kid in activated:
+            for base in [VERSIONS_DIR, TEST_DIR]:
+                d = os.path.join(base, kid)
+                if os.path.isdir(d):
+                    dirs.append((kid, d))
+                    break
+        return dirs, meta
 
-    def __init__(self):
-        self._kb = None
-        self._kb_dir = None
-
-    def _get_kb_dir(self):
-        if self._kb_dir is None:
-            from industrial_rag.step7_rag_util import VERSIONS_DIR
-            vs = sorted(os.listdir(VERSIONS_DIR))
-            self._kb_dir = os.path.join(VERSIONS_DIR, vs[-1])
-        return self._kb_dir
-
-    def _get_kb(self):
-        if self._kb is None:
-            from industrial_rag.step6_query_interface import IndustrialKB
-            self._kb = IndustrialKB.get()
-        return self._kb
-
-    # ═══════════════════════════════════════════════════════════════
-    # Query
-    # ═══════════════════════════════════════════════════════════════
+    # query
     def query_industrial_kb(self, query: str) -> str:
-        """Query the industrial knowledge base and return an answer.
+        """Query all activated industrial knowledge bases.
 
-        Use this for questions about:
-        - Industrial standards (IEC 61508, ISO 26262, GB/T 17626, etc.)
-        - Control theory concepts (PID, MPC, Kalman filter, etc.)
-        - Component datasheets (STM32, ESP32, MPU6050, etc.)
-        - Academic papers on control systems, robotics, automation
-
-        Args:
-            query: A natural language question about industrial control.
-
-        Returns:
-            A detailed answer with facts from the knowledge base.
+        Use for: standards, control theory, datasheets, papers.
+        Args: query - natural language question.
+        Returns: detailed answer with sources.
         """
-        kb = self._get_kb()
-        result = kb.query(query)
-        sources = "\n".join(
-            f"  [{i}] {s['title'][:80]}" for i, s in enumerate(result["sources"], 1)
-        )
-        return f"{result['answer']}\n\n[Sources from industrial knowledge base: {len(result['sources'])} documents, {result['ms']}ms]\n{sources}"
+        dirs, _ = self._activated_dirs()
+        if not dirs:
+            return "No industrial knowledge base activated. Use the KB manager to activate one."
+        from industrial_rag.step6_query_interface import IndustrialKB
+        answers = []
+        for kid, d in dirs:
+            kb = IndustrialKB.get(kb_dir=d)
+            r = kb.query(query)
+            answers.append(f"[{kid}] {r['answer']}")
+        return "\n\n".join(answers)
 
-    # ═══════════════════════════════════════════════════════════════
-    # List
-    # ═══════════════════════════════════════════════════════════════
-    def list_industrial_files(self) -> str:
-        """List all documents currently in the industrial knowledge base.
+    # list files
+    def list_industrial_files(self, kb_name: str = "") -> str:
+        """List documents in an activated knowledge base.
 
-        Returns:
-            A numbered list of document titles with categories.
+        Args: kb_name - name of the KB (from list_activated_kbs). If empty, lists all.
+        Returns: document list with categories, chunk/vector counts.
         """
+        dirs, meta = self._activated_dirs()
+        if not dirs:
+            return "No KB activated."
         from industrial_rag.step7_rag_util import file_list
         import io
-        buf = io.StringIO()
-        old_stdout = sys.stdout
-        sys.stdout = buf
-        try:
-            file_list(self._get_kb_dir())
-            return buf.getvalue().strip()
-        finally:
-            sys.stdout = old_stdout
+        results = []
+        for kid, d in dirs:
+            name = meta.get(kid, {}).get("name", kid)
+            if kb_name and name != kb_name:
+                continue
+            buf = io.StringIO()
+            old = sys.stdout; sys.stdout = buf
+            try:
+                file_list(d)
+            finally:
+                sys.stdout = old
+            results.append(f"--- {name} ---\n{buf.getvalue().strip()}")
+        return "\n\n".join(results) if results else f"KB '{kb_name}' not found among activated KBs."
 
-    # ═══════════════════════════════════════════════════════════════
-    # Add
-    # ═══════════════════════════════════════════════════════════════
-    def add_industrial_file(self, pdf_path: str) -> str:
-        """Add a PDF document to the industrial knowledge base.
+    # list activated KBs
+    def list_activated_kbs(self) -> str:
+        """List all activated knowledge bases with their info.
 
-        The document goes through: OCR -> cleanup -> chunk -> embed -> index.
-        If the document already exists, it will be skipped.
-
-        Args:
-            pdf_path: Path to the PDF file (must exist on the server filesystem).
-
-        Returns:
-            Status message: success, failure reason, or skip info.
+        Returns: name, description, document count, chunk count, last modified.
         """
-        from industrial_rag.step7_rag_util import file_add
-        import io
-        if not os.path.exists(pdf_path):
-            return f"ERROR: File not found: {pdf_path}"
-        buf = io.StringIO()
-        old_stdout, old_stderr = sys.stdout, sys.stderr
-        sys.stdout = sys.stderr = buf
-        try:
-            file_add(pdf_path, self._get_kb_dir())
-            return buf.getvalue().strip()
-        finally:
-            sys.stdout, sys.stderr = old_stdout, old_stderr
-
-    # ═══════════════════════════════════════════════════════════════
-    # Delete
-    # ═══════════════════════════════════════════════════════════════
-    def delete_industrial_file(self, doc_id: str) -> str:
-        """Remove a document from the industrial knowledge base.
-
-        Args:
-            doc_id: The document ID (as shown by list_industrial_files).
-
-        Returns:
-            Status message: success or failure reason.
-        """
-        from industrial_rag.step7_rag_util import file_delete
+        dirs, meta = self._activated_dirs()
+        if not dirs:
+            return "No KB activated."
+        from industrial_rag.step7_rag_util import kb_list as _kb_list
         import io
         buf = io.StringIO()
-        old_stdout, old_stderr = sys.stdout, sys.stderr
-        sys.stdout = sys.stderr = buf
+        old = sys.stdout; sys.stdout = buf
         try:
-            file_delete(doc_id, self._get_kb_dir())
-            return buf.getvalue().strip()
+            _kb_list()
         finally:
-            sys.stdout, sys.stderr = old_stdout, old_stderr
+            sys.stdout = old
+        # Filter to only activated
+        lines = buf.getvalue().strip().split("\n")
+        header = lines[0] if lines else ""
+        sep = lines[1] if len(lines) > 1 else ""
+        active_ids = {kid for kid, _ in dirs}
+        result = [header, sep]
+        for line in lines[2:]:
+            parts = line.strip().split()
+            if parts and parts[0] in active_ids:
+                result.append(line)
+        return "\n".join(result)

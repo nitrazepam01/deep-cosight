@@ -1,0 +1,25 @@
+schema_version: 1.0.0
+task_id: second_order_state_feedback
+plant:
+  representation: state_space
+  A: [[0.0, 1.0], [-2.0, -3.0]]
+  B: [[0.0], [1.0]]
+  C: [[1.0, 0.0]]
+  D: [[0.0]]
+  timebase: {kind: continuous}
+  channels:
+    inputs: [{name: force, unit: N}]
+    outputs: [{name: position, unit: m}]
+    states: [{name: position, unit: m}, {name: velocity, unit: m / s}]
+feedback: {sign: negative, gain: 1.0}
+requirements: []
+design:
+  method: state_feedback
+  parameters: {desired_poles: [-4.0, -5.0], reference_gain: 1.0}
+simulation:
+  configuration: closed_loop
+  responses: [step, impulse]
+  time: {mode: explicit, start: 0.0, stop: 5.0, points: 1001}
+  frequency: {mode: auto, points: 800}
+backends: [python-control, scipy]
+

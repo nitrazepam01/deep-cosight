@@ -1,0 +1,95 @@
+\documentclass[UTF8,a4paper,12pt]{ctexart}
+
+\usepackage[left=2.35cm,right=2.35cm,top=2.35cm,bottom=2.35cm]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage[table]{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{tcolorbox}
+\usepackage{fancyhdr}
+\usepackage{etoolbox}
+\usepackage{tocloft}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{figures/}}
+\definecolor{deepblue}{HTML}{1E4E8C}
+\definecolor{softblue}{HTML}{EAF3FF}
+\definecolor{accent}{HTML}{D15B35}
+\definecolor{goodgreen}{HTML}{1F8A5B}
+\definecolor{lightgray}{HTML}{F5F7FA}
+\definecolor{codebg}{HTML}{F7F9FC}
+\definecolor{codeframe}{HTML}{D7E3F3}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=deepblue,
+  urlcolor=deepblue,
+  citecolor=deepblue,
+  pdfauthor={__PDF_AUTHOR__},
+  pdftitle={__PDF_TITLE__}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textcolor{deepblue}{__REPORT_TITLE__}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{15pt}
+
+\setlist[itemize]{leftmargin=2em,itemsep=0.2em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2em,itemsep=0.2em,topsep=0.2em}
+\renewcommand{\arraystretch}{1.25}
+\renewcommand{\thesection}{\chinese{section}}
+\renewcommand{\thesubsection}{\arabic{section}.\arabic{subsection}}
+\ctexset{
+  section = {
+    name = {,、},
+    format = \zihao{3}\bfseries,
+    beforeskip = 0pt,
+    afterskip = 1.0em
+  },
+  subsection = {
+    format = \zihao{4}\bfseries,
+    beforeskip = 0.9em,
+    afterskip = 0.45em
+  }
+}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.25em}
+\pretocmd{\section}{\ifnum\value{section}>0\clearpage\fi}{}{}
+
+\lstdefinestyle{reportcode}{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  keywordstyle=\color{deepblue}\bfseries,
+  commentstyle=\color{goodgreen},
+  stringstyle=\color{accent},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  xleftmargin=1.5em,
+  framexleftmargin=1.2em
+}
+\lstset{style=reportcode}
+\newcommand{\figref}[1]{图~\ref{#1}}
+\newcommand{\tabref}[1]{表~\ref{#1}}
+\renewcommand{\contentsname}{目\quad 录}
+\setcounter{tocdepth}{2}
+\setlength{\cftbeforesecskip}{0.8em}
+\setlength{\cftsecindent}{0em}
+\setlength{\cftsecnumwidth}{2.2em}
+\setlength{\cftsubsecindent}{2.2em}
+\setlength{\cftsubsecnumwidth}{3.2em}
+\renewcommand{\cftsecfont}{\bfseries}
+\renewcommand{\cftsecpagefont}{\bfseries}

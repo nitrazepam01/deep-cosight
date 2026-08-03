@@ -98,5 +98,5 @@ python-pptx==1.0.2
 docling==2.115.0
 PyMuPDF==1.27.2.3
 
-# --- RAG-Anything / document parsing ---
-# RAG-Anything: pip install -e ./RAG-Anything
+# --- CoSightControlSkill ---
+# pip install ./CoSightControlSkill

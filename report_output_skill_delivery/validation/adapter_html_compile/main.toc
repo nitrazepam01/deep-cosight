@@ -1,0 +1,6 @@
+\contentsline {section}{\numberline {一、}题目背景与被控对象}{2}{section.1}%
+\contentsline {section}{\numberline {二、}性能指标与方案约束}{3}{section.2}%
+\contentsline {section}{\numberline {三、}控制方案设计与机理}{4}{section.3}%
+\contentsline {section}{\numberline {四、}仿真验证与性能对比}{5}{section.4}%
+\contentsline {section}{\numberline {五、}工程评价与结论}{6}{section.5}%
+\contentsline {section}{\numberline {A}可复现性说明}{8}{appendix.A}%

@@ -1,0 +1,12 @@
+{
+  "skills_to_add_to_builtin_actor": [
+    "parse_control_task",
+    "analyze_plant",
+    "design_controller",
+    "simulate_system",
+    "verify_requirements",
+    "run_control_workflow"
+  ],
+  "recommended_system_prompt_addition_zh": "控制系统任务必须先形成结构化任务 Schema。优先调用 run_control_workflow；需要定位问题时再分别调用 analyze_plant、design_controller、simulate_system 和 verify_requirements。不得使用 execute_code 替代控制仿真 Skill，也不得把未通过或 indeterminate 的指标写成满足要求。"
+}
+
