@@ -1,0 +1,1316 @@
+[21:52:19] === Step 7 Integration Test ===
+[21:52:19] PROD KB: 20260729_013732
+[21:52:19] 
+============================================================
+[21:52:19] STEP: 1. Create empty KB
+[21:52:19] ============================================================
+[21:52:19]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py kb create test_empty
+[21:52:20]     
+[21:52:20]     2026-07-29 21:52:20,034 [INFO] KB created: test_empty (empty)
+[21:52:20]   [PASS] kb created
+[21:52:20] 
+============================================================
+[21:52:20] STEP: 2. Add document to empty KB
+[21:52:20] ============================================================
+[21:52:20]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py file add /home/nitrazepam/Cosight/deep-cosight/industrial_rag/add_test_raw/大地巡旅.pdf --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_empty
+[21:52:26]     
+[21:52:26]     2026-07-29 21:52:21,034 [INFO] ============================================================
+[21:52:26]     2026-07-29 21:52:21,035 [INFO] ADD: 大地巡旅.pdf -> test_empty
+[21:52:26]     2026-07-29 21:52:21,035 [INFO] Category: textbooks
+[21:52:26]     2026-07-29 21:52:21,035 [INFO] [Phase 1+2] SKIP (fix.md exists)
+[21:52:26]     2026-07-29 21:52:21,035 [INFO] [Parse] 大地巡旅_fix.md
+[21:52:26]     2026-07-29 21:52:21,404 [INFO]   1759 blocks
+[21:52:26]     2026-07-29 21:52:21,408 [INFO]   62 chunks (1P, 61C)
+[21:52:26]     2026-07-29 21:52:21,409 [INFO] [Embed] 62 chunks (model=BAAI/bge-m3, dim=1024)
+[21:52:26]     2026-07-29 21:52:21,410 [INFO]   Cached: 0, To fetch: 62
+[21:52:26]     2026-07-29 21:52:24,438 [INFO]   Saved: 62 vectors (124KB)
+[21:52:26]     2026-07-29 21:52:24,442 [INFO] [BM25] Rebuilding for 62 chunks
+[21:52:26]     Building prefix dict from the default dictionary ...
+[21:52:26]     2026-07-29 21:52:24,442 [DEBUG] Building prefix dict from the default dictionary ...
+[21:52:26]     Loading model from cache /tmp/jieba.cache
+[21:52:26]     2026-07-29 21:52:24,443 [DEBUG] Loading model from cache /tmp/jieba.cache
+[21:52:26]     Loading model cost 1.146 seconds.
+[21:52:26]     2026-07-29 21:52:25,588 [DEBUG] Loading model cost 1.146 seconds.
+[21:52:26]     Prefix dict has been built successfully.
+[21:52:26]     2026-07-29 21:52:25,588 [DEBUG] Prefix dict has been built successfully.
+[21:52:26]     2026-07-29 21:52:26,386 [DEBUG] Building index from tokens
+[21:52:26]     
+[21:52:26]     BM25S Create Vocab:   0%|          | 0/62 [00:00<?, ?it/s]
+[21:52:26]                                                               
+[21:52:26]     
+[21:52:26]     BM25S Convert tokens to indices:   0%|          | 0/62 [00:00<?, ?it/s]
+[21:52:26]                                                                            
+[21:52:26]     
+[21:52:26]     BM25S Count Tokens:   0%|          | 0/62 [00:00<?, ?it/s]
+[21:52:26]                                                               
+[21:52:26]     
+[21:52:26]     BM25S Compute Scores:   0%|          | 0/62 [00:00<?, ?it/s]
+[21:52:26]                                                                 
+[21:52:26]     2026-07-29 21:52:26,479 [INFO]   Done in 2s
+[21:52:26]     2026-07-29 21:52:26,489 [INFO] DONE in 5s
+[21:52:26]     2026-07-29 21:52:26,489 [INFO]   .md: /home/nitrazepam/Cosight/deep-cosight/industrial_rag/add_test_raw/大地巡旅.md
+[21:52:26]     2026-07-29 21:52:26,489 [INFO]   _fix.md: /home/nitrazepam/Cosight/deep-cosight/industrial_rag/add_test_raw/大地巡旅_fix.md
+[21:52:26]   [PASS] file added
+[21:52:26] 
+============================================================
+[21:52:26] STEP: 3. Query after add
+[21:52:26] ============================================================
+[21:52:26]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step6_query_interface.py --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_empty 大地巡旅 罗德岛
+[21:52:55]     Query: 大地巡旅 罗德岛
+[21:52:55]     
+[21:52:55]     ============================================================
+[21:52:55]     根据知识库中的内容，“大地巡旅”指的是《明日方舟》官方世界观设定集《大地巡航》（英文名“A Journey”），由E.E.埃里克森博士撰写。这本书中明确提到了“罗德岛”：作者在讲述自己退休后结识了后来建立了罗德岛制药的凯尔希医生，正是她的鼓励促使作者将见闻整理成书。因此，罗德岛（罗德岛制药）是《明日方舟》中由凯尔希医生建立的组织，在设定集中作为作者的合作者和启发者出现。
+[21:52:55]     
+[21:52:55]     需要指出的是，知识库中并未详细展开罗德岛的具体设定，仅提及了凯尔希医生与这本书的渊源。如果想了解罗德岛更全面的信息，则需要参考《明日方舟》游戏本体或其他官方资料。
+[21:52:55]     
+[21:52:55]     ============================================================
+[21:52:55]     Time: 27689.3ms  |  Sources: 1
+[21:52:55]       [1] 大地巡旅
+[21:52:55]     Loading: test_empty
+[21:52:55]       D:1 C:62 V:62 SI:0 FI:0
+[21:52:55]     Building prefix dict from the default dictionary ...
+[21:52:55]     Loading model from cache /tmp/jieba.cache
+[21:52:55]     Loading model cost 1.150 seconds.
+[21:52:55]     Prefix dict has been built successfully.
+[21:52:55]     
+[21:52:55]     BM25S Retrieve:   0%|          | 0/1 [00:00<?, ?it/s]
+[21:52:55]   [PASS] query returns 大地巡旅
+[21:52:55] 
+============================================================
+[21:52:55] STEP: 4. File list after add
+[21:52:55] ============================================================
+[21:52:55]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py file list --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_empty
+[21:52:56]     test_empty: 1 documents
+[21:52:56]       [1] 大地巡旅  cat=textbooks  std=  id=textbooks_大地巡旅
+[21:52:56]     
+[21:52:56]   [PASS] file list contains 大地巡旅
+[21:52:56] 
+============================================================
+[21:52:56] STEP: 5. Delete document
+[21:52:56] ============================================================
+[21:52:56]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py file list --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_empty
+[21:52:57]     test_empty: 1 documents
+[21:52:57]       [1] 大地巡旅  cat=textbooks  std=  id=textbooks_大地巡旅
+[21:52:57]     
+[21:52:57]   [PASS] found doc_id
+[21:52:57]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py file delete textbooks_大地巡旅 --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_empty
+[21:52:58]     
+[21:52:58]     2026-07-29 21:52:57,942 [INFO] [DELETE] textbooks_大地巡旅
+[21:52:58]     2026-07-29 21:52:57,946 [INFO]   Removing 62 chunks, 0 remaining
+[21:52:58]     2026-07-29 21:52:57,947 [INFO]   BM25 cleared (empty KB)
+[21:52:58]     2026-07-29 21:52:57,949 [INFO]   DONE
+[21:52:58]   [PASS] file deleted
+[21:52:58] 
+============================================================
+[21:52:58] STEP: 6. Query after delete
+[21:52:58] ============================================================
+[21:52:58]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step6_query_interface.py --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_empty 大地巡旅 罗德岛
+[21:53:04]     Query: 大地巡旅 罗德岛
+[21:53:04]     
+[21:53:04]     ============================================================
+[21:53:04]     根据现有信息，无法直接回答“大地巡旅 罗德岛”这一查询。在知识库摘要中，未检索到与“大地巡旅”或“罗德岛”直接相关的具体内容。目前仅知“罗德岛”可能指代《明日方舟》中的罗德岛制药公司，但“大地巡旅”并未在提供的摘要中出现，其含义（如是否为游戏活动、书籍或其他作品）及与罗德岛的关系均不明确。如需进一步解答，请提供相关背景或具体描述。
+[21:53:04]     
+[21:53:04]     ============================================================
+[21:53:04]     Time: 6028.6ms  |  Sources: 0
+[21:53:04]     Loading: test_empty
+[21:53:04]       D:0 C:0 V:62 SI:0 FI:0
+[21:53:04]     Building prefix dict from the default dictionary ...
+[21:53:04]     Loading model from cache /tmp/jieba.cache
+[21:53:04]     Loading model cost 1.161 seconds.
+[21:53:04]     Prefix dict has been built successfully.
+[21:53:04]   [PASS] query NO LONGER returns 大地巡旅
+[21:53:04]   [PASS] query NO LONGER returns 大地巡旅 in inherited
+[21:53:04] 
+============================================================
+[21:53:04] STEP: 7. Re-add document
+[21:53:04] ============================================================
+[21:53:04]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py file add /home/nitrazepam/Cosight/deep-cosight/industrial_rag/add_test_raw/大地巡旅.pdf --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_empty
+[21:53:08]     
+[21:53:08]     2026-07-29 21:53:05,744 [INFO] ============================================================
+[21:53:08]     2026-07-29 21:53:05,744 [INFO] ADD: 大地巡旅.pdf -> test_empty
+[21:53:08]     2026-07-29 21:53:05,745 [INFO] Category: textbooks
+[21:53:08]     2026-07-29 21:53:05,745 [INFO] [Phase 1+2] SKIP (fix.md exists)
+[21:53:08]     2026-07-29 21:53:05,745 [INFO] [Parse] 大地巡旅_fix.md
+[21:53:08]     2026-07-29 21:53:06,121 [INFO]   1759 blocks
+[21:53:08]     2026-07-29 21:53:06,125 [INFO]   62 chunks (1P, 61C)
+[21:53:08]     2026-07-29 21:53:06,126 [INFO] [Embed] 62 chunks (model=BAAI/bge-m3, dim=1024)
+[21:53:08]     2026-07-29 21:53:06,172 [INFO]   Saved: 124 vectors (248KB)
+[21:53:08]     2026-07-29 21:53:06,173 [INFO] [BM25] Rebuilding for 62 chunks
+[21:53:08]     Building prefix dict from the default dictionary ...
+[21:53:08]     2026-07-29 21:53:06,173 [DEBUG] Building prefix dict from the default dictionary ...
+[21:53:08]     Loading model from cache /tmp/jieba.cache
+[21:53:08]     2026-07-29 21:53:06,174 [DEBUG] Loading model from cache /tmp/jieba.cache
+[21:53:08]     Loading model cost 1.146 seconds.
+[21:53:08]     2026-07-29 21:53:07,319 [DEBUG] Loading model cost 1.146 seconds.
+[21:53:08]     Prefix dict has been built successfully.
+[21:53:08]     2026-07-29 21:53:07,320 [DEBUG] Prefix dict has been built successfully.
+[21:53:08]     2026-07-29 21:53:08,129 [DEBUG] Building index from tokens
+[21:53:08]     
+[21:53:08]     BM25S Create Vocab:   0%|          | 0/62 [00:00<?, ?it/s]
+[21:53:08]                                                               
+[21:53:08]     
+[21:53:08]     BM25S Convert tokens to indices:   0%|          | 0/62 [00:00<?, ?it/s]
+[21:53:08]                                                                            
+[21:53:08]     
+[21:53:08]     BM25S Count Tokens:   0%|          | 0/62 [00:00<?, ?it/s]
+[21:53:08]                                                               
+[21:53:08]     
+[21:53:08]     BM25S Compute Scores:   0%|          | 0/62 [00:00<?, ?it/s]
+[21:53:08]                                                                 
+[21:53:08]     2026-07-29 21:53:08,230 [INFO]   Done in 2s
+[21:53:08]     2026-07-29 21:53:08,242 [INFO] DONE in 2s
+[21:53:08]     2026-07-29 21:53:08,242 [INFO]   .md: /home/nitrazepam/Cosight/deep-cosight/industrial_rag/add_test_raw/大地巡旅.md
+[21:53:08]     2026-07-29 21:53:08,243 [INFO]   _fix.md: /home/nitrazepam/Cosight/deep-cosight/industrial_rag/add_test_raw/大地巡旅_fix.md
+[21:53:08]   [PASS] file re-added
+[21:53:08] 
+============================================================
+[21:53:08] STEP: 8. Verify re-add
+[21:53:08] ============================================================
+[21:53:08]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step6_query_interface.py --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_empty 大地巡旅 罗德岛
+[21:53:32]     Query: 大地巡旅 罗德岛
+[21:53:32]     
+[21:53:32]     ============================================================
+[21:53:32]     根据提供的资料，“大地巡旅”是《明日方舟》官方世界观设定集的全称，全名为**《大地巡旅：〈明日方舟〉官方世界观设定集》**，由作者**E.E.埃里克森博士**撰写，浙江摄影出版社出版。
+[21:53:32]     
+[21:53:32]     该书与“罗德岛”有直接且明确的关联：
+[21:53:32]     1.  **创作缘起**：作者埃里克森博士在1085年从维多利亚国立大学退休后，结识了后来建立**罗德岛制药**的**凯尔希医生**。正是凯尔希医生鼓励他将想法付诸行动，撰写这本面向大众的泰拉世界科普读物。
+[21:53:32]     2.  **内容定位**：书中涵盖泰拉世界的源石、天灾、矿石病、科技、生物与种族等知识，旨在填补全泰拉范围内知识普及教育的空白，目标读者是所有想了解这片大地的人。
+[21:53:32]     
+[21:53:32]     因此，“大地巡旅”不仅是官方设定集，其诞生直接源于罗德岛创始人凯尔希医生的鼓励与支持，书中内容也系统介绍了罗德岛所处的泰拉世界背景。
+[21:53:32]     
+[21:53:32]     ============================================================
+[21:53:32]     Time: 23237.5ms  |  Sources: 1
+[21:53:32]       [1] 大地巡旅
+[21:53:32]     Loading: test_empty
+[21:53:32]       D:1 C:62 V:124 SI:0 FI:0
+[21:53:32]     Building prefix dict from the default dictionary ...
+[21:53:32]     Loading model from cache /tmp/jieba.cache
+[21:53:32]     Loading model cost 1.132 seconds.
+[21:53:32]     Prefix dict has been built successfully.
+[21:53:32]     
+[21:53:32]     BM25S Retrieve:   0%|          | 0/1 [00:00<?, ?it/s]
+[21:53:32]   [PASS] query returns 大地巡旅 again
+[21:53:32] 
+============================================================
+[21:53:32] STEP: 9. Duplicate add (should fail)
+[21:53:32] ============================================================
+[21:53:32]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py file add /home/nitrazepam/Cosight/deep-cosight/industrial_rag/add_test_raw/大地巡旅.pdf --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_empty
+[21:53:33]     
+[21:53:33]     2026-07-29 21:53:33,239 [INFO] ============================================================
+[21:53:33]     2026-07-29 21:53:33,239 [INFO] ADD: 大地巡旅.pdf -> test_empty
+[21:53:33]     2026-07-29 21:53:33,239 [INFO] Category: textbooks
+[21:53:33]     2026-07-29 21:53:33,239 [INFO] [Phase 1+2] SKIP (fix.md exists)
+[21:53:33]     2026-07-29 21:53:33,239 [INFO] [Parse] 大地巡旅_fix.md
+[21:53:33]     2026-07-29 21:53:33,612 [INFO]   1759 blocks
+[21:53:33]     2026-07-29 21:53:33,616 [ERROR]   Document already exists: textbooks_大地巡旅
+[21:53:33]   [PASS] duplicate rejected
+[21:53:33] 
+============================================================
+[21:53:33] STEP: 10. Create inherited KB from production
+[21:53:33] ============================================================
+[21:53:33]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py kb create test_inherited --from /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/versions/20260729_013732
+[21:53:34]     
+[21:53:34]     2026-07-29 21:53:34,704 [INFO] KB created: test_inherited (inherited from 20260729_013732)
+[21:53:34]   [PASS] kb created from production
+[21:53:34] 
+============================================================
+[21:53:34] STEP: 11. Query production-like query on inherited KB
+[21:53:34] ============================================================
+[21:53:34]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step6_query_interface.py --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_inherited IEC 61508 对安全生命周期的总体要求是什么
+[21:54:03]     Query: IEC 61508 对安全生命周期的总体要求是什么
+[21:54:03]     
+[21:54:03]     ============================================================
+[21:54:03]     根据IEC 61508系列标准，其对安全生命周期的总体要求主要体现在必须遵循一个系统化、结构化的**整体安全生命周期**模型，并基于此模型进行全生命周期的管理和文档化。具体要点如下：
+[21:54:03]     
+[21:54:03]     1.  **必须遵循特定的生命周期模型**：标准要求将图2中指定的“整体安全生命周期”作为符合性声明的基础。如果使用其他生命周期模型，则必须明确指定并说明其等效性。该生命周期覆盖了从初始概念到最终停用的所有阶段。
+[21:54:03]     
+[21:54:03]     2.  **涵盖完整的16个阶段**：标准明确列出了整体安全生命周期的具体阶段，要求每个阶段都必须被应用并满足相应的要求。这些阶段包括：
+[21:54:03]         -   概念（Concept）
+[21:54:03]         -   整体范围定义（Overall scope definition）
+[21:54:03]         -   危险和风险分析（Hazard and risk analysis）
+[21:54:03]         -   整体安全要求（Overall safety requirements）
+[21:54:03]         -   整体安全要求分配（Overall safety requirements allocation）
+[21:54:03]         -   整体运行和维护规划（Overall operation and maintenance planning）
+[21:54:03]         -   整体安全验证规划（Overall safety validation planning）
+[21:54:03]         -   整体安装和调试规划（Overall installation and commissioning planning）
+[21:54:03]         -   整体可行性验证规划（Overall feasibility validation planning）
+[21:54:03]         -   E/E/PE安全要求规范（E/E/PE safety requirements specifications）
+[21:54:03]         -   E/E/PE安全相关系统的实现、安装、验证、运行维护及停用处置（E/E/PE safety-related systems: Realisation, Installation, Validation, Operation & Maintenance, Decommissioning）
+[21:54:03]     
+[21:54:03]     3.  **明确生命周期的双重目标**：
+[21:54:03]         -   **系统化结构**：首要目标是通过系统化的方式组织安全生命周期各阶段，以达成所需的E/E/PE安全相关系统的功能安全。
+[21:54:03]         -   **文档化信息**：第二个目标是记录与功能安全相关的所有关键信息，并贯穿整个生命周期。
+[21:54:03]     
+[21:54:03]     4.  **要求整合管理与技术活动**：标准要求将**功能安全管理**的要求（见标准第6条）与整体安全生命周期的各个阶段同步进行，确保管理活动与技术实现活动紧密结合。
+[21:54:03]     
+[21:54:03]     5.  **作为整体框架的基础**：IEC 61508-1（一般要求）为功能安全的实现提供了总体框架。整体安全生命周期是该框架的核心，用于指导后续各部分（如IEC 61508-2对E/E/PE系统硬件的要求，IEC 61508-3对软件的要求）的具体实施。
+[21:54:03]     
+[21:54:03]     **总结**：IEC 61508对安全生命周期的总体要求是：必须采用并严格遵循一个包含16个特定阶段的系统化整体安全生命周期模型（如图2所示），在对其所有阶段进行有效管理并记录关键信息的基础上，实现E/E/PE安全相关系统的功能安全。
+[21:54:03]     
+[21:54:03]     ============================================================
+[21:54:03]     Time: 26929.5ms  |  Sources: 5
+[21:54:03]       [1] IEC 61508-3
+[21:54:03]       [2] IEC 61508-1
+[21:54:03]       [3] IEC 61508-2
+[21:54:03]       [4] IEC_61508-4
+[21:54:03]       [5] IEC_61508-7
+[21:54:03]     Loading: test_inherited
+[21:54:03]       D:316 C:19699 V:17812 SI:123 FI:20
+[21:54:03]     Building prefix dict from the default dictionary ...
+[21:54:03]     Loading model from cache /tmp/jieba.cache
+[21:54:03]     Loading model cost 1.155 seconds.
+[21:54:03]     Prefix dict has been built successfully.
+[21:54:03]     
+[21:54:03]     BM25S Retrieve:   0%|          | 0/1 [00:00<?, ?it/s]
+[21:54:03]   [PASS] query IEC 61508 works
+[21:54:03] 
+============================================================
+[21:54:03] STEP: 12. Merge test_empty into inherited
+[21:54:03] ============================================================
+[21:54:03]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py kb merge /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_empty /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_inherited
+[21:55:35]     
+[21:55:35]     2026-07-29 21:54:04,206 [INFO] [MERGE] test_empty -> test_inherited
+[21:55:35]     2026-07-29 21:54:04,214 [INFO]   Adding 1 new documents
+[21:55:35]     2026-07-29 21:54:04,649 [INFO] [Embed] 62 chunks (model=BAAI/bge-m3, dim=1024)
+[21:55:35]     2026-07-29 21:54:04,650 [INFO]   Cached: 0, To fetch: 62
+[21:55:35]     2026-07-29 21:54:08,087 [INFO]   Saved: 17874 vectors (35748KB)
+[21:55:35]     2026-07-29 21:54:08,618 [INFO] [BM25] Rebuilding for 19761 chunks
+[21:55:35]     Building prefix dict from the default dictionary ...
+[21:55:35]     2026-07-29 21:54:08,682 [DEBUG] Building prefix dict from the default dictionary ...
+[21:55:35]     Loading model from cache /tmp/jieba.cache
+[21:55:35]     2026-07-29 21:54:08,683 [DEBUG] Loading model from cache /tmp/jieba.cache
+[21:55:35]     Loading model cost 1.141 seconds.
+[21:55:35]     2026-07-29 21:54:09,824 [DEBUG] Loading model cost 1.141 seconds.
+[21:55:35]     Prefix dict has been built successfully.
+[21:55:35]     2026-07-29 21:54:09,824 [DEBUG] Prefix dict has been built successfully.
+[21:55:35]     2026-07-29 21:55:24,599 [DEBUG] Building index from tokens
+[21:55:35]     
+[21:55:35]     BM25S Create Vocab:   0%|          | 0/19761 [00:00<?, ?it/s]
+[21:55:35]     BM25S Create Vocab:  12%|█▏        | 2307/19761 [00:00<00:00, 23066.45it/s]
+[21:55:35]     BM25S Create Vocab:  23%|██▎       | 4614/19761 [00:00<00:00, 21824.79it/s]
+[21:55:35]     BM25S Create Vocab:  37%|███▋      | 7294/19761 [00:00<00:00, 24020.34it/s]
+[21:55:35]     BM25S Create Vocab:  50%|█████     | 9896/19761 [00:00<00:00, 24786.69it/s]
+[21:55:35]     BM25S Create Vocab:  64%|██████▎   | 12590/19761 [00:00<00:00, 25553.25it/s]
+[21:55:35]     BM25S Create Vocab:  77%|███████▋  | 15183/19761 [00:00<00:00, 25676.41it/s]
+[21:55:35]     BM25S Create Vocab:  90%|████████▉ | 17755/19761 [00:00<00:00, 22645.25it/s]
+[21:55:35]                                                                                 
+[21:55:35]     
+[21:55:35]     BM25S Convert tokens to indices:   0%|          | 0/19761 [00:00<?, ?it/s]
+[21:55:35]     BM25S Convert tokens to indices:   4%|▍         | 755/19761 [00:00<00:02, 7544.29it/s]
+[21:55:35]     BM25S Convert tokens to indices:   8%|▊         | 1510/19761 [00:00<00:02, 7365.91it/s]
+[21:55:35]     BM25S Convert tokens to indices:  11%|█▏        | 2247/19761 [00:00<00:02, 6997.79it/s]
+[21:55:35]     BM25S Convert tokens to indices:  15%|█▍        | 2949/19761 [00:00<00:02, 6316.87it/s]
+[21:55:35]     BM25S Convert tokens to indices:  18%|█▊        | 3609/19761 [00:00<00:02, 6408.12it/s]
+[21:55:35]     BM25S Convert tokens to indices:  22%|██▏       | 4276/19761 [00:00<00:02, 6491.63it/s]
+[21:55:35]     BM25S Convert tokens to indices:  25%|██▍       | 4930/19761 [00:00<00:02, 5901.87it/s]
+[21:55:35]     BM25S Convert tokens to indices:  28%|██▊       | 5561/19761 [00:00<00:02, 6019.62it/s]
+[21:55:35]     BM25S Convert tokens to indices:  31%|███▏      | 6218/19761 [00:00<00:02, 6178.56it/s]
+[21:55:35]     BM25S Convert tokens to indices:  35%|███▌      | 6931/19761 [00:01<00:01, 6457.57it/s]
+[21:55:35]     BM25S Convert tokens to indices:  38%|███▊      | 7585/19761 [00:01<00:01, 6479.73it/s]
+[21:55:35]     BM25S Convert tokens to indices:  42%|████▏     | 8253/19761 [00:01<00:01, 6538.19it/s]
+[21:55:35]     BM25S Convert tokens to indices:  45%|████▌     | 8942/19761 [00:01<00:01, 6642.69it/s]
+[21:55:35]     BM25S Convert tokens to indices:  49%|████▉     | 9669/19761 [00:01<00:01, 6752.24it/s]
+[21:55:35]     BM25S Convert tokens to indices:  53%|█████▎    | 10376/19761 [00:01<00:01, 6846.06it/s]
+[21:55:35]     BM25S Convert tokens to indices:  56%|█████▌    | 11063/19761 [00:01<00:01, 6845.45it/s]
+[21:55:35]     BM25S Convert tokens to indices:  59%|█████▉    | 11749/19761 [00:01<00:01, 5491.58it/s]
+[21:55:35]     BM25S Convert tokens to indices:  63%|██████▎   | 12357/19761 [00:01<00:01, 5639.83it/s]
+[21:55:35]     BM25S Convert tokens to indices:  66%|██████▌   | 12954/19761 [00:02<00:01, 5670.68it/s]
+[21:55:35]     BM25S Convert tokens to indices:  69%|██████▉   | 13619/19761 [00:02<00:01, 5937.66it/s]
+[21:55:35]     BM25S Convert tokens to indices:  72%|███████▏  | 14246/19761 [00:02<00:00, 6030.41it/s]
+[21:55:35]     BM25S Convert tokens to indices:  75%|███████▌  | 14872/19761 [00:02<00:00, 6094.77it/s]
+[21:55:35]     BM25S Convert tokens to indices:  78%|███████▊  | 15492/19761 [00:02<00:00, 5929.56it/s]
+[21:55:35]     BM25S Convert tokens to indices:  81%|████████▏ | 16093/19761 [00:02<00:00, 5899.44it/s]
+[21:55:35]     BM25S Convert tokens to indices:  84%|████████▍ | 16689/19761 [00:02<00:00, 5845.98it/s]
+[21:55:35]     BM25S Convert tokens to indices:  87%|████████▋ | 17278/19761 [00:02<00:00, 5795.57it/s]
+[21:55:35]     BM25S Convert tokens to indices:  91%|█████████ | 18028/19761 [00:02<00:00, 6285.89it/s]
+[21:55:35]     BM25S Convert tokens to indices:  95%|█████████▌| 18813/19761 [00:02<00:00, 6743.35it/s]
+[21:55:35]     BM25S Convert tokens to indices:  99%|█████████▊| 19491/19761 [00:03<00:00, 5591.66it/s]
+[21:55:35]                                                                                             
+[21:55:35]     
+[21:55:35]     BM25S Count Tokens:   0%|          | 0/19761 [00:00<?, ?it/s]
+[21:55:35]     BM25S Count Tokens:   6%|▋         | 1279/19761 [00:00<00:01, 12787.02it/s]
+[21:55:35]     BM25S Count Tokens:  13%|█▎        | 2558/19761 [00:00<00:01, 11231.55it/s]
+[21:55:35]     BM25S Count Tokens:  19%|█▊        | 3694/19761 [00:00<00:01, 10876.68it/s]
+[21:55:35]     BM25S Count Tokens:  24%|██▍       | 4789/19761 [00:00<00:01, 10902.63it/s]
+[21:55:35]     BM25S Count Tokens:  30%|██▉       | 5922/19761 [00:00<00:01, 11046.32it/s]
+[21:55:35]     BM25S Count Tokens:  36%|███▌      | 7049/19761 [00:00<00:01, 11119.86it/s]
+[21:55:35]     BM25S Count Tokens:  41%|████▏     | 8164/19761 [00:00<00:01, 11034.56it/s]
+[21:55:35]     BM25S Count Tokens:  47%|████▋     | 9269/19761 [00:00<00:00, 11009.92it/s]
+[21:55:35]     BM25S Count Tokens:  54%|█████▎    | 10576/19761 [00:00<00:00, 11640.23it/s]
+[21:55:35]     BM25S Count Tokens:  59%|█████▉    | 11742/19761 [00:01<00:00, 11566.43it/s]
+[21:55:35]     BM25S Count Tokens:  65%|██████▌   | 12900/19761 [00:01<00:00, 11428.63it/s]
+[21:55:35]     BM25S Count Tokens:  71%|███████   | 14044/19761 [00:01<00:00, 11327.54it/s]
+[21:55:35]     BM25S Count Tokens:  77%|███████▋  | 15178/19761 [00:01<00:00, 11180.95it/s]
+[21:55:35]     BM25S Count Tokens:  82%|████████▏ | 16297/19761 [00:01<00:00, 10455.22it/s]
+[21:55:35]     BM25S Count Tokens:  88%|████████▊ | 17352/19761 [00:01<00:00, 10257.88it/s]
+[21:55:35]     BM25S Count Tokens:  94%|█████████▍| 18605/19761 [00:01<00:00, 10901.64it/s]
+[21:55:35]     BM25S Count Tokens: 100%|█████████▉| 19729/19761 [00:01<00:00, 10998.81it/s]
+[21:55:35]                                                                                 
+[21:55:35]     
+[21:55:35]     BM25S Compute Scores:   0%|          | 0/19761 [00:00<?, ?it/s]
+[21:55:35]     BM25S Compute Scores:   3%|▎         | 515/19761 [00:00<00:03, 5142.24it/s]
+[21:55:35]     BM25S Compute Scores:   5%|▌         | 1034/19761 [00:00<00:03, 5169.97it/s]
+[21:55:35]     BM25S Compute Scores:   8%|▊         | 1560/19761 [00:00<00:03, 5208.63it/s]
+[21:55:35]     BM25S Compute Scores:  11%|█         | 2081/19761 [00:00<00:03, 5129.95it/s]
+[21:55:35]     BM25S Compute Scores:  13%|█▎        | 2596/19761 [00:00<00:03, 5133.99it/s]
+[21:55:35]     BM25S Compute Scores:  16%|█▌        | 3110/19761 [00:00<00:03, 4974.62it/s]
+[21:55:35]     BM25S Compute Scores:  18%|█▊        | 3609/19761 [00:00<00:03, 4939.34it/s]
+[21:55:35]     BM25S Compute Scores:  21%|██        | 4106/19761 [00:00<00:03, 4948.64it/s]
+[21:55:35]     BM25S Compute Scores:  23%|██▎       | 4602/19761 [00:00<00:03, 4789.38it/s]
+[21:55:35]     BM25S Compute Scores:  26%|██▌       | 5083/19761 [00:01<00:03, 4625.08it/s]
+[21:55:35]     BM25S Compute Scores:  28%|██▊       | 5567/19761 [00:01<00:03, 4685.49it/s]
+[21:55:35]     BM25S Compute Scores:  31%|███       | 6052/19761 [00:01<00:02, 4732.70it/s]
+[21:55:35]     BM25S Compute Scores:  33%|███▎      | 6527/19761 [00:01<00:02, 4732.65it/s]
+[21:55:35]     BM25S Compute Scores:  36%|███▌      | 7042/19761 [00:01<00:02, 4848.52it/s]
+[21:55:35]     BM25S Compute Scores:  38%|███▊      | 7528/19761 [00:01<00:02, 4551.15it/s]
+[21:55:35]     BM25S Compute Scores:  40%|████      | 7988/19761 [00:01<00:02, 4361.15it/s]
+[21:55:35]     BM25S Compute Scores:  43%|████▎     | 8452/19761 [00:01<00:02, 4438.94it/s]
+[21:55:35]     BM25S Compute Scores:  45%|████▌     | 8941/19761 [00:01<00:02, 4566.09it/s]
+[21:55:35]     BM25S Compute Scores:  48%|████▊     | 9460/19761 [00:01<00:02, 4746.06it/s]
+[21:55:35]     BM25S Compute Scores:  50%|█████     | 9938/19761 [00:02<00:02, 4755.00it/s]
+[21:55:35]     BM25S Compute Scores:  53%|█████▎    | 10439/19761 [00:02<00:01, 4828.75it/s]
+[21:55:35]     BM25S Compute Scores:  55%|█████▌    | 10924/19761 [00:02<00:01, 4678.02it/s]
+[21:55:35]     BM25S Compute Scores:  58%|█████▊    | 11394/19761 [00:02<00:01, 4663.21it/s]
+[21:55:35]     BM25S Compute Scores:  60%|██████    | 11862/19761 [00:02<00:01, 4664.79it/s]
+[21:55:35]     BM25S Compute Scores:  62%|██████▏   | 12330/19761 [00:02<00:01, 4477.35it/s]
+[21:55:35]     BM25S Compute Scores:  65%|██████▍   | 12780/19761 [00:02<00:01, 4267.99it/s]
+[21:55:35]     BM25S Compute Scores:  67%|██████▋   | 13210/19761 [00:02<00:01, 4247.03it/s]
+[21:55:35]     BM25S Compute Scores:  69%|██████▉   | 13712/19761 [00:02<00:01, 4465.77it/s]
+[21:55:35]     BM25S Compute Scores:  72%|███████▏  | 14162/19761 [00:03<00:01, 4463.10it/s]
+[21:55:35]     BM25S Compute Scores:  74%|███████▍  | 14628/19761 [00:03<00:01, 4514.79it/s]
+[21:55:35]     BM25S Compute Scores:  76%|███████▋  | 15081/19761 [00:03<00:01, 4480.96it/s]
+[21:55:35]     BM25S Compute Scores:  79%|███████▊  | 15531/19761 [00:03<00:01, 4219.06it/s]
+[21:55:35]     BM25S Compute Scores:  81%|████████  | 15970/19761 [00:03<00:00, 4263.25it/s]
+[21:55:35]     BM25S Compute Scores:  83%|████████▎ | 16399/19761 [00:03<00:00, 4164.02it/s]
+[21:55:35]     BM25S Compute Scores:  85%|████████▌ | 16819/19761 [00:03<00:00, 4173.29it/s]
+[21:55:35]     BM25S Compute Scores:  87%|████████▋ | 17238/19761 [00:03<00:00, 4063.02it/s]
+[21:55:35]     BM25S Compute Scores:  90%|████████▉ | 17759/19761 [00:03<00:00, 4392.34it/s]
+[21:55:35]     BM25S Compute Scores:  93%|█████████▎| 18300/19761 [00:03<00:00, 4688.02it/s]
+[21:55:35]     BM25S Compute Scores:  95%|█████████▌| 18848/19761 [00:04<00:00, 4918.71it/s]
+[21:55:35]     BM25S Compute Scores:  98%|█████████▊| 19393/19761 [00:04<00:00, 5074.21it/s]
+[21:55:35]                                                                                  
+[21:55:35]     2026-07-29 21:55:35,273 [INFO]   Done in 87s
+[21:55:35]     2026-07-29 21:55:35,478 [INFO]   DONE in 91s
+[21:55:35]   [PASS] merge succeeded
+[21:55:35] 
+============================================================
+[21:55:35] STEP: 13. Query IEC 61508 after merge
+[21:55:35] ============================================================
+[21:55:35]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step6_query_interface.py --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_inherited IEC 61508 对安全生命周期的总体要求是什么
+[21:56:04]     Query: IEC 61508 对安全生命周期的总体要求是什么
+[21:56:04]     
+[21:56:04]     ============================================================
+[21:56:04]     根据 IEC 61508 系列标准，对安全生命周期的总体要求是必须采用并遵循一个结构化的**总体安全生命周期（Overall safety lifecycle）**，作为实现功能安全的基础框架。该生命周期定义在标准第1部分的**图2（Figure 2）**中，涵盖从初始概念到最终退役的完整过程，并需结合其他部分（如第2、3部分）的细化要求。以下是具体要求的总结：
+[21:56:04]     
+[21:56:04]     ### 1. 必须采用图2规定的安全生命周期阶段
+[21:56:04]     IEC 61508 要求所有安全相关系统（特别是 E/E/PE 系统）的开发、运行和维护都必须按照图2列出的15个阶段进行。这些阶段包括：
+[21:56:04]     - 1. 概念（Concept）
+[21:56:04]     - 2. 总体范围定义（Overall scope definition）
+[21:56:04]     - 3. 危险与风险分析（Hazard and risk analysis）
+[21:56:04]     - 4. 总体安全要求（Overall safety requirements）
+[21:56:04]     - 5. 总体安全要求分配（Overall safety requirements allocation）
+[21:56:04]     - 6. 总体运行和维护规划（Overall operation and maintenance planning）
+[21:56:04]     - 7. 总体安全验证规划（Overall safety validation planning）
+[21:56:04]     - 8. 总体安装与调试规划（Overall installation and commissioning planning）
+[21:56:04]     - 9. 总体可行性验证规划（Overall feasibility validation planning）——此阶段在原文中标注为可能存在笔误或OCR错误，通常应为“总体安全安装与调试规划”，但实际以图2标准定义为准。
+[21:56:04]     - 10. E/E/PE 安全要求规范（E/E/PE safety requirements specifications）
+[21:56:04]     - 11. E/E/PE 安全相关系统（E/E/PE safety-related systems）——包括实现阶段（参照E/E/PE系统安全生命周期）
+[21:56:04]     - 12. 总体安装与调试（Overall installation and commissioning）
+[21:56:04]     - 13. 总体安全验证（Overall safety validation）
+[21:56:04]     - 14. 总体运行、维护与修理（Overall operation, maintenance and repair）
+[21:56:04]     - 15. 退役或处置（Decommissioning or disposal）
+[21:56:04]     
+[21:56:04]     ### 2. 各阶段必须同时满足功能安全管理要求
+[21:56:04]     除了阶段本身，标准要求在整个生命周期中并行应用**功能安全管理（functional safety management）**的要求（见IEC 61508-1第6条）。这意味着每个阶段都需要明确目标、输入、输出以及相应的文档记录，确保安全活动的系统性和可追溯性。
+[21:56:04]     
+[21:56:04]     ### 3. 生命周期需考虑多种技术与系统组合
+[21:56:04]     IEC 61508 强调安全通常由多种技术（机械、液压、气动、电气、电子、可编程电子等）的系统共同实现。因此，总体安全生命周期必须不仅关注单个 E/E/PE 系统内的元件（传感器、控制器、执行器），还应考虑所有安全相关系统的组合，并在框架内协调不同技术的基础安全措施。
+[21:56:04]     
+[21:56:04]     ### 4. 生命周期框架具有通用性与可扩展性
+[21:56:04]     该生命周期是通用性的基础安全出版物，允许未来产品标准和行业标准在此基础上制定具体细则。它覆盖了从概念、设计、实现、运行、维护到退役的全部阶段，并考虑了技术快速发展的需求，确保框架的稳健性和全面性。
+[21:56:04]     
+[21:56:04]     ### 5. 要求文档化与一致性
+[21:56:04]     根据IEC 61508-1的7.1.3和7.1.4节，生命周期的首要目标是**系统地结构化各阶段**，并**记录与功能安全相关的关键信息**贯穿整个生命周期。若采用不同的生命周期模型，必须明确说明其与图2的差异。
+[21:56:04]     
+[21:56:04]     总之，IEC 61508 对安全生命周期的总体要求可概括为：**强制采用图2定义的15阶段结构化模型，并配合功能安全管理、跨技术协调、完整文档记录以及可扩展的通用框架，以确保 E/E/PE 安全相关系统在整个寿命周期内达到所需的功能安全水平。** 更多细节（如各阶段的具体输入输出要求）需查阅IEC 61508-1及相关子标准。
+[21:56:04]     
+[21:56:04]     ============================================================
+[21:56:04]     Time: 27357.9ms  |  Sources: 5
+[21:56:04]       [1] IEC 61508-3
+[21:56:04]       [2] IEC 61508-1
+[21:56:04]       [3] IEC 61508-2
+[21:56:04]       [4] IEC_61508-4
+[21:56:04]       [5] IEC_61508-7
+[21:56:04]     Loading: test_inherited
+[21:56:04]       D:317 C:19761 V:17874 SI:123 FI:20
+[21:56:04]     Building prefix dict from the default dictionary ...
+[21:56:04]     Loading model from cache /tmp/jieba.cache
+[21:56:04]     Loading model cost 1.157 seconds.
+[21:56:04]     Prefix dict has been built successfully.
+[21:56:04]     
+[21:56:04]     BM25S Retrieve:   0%|          | 0/1 [00:00<?, ?it/s]
+[21:56:04]   [PASS] query IEC 61508 still works after merge
+[21:56:04] 
+============================================================
+[21:56:04] STEP: 14. Query merged content (大地巡旅)
+[21:56:04] ============================================================
+[21:56:04]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step6_query_interface.py --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_inherited 大地巡旅 罗德岛
+[21:56:41]     Query: 大地巡旅 罗德岛
+[21:56:41]     
+[21:56:41]     ============================================================
+[21:56:41]     根据提供的资料，**《大地巡旅》（或称《大地巡航》）** 是《明日方舟》官方世界观设定集，作者为E.E.埃里克森博士。该书旨在填补泰拉世界知识普及教育的空白，帮助所有想了解这片大地的读者认识泰拉的科技、文化、历史与政治。
+[21:56:41]     
+[21:56:41]     关于**罗德岛**：书中明确提到，埃里克森博士在**1086年**（从维多利亚国立大学退休后一年）结识了**后来建立了罗德岛制药的凯尔希医生**。正是凯尔希医生鼓励他将书写成书的想法付诸行动，并给予了他支持。因此，罗德岛的建立者（凯尔希）是促成此书诞生的关键人物。
+[21:56:41]     
+[21:56:41]     然而，提供的资料**没有进一步说明罗德岛的组织结构、主要人物（如博士、阿米娅等）或具体剧情**，仅提及凯尔希医生与本书的关联。如需了解更多关于罗德岛本身的详细信息（如建立时间、宗旨、主要成员等），资料中未包含相关内容。
+[21:56:41]     
+[21:56:41]     ============================================================
+[21:56:41]     Time: 35774.0ms  |  Sources: 5
+[21:56:41]       [1] 大地巡旅
+[21:56:41]       [2] IEC 61800-5-1
+[21:56:41]       [3] 机器人操作系统ROS应用实践 (彭刚,林天麟,刘锦涛,胡春旭,姚昱,杨帆) (z-library.sk, 1lib.sk
+[21:56:41]       [4] 矩阵分析与应用（第2版） (张贤达) (z-library.sk, 1lib.sk, z-lib.sk)
+[21:56:41]       [5] IEC_61131-3
+[21:56:41]     Loading: test_inherited
+[21:56:41]       D:317 C:19761 V:17874 SI:123 FI:20
+[21:56:41]     Building prefix dict from the default dictionary ...
+[21:56:41]     Loading model from cache /tmp/jieba.cache
+[21:56:41]     Loading model cost 1.151 seconds.
+[21:56:41]     Prefix dict has been built successfully.
+[21:56:41]     
+[21:56:41]     BM25S Retrieve:   0%|          | 0/1 [00:00<?, ?it/s]
+[21:56:41]   [PASS] query returns 大地巡旅 after merge
+[21:56:41] 
+============================================================
+[21:56:41] STEP: 15. Delete merged document from inherited KB
+[21:56:41] ============================================================
+[21:56:41]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py file list --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_inherited
+[21:56:42]     test_inherited: 317 documents
+[21:56:42]       [1] BS_EN_61131-1  cat=standards  std=BS EN 61131-1  id=standards_BS_EN_61131-1
+[21:56:42]       [2] BS_EN_61131-3  cat=standards  std=BS EN 61131-3  id=standards_BS_EN_61131-3
+[21:56:42]       [3] BS_EN_61131-5  cat=standards  std=BS EN 61131-5  id=standards_BS_EN_61131-5
+[21:56:42]       [4] BS_EN_61131-7  cat=standards  std=BS EN 61131-7  id=standards_BS_EN_61131-7
+[21:56:42]       [5] BS_EN_61508-6  cat=standards  std=BS EN 61508-6  id=standards_BS_EN_61508-6
+[21:56:42]       [6] BS_EN_ISO_26262-10  cat=standards  std=ISO 26262-10  id=standards_BS_EN_ISO_26262-10
+[21:56:42]       [7] BS_EN_ISO_26262-1  cat=standards  std=ISO 26262-1  id=standards_BS_EN_ISO_26262-1
+[21:56:42]       [8] BS_EN_ISO_26262-2  cat=standards  std=ISO 26262-2  id=standards_BS_EN_ISO_26262-2
+[21:56:42]       [9] BS_EN_ISO_26262-3  cat=standards  std=ISO 26262-3  id=standards_BS_EN_ISO_26262-3
+[21:56:42]       [10] BS_EN_ISO_26262-4  cat=standards  std=ISO 26262-4  id=standards_BS_EN_ISO_26262-4
+[21:56:42]       [11] BS_EN_ISO_26262-5  cat=standards  std=ISO 26262-5  id=standards_BS_EN_ISO_26262-5
+[21:56:42]       [12] BS_EN_ISO_26262-6  cat=standards  std=ISO 26262-6  id=standards_BS_EN_ISO_26262-6
+[21:56:42]       [13] BS_EN_ISO_26262-7  cat=standards  std=ISO 26262-7  id=standards_BS_EN_ISO_26262-7
+[21:56:42]       [14] BS_EN_ISO_26262-8  cat=standards  std=ISO 26262-8  id=standards_BS_EN_ISO_26262-8
+[21:56:42]       [15] BS_EN_ISO_26262-9  cat=standards  std=ISO 26262-9  id=standards_BS_EN_ISO_26262-9
+[21:56:42]       [16] DIN_EN_61131-10  cat=standards  std=DIN EN 61131-10  id=standards_DIN_EN_61131-10
+[21:56:42]       [17] DIN_EN_61784-2-19  cat=standards  std=DIN EN 61784-2-19  id=standards_DIN_EN_61784-2-19
+[21:56:42]       [18] EN_IEC_62541-12  cat=standards  std=IEC 62541-12  id=standards_EN_IEC_62541-12
+[21:56:42]       [19] EN_IEC_62541-3  cat=standards  std=IEC 62541-3  id=standards_EN_IEC_62541-3
+[21:56:42]       [20] EN_IEC_62541-4  cat=standards  std=IEC 62541-4  id=standards_EN_IEC_62541-4
+[21:56:42]       [21] GBJ_8848  cat=standards  std=  id=standards_GBJ_8848
+[21:56:42]       [22] GB_15969.4  cat=standards  std=GB 15969.4  id=standards_GB_15969.4
+[21:56:42]       [23] GB_4793.1  cat=standards  std=GB 4793.1  id=standards_GB_4793.1
+[21:56:42]       [24] GB_T_12668.1  cat=standards  std=GB/T 12668.1  id=standards_GB_T_12668.1
+[21:56:42]       [25] GB_T_12668.2  cat=standards  std=GB/T 12668.2  id=standards_GB_T_12668.2
+[21:56:42]       [26] GB_T_12668.3  cat=standards  std=GB/T 12668.3  id=standards_GB_T_12668.3
+[21:56:42]       [27] GB_T_12668.4  cat=standards  std=GB/T 12668.4  id=standards_GB_T_12668.4
+[21:56:42]       [28] GB_T_12668.6  cat=standards  std=GB/T 12668.6  id=standards_GB_T_12668.6
+[21:56:42]       [29] GB_T_12668.8  cat=standards  std=GB/T 12668.8  id=standards_GB_T_12668.8
+[21:56:42]       [30] GB_T_15969.1  cat=standards  std=GB/T 15969.1  id=standards_GB_T_15969.1
+[21:56:42]       [31] GB_T_15969.2  cat=standards  std=GB/T 15969.2  id=standards_GB_T_15969.2
+[21:56:42]       [32] GB_T_15969.3  cat=standards  std=GB/T 15969.3  id=standards_GB_T_15969.3
+[21:56:42]       [33] GB_T_17626.10  cat=standards  std=GB/T 17626.10  id=standards_GB_T_17626.10
+[21:56:42]       [34] GB_T_17626.11  cat=standards  std=GB/T 17626.11  id=standards_GB_T_17626.11
+[21:56:42]       [35] GB_T_17626.12  cat=standards  std=GB/T 17626.12  id=standards_GB_T_17626.12
+[21:56:42]       [36] GB_T_17626.13  cat=standards  std=GB/T 17626.13  id=standards_GB_T_17626.13
+[21:56:42]       [37] GB_T_17626.14  cat=standards  std=GB/T 17626.14  id=standards_GB_T_17626.14
+[21:56:42]       [38] GB_T_17626.15  cat=standards  std=GB/T 17626.15  id=standards_GB_T_17626.15
+[21:56:42]       [39] GB_T_17626.16  cat=standards  std=GB/T 17626.16  id=standards_GB_T_17626.16
+[21:56:42]       [40] GB_T_17626.17  cat=standards  std=GB/T 17626.17  id=standards_GB_T_17626.17
+[21:56:42]       [41] GB_T_17626.18  cat=standards  std=GB/T 17626.18  id=standards_GB_T_17626.18
+[21:56:42]       [42] GB_T_17626.19  cat=standards  std=GB/T 17626.19  id=standards_GB_T_17626.19
+[21:56:42]       [43] GB_T_17626.1  cat=standards  std=GB/T 17626.1  id=standards_GB_T_17626.1
+[21:56:42]       [44] GB_T_17626.20  cat=standards  std=GB/T 17626.20  id=standards_GB_T_17626.20
+[21:56:42]       [45] GB_T_17626.21  cat=standards  std=GB/T 17626.21  id=standards_GB_T_17626.21
+[21:56:42]       [46] GB_T_17626.22  cat=standards  std=GB/T 17626.22  id=standards_GB_T_17626.22
+[21:56:42]       [47] GB_T_17626.24  cat=standards  std=GB/T 17626.24  id=standards_GB_T_17626.24
+[21:56:42]       [48] GB_T_17626.27  cat=standards  std=GB/T 17626.27  id=standards_GB_T_17626.27
+[21:56:42]       [49] GB_T_17626.28  cat=standards  std=GB/T 17626.28  id=standards_GB_T_17626.28
+[21:56:42]       [50] GB_T_17626.29  cat=standards  std=GB/T 17626.29  id=standards_GB_T_17626.29
+[21:56:42]       [51] GB_T_17626.2  cat=standards  std=GB/T 17626.2  id=standards_GB_T_17626.2
+[21:56:42]       [52] GB_T_17626.30  cat=standards  std=GB/T 17626.30  id=standards_GB_T_17626.30
+[21:56:42]       [53] GB_T_17626.3  cat=standards  std=GB/T 17626.3  id=standards_GB_T_17626.3
+[21:56:42]       [54] GB_T_17626.4  cat=standards  std=GB/T 17626.4  id=standards_GB_T_17626.4
+[21:56:42]       [55] GB_T_17626.5  cat=standards  std=GB/T 17626.5  id=standards_GB_T_17626.5
+[21:56:42]       [56] GB_T_17626.6  cat=standards  std=GB/T 17626.6  id=standards_GB_T_17626.6
+[21:56:42]       [57] GB_T_17626.7  cat=standards  std=GB/T 17626.7  id=standards_GB_T_17626.7
+[21:56:42]       [58] GB_T_17626.8  cat=standards  std=GB/T 17626.8  id=standards_GB_T_17626.8
+[21:56:42]       [59] GB_T_17626.9  cat=standards  std=GB/T 17626.9  id=standards_GB_T_17626.9
+[21:56:42]       [60] GB_T_20438.1  cat=standards  std=GB/T 20438.1  id=standards_GB_T_20438.1
+[21:56:42]       [61] GB_T_20438.2  cat=standards  std=GB/T 20438.2  id=standards_GB_T_20438.2
+[21:56:42]       [62] GB_T_20438.3  cat=standards  std=GB/T 20438.3  id=standards_GB_T_20438.3
+[21:56:42]       [63] GB_T_20438.4  cat=standards  std=GB/T 20438.4  id=standards_GB_T_20438.4
+[21:56:42]       [64] GB_T_20438.5  cat=standards  std=GB/T 20438.5  id=standards_GB_T_20438.5
+[21:56:42]       [65] GB_T_20438.6  cat=standards  std=GB/T 20438.6  id=standards_GB_T_20438.6
+[21:56:42]       [66] GB_T_20438.7  cat=standards  std=GB/T 20438.7  id=standards_GB_T_20438.7
+[21:56:42]       [67] GB_T_20438  cat=standards  std=GB/T 20438  id=standards_GB_T_20438
+[21:56:42]       [68] GB_T_26862  cat=standards  std=GB/T 26862  id=standards_GB_T_26862
+[21:56:42]       [69] GB_T_33007  cat=standards  std=GB/T 33007  id=standards_GB_T_33007
+[21:56:42]       [70] IEC 61000-4-2  cat=standards  std=IEC 61000-4-2  id=standards_IEC 61000-4-2
+[21:56:42]       [71] IEC 61000-4-4  cat=standards  std=IEC 61000-4-4  id=standards_IEC 61000-4-4
+[21:56:42]       [72] IEC 61000-4-5  cat=standards  std=IEC 61000-4-5  id=standards_IEC 61000-4-5
+[21:56:42]       [73] IEC 61131-1  cat=standards  std=IEC 61131-1  id=standards_IEC 61131-1
+[21:56:42]       [74] IEC 61131-4  cat=standards  std=IEC 61131-4  id=standards_IEC 61131-4
+[21:56:42]       [75] IEC 61131-5  cat=standards  std=IEC 61131-5  id=standards_IEC 61131-5
+[21:56:42]       [76] IEC 61131-6  cat=standards  std=IEC 61131-6  id=standards_IEC 61131-6
+[21:56:42]       [77] IEC 61131-7  cat=standards  std=IEC 61131-7  id=standards_IEC 61131-7
+[21:56:42]       [78] IEC 61508-1  cat=standards  std=IEC 61508-1  id=standards_IEC 61508-1
+[21:56:42]       [79] IEC 61508-2  cat=standards  std=IEC 61508-2  id=standards_IEC 61508-2
+[21:56:42]       [80] IEC 61508-3  cat=standards  std=IEC 61508-3  id=standards_IEC 61508-3
+[21:56:42]       [81] IEC 61800-5-1  cat=standards  std=IEC 61800-5-1  id=standards_IEC 61800-5-1
+[21:56:42]       [82] IEC 62061  cat=standards  std=IEC 62061  id=standards_IEC 62061
+[21:56:42]       [83] IEC 62443-2-1  cat=standards  std=IEC 62443-2-1  id=standards_IEC 62443-2-1
+[21:56:42]       [84] IEC 62443-3-2  cat=standards  std=IEC 62443-3-2  id=standards_IEC 62443-3-2
+[21:56:42]       [85] IEC TR 61131-8  cat=standards  std=  id=standards_IEC TR 61131-8
+[21:56:42]       [86] IEC_61000-4-20  cat=standards  std=IEC 61000-4-20  id=standards_IEC_61000-4-20
+[21:56:42]       [87] IEC_61000-4-41  cat=standards  std=IEC 61000-4-41  id=standards_IEC_61000-4-41
+[21:56:42]       [88] IEC_61000-4-6  cat=standards  std=IEC 61000-4-6  id=standards_IEC_61000-4-6
+[21:56:42]       [89] IEC_61131-10  cat=standards  std=IEC 61131-10  id=standards_IEC_61131-10
+[21:56:42]       [90] IEC_61131-2  cat=standards  std=IEC 61131-2  id=standards_IEC_61131-2
+[21:56:42]       [91] IEC_61131-3  cat=standards  std=IEC 61131-3  id=standards_IEC_61131-3
+[21:56:42]       [92] IEC_61131-9  cat=standards  std=IEC 61131-9  id=standards_IEC_61131-9
+[21:56:42]       [93] IEC_61499-1  cat=standards  std=IEC 61499-1  id=standards_IEC_61499-1
+[21:56:42]       [94] IEC_61499-2  cat=standards  std=IEC 61499-2  id=standards_IEC_61499-2
+[21:56:42]       [95] IEC_61499-3  cat=standards  std=IEC 61499-3  id=standards_IEC_61499-3
+[21:56:42]       [96] IEC_61499-4  cat=standards  std=IEC 61499-4  id=standards_IEC_61499-4
+[21:56:42]       [97] IEC_61508-4  cat=standards  std=IEC 61508-4  id=standards_IEC_61508-4
+[21:56:42]       [98] IEC_61508-5  cat=standards  std=IEC 61508-5  id=standards_IEC_61508-5
+[21:56:42]       [99] IEC_61508-6  cat=standards  std=IEC 61508-6  id=standards_IEC_61508-6
+[21:56:42]       [100] IEC_61508-7  cat=standards  std=IEC 61508-7  id=standards_IEC_61508-7
+[21:56:42]       [101] IEC_61784-3-3  cat=standards  std=IEC 61784-3-3  id=standards_IEC_61784-3-3
+[21:56:42]       [102] IEC_61784-5-22  cat=standards  std=IEC 61784-5-22  id=standards_IEC_61784-5-22
+[21:56:42]       [103] IEC_61800-1  cat=standards  std=IEC 61800-1  id=standards_IEC_61800-1
+[21:56:42]       [104] IEC_61800-3  cat=standards  std=IEC 61800-3  id=standards_IEC_61800-3
+[21:56:42]       [105] IEC_61800-5-1  cat=standards  std=IEC 61800-5-1  id=standards_IEC_61800-5-1
+[21:56:42]       [106] IEC_61800-9  cat=standards  std=IEC 61800-9  id=standards_IEC_61800-9
+[21:56:42]       [107] IEC_62443-2-1  cat=standards  std=IEC 62443-2-1  id=standards_IEC_62443-2-1
+[21:56:42]       [108] IEC_62443-3-2  cat=standards  std=IEC 62443-3-2  id=standards_IEC_62443-3-2
+[21:56:42]       [109] IEC_62541-10  cat=standards  std=IEC 62541-10  id=standards_IEC_62541-10
+[21:56:42]       [110] IEC_62541-11  cat=standards  std=IEC 62541-11  id=standards_IEC_62541-11
+[21:56:42]       [111] IEC_62541-12  cat=standards  std=IEC 62541-12  id=standards_IEC_62541-12
+[21:56:42]       [112] IEC_62541-13  cat=standards  std=IEC 62541-13  id=standards_IEC_62541-13
+[21:56:42]       [113] IEC_62541-14  cat=standards  std=IEC 62541-14  id=standards_IEC_62541-14
+[21:56:42]       [114] IEC_62541-15  cat=standards  std=IEC 62541-15  id=standards_IEC_62541-15
+[21:56:42]       [115] IEC_62541-16  cat=standards  std=IEC 62541-16  id=standards_IEC_62541-16
+[21:56:42]       [116] IEC_62541-17  cat=standards  std=IEC 62541-17  id=standards_IEC_62541-17
+[21:56:42]       [117] IEC_62541-18  cat=standards  std=IEC 62541-18  id=standards_IEC_62541-18
+[21:56:42]       [118] IEC_62541-19  cat=standards  std=IEC 62541-19  id=standards_IEC_62541-19
+[21:56:42]       [119] IEC_62541-2  cat=standards  std=IEC 62541-2  id=standards_IEC_62541-2
+[21:56:42]       [120] IEC_62541-5  cat=standards  std=IEC 62541-5  id=standards_IEC_62541-5
+[21:56:42]       [121] IEC_62541-6  cat=standards  std=IEC 62541-6  id=standards_IEC_62541-6
+[21:56:42]       [122] IEC_62541-7  cat=standards  std=IEC 62541-7  id=standards_IEC_62541-7
+[21:56:42]       [123] IEC_62541-8  cat=standards  std=IEC 62541-8  id=standards_IEC_62541-8
+[21:56:42]       [124] IEC_62541-9  cat=standards  std=IEC 62541-9  id=standards_IEC_62541-9
+[21:56:42]       [125] IEC_TR_61131-4  cat=standards  std=  id=standards_IEC_TR_61131-4
+[21:56:42]       [126] IEC_TR_61131-8  cat=standards  std=  id=standards_IEC_TR_61131-8
+[21:56:42]       [127] IEC_TS_62443-6-2  cat=standards  std=  id=standards_IEC_TS_62443-6-2
+[21:56:42]       [128] ISO-TR_3152  cat=standards  std=  id=standards_ISO-TR_3152
+[21:56:42]       [129] ISO_13849-1  cat=standards  std=ISO 13849-1  id=standards_ISO_13849-1
+[21:56:42]       [130] ISO_13849-2  cat=standards  std=ISO 13849-2  id=standards_ISO_13849-2
+[21:56:42]       [131] ISO_21434  cat=standards  std=ISO 21434  id=standards_ISO_21434
+[21:56:42]       [132] ISO_26262-10  cat=standards  std=ISO 26262-10  id=standards_ISO_26262-10
+[21:56:42]       [133] ISO_26262-11  cat=standards  std=ISO 26262-11  id=standards_ISO_26262-11
+[21:56:42]       [134] ISO_26262-12  cat=standards  std=ISO 26262-12  id=standards_ISO_26262-12
+[21:56:42]       [135] ISO_26262-1  cat=standards  std=ISO 26262-1  id=standards_ISO_26262-1
+[21:56:42]       [136] ISO_26262-2  cat=standards  std=ISO 26262-2  id=standards_ISO_26262-2
+[21:56:42]       [137] ISO_26262-3  cat=standards  std=ISO 26262-3  id=standards_ISO_26262-3
+[21:56:42]       [138] ISO_26262-4  cat=standards  std=ISO 26262-4  id=standards_ISO_26262-4
+[21:56:42]       [139] ISO_26262-5  cat=standards  std=ISO 26262-5  id=standards_ISO_26262-5
+[21:56:42]       [140] ISO_26262-6  cat=standards  std=ISO 26262-6  id=standards_ISO_26262-6
+[21:56:42]       [141] ISO_26262-7  cat=standards  std=ISO 26262-7  id=standards_ISO_26262-7
+[21:56:42]       [142] ISO_26262-8  cat=standards  std=ISO 26262-8  id=standards_ISO_26262-8
+[21:56:42]       [143] ISO_26262-9  cat=standards  std=ISO 26262-9  id=standards_ISO_26262-9
+[21:56:42]       [144] 1109.3781  cat=papers  std=  id=papers_1109.3781
+[21:56:42]       [145] 1111.1498  cat=papers  std=  id=papers_1111.1498
+[21:56:42]       [146] 1112.4113  cat=papers  std=  id=papers_1112.4113
+[21:56:42]       [147] 1211.5494  cat=papers  std=  id=papers_1211.5494
+[21:56:42]       [148] 1212.1120  cat=papers  std=  id=papers_1212.1120
+[21:56:42]       [149] 1303.0425  cat=papers  std=  id=papers_1303.0425
+[21:56:42]       [150] 1304.7934  cat=papers  std=  id=papers_1304.7934
+[21:56:42]       [151] 1308.2426  cat=papers  std=  id=papers_1308.2426
+[21:56:42]       [152] 1310.5377  cat=papers  std=  id=papers_1310.5377
+[21:56:42]       [153] 1403.5204  cat=papers  std=  id=papers_1403.5204
+[21:56:42]       [154] 1406.4924  cat=papers  std=  id=papers_1406.4924
+[21:56:42]       [155] 1503.06058  cat=papers  std=  id=papers_1503.06058
+[21:56:42]       [156] 1506.01665  cat=papers  std=  id=papers_1506.01665
+[21:56:42]       [157] 1507.05535  cat=papers  std=  id=papers_1507.05535
+[21:56:42]       [158] 1509.02861  cat=papers  std=  id=papers_1509.02861
+[21:56:42]       [159] 1512.00375  cat=papers  std=  id=papers_1512.00375
+[21:56:42]       [160] 1604.02527  cat=papers  std=  id=papers_1604.02527
+[21:56:42]       [161] 1609.05801  cat=papers  std=  id=papers_1609.05801
+[21:56:42]       [162] 1610.04395  cat=papers  std=  id=papers_1610.04395
+[21:56:42]       [163] 1612.02784  cat=papers  std=  id=papers_1612.02784
+[21:56:42]       [164] 1702.08262  cat=papers  std=  id=papers_1702.08262
+[21:56:42]       [165] 1706.03564  cat=papers  std=  id=papers_1706.03564
+[21:56:42]       [166] 1712.00006  cat=papers  std=  id=papers_1712.00006
+[21:56:42]       [167] 1802.09689  cat=papers  std=  id=papers_1802.09689
+[21:56:42]       [168] 1802.09767  cat=papers  std=  id=papers_1802.09767
+[21:56:42]       [169] 1806.01623  cat=papers  std=  id=papers_1806.01623
+[21:56:42]       [170] 1807.03475  cat=papers  std=  id=papers_1807.03475
+[21:56:42]       [171] 1807.05037  cat=papers  std=  id=papers_1807.05037
+[21:56:42]       [172] 1810.04866  cat=papers  std=  id=papers_1810.04866
+[21:56:42]       [173] 1810.09292  cat=papers  std=  id=papers_1810.09292
+[21:56:42]       [174] 1902.06026  cat=papers  std=  id=papers_1902.06026
+[21:56:42]       [175] 1911.01481  cat=papers  std=  id=papers_1911.01481
+[21:56:42]       [176] 1911.02899  cat=papers  std=  id=papers_1911.02899
+[21:56:42]       [177] 1911.09560  cat=papers  std=  id=papers_1911.09560
+[21:56:42]       [178] 1911.09615  cat=papers  std=  id=papers_1911.09615
+[21:56:42]       [179] 2001.03108  cat=papers  std=  id=papers_2001.03108
+[21:56:42]       [180] 2003.05711  cat=papers  std=  id=papers_2003.05711
+[21:56:42]       [181] 2004.04911  cat=papers  std=  id=papers_2004.04911
+[21:56:42]       [182] 2006.11141  cat=papers  std=  id=papers_2006.11141
+[21:56:42]       [183] 2008.09071  cat=papers  std=  id=papers_2008.09071
+[21:56:42]       [184] 2009.13079  cat=papers  std=  id=papers_2009.13079
+[21:56:42]       [185] 2011.08105  cat=papers  std=  id=papers_2011.08105
+[21:56:42]       [186] 2011.11355  cat=papers  std=  id=papers_2011.11355
+[21:56:42]       [187] 2012.06069  cat=papers  std=  id=papers_2012.06069
+[21:56:42]       [188] 2012.06341  cat=papers  std=  id=papers_2012.06341
+[21:56:42]       [189] 2104.01704  cat=papers  std=  id=papers_2104.01704
+[21:56:42]       [190] 2106.05025  cat=papers  std=  id=papers_2106.05025
+[21:56:42]       [191] 2107.08360  cat=papers  std=  id=papers_2107.08360
+[21:56:42]       [192] 2107.10697  cat=papers  std=  id=papers_2107.10697
+[21:56:42]       [193] 2111.04153  cat=papers  std=  id=papers_2111.04153
+[21:56:42]       [194] 2203.10416  cat=papers  std=  id=papers_2203.10416
+[21:56:42]       [195] 2203.13633  cat=papers  std=  id=papers_2203.13633
+[21:56:42]       [196] 2207.08285  cat=papers  std=  id=papers_2207.08285
+[21:56:42]       [197] 2208.05694  cat=papers  std=  id=papers_2208.05694
+[21:56:42]       [198] 2211.08080  cat=papers  std=  id=papers_2211.08080
+[21:56:42]       [199] 2211.12700  cat=papers  std=  id=papers_2211.12700
+[21:56:42]       [200] 2212.03225  cat=papers  std=  id=papers_2212.03225
+[21:56:42]       [201] 2301.04943  cat=papers  std=  id=papers_2301.04943
+[21:56:42]       [202] 2304.04111  cat=papers  std=  id=papers_2304.04111
+[21:56:42]       [203] 2304.04727  cat=papers  std=  id=papers_2304.04727
+[21:56:42]       [204] 2304.14350  cat=papers  std=  id=papers_2304.14350
+[21:56:42]       [205] 2305.07875  cat=papers  std=  id=papers_2305.07875
+[21:56:42]       [206] 2307.03004  cat=papers  std=  id=papers_2307.03004
+[21:56:42]       [207] 2312.05910  cat=papers  std=  id=papers_2312.05910
+[21:56:42]       [208] 2403.06640  cat=papers  std=  id=papers_2403.06640
+[21:56:42]       [209] 2405.18207  cat=papers  std=  id=papers_2405.18207
+[21:56:42]       [210] 2407.13257  cat=papers  std=  id=papers_2407.13257
+[21:56:42]       [211] 2407.13496  cat=papers  std=  id=papers_2407.13496
+[21:56:42]       [212] 2408.15743  cat=papers  std=  id=papers_2408.15743
+[21:56:42]       [213] 2409.07642  cat=papers  std=  id=papers_2409.07642
+[21:56:42]       [214] 2409.09848  cat=papers  std=  id=papers_2409.09848
+[21:56:42]       [215] 2411.03875  cat=papers  std=  id=papers_2411.03875
+[21:56:42]       [216] 2503.13407  cat=papers  std=  id=papers_2503.13407
+[21:56:42]       [217] 2507.02910  cat=papers  std=  id=papers_2507.02910
+[21:56:42]       [218] 2508.08153  cat=papers  std=  id=papers_2508.08153
+[21:56:42]       [219] 2508.10150  cat=papers  std=  id=papers_2508.10150
+[21:56:42]       [220] 2510.07507  cat=papers  std=  id=papers_2510.07507
+[21:56:42]       [221] 2510.26496  cat=papers  std=  id=papers_2510.26496
+[21:56:42]       [222] 2511.07713  cat=papers  std=  id=papers_2511.07713
+[21:56:42]       [223] 2601.23160  cat=papers  std=  id=papers_2601.23160
+[21:56:42]       [224] 2602.12375  cat=papers  std=  id=papers_2602.12375
+[21:56:42]       [225] 2603.29499  cat=papers  std=  id=papers_2603.29499
+[21:56:42]       [226] 2604.17391  cat=papers  std=  id=papers_2604.17391
+[21:56:42]       [227] 2604.21989  cat=papers  std=  id=papers_2604.21989
+[21:56:42]       [228] 2604.27587  cat=papers  std=  id=papers_2604.27587
+[21:56:42]       [229] 2606.29271  cat=papers  std=  id=papers_2606.29271
+[21:56:42]       [230] 2607.18488  cat=papers  std=  id=papers_2607.18488
+[21:56:42]       [231] Automatic Control Systems (Farid Golnaraghi, Benjamin C. Kuo  cat=textbooks  std=  id=textbooks_Automatic Control Systems (Farid Golnaraghi, Benjamin C. Kuo
+[21:56:42]       [232] Control Systems Engineering 8th Edition  cat=textbooks  std=  id=textbooks_Control Systems Engineering 8th Edition
+[21:56:42]       [233] ESP32 Technical Reference Manual CN  cat=textbooks  std=  id=textbooks_ESP32 Technical Reference Manual CN
+[21:56:42]       [234] Embedded Control Systems in CC++ (Jim Ledin) (z-library.sk,   cat=textbooks  std=  id=textbooks_Embedded Control Systems in CC++ (Jim Ledin) (z-library.sk, 
+[21:56:42]       [235] Feedback Control of Dynamic Systems (6th Edition) (Franklin,  cat=textbooks  std=  id=textbooks_Feedback Control of Dynamic Systems (6th Edition) (Franklin,
+[21:56:42]       [236] Model Predictive Control Theory, Computation, and Design, 2n  cat=textbooks  std=  id=textbooks_Model Predictive Control Theory, Computation, and Design, 2n
+[21:56:42]       [237] Modern Control Engineering (5th Edition). 2010. (Katsuhiko O  cat=textbooks  std=  id=textbooks_Modern Control Engineering (5th Edition). 2010. (Katsuhiko O
+[21:56:42]       [238] Optimal control theory an introduction (Donald E. Kirk) (z-l  cat=textbooks  std=  id=textbooks_Optimal control theory an introduction (Donald E. Kirk) (z-l
+[21:56:42]       [239] PID控制器参数整定方法及应用 (杨平，邓亮，徐春梅，李芹著) (z-library.sk, 1lib.sk, z-li  cat=textbooks  std=  id=textbooks_PID控制器参数整定方法及应用 (杨平，邓亮，徐春梅，李芹著) (z-library.sk, 1lib.sk, z-li
+[21:56:42]       [240] Robust and Adaptive Control  cat=textbooks  std=  id=textbooks_Robust and Adaptive Control
+[21:56:42]       [241] Robust and optimal control (Kemin Zhou, John C. Doyle, Keith  cat=textbooks  std=  id=textbooks_Robust and optimal control (Kemin Zhou, John C. Doyle, Keith
+[21:56:42]       [242] STM32嵌入式系统开发实战指南：FreeRTOS与LwIP联合移植 (单片机与嵌入式) (李志明；檀永；徐石明) (z  cat=textbooks  std=  id=textbooks_STM32嵌入式系统开发实战指南：FreeRTOS与LwIP联合移植 (单片机与嵌入式) (李志明；檀永；徐石明) (z
+[21:56:42]       [243] Sliding Mode Control Theory And Applications (Christopher Ed  cat=textbooks  std=  id=textbooks_Sliding Mode Control Theory And Applications (Christopher Ed
+[21:56:42]       [244] 基于ARM的嵌入式系统和物联网开发 (【英】佩里·肖（Perry Xiao）) (z-library.sk, 1lib.  cat=textbooks  std=  id=textbooks_基于ARM的嵌入式系统和物联网开发 (【英】佩里·肖（Perry Xiao）) (z-library.sk, 1lib.
+[21:56:42]       [245] 机器人操作系统ROS应用实践 (彭刚,林天麟,刘锦涛,胡春旭,姚昱,杨帆) (z-library.sk, 1lib.sk  cat=textbooks  std=  id=textbooks_机器人操作系统ROS应用实践 (彭刚,林天麟,刘锦涛,胡春旭,姚昱,杨帆) (z-library.sk, 1lib.sk
+[21:56:42]       [246] 矩阵分析与应用（第2版） (张贤达) (z-library.sk, 1lib.sk, z-lib.sk)  cat=textbooks  std=  id=textbooks_矩阵分析与应用（第2版） (张贤达) (z-library.sk, 1lib.sk, z-lib.sk)
+[21:56:42]       [247] 自动控制原理 第2版 (卢京潮主编；自动控制原理教学组编, 卢京潮主编 , 自动控制原理教学组编, 卢京潮 etc.)   cat=textbooks  std=  id=textbooks_自动控制原理 第2版 (卢京潮主编；自动控制原理教学组编, 卢京潮主编 , 自动控制原理教学组编, 卢京潮 etc.) 
+[21:56:42]       [248] 自动控制原理与设计 (富兰克林, Gene F.Franklin, J.David Powell etc.) (z-li  cat=textbooks  std=  id=textbooks_自动控制原理与设计 (富兰克林, Gene F.Franklin, J.David Powell etc.) (z-li
+[21:56:42]       [249] 自动控制原理习题解析（第三版） (胡寿松) (z-library.sk, 1lib.sk, z-lib.sk)  cat=textbooks  std=  id=textbooks_自动控制原理习题解析（第三版） (胡寿松) (z-library.sk, 1lib.sk, z-lib.sk)
+[21:56:42]       [250] 自动控制原理习题解答[国家级规划教材] (卢京潮, 赵忠) (z-library.sk, 1lib.sk, z-lib.  cat=textbooks  std=  id=textbooks_自动控制原理习题解答[国家级规划教材] (卢京潮, 赵忠) (z-library.sk, 1lib.sk, z-lib.
+[21:56:42]       [251] 自动控制原理（第七版） (胡寿松) (z-library.sk, 1lib.sk, z-lib.sk)  cat=textbooks  std=  id=textbooks_自动控制原理（第七版） (胡寿松) (z-library.sk, 1lib.sk, z-lib.sk)
+[21:56:42]       [252] 自动控制原理（第八版） (胡寿松、姜斌、张绍杰) (z-library.sk, 1lib.sk, z-lib.sk)  cat=textbooks  std=  id=textbooks_自动控制原理（第八版） (胡寿松、姜斌、张绍杰) (z-library.sk, 1lib.sk, z-lib.sk)
+[21:56:42]       [253] ADI AN-1067  cat=datasheets  std=  id=datasheets_ADI AN-1067
+[21:56:42]       [254] ADI AN-581  cat=datasheets  std=  id=datasheets_ADI AN-581
+[21:56:42]       [255] ADS1115  cat=datasheets  std=  id=datasheets_ADS1115
+[21:56:42]       [256] ADS1256  cat=datasheets  std=  id=datasheets_ADS1256
+[21:56:42]       [257] C12345_单片机(MCU-MPU-SOC)_STM32F407VGT6_规格书_WJ08389  cat=datasheets  std=  id=datasheets_C12345_单片机(MCU-MPU-SOC)_STM32F407VGT6_规格书_WJ08389
+[21:56:42]       [258] C144198_数模转换芯片DAC_MCP4725A0T-E-CH_规格书_数模转换芯片DAC_MCP4725A0T-E  cat=datasheets  std=  id=datasheets_C144198_数模转换芯片DAC_MCP4725A0T-E-CH_规格书_数模转换芯片DAC_MCP4725A0T-E
+[21:56:42]       [259] C14877_单片机(MCU-MPU-SOC)_ATMEGA328P-AU_规格书_单片机(MCU_MPU_SOC)_A  cat=datasheets  std=  id=datasheets_C14877_单片机(MCU-MPU-SOC)_ATMEGA328P-AU_规格书_单片机(MCU_MPU_SOC)_A
+[21:56:42]       [260] C15051_DC-DC电源芯片_MP1584EN-LF-Z_规格书_WJ1074595  cat=datasheets  std=  id=datasheets_C15051_DC-DC电源芯片_MP1584EN-LF-Z_规格书_WJ1074595
+[21:56:42]       [261] C16283_达林顿管_TIP122_规格书_WJ21385  cat=datasheets  std=  id=datasheets_C16283_达林顿管_TIP122_规格书_WJ21385
+[21:56:42]       [262] C19723770_CAN收发器_TJA1050DRG_规格书_WJ957991  cat=datasheets  std=  id=datasheets_C19723770_CAN收发器_TJA1050DRG_规格书_WJ957991
+[21:56:42]       [263] C19738_RS-485-RS-422芯片_MAX485ESA+T_规格书_WJ337218  cat=datasheets  std=  id=datasheets_C19738_RS-485-RS-422芯片_MAX485ESA+T_规格书_WJ337218
+[21:56:42]       [264] C19922_步进电机驱动芯片_L298N_规格书_WJ03685  cat=datasheets  std=  id=datasheets_C19922_步进电机驱动芯片_L298N_规格书_WJ03685
+[21:56:42]       [265] C24112_姿态传感器-陀螺仪_MPU-6050_规格书_姿态传感器_陀螺仪_MPU-6050_英文规格书  cat=datasheets  std=  id=datasheets_C24112_姿态传感器-陀螺仪_MPU-6050_规格书_姿态传感器_陀螺仪_MPU-6050_英文规格书
+[21:56:42]       [266] C2566_场效应管(MOSFET)_IRF540NPBF_规格书_WJ81476  cat=datasheets  std=  id=datasheets_C2566_场效应管(MOSFET)_IRF540NPBF_规格书_WJ81476
+[21:56:42]       [267] C2586_场效应管(MOSFET)_IRFZ44NPBF_规格书_WJ118532  cat=datasheets  std=  id=datasheets_C2586_场效应管(MOSFET)_IRFZ44NPBF_规格书_WJ118532
+[21:56:42]       [268] C2598_场效应管(MOSFET)_IRF520NPBF_规格书_WJ277028  cat=datasheets  std=  id=datasheets_C2598_场效应管(MOSFET)_IRF520NPBF_规格书_WJ277028
+[21:56:42]       [269] C2649487_环境光传感器_TCS34725FN_规格书_WJ79438  cat=datasheets  std=  id=datasheets_C2649487_环境光传感器_TCS34725FN_规格书_WJ79438
+[21:56:42]       [270] C2687423_温湿度传感器_SHT30-DIS-B10KS_规格书_WJ85195  cat=datasheets  std=  id=datasheets_C2687423_温湿度传感器_SHT30-DIS-B10KS_规格书_WJ85195
+[21:56:42]       [271] C2880291_温湿度传感器_DHT22_规格书_WJ376857  cat=datasheets  std=  id=datasheets_C2880291_温湿度传感器_DHT22_规格书_WJ376857
+[21:56:42]       [272] C2960_栅极驱动芯片_IR2104STRPBF_规格书_WJ224299  cat=datasheets  std=  id=datasheets_C2960_栅极驱动芯片_IR2104STRPBF_规格书_WJ224299
+[21:56:42]       [273] C2968_栅极驱动芯片_IR2110STRPBF_规格书_WJ120340  cat=datasheets  std=  id=datasheets_C2968_栅极驱动芯片_IR2110STRPBF_规格书_WJ120340
+[21:56:42]       [274] C2984661_反射式光电开关_TCRT5000_规格书_WJ86853  cat=datasheets  std=  id=datasheets_C2984661_反射式光电开关_TCRT5000_规格书_WJ86853
+[21:56:42]       [275] C32843_以太网控制器_W5500_规格书_以太网控制器_W5500_英文规格书  cat=datasheets  std=  id=datasheets_C32843_以太网控制器_W5500_规格书_以太网控制器_W5500_英文规格书
+[21:56:42]       [276] C347420_DC-DC电源芯片_LM2596S-3.3(UMW)_规格书_WJ1878176  cat=datasheets  std=  id=datasheets_C347420_DC-DC电源芯片_LM2596S-3.3(UMW)_规格书_WJ1878176
+[21:56:42]       [277] C347423_DC-DC电源芯片_LM2596S-ADJ(UMW)_规格书_WJ1878176  cat=datasheets  std=  id=datasheets_C347423_DC-DC电源芯片_LM2596S-ADJ(UMW)_规格书_WJ1878176
+[21:56:42]       [278] C38437_步进电机驱动芯片_A4988SETTR-T_规格书_步进电机驱动芯片_A4988SETTR-T_英文规格书  cat=datasheets  std=  id=datasheets_C38437_步进电机驱动芯片_A4988SETTR-T_规格书_步进电机驱动芯片_A4988SETTR-T_英文规格书
+[21:56:42]       [279] C41419318_晶体管输出光耦_MTLP521-1GB(SOP)_规格书_晶体管输出光耦_MTLP521-1GB(D  cat=datasheets  std=  id=datasheets_C41419318_晶体管输出光耦_MTLP521-1GB(SOP)_规格书_晶体管输出光耦_MTLP521-1GB(D
+[21:56:42]       [280] C432205_单片机(MCU-MPU-SOC)_STM32G031C8T6_规格书_WJ215307  cat=datasheets  std=  id=datasheets_C432205_单片机(MCU-MPU-SOC)_STM32G031C8T6_规格书_WJ215307
+[21:56:42]       [281] C513144_场效应管(MOSFET)_IRLZ34NPBF_规格书_WJ85474  cat=datasheets  std=  id=datasheets_C513144_场效应管(MOSFET)_IRLZ34NPBF_规格书_WJ85474
+[21:56:42]       [282] C51661_DC-DC电源芯片_XL4015E1_规格书_WJ1570548  cat=datasheets  std=  id=datasheets_C51661_DC-DC电源芯片_XL4015E1_规格书_WJ1570548
+[21:56:42]       [283] C5177_AC-DC控制器和稳压器_UC3843BN_规格书_WJ257069  cat=datasheets  std=  id=datasheets_C5177_AC-DC控制器和稳压器_UC3843BN_规格书_WJ257069
+[21:56:42]       [284] C5252902_运算放大器_LM358_规格书_WJ1176203  cat=datasheets  std=  id=datasheets_C5252902_运算放大器_LM358_规格书_WJ1176203
+[21:56:42]       [285] C54328_单片机(MCU-MPU-SOC)_STM32F429IGT6_规格书_WJ54298  cat=datasheets  std=  id=datasheets_C54328_单片机(MCU-MPU-SOC)_STM32F429IGT6_规格书_WJ54298
+[21:56:42]       [286] C6186_线性稳压器(LDO)_AMS1117-3.3_规格书_WJ27995  cat=datasheets  std=  id=datasheets_C6186_线性稳压器(LDO)_AMS1117-3.3_规格书_WJ27995
+[21:56:42]       [287] C6187_线性稳压器(LDO)_AMS1117-5.0_规格书_WJ27995  cat=datasheets  std=  id=datasheets_C6187_线性稳压器(LDO)_AMS1117-5.0_规格书_WJ27995
+[21:56:42]       [288] C648660_有刷直流电机驱动芯片_BTN7960B_规格书_WJ1759626  cat=datasheets  std=  id=datasheets_C648660_有刷直流电机驱动芯片_BTN7960B_规格书_WJ1759626
+[21:56:42]       [289] C66405_晶体管输出光耦_PC817X2CSP9F_规格书_WJ323798  cat=datasheets  std=  id=datasheets_C66405_晶体管输出光耦_PC817X2CSP9F_规格书_WJ323798
+[21:56:42]       [290] C701341_WIFI模块_ESP32-WROOM-32E-N4_规格书_WJ1389029  cat=datasheets  std=  id=datasheets_C701341_WIFI模块_ESP32-WROOM-32E-N4_规格书_WJ1389029
+[21:56:42]       [291] C726001_姿态传感器-陀螺仪_ICM-20948_规格书_WJ164427  cat=datasheets  std=  id=datasheets_C726001_姿态传感器-陀螺仪_ICM-20948_规格书_WJ164427
+[21:56:42]       [292] C7377_运算放大器_MCP6002T-I-SN_规格书_WJ146586  cat=datasheets  std=  id=datasheets_C7377_运算放大器_MCP6002T-I-SN_规格书_WJ146586
+[21:56:42]       [293] C7501763_温度传感器_MLX90614ESF-BCC-000-TU_规格书_WJ1178313  cat=datasheets  std=  id=datasheets_C7501763_温度传感器_MLX90614ESF-BCC-000-TU_规格书_WJ1178313
+[21:56:42]       [294] C77950_可控硅输出光耦_MOC3063S-TA1_规格书_WJ01745  cat=datasheets  std=  id=datasheets_C77950_可控硅输出光耦_MOC3063S-TA1_规格书_WJ01745
+[21:56:42]       [295] C77967_无线收发芯片_ESP8266EX_规格书_无线收发芯片_ESP8266EX_中文规格书  cat=datasheets  std=  id=datasheets_C77967_无线收发芯片_ESP8266EX_规格书_无线收发芯片_ESP8266EX_中文规格书
+[21:56:42]       [296] C7950_运算放大器_LM358DR2G_规格书_WJ197166  cat=datasheets  std=  id=datasheets_C7950_运算放大器_LM358DR2G_规格书_WJ197166
+[21:56:42]       [297] C83291_压力传感器_BMP280_规格书_压力传感器_BMP280_英文规格书  cat=datasheets  std=  id=datasheets_C83291_压力传感器_BMP280_规格书_压力传感器_BMP280_英文规格书
+[21:56:42]       [298] C84681_USB转换芯片_CH340C_规格书_CH340DS1_CN  cat=datasheets  std=  id=datasheets_C84681_USB转换芯片_CH340C_规格书_CH340DS1_CN
+[21:56:42]       [299] C8734_单片机(MCU-MPU-SOC)_STM32F103C8T6_规格书_WJ115614  cat=datasheets  std=  id=datasheets_C8734_单片机(MCU-MPU-SOC)_STM32F103C8T6_规格书_WJ115614
+[21:56:42]       [300] C8791_无线收发芯片_NRF24L01P-R_规格书_无线收发芯片_NRF24L01P-R_英文规格书  cat=datasheets  std=  id=datasheets_C8791_无线收发芯片_NRF24L01P-R_规格书_无线收发芯片_NRF24L01P-R_英文规格书
+[21:56:42]       [301] C93216_姿态传感器-陀螺仪_BNO055_规格书_WJ250333  cat=datasheets  std=  id=datasheets_C93216_姿态传感器-陀螺仪_BNO055_规格书_WJ250333
+[21:56:42]       [302] CC1101RGPT  cat=datasheets  std=  id=datasheets_CC1101RGPT
+[21:56:42]       [303] DRV8825  cat=datasheets  std=  id=datasheets_DRV8825
+[21:56:42]       [304] LM324  cat=datasheets  std=  id=datasheets_LM324
+[21:56:42]       [305] NXP-TJA1050T  cat=datasheets  std=  id=datasheets_NXP-TJA1050T
+[21:56:42]       [306] ST AN1705  cat=datasheets  std=  id=datasheets_ST AN1705
+[21:56:42]       [307] ST AN4323  cat=datasheets  std=  id=datasheets_ST AN4323
+[21:56:42]       [308] ST UM1722  cat=datasheets  std=  id=datasheets_ST UM1722
+[21:56:42]       [309] TI AN-1286  cat=datasheets  std=  id=datasheets_TI AN-1286
+[21:56:42]       [310] TI AN-263  cat=datasheets  std=  id=datasheets_TI AN-263
+[21:56:42]       [311] TI SLAU723  cat=datasheets  std=  id=datasheets_TI SLAU723
+[21:56:42]       [312] TI SPRABQ6  cat=datasheets  std=  id=datasheets_TI SPRABQ6
+[21:56:42]       [313] TL494  cat=datasheets  std=  id=datasheets_TL494
+[21:56:42]       [314] TPS5430  cat=datasheets  std=  id=datasheets_TPS5430
+[21:56:42]       [315] TPS54331  cat=datasheets  std=  id=datasheets_TPS54331
+[21:56:42]       [316] esp32_technical_reference_manual_cn  cat=datasheets  std=  id=datasheets_esp32_technical_reference_manual_cn
+[21:56:42]       [317] 大地巡旅  cat=textbooks  std=  id=textbooks_大地巡旅
+[21:56:42]     
+[21:56:42]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py file delete textbooks_大地巡旅 --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_inherited
+[21:58:11]     
+[21:58:11]     2026-07-29 21:56:43,350 [INFO] [DELETE] textbooks_大地巡旅
+[21:58:11]     2026-07-29 21:56:43,885 [INFO]   Removing 62 chunks, 19699 remaining
+[21:58:11]     2026-07-29 21:56:44,891 [INFO] [BM25] Rebuilding for 19699 chunks
+[21:58:11]     Building prefix dict from the default dictionary ...
+[21:58:11]     2026-07-29 21:56:44,953 [DEBUG] Building prefix dict from the default dictionary ...
+[21:58:11]     Loading model from cache /tmp/jieba.cache
+[21:58:11]     2026-07-29 21:56:44,954 [DEBUG] Loading model from cache /tmp/jieba.cache
+[21:58:11]     Loading model cost 1.159 seconds.
+[21:58:11]     2026-07-29 21:56:46,112 [DEBUG] Loading model cost 1.159 seconds.
+[21:58:11]     Prefix dict has been built successfully.
+[21:58:11]     2026-07-29 21:56:46,112 [DEBUG] Prefix dict has been built successfully.
+[21:58:11]     2026-07-29 21:58:00,648 [DEBUG] Building index from tokens
+[21:58:11]     
+[21:58:11]     BM25S Create Vocab:   0%|          | 0/19699 [00:00<?, ?it/s]
+[21:58:11]     BM25S Create Vocab:  12%|█▏        | 2283/19699 [00:00<00:00, 22826.92it/s]
+[21:58:11]     BM25S Create Vocab:  23%|██▎       | 4566/19699 [00:00<00:00, 21384.71it/s]
+[21:58:11]     BM25S Create Vocab:  36%|███▋      | 7173/19699 [00:00<00:00, 23445.11it/s]
+[21:58:11]     BM25S Create Vocab:  50%|█████     | 9856/19699 [00:00<00:00, 24747.12it/s]
+[21:58:11]     BM25S Create Vocab:  64%|██████▍   | 12607/19699 [00:00<00:00, 25719.69it/s]
+[21:58:11]     BM25S Create Vocab:  77%|███████▋  | 15187/19699 [00:00<00:00, 25615.64it/s]
+[21:58:11]     BM25S Create Vocab:  90%|█████████ | 17754/19699 [00:00<00:00, 22470.42it/s]
+[21:58:11]                                                                                 
+[21:58:11]     
+[21:58:11]     BM25S Convert tokens to indices:   0%|          | 0/19699 [00:00<?, ?it/s]
+[21:58:11]     BM25S Convert tokens to indices:   4%|▍         | 780/19699 [00:00<00:02, 7795.96it/s]
+[21:58:11]     BM25S Convert tokens to indices:   8%|▊         | 1560/19699 [00:00<00:02, 7531.70it/s]
+[21:58:11]     BM25S Convert tokens to indices:  12%|█▏        | 2314/19699 [00:00<00:02, 7029.31it/s]
+[21:58:11]     BM25S Convert tokens to indices:  15%|█▌        | 3021/19699 [00:00<00:02, 6796.82it/s]
+[21:58:11]     BM25S Convert tokens to indices:  19%|█▉        | 3703/19699 [00:00<00:02, 6681.91it/s]
+[21:58:11]     BM25S Convert tokens to indices:  22%|██▏       | 4384/19699 [00:00<00:02, 6723.21it/s]
+[21:58:11]     BM25S Convert tokens to indices:  26%|██▌       | 5058/19699 [00:00<00:02, 5675.15it/s]
+[21:58:11]     BM25S Convert tokens to indices:  29%|██▉       | 5721/19699 [00:00<00:02, 5936.92it/s]
+[21:58:11]     BM25S Convert tokens to indices:  33%|███▎      | 6434/19699 [00:00<00:02, 6273.55it/s]
+[21:58:11]     BM25S Convert tokens to indices:  36%|███▋      | 7141/19699 [00:01<00:01, 6501.04it/s]
+[21:58:11]     BM25S Convert tokens to indices:  40%|███▉      | 7806/19699 [00:01<00:01, 6358.27it/s]
+[21:58:11]     BM25S Convert tokens to indices:  43%|████▎     | 8486/19699 [00:01<00:01, 6484.69it/s]
+[21:58:11]     BM25S Convert tokens to indices:  47%|████▋     | 9167/19699 [00:01<00:01, 6579.38it/s]
+[21:58:11]     BM25S Convert tokens to indices:  51%|█████     | 9954/19699 [00:01<00:01, 6954.89it/s]
+[21:58:11]     BM25S Convert tokens to indices:  54%|█████▍    | 10657/19699 [00:01<00:01, 6966.87it/s]
+[21:58:11]     BM25S Convert tokens to indices:  58%|█████▊    | 11358/19699 [00:01<00:01, 6925.19it/s]
+[21:58:11]     BM25S Convert tokens to indices:  61%|██████    | 12053/19699 [00:01<00:01, 6792.92it/s]
+[21:58:11]     BM25S Convert tokens to indices:  65%|██████▍   | 12735/19699 [00:01<00:01, 6522.94it/s]
+[21:58:11]     BM25S Convert tokens to indices:  68%|██████▊   | 13391/19699 [00:02<00:01, 5083.88it/s]
+[21:58:11]     BM25S Convert tokens to indices:  72%|███████▏  | 14106/19699 [00:02<00:01, 5580.92it/s]
+[21:58:11]     BM25S Convert tokens to indices:  75%|███████▍  | 14740/19699 [00:02<00:00, 5774.48it/s]
+[21:58:11]     BM25S Convert tokens to indices:  78%|███████▊  | 15354/19699 [00:02<00:00, 5817.07it/s]
+[21:58:11]     BM25S Convert tokens to indices:  81%|████████  | 15962/19699 [00:02<00:00, 5831.45it/s]
+[21:58:11]     BM25S Convert tokens to indices:  84%|████████▍ | 16564/19699 [00:02<00:00, 5680.18it/s]
+[21:58:11]     BM25S Convert tokens to indices:  87%|████████▋ | 17145/19699 [00:02<00:00, 5610.91it/s]
+[21:58:11]     BM25S Convert tokens to indices:  91%|█████████ | 17934/19699 [00:02<00:00, 6250.47it/s]
+[21:58:11]     BM25S Convert tokens to indices:  95%|█████████▌| 18769/19699 [00:02<00:00, 6739.23it/s]
+[21:58:11]     BM25S Convert tokens to indices:  99%|█████████▉| 19571/19699 [00:03<00:00, 7105.63it/s]
+[21:58:11]                                                                                             
+[21:58:11]     
+[21:58:11]     BM25S Count Tokens:   0%|          | 0/19699 [00:00<?, ?it/s]
+[21:58:11]     BM25S Count Tokens:   7%|▋         | 1307/19699 [00:00<00:01, 13067.05it/s]
+[21:58:11]     BM25S Count Tokens:  13%|█▎        | 2614/19699 [00:00<00:01, 11793.41it/s]
+[21:58:11]     BM25S Count Tokens:  19%|█▉        | 3802/19699 [00:00<00:01, 11322.78it/s]
+[21:58:11]     BM25S Count Tokens:  25%|██▌       | 4939/19699 [00:00<00:01, 11071.54it/s]
+[21:58:11]     BM25S Count Tokens:  31%|███       | 6088/19699 [00:00<00:01, 11210.41it/s]
+[21:58:11]     BM25S Count Tokens:  37%|███▋      | 7305/19699 [00:00<00:01, 11524.46it/s]
+[21:58:11]     BM25S Count Tokens:  43%|████▎     | 8461/19699 [00:00<00:01, 11171.11it/s]
+[21:58:11]     BM25S Count Tokens:  49%|████▉     | 9717/19699 [00:00<00:00, 11595.87it/s]
+[21:58:11]     BM25S Count Tokens:  55%|█████▌    | 10881/19699 [00:00<00:00, 11586.40it/s]
+[21:58:11]     BM25S Count Tokens:  61%|██████    | 12063/19699 [00:01<00:00, 11653.19it/s]
+[21:58:11]     BM25S Count Tokens:  67%|██████▋   | 13231/19699 [00:01<00:00, 11307.30it/s]
+[21:58:11]     BM25S Count Tokens:  73%|███████▎  | 14365/19699 [00:01<00:00, 11238.51it/s]
+[21:58:11]     BM25S Count Tokens:  79%|███████▊  | 15491/19699 [00:01<00:00, 10902.06it/s]
+[21:58:11]     BM25S Count Tokens:  84%|████████▍ | 16585/19699 [00:01<00:00, 10375.25it/s]
+[21:58:11]     BM25S Count Tokens:  89%|████████▉ | 17629/19699 [00:01<00:00, 10344.63it/s]
+[21:58:11]     BM25S Count Tokens:  96%|█████████▌| 18944/19699 [00:01<00:00, 11148.53it/s]
+[21:58:11]                                                                                 
+[21:58:11]     
+[21:58:11]     BM25S Compute Scores:   0%|          | 0/19699 [00:00<?, ?it/s]
+[21:58:11]     BM25S Compute Scores:   3%|▎         | 506/19699 [00:00<00:03, 5057.10it/s]
+[21:58:11]     BM25S Compute Scores:   5%|▌         | 1012/19699 [00:00<00:03, 4897.80it/s]
+[21:58:11]     BM25S Compute Scores:   8%|▊         | 1523/19699 [00:00<00:03, 4986.57it/s]
+[21:58:11]     BM25S Compute Scores:  10%|█         | 2022/19699 [00:00<00:03, 4941.82it/s]
+[21:58:11]     BM25S Compute Scores:  13%|█▎        | 2528/19699 [00:00<00:03, 4982.34it/s]
+[21:58:11]     BM25S Compute Scores:  15%|█▌        | 3027/19699 [00:00<00:03, 4839.08it/s]
+[21:58:11]     BM25S Compute Scores:  18%|█▊        | 3512/19699 [00:00<00:03, 4740.13it/s]
+[21:58:11]     BM25S Compute Scores:  20%|██        | 4002/19699 [00:00<00:03, 4789.31it/s]
+[21:58:11]     BM25S Compute Scores:  23%|██▎       | 4482/19699 [00:00<00:03, 4662.67it/s]
+[21:58:11]     BM25S Compute Scores:  25%|██▌       | 4950/19699 [00:01<00:03, 4496.32it/s]
+[21:58:11]     BM25S Compute Scores:  27%|██▋       | 5411/19699 [00:01<00:03, 4528.95it/s]
+[21:58:11]     BM25S Compute Scores:  30%|██▉       | 5871/19699 [00:01<00:03, 4546.60it/s]
+[21:58:11]     BM25S Compute Scores:  32%|███▏      | 6372/19699 [00:01<00:02, 4682.33it/s]
+[21:58:11]     BM25S Compute Scores:  35%|███▍      | 6848/19699 [00:01<00:02, 4698.24it/s]
+[21:58:11]     BM25S Compute Scores:  37%|███▋      | 7373/19699 [00:01<00:02, 4860.77it/s]
+[21:58:11]     BM25S Compute Scores:  40%|███▉      | 7860/19699 [00:01<00:02, 4150.52it/s]
+[21:58:11]     BM25S Compute Scores:  42%|████▏     | 8330/19699 [00:01<00:02, 4295.31it/s]
+[21:58:11]     BM25S Compute Scores:  45%|████▍     | 8812/19699 [00:01<00:02, 4439.25it/s]
+[21:58:11]     BM25S Compute Scores:  47%|████▋     | 9268/19699 [00:02<00:02, 4376.70it/s]
+[21:58:11]     BM25S Compute Scores:  50%|████▉     | 9844/19699 [00:02<00:02, 4764.16it/s]
+[21:58:11]     BM25S Compute Scores:  52%|█████▏    | 10329/19699 [00:02<00:02, 4630.88it/s]
+[21:58:11]     BM25S Compute Scores:  55%|█████▍    | 10799/19699 [00:02<00:01, 4593.22it/s]
+[21:58:11]     BM25S Compute Scores:  57%|█████▋    | 11272/19699 [00:02<00:01, 4629.19it/s]
+[21:58:11]     BM25S Compute Scores:  60%|█████▉    | 11746/19699 [00:02<00:01, 4660.39it/s]
+[21:58:11]     BM25S Compute Scores:  62%|██████▏   | 12215/19699 [00:02<00:01, 4469.30it/s]
+[21:58:11]     BM25S Compute Scores:  64%|██████▍   | 12665/19699 [00:02<00:01, 4343.83it/s]
+[21:58:11]     BM25S Compute Scores:  67%|██████▋   | 13102/19699 [00:02<00:01, 4279.98it/s]
+[21:58:11]     BM25S Compute Scores:  69%|██████▉   | 13599/19699 [00:02<00:01, 4476.49it/s]
+[21:58:11]     BM25S Compute Scores:  71%|███████▏  | 14049/19699 [00:03<00:01, 4459.39it/s]
+[21:58:11]     BM25S Compute Scores:  74%|███████▎  | 14497/19699 [00:03<00:01, 4343.65it/s]
+[21:58:11]     BM25S Compute Scores:  76%|███████▌  | 14933/19699 [00:03<00:01, 4334.40it/s]
+[21:58:11]     BM25S Compute Scores:  78%|███████▊  | 15368/19699 [00:03<00:01, 4203.40it/s]
+[21:58:11]     BM25S Compute Scores:  80%|████████  | 15795/19699 [00:03<00:00, 4211.93it/s]
+[21:58:11]     BM25S Compute Scores:  82%|████████▏ | 16222/19699 [00:03<00:00, 4227.57it/s]
+[21:58:11]     BM25S Compute Scores:  85%|████████▍ | 16647/19699 [00:03<00:00, 4227.22it/s]
+[21:58:11]     BM25S Compute Scores:  87%|████████▋ | 17071/19699 [00:03<00:00, 4091.30it/s]
+[21:58:11]     BM25S Compute Scores:  89%|████████▉ | 17533/19699 [00:03<00:00, 4242.95it/s]
+[21:58:11]     BM25S Compute Scores:  92%|█████████▏| 18071/19699 [00:03<00:00, 4571.10it/s]
+[21:58:11]     BM25S Compute Scores:  95%|█████████▍| 18641/19699 [00:04<00:00, 4902.03it/s]
+[21:58:11]     BM25S Compute Scores:  97%|█████████▋| 19173/19699 [00:04<00:00, 5021.81it/s]
+[21:58:11]     BM25S Compute Scores: 100%|█████████▉| 19683/19699 [00:04<00:00, 5044.30it/s]
+[21:58:11]                                                                                  
+[21:58:11]     2026-07-29 21:58:11,202 [INFO]   Done in 86s
+[21:58:11]     2026-07-29 21:58:11,399 [INFO]   DONE
+[21:58:11]   [PASS] merged doc deleted
+[21:58:11] 
+============================================================
+[21:58:11] STEP: 16. Query after deleting merged doc
+[21:58:11] ============================================================
+[21:58:11]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step6_query_interface.py --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_inherited 大地巡旅 罗德岛
+[21:58:24]     Query: 大地巡旅 罗德岛
+[21:58:24]     
+[21:58:24]     ============================================================
+[21:58:24]     根据提供的知识库摘要，所有条目均标记为“IRRELEVANT”（不相关），因此无法从中提取任何与“大地巡旅 罗德岛”相关的事实或信息。  
+[21:58:24]     
+[21:58:24]     目前已知的信息仅能推断该查询可能指向《明日方舟》游戏中的内容（“罗德岛”为该游戏的主要组织，“大地巡旅”可能指特定活动、剧情章节或设定集），但由于知识库中缺乏有效数据，无法确认具体含义、事件细节或官方名称。如需准确回答，需要补充相关背景资料或游戏内具体条目。
+[21:58:24]     
+[21:58:24]     ============================================================
+[21:58:24]     Time: 11432.7ms  |  Sources: 5
+[21:58:24]       [1] IEC 61800-5-1
+[21:58:24]       [2] 机器人操作系统ROS应用实践 (彭刚,林天麟,刘锦涛,胡春旭,姚昱,杨帆) (z-library.sk, 1lib.sk
+[21:58:24]       [3] 矩阵分析与应用（第2版） (张贤达) (z-library.sk, 1lib.sk, z-lib.sk)
+[21:58:24]       [4] IEC_61131-3
+[21:58:24]       [5] NXP-TJA1050T
+[21:58:24]     Loading: test_inherited
+[21:58:24]       D:316 C:19699 V:17874 SI:123 FI:20
+[21:58:24]     Building prefix dict from the default dictionary ...
+[21:58:24]     Loading model from cache /tmp/jieba.cache
+[21:58:24]     Loading model cost 1.176 seconds.
+[21:58:24]     Prefix dict has been built successfully.
+[21:58:24]     
+[21:58:24]     BM25S Retrieve:   0%|          | 0/1 [00:00<?, ?it/s]
+[21:58:24]   [PASS] query NO LONGER returns 大地巡旅 in inherited
+[21:58:24] 
+============================================================
+[21:58:24] STEP: 17. File list on merged KB (after delete)
+[21:58:24] ============================================================
+[21:58:24]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py file list --kb /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_inherited
+[21:58:25]     test_inherited: 316 documents
+[21:58:25]       [1] BS_EN_61131-1  cat=standards  std=BS EN 61131-1  id=standards_BS_EN_61131-1
+[21:58:25]       [2] BS_EN_61131-3  cat=standards  std=BS EN 61131-3  id=standards_BS_EN_61131-3
+[21:58:25]       [3] BS_EN_61131-5  cat=standards  std=BS EN 61131-5  id=standards_BS_EN_61131-5
+[21:58:25]       [4] BS_EN_61131-7  cat=standards  std=BS EN 61131-7  id=standards_BS_EN_61131-7
+[21:58:25]       [5] BS_EN_61508-6  cat=standards  std=BS EN 61508-6  id=standards_BS_EN_61508-6
+[21:58:25]       [6] BS_EN_ISO_26262-10  cat=standards  std=ISO 26262-10  id=standards_BS_EN_ISO_26262-10
+[21:58:25]       [7] BS_EN_ISO_26262-1  cat=standards  std=ISO 26262-1  id=standards_BS_EN_ISO_26262-1
+[21:58:25]       [8] BS_EN_ISO_26262-2  cat=standards  std=ISO 26262-2  id=standards_BS_EN_ISO_26262-2
+[21:58:25]       [9] BS_EN_ISO_26262-3  cat=standards  std=ISO 26262-3  id=standards_BS_EN_ISO_26262-3
+[21:58:25]       [10] BS_EN_ISO_26262-4  cat=standards  std=ISO 26262-4  id=standards_BS_EN_ISO_26262-4
+[21:58:25]       [11] BS_EN_ISO_26262-5  cat=standards  std=ISO 26262-5  id=standards_BS_EN_ISO_26262-5
+[21:58:25]       [12] BS_EN_ISO_26262-6  cat=standards  std=ISO 26262-6  id=standards_BS_EN_ISO_26262-6
+[21:58:25]       [13] BS_EN_ISO_26262-7  cat=standards  std=ISO 26262-7  id=standards_BS_EN_ISO_26262-7
+[21:58:25]       [14] BS_EN_ISO_26262-8  cat=standards  std=ISO 26262-8  id=standards_BS_EN_ISO_26262-8
+[21:58:25]       [15] BS_EN_ISO_26262-9  cat=standards  std=ISO 26262-9  id=standards_BS_EN_ISO_26262-9
+[21:58:25]       [16] DIN_EN_61131-10  cat=standards  std=DIN EN 61131-10  id=standards_DIN_EN_61131-10
+[21:58:25]       [17] DIN_EN_61784-2-19  cat=standards  std=DIN EN 61784-2-19  id=standards_DIN_EN_61784-2-19
+[21:58:25]       [18] EN_IEC_62541-12  cat=standards  std=IEC 62541-12  id=standards_EN_IEC_62541-12
+[21:58:25]       [19] EN_IEC_62541-3  cat=standards  std=IEC 62541-3  id=standards_EN_IEC_62541-3
+[21:58:25]       [20] EN_IEC_62541-4  cat=standards  std=IEC 62541-4  id=standards_EN_IEC_62541-4
+[21:58:25]       [21] GBJ_8848  cat=standards  std=  id=standards_GBJ_8848
+[21:58:25]       [22] GB_15969.4  cat=standards  std=GB 15969.4  id=standards_GB_15969.4
+[21:58:25]       [23] GB_4793.1  cat=standards  std=GB 4793.1  id=standards_GB_4793.1
+[21:58:25]       [24] GB_T_12668.1  cat=standards  std=GB/T 12668.1  id=standards_GB_T_12668.1
+[21:58:25]       [25] GB_T_12668.2  cat=standards  std=GB/T 12668.2  id=standards_GB_T_12668.2
+[21:58:25]       [26] GB_T_12668.3  cat=standards  std=GB/T 12668.3  id=standards_GB_T_12668.3
+[21:58:25]       [27] GB_T_12668.4  cat=standards  std=GB/T 12668.4  id=standards_GB_T_12668.4
+[21:58:25]       [28] GB_T_12668.6  cat=standards  std=GB/T 12668.6  id=standards_GB_T_12668.6
+[21:58:25]       [29] GB_T_12668.8  cat=standards  std=GB/T 12668.8  id=standards_GB_T_12668.8
+[21:58:25]       [30] GB_T_15969.1  cat=standards  std=GB/T 15969.1  id=standards_GB_T_15969.1
+[21:58:25]       [31] GB_T_15969.2  cat=standards  std=GB/T 15969.2  id=standards_GB_T_15969.2
+[21:58:25]       [32] GB_T_15969.3  cat=standards  std=GB/T 15969.3  id=standards_GB_T_15969.3
+[21:58:25]       [33] GB_T_17626.10  cat=standards  std=GB/T 17626.10  id=standards_GB_T_17626.10
+[21:58:25]       [34] GB_T_17626.11  cat=standards  std=GB/T 17626.11  id=standards_GB_T_17626.11
+[21:58:25]       [35] GB_T_17626.12  cat=standards  std=GB/T 17626.12  id=standards_GB_T_17626.12
+[21:58:25]       [36] GB_T_17626.13  cat=standards  std=GB/T 17626.13  id=standards_GB_T_17626.13
+[21:58:25]       [37] GB_T_17626.14  cat=standards  std=GB/T 17626.14  id=standards_GB_T_17626.14
+[21:58:25]       [38] GB_T_17626.15  cat=standards  std=GB/T 17626.15  id=standards_GB_T_17626.15
+[21:58:25]       [39] GB_T_17626.16  cat=standards  std=GB/T 17626.16  id=standards_GB_T_17626.16
+[21:58:25]       [40] GB_T_17626.17  cat=standards  std=GB/T 17626.17  id=standards_GB_T_17626.17
+[21:58:25]       [41] GB_T_17626.18  cat=standards  std=GB/T 17626.18  id=standards_GB_T_17626.18
+[21:58:25]       [42] GB_T_17626.19  cat=standards  std=GB/T 17626.19  id=standards_GB_T_17626.19
+[21:58:25]       [43] GB_T_17626.1  cat=standards  std=GB/T 17626.1  id=standards_GB_T_17626.1
+[21:58:25]       [44] GB_T_17626.20  cat=standards  std=GB/T 17626.20  id=standards_GB_T_17626.20
+[21:58:25]       [45] GB_T_17626.21  cat=standards  std=GB/T 17626.21  id=standards_GB_T_17626.21
+[21:58:25]       [46] GB_T_17626.22  cat=standards  std=GB/T 17626.22  id=standards_GB_T_17626.22
+[21:58:25]       [47] GB_T_17626.24  cat=standards  std=GB/T 17626.24  id=standards_GB_T_17626.24
+[21:58:25]       [48] GB_T_17626.27  cat=standards  std=GB/T 17626.27  id=standards_GB_T_17626.27
+[21:58:25]       [49] GB_T_17626.28  cat=standards  std=GB/T 17626.28  id=standards_GB_T_17626.28
+[21:58:25]       [50] GB_T_17626.29  cat=standards  std=GB/T 17626.29  id=standards_GB_T_17626.29
+[21:58:25]       [51] GB_T_17626.2  cat=standards  std=GB/T 17626.2  id=standards_GB_T_17626.2
+[21:58:25]       [52] GB_T_17626.30  cat=standards  std=GB/T 17626.30  id=standards_GB_T_17626.30
+[21:58:25]       [53] GB_T_17626.3  cat=standards  std=GB/T 17626.3  id=standards_GB_T_17626.3
+[21:58:25]       [54] GB_T_17626.4  cat=standards  std=GB/T 17626.4  id=standards_GB_T_17626.4
+[21:58:25]       [55] GB_T_17626.5  cat=standards  std=GB/T 17626.5  id=standards_GB_T_17626.5
+[21:58:25]       [56] GB_T_17626.6  cat=standards  std=GB/T 17626.6  id=standards_GB_T_17626.6
+[21:58:25]       [57] GB_T_17626.7  cat=standards  std=GB/T 17626.7  id=standards_GB_T_17626.7
+[21:58:25]       [58] GB_T_17626.8  cat=standards  std=GB/T 17626.8  id=standards_GB_T_17626.8
+[21:58:25]       [59] GB_T_17626.9  cat=standards  std=GB/T 17626.9  id=standards_GB_T_17626.9
+[21:58:25]       [60] GB_T_20438.1  cat=standards  std=GB/T 20438.1  id=standards_GB_T_20438.1
+[21:58:25]       [61] GB_T_20438.2  cat=standards  std=GB/T 20438.2  id=standards_GB_T_20438.2
+[21:58:25]       [62] GB_T_20438.3  cat=standards  std=GB/T 20438.3  id=standards_GB_T_20438.3
+[21:58:25]       [63] GB_T_20438.4  cat=standards  std=GB/T 20438.4  id=standards_GB_T_20438.4
+[21:58:25]       [64] GB_T_20438.5  cat=standards  std=GB/T 20438.5  id=standards_GB_T_20438.5
+[21:58:25]       [65] GB_T_20438.6  cat=standards  std=GB/T 20438.6  id=standards_GB_T_20438.6
+[21:58:25]       [66] GB_T_20438.7  cat=standards  std=GB/T 20438.7  id=standards_GB_T_20438.7
+[21:58:25]       [67] GB_T_20438  cat=standards  std=GB/T 20438  id=standards_GB_T_20438
+[21:58:25]       [68] GB_T_26862  cat=standards  std=GB/T 26862  id=standards_GB_T_26862
+[21:58:25]       [69] GB_T_33007  cat=standards  std=GB/T 33007  id=standards_GB_T_33007
+[21:58:25]       [70] IEC 61000-4-2  cat=standards  std=IEC 61000-4-2  id=standards_IEC 61000-4-2
+[21:58:25]       [71] IEC 61000-4-4  cat=standards  std=IEC 61000-4-4  id=standards_IEC 61000-4-4
+[21:58:25]       [72] IEC 61000-4-5  cat=standards  std=IEC 61000-4-5  id=standards_IEC 61000-4-5
+[21:58:25]       [73] IEC 61131-1  cat=standards  std=IEC 61131-1  id=standards_IEC 61131-1
+[21:58:25]       [74] IEC 61131-4  cat=standards  std=IEC 61131-4  id=standards_IEC 61131-4
+[21:58:25]       [75] IEC 61131-5  cat=standards  std=IEC 61131-5  id=standards_IEC 61131-5
+[21:58:25]       [76] IEC 61131-6  cat=standards  std=IEC 61131-6  id=standards_IEC 61131-6
+[21:58:25]       [77] IEC 61131-7  cat=standards  std=IEC 61131-7  id=standards_IEC 61131-7
+[21:58:25]       [78] IEC 61508-1  cat=standards  std=IEC 61508-1  id=standards_IEC 61508-1
+[21:58:25]       [79] IEC 61508-2  cat=standards  std=IEC 61508-2  id=standards_IEC 61508-2
+[21:58:25]       [80] IEC 61508-3  cat=standards  std=IEC 61508-3  id=standards_IEC 61508-3
+[21:58:25]       [81] IEC 61800-5-1  cat=standards  std=IEC 61800-5-1  id=standards_IEC 61800-5-1
+[21:58:25]       [82] IEC 62061  cat=standards  std=IEC 62061  id=standards_IEC 62061
+[21:58:25]       [83] IEC 62443-2-1  cat=standards  std=IEC 62443-2-1  id=standards_IEC 62443-2-1
+[21:58:25]       [84] IEC 62443-3-2  cat=standards  std=IEC 62443-3-2  id=standards_IEC 62443-3-2
+[21:58:25]       [85] IEC TR 61131-8  cat=standards  std=  id=standards_IEC TR 61131-8
+[21:58:25]       [86] IEC_61000-4-20  cat=standards  std=IEC 61000-4-20  id=standards_IEC_61000-4-20
+[21:58:25]       [87] IEC_61000-4-41  cat=standards  std=IEC 61000-4-41  id=standards_IEC_61000-4-41
+[21:58:25]       [88] IEC_61000-4-6  cat=standards  std=IEC 61000-4-6  id=standards_IEC_61000-4-6
+[21:58:25]       [89] IEC_61131-10  cat=standards  std=IEC 61131-10  id=standards_IEC_61131-10
+[21:58:25]       [90] IEC_61131-2  cat=standards  std=IEC 61131-2  id=standards_IEC_61131-2
+[21:58:25]       [91] IEC_61131-3  cat=standards  std=IEC 61131-3  id=standards_IEC_61131-3
+[21:58:25]       [92] IEC_61131-9  cat=standards  std=IEC 61131-9  id=standards_IEC_61131-9
+[21:58:25]       [93] IEC_61499-1  cat=standards  std=IEC 61499-1  id=standards_IEC_61499-1
+[21:58:25]       [94] IEC_61499-2  cat=standards  std=IEC 61499-2  id=standards_IEC_61499-2
+[21:58:25]       [95] IEC_61499-3  cat=standards  std=IEC 61499-3  id=standards_IEC_61499-3
+[21:58:25]       [96] IEC_61499-4  cat=standards  std=IEC 61499-4  id=standards_IEC_61499-4
+[21:58:25]       [97] IEC_61508-4  cat=standards  std=IEC 61508-4  id=standards_IEC_61508-4
+[21:58:25]       [98] IEC_61508-5  cat=standards  std=IEC 61508-5  id=standards_IEC_61508-5
+[21:58:25]       [99] IEC_61508-6  cat=standards  std=IEC 61508-6  id=standards_IEC_61508-6
+[21:58:25]       [100] IEC_61508-7  cat=standards  std=IEC 61508-7  id=standards_IEC_61508-7
+[21:58:25]       [101] IEC_61784-3-3  cat=standards  std=IEC 61784-3-3  id=standards_IEC_61784-3-3
+[21:58:25]       [102] IEC_61784-5-22  cat=standards  std=IEC 61784-5-22  id=standards_IEC_61784-5-22
+[21:58:25]       [103] IEC_61800-1  cat=standards  std=IEC 61800-1  id=standards_IEC_61800-1
+[21:58:25]       [104] IEC_61800-3  cat=standards  std=IEC 61800-3  id=standards_IEC_61800-3
+[21:58:25]       [105] IEC_61800-5-1  cat=standards  std=IEC 61800-5-1  id=standards_IEC_61800-5-1
+[21:58:25]       [106] IEC_61800-9  cat=standards  std=IEC 61800-9  id=standards_IEC_61800-9
+[21:58:25]       [107] IEC_62443-2-1  cat=standards  std=IEC 62443-2-1  id=standards_IEC_62443-2-1
+[21:58:25]       [108] IEC_62443-3-2  cat=standards  std=IEC 62443-3-2  id=standards_IEC_62443-3-2
+[21:58:25]       [109] IEC_62541-10  cat=standards  std=IEC 62541-10  id=standards_IEC_62541-10
+[21:58:25]       [110] IEC_62541-11  cat=standards  std=IEC 62541-11  id=standards_IEC_62541-11
+[21:58:25]       [111] IEC_62541-12  cat=standards  std=IEC 62541-12  id=standards_IEC_62541-12
+[21:58:25]       [112] IEC_62541-13  cat=standards  std=IEC 62541-13  id=standards_IEC_62541-13
+[21:58:25]       [113] IEC_62541-14  cat=standards  std=IEC 62541-14  id=standards_IEC_62541-14
+[21:58:25]       [114] IEC_62541-15  cat=standards  std=IEC 62541-15  id=standards_IEC_62541-15
+[21:58:25]       [115] IEC_62541-16  cat=standards  std=IEC 62541-16  id=standards_IEC_62541-16
+[21:58:25]       [116] IEC_62541-17  cat=standards  std=IEC 62541-17  id=standards_IEC_62541-17
+[21:58:25]       [117] IEC_62541-18  cat=standards  std=IEC 62541-18  id=standards_IEC_62541-18
+[21:58:25]       [118] IEC_62541-19  cat=standards  std=IEC 62541-19  id=standards_IEC_62541-19
+[21:58:25]       [119] IEC_62541-2  cat=standards  std=IEC 62541-2  id=standards_IEC_62541-2
+[21:58:25]       [120] IEC_62541-5  cat=standards  std=IEC 62541-5  id=standards_IEC_62541-5
+[21:58:25]       [121] IEC_62541-6  cat=standards  std=IEC 62541-6  id=standards_IEC_62541-6
+[21:58:25]       [122] IEC_62541-7  cat=standards  std=IEC 62541-7  id=standards_IEC_62541-7
+[21:58:25]       [123] IEC_62541-8  cat=standards  std=IEC 62541-8  id=standards_IEC_62541-8
+[21:58:25]       [124] IEC_62541-9  cat=standards  std=IEC 62541-9  id=standards_IEC_62541-9
+[21:58:25]       [125] IEC_TR_61131-4  cat=standards  std=  id=standards_IEC_TR_61131-4
+[21:58:25]       [126] IEC_TR_61131-8  cat=standards  std=  id=standards_IEC_TR_61131-8
+[21:58:25]       [127] IEC_TS_62443-6-2  cat=standards  std=  id=standards_IEC_TS_62443-6-2
+[21:58:25]       [128] ISO-TR_3152  cat=standards  std=  id=standards_ISO-TR_3152
+[21:58:25]       [129] ISO_13849-1  cat=standards  std=ISO 13849-1  id=standards_ISO_13849-1
+[21:58:25]       [130] ISO_13849-2  cat=standards  std=ISO 13849-2  id=standards_ISO_13849-2
+[21:58:25]       [131] ISO_21434  cat=standards  std=ISO 21434  id=standards_ISO_21434
+[21:58:25]       [132] ISO_26262-10  cat=standards  std=ISO 26262-10  id=standards_ISO_26262-10
+[21:58:25]       [133] ISO_26262-11  cat=standards  std=ISO 26262-11  id=standards_ISO_26262-11
+[21:58:25]       [134] ISO_26262-12  cat=standards  std=ISO 26262-12  id=standards_ISO_26262-12
+[21:58:25]       [135] ISO_26262-1  cat=standards  std=ISO 26262-1  id=standards_ISO_26262-1
+[21:58:25]       [136] ISO_26262-2  cat=standards  std=ISO 26262-2  id=standards_ISO_26262-2
+[21:58:25]       [137] ISO_26262-3  cat=standards  std=ISO 26262-3  id=standards_ISO_26262-3
+[21:58:25]       [138] ISO_26262-4  cat=standards  std=ISO 26262-4  id=standards_ISO_26262-4
+[21:58:25]       [139] ISO_26262-5  cat=standards  std=ISO 26262-5  id=standards_ISO_26262-5
+[21:58:25]       [140] ISO_26262-6  cat=standards  std=ISO 26262-6  id=standards_ISO_26262-6
+[21:58:25]       [141] ISO_26262-7  cat=standards  std=ISO 26262-7  id=standards_ISO_26262-7
+[21:58:25]       [142] ISO_26262-8  cat=standards  std=ISO 26262-8  id=standards_ISO_26262-8
+[21:58:25]       [143] ISO_26262-9  cat=standards  std=ISO 26262-9  id=standards_ISO_26262-9
+[21:58:25]       [144] 1109.3781  cat=papers  std=  id=papers_1109.3781
+[21:58:25]       [145] 1111.1498  cat=papers  std=  id=papers_1111.1498
+[21:58:25]       [146] 1112.4113  cat=papers  std=  id=papers_1112.4113
+[21:58:25]       [147] 1211.5494  cat=papers  std=  id=papers_1211.5494
+[21:58:25]       [148] 1212.1120  cat=papers  std=  id=papers_1212.1120
+[21:58:25]       [149] 1303.0425  cat=papers  std=  id=papers_1303.0425
+[21:58:25]       [150] 1304.7934  cat=papers  std=  id=papers_1304.7934
+[21:58:25]       [151] 1308.2426  cat=papers  std=  id=papers_1308.2426
+[21:58:25]       [152] 1310.5377  cat=papers  std=  id=papers_1310.5377
+[21:58:25]       [153] 1403.5204  cat=papers  std=  id=papers_1403.5204
+[21:58:25]       [154] 1406.4924  cat=papers  std=  id=papers_1406.4924
+[21:58:25]       [155] 1503.06058  cat=papers  std=  id=papers_1503.06058
+[21:58:25]       [156] 1506.01665  cat=papers  std=  id=papers_1506.01665
+[21:58:25]       [157] 1507.05535  cat=papers  std=  id=papers_1507.05535
+[21:58:25]       [158] 1509.02861  cat=papers  std=  id=papers_1509.02861
+[21:58:25]       [159] 1512.00375  cat=papers  std=  id=papers_1512.00375
+[21:58:25]       [160] 1604.02527  cat=papers  std=  id=papers_1604.02527
+[21:58:25]       [161] 1609.05801  cat=papers  std=  id=papers_1609.05801
+[21:58:25]       [162] 1610.04395  cat=papers  std=  id=papers_1610.04395
+[21:58:25]       [163] 1612.02784  cat=papers  std=  id=papers_1612.02784
+[21:58:25]       [164] 1702.08262  cat=papers  std=  id=papers_1702.08262
+[21:58:25]       [165] 1706.03564  cat=papers  std=  id=papers_1706.03564
+[21:58:25]       [166] 1712.00006  cat=papers  std=  id=papers_1712.00006
+[21:58:25]       [167] 1802.09689  cat=papers  std=  id=papers_1802.09689
+[21:58:25]       [168] 1802.09767  cat=papers  std=  id=papers_1802.09767
+[21:58:25]       [169] 1806.01623  cat=papers  std=  id=papers_1806.01623
+[21:58:25]       [170] 1807.03475  cat=papers  std=  id=papers_1807.03475
+[21:58:25]       [171] 1807.05037  cat=papers  std=  id=papers_1807.05037
+[21:58:25]       [172] 1810.04866  cat=papers  std=  id=papers_1810.04866
+[21:58:25]       [173] 1810.09292  cat=papers  std=  id=papers_1810.09292
+[21:58:25]       [174] 1902.06026  cat=papers  std=  id=papers_1902.06026
+[21:58:25]       [175] 1911.01481  cat=papers  std=  id=papers_1911.01481
+[21:58:25]       [176] 1911.02899  cat=papers  std=  id=papers_1911.02899
+[21:58:25]       [177] 1911.09560  cat=papers  std=  id=papers_1911.09560
+[21:58:25]       [178] 1911.09615  cat=papers  std=  id=papers_1911.09615
+[21:58:25]       [179] 2001.03108  cat=papers  std=  id=papers_2001.03108
+[21:58:25]       [180] 2003.05711  cat=papers  std=  id=papers_2003.05711
+[21:58:25]       [181] 2004.04911  cat=papers  std=  id=papers_2004.04911
+[21:58:25]       [182] 2006.11141  cat=papers  std=  id=papers_2006.11141
+[21:58:25]       [183] 2008.09071  cat=papers  std=  id=papers_2008.09071
+[21:58:25]       [184] 2009.13079  cat=papers  std=  id=papers_2009.13079
+[21:58:25]       [185] 2011.08105  cat=papers  std=  id=papers_2011.08105
+[21:58:25]       [186] 2011.11355  cat=papers  std=  id=papers_2011.11355
+[21:58:25]       [187] 2012.06069  cat=papers  std=  id=papers_2012.06069
+[21:58:25]       [188] 2012.06341  cat=papers  std=  id=papers_2012.06341
+[21:58:25]       [189] 2104.01704  cat=papers  std=  id=papers_2104.01704
+[21:58:25]       [190] 2106.05025  cat=papers  std=  id=papers_2106.05025
+[21:58:25]       [191] 2107.08360  cat=papers  std=  id=papers_2107.08360
+[21:58:25]       [192] 2107.10697  cat=papers  std=  id=papers_2107.10697
+[21:58:25]       [193] 2111.04153  cat=papers  std=  id=papers_2111.04153
+[21:58:25]       [194] 2203.10416  cat=papers  std=  id=papers_2203.10416
+[21:58:25]       [195] 2203.13633  cat=papers  std=  id=papers_2203.13633
+[21:58:25]       [196] 2207.08285  cat=papers  std=  id=papers_2207.08285
+[21:58:25]       [197] 2208.05694  cat=papers  std=  id=papers_2208.05694
+[21:58:25]       [198] 2211.08080  cat=papers  std=  id=papers_2211.08080
+[21:58:25]       [199] 2211.12700  cat=papers  std=  id=papers_2211.12700
+[21:58:25]       [200] 2212.03225  cat=papers  std=  id=papers_2212.03225
+[21:58:25]       [201] 2301.04943  cat=papers  std=  id=papers_2301.04943
+[21:58:25]       [202] 2304.04111  cat=papers  std=  id=papers_2304.04111
+[21:58:25]       [203] 2304.04727  cat=papers  std=  id=papers_2304.04727
+[21:58:25]       [204] 2304.14350  cat=papers  std=  id=papers_2304.14350
+[21:58:25]       [205] 2305.07875  cat=papers  std=  id=papers_2305.07875
+[21:58:25]       [206] 2307.03004  cat=papers  std=  id=papers_2307.03004
+[21:58:25]       [207] 2312.05910  cat=papers  std=  id=papers_2312.05910
+[21:58:25]       [208] 2403.06640  cat=papers  std=  id=papers_2403.06640
+[21:58:25]       [209] 2405.18207  cat=papers  std=  id=papers_2405.18207
+[21:58:25]       [210] 2407.13257  cat=papers  std=  id=papers_2407.13257
+[21:58:25]       [211] 2407.13496  cat=papers  std=  id=papers_2407.13496
+[21:58:25]       [212] 2408.15743  cat=papers  std=  id=papers_2408.15743
+[21:58:25]       [213] 2409.07642  cat=papers  std=  id=papers_2409.07642
+[21:58:25]       [214] 2409.09848  cat=papers  std=  id=papers_2409.09848
+[21:58:25]       [215] 2411.03875  cat=papers  std=  id=papers_2411.03875
+[21:58:25]       [216] 2503.13407  cat=papers  std=  id=papers_2503.13407
+[21:58:25]       [217] 2507.02910  cat=papers  std=  id=papers_2507.02910
+[21:58:25]       [218] 2508.08153  cat=papers  std=  id=papers_2508.08153
+[21:58:25]       [219] 2508.10150  cat=papers  std=  id=papers_2508.10150
+[21:58:25]       [220] 2510.07507  cat=papers  std=  id=papers_2510.07507
+[21:58:25]       [221] 2510.26496  cat=papers  std=  id=papers_2510.26496
+[21:58:25]       [222] 2511.07713  cat=papers  std=  id=papers_2511.07713
+[21:58:25]       [223] 2601.23160  cat=papers  std=  id=papers_2601.23160
+[21:58:25]       [224] 2602.12375  cat=papers  std=  id=papers_2602.12375
+[21:58:25]       [225] 2603.29499  cat=papers  std=  id=papers_2603.29499
+[21:58:25]       [226] 2604.17391  cat=papers  std=  id=papers_2604.17391
+[21:58:25]       [227] 2604.21989  cat=papers  std=  id=papers_2604.21989
+[21:58:25]       [228] 2604.27587  cat=papers  std=  id=papers_2604.27587
+[21:58:25]       [229] 2606.29271  cat=papers  std=  id=papers_2606.29271
+[21:58:25]       [230] 2607.18488  cat=papers  std=  id=papers_2607.18488
+[21:58:25]       [231] Automatic Control Systems (Farid Golnaraghi, Benjamin C. Kuo  cat=textbooks  std=  id=textbooks_Automatic Control Systems (Farid Golnaraghi, Benjamin C. Kuo
+[21:58:25]       [232] Control Systems Engineering 8th Edition  cat=textbooks  std=  id=textbooks_Control Systems Engineering 8th Edition
+[21:58:25]       [233] ESP32 Technical Reference Manual CN  cat=textbooks  std=  id=textbooks_ESP32 Technical Reference Manual CN
+[21:58:25]       [234] Embedded Control Systems in CC++ (Jim Ledin) (z-library.sk,   cat=textbooks  std=  id=textbooks_Embedded Control Systems in CC++ (Jim Ledin) (z-library.sk, 
+[21:58:25]       [235] Feedback Control of Dynamic Systems (6th Edition) (Franklin,  cat=textbooks  std=  id=textbooks_Feedback Control of Dynamic Systems (6th Edition) (Franklin,
+[21:58:25]       [236] Model Predictive Control Theory, Computation, and Design, 2n  cat=textbooks  std=  id=textbooks_Model Predictive Control Theory, Computation, and Design, 2n
+[21:58:25]       [237] Modern Control Engineering (5th Edition). 2010. (Katsuhiko O  cat=textbooks  std=  id=textbooks_Modern Control Engineering (5th Edition). 2010. (Katsuhiko O
+[21:58:25]       [238] Optimal control theory an introduction (Donald E. Kirk) (z-l  cat=textbooks  std=  id=textbooks_Optimal control theory an introduction (Donald E. Kirk) (z-l
+[21:58:25]       [239] PID控制器参数整定方法及应用 (杨平，邓亮，徐春梅，李芹著) (z-library.sk, 1lib.sk, z-li  cat=textbooks  std=  id=textbooks_PID控制器参数整定方法及应用 (杨平，邓亮，徐春梅，李芹著) (z-library.sk, 1lib.sk, z-li
+[21:58:25]       [240] Robust and Adaptive Control  cat=textbooks  std=  id=textbooks_Robust and Adaptive Control
+[21:58:25]       [241] Robust and optimal control (Kemin Zhou, John C. Doyle, Keith  cat=textbooks  std=  id=textbooks_Robust and optimal control (Kemin Zhou, John C. Doyle, Keith
+[21:58:25]       [242] STM32嵌入式系统开发实战指南：FreeRTOS与LwIP联合移植 (单片机与嵌入式) (李志明；檀永；徐石明) (z  cat=textbooks  std=  id=textbooks_STM32嵌入式系统开发实战指南：FreeRTOS与LwIP联合移植 (单片机与嵌入式) (李志明；檀永；徐石明) (z
+[21:58:25]       [243] Sliding Mode Control Theory And Applications (Christopher Ed  cat=textbooks  std=  id=textbooks_Sliding Mode Control Theory And Applications (Christopher Ed
+[21:58:25]       [244] 基于ARM的嵌入式系统和物联网开发 (【英】佩里·肖（Perry Xiao）) (z-library.sk, 1lib.  cat=textbooks  std=  id=textbooks_基于ARM的嵌入式系统和物联网开发 (【英】佩里·肖（Perry Xiao）) (z-library.sk, 1lib.
+[21:58:25]       [245] 机器人操作系统ROS应用实践 (彭刚,林天麟,刘锦涛,胡春旭,姚昱,杨帆) (z-library.sk, 1lib.sk  cat=textbooks  std=  id=textbooks_机器人操作系统ROS应用实践 (彭刚,林天麟,刘锦涛,胡春旭,姚昱,杨帆) (z-library.sk, 1lib.sk
+[21:58:25]       [246] 矩阵分析与应用（第2版） (张贤达) (z-library.sk, 1lib.sk, z-lib.sk)  cat=textbooks  std=  id=textbooks_矩阵分析与应用（第2版） (张贤达) (z-library.sk, 1lib.sk, z-lib.sk)
+[21:58:25]       [247] 自动控制原理 第2版 (卢京潮主编；自动控制原理教学组编, 卢京潮主编 , 自动控制原理教学组编, 卢京潮 etc.)   cat=textbooks  std=  id=textbooks_自动控制原理 第2版 (卢京潮主编；自动控制原理教学组编, 卢京潮主编 , 自动控制原理教学组编, 卢京潮 etc.) 
+[21:58:25]       [248] 自动控制原理与设计 (富兰克林, Gene F.Franklin, J.David Powell etc.) (z-li  cat=textbooks  std=  id=textbooks_自动控制原理与设计 (富兰克林, Gene F.Franklin, J.David Powell etc.) (z-li
+[21:58:25]       [249] 自动控制原理习题解析（第三版） (胡寿松) (z-library.sk, 1lib.sk, z-lib.sk)  cat=textbooks  std=  id=textbooks_自动控制原理习题解析（第三版） (胡寿松) (z-library.sk, 1lib.sk, z-lib.sk)
+[21:58:25]       [250] 自动控制原理习题解答[国家级规划教材] (卢京潮, 赵忠) (z-library.sk, 1lib.sk, z-lib.  cat=textbooks  std=  id=textbooks_自动控制原理习题解答[国家级规划教材] (卢京潮, 赵忠) (z-library.sk, 1lib.sk, z-lib.
+[21:58:25]       [251] 自动控制原理（第七版） (胡寿松) (z-library.sk, 1lib.sk, z-lib.sk)  cat=textbooks  std=  id=textbooks_自动控制原理（第七版） (胡寿松) (z-library.sk, 1lib.sk, z-lib.sk)
+[21:58:25]       [252] 自动控制原理（第八版） (胡寿松、姜斌、张绍杰) (z-library.sk, 1lib.sk, z-lib.sk)  cat=textbooks  std=  id=textbooks_自动控制原理（第八版） (胡寿松、姜斌、张绍杰) (z-library.sk, 1lib.sk, z-lib.sk)
+[21:58:25]       [253] ADI AN-1067  cat=datasheets  std=  id=datasheets_ADI AN-1067
+[21:58:25]       [254] ADI AN-581  cat=datasheets  std=  id=datasheets_ADI AN-581
+[21:58:25]       [255] ADS1115  cat=datasheets  std=  id=datasheets_ADS1115
+[21:58:25]       [256] ADS1256  cat=datasheets  std=  id=datasheets_ADS1256
+[21:58:25]       [257] C12345_单片机(MCU-MPU-SOC)_STM32F407VGT6_规格书_WJ08389  cat=datasheets  std=  id=datasheets_C12345_单片机(MCU-MPU-SOC)_STM32F407VGT6_规格书_WJ08389
+[21:58:25]       [258] C144198_数模转换芯片DAC_MCP4725A0T-E-CH_规格书_数模转换芯片DAC_MCP4725A0T-E  cat=datasheets  std=  id=datasheets_C144198_数模转换芯片DAC_MCP4725A0T-E-CH_规格书_数模转换芯片DAC_MCP4725A0T-E
+[21:58:25]       [259] C14877_单片机(MCU-MPU-SOC)_ATMEGA328P-AU_规格书_单片机(MCU_MPU_SOC)_A  cat=datasheets  std=  id=datasheets_C14877_单片机(MCU-MPU-SOC)_ATMEGA328P-AU_规格书_单片机(MCU_MPU_SOC)_A
+[21:58:25]       [260] C15051_DC-DC电源芯片_MP1584EN-LF-Z_规格书_WJ1074595  cat=datasheets  std=  id=datasheets_C15051_DC-DC电源芯片_MP1584EN-LF-Z_规格书_WJ1074595
+[21:58:25]       [261] C16283_达林顿管_TIP122_规格书_WJ21385  cat=datasheets  std=  id=datasheets_C16283_达林顿管_TIP122_规格书_WJ21385
+[21:58:25]       [262] C19723770_CAN收发器_TJA1050DRG_规格书_WJ957991  cat=datasheets  std=  id=datasheets_C19723770_CAN收发器_TJA1050DRG_规格书_WJ957991
+[21:58:25]       [263] C19738_RS-485-RS-422芯片_MAX485ESA+T_规格书_WJ337218  cat=datasheets  std=  id=datasheets_C19738_RS-485-RS-422芯片_MAX485ESA+T_规格书_WJ337218
+[21:58:25]       [264] C19922_步进电机驱动芯片_L298N_规格书_WJ03685  cat=datasheets  std=  id=datasheets_C19922_步进电机驱动芯片_L298N_规格书_WJ03685
+[21:58:25]       [265] C24112_姿态传感器-陀螺仪_MPU-6050_规格书_姿态传感器_陀螺仪_MPU-6050_英文规格书  cat=datasheets  std=  id=datasheets_C24112_姿态传感器-陀螺仪_MPU-6050_规格书_姿态传感器_陀螺仪_MPU-6050_英文规格书
+[21:58:25]       [266] C2566_场效应管(MOSFET)_IRF540NPBF_规格书_WJ81476  cat=datasheets  std=  id=datasheets_C2566_场效应管(MOSFET)_IRF540NPBF_规格书_WJ81476
+[21:58:25]       [267] C2586_场效应管(MOSFET)_IRFZ44NPBF_规格书_WJ118532  cat=datasheets  std=  id=datasheets_C2586_场效应管(MOSFET)_IRFZ44NPBF_规格书_WJ118532
+[21:58:25]       [268] C2598_场效应管(MOSFET)_IRF520NPBF_规格书_WJ277028  cat=datasheets  std=  id=datasheets_C2598_场效应管(MOSFET)_IRF520NPBF_规格书_WJ277028
+[21:58:25]       [269] C2649487_环境光传感器_TCS34725FN_规格书_WJ79438  cat=datasheets  std=  id=datasheets_C2649487_环境光传感器_TCS34725FN_规格书_WJ79438
+[21:58:25]       [270] C2687423_温湿度传感器_SHT30-DIS-B10KS_规格书_WJ85195  cat=datasheets  std=  id=datasheets_C2687423_温湿度传感器_SHT30-DIS-B10KS_规格书_WJ85195
+[21:58:25]       [271] C2880291_温湿度传感器_DHT22_规格书_WJ376857  cat=datasheets  std=  id=datasheets_C2880291_温湿度传感器_DHT22_规格书_WJ376857
+[21:58:25]       [272] C2960_栅极驱动芯片_IR2104STRPBF_规格书_WJ224299  cat=datasheets  std=  id=datasheets_C2960_栅极驱动芯片_IR2104STRPBF_规格书_WJ224299
+[21:58:25]       [273] C2968_栅极驱动芯片_IR2110STRPBF_规格书_WJ120340  cat=datasheets  std=  id=datasheets_C2968_栅极驱动芯片_IR2110STRPBF_规格书_WJ120340
+[21:58:25]       [274] C2984661_反射式光电开关_TCRT5000_规格书_WJ86853  cat=datasheets  std=  id=datasheets_C2984661_反射式光电开关_TCRT5000_规格书_WJ86853
+[21:58:25]       [275] C32843_以太网控制器_W5500_规格书_以太网控制器_W5500_英文规格书  cat=datasheets  std=  id=datasheets_C32843_以太网控制器_W5500_规格书_以太网控制器_W5500_英文规格书
+[21:58:25]       [276] C347420_DC-DC电源芯片_LM2596S-3.3(UMW)_规格书_WJ1878176  cat=datasheets  std=  id=datasheets_C347420_DC-DC电源芯片_LM2596S-3.3(UMW)_规格书_WJ1878176
+[21:58:25]       [277] C347423_DC-DC电源芯片_LM2596S-ADJ(UMW)_规格书_WJ1878176  cat=datasheets  std=  id=datasheets_C347423_DC-DC电源芯片_LM2596S-ADJ(UMW)_规格书_WJ1878176
+[21:58:25]       [278] C38437_步进电机驱动芯片_A4988SETTR-T_规格书_步进电机驱动芯片_A4988SETTR-T_英文规格书  cat=datasheets  std=  id=datasheets_C38437_步进电机驱动芯片_A4988SETTR-T_规格书_步进电机驱动芯片_A4988SETTR-T_英文规格书
+[21:58:25]       [279] C41419318_晶体管输出光耦_MTLP521-1GB(SOP)_规格书_晶体管输出光耦_MTLP521-1GB(D  cat=datasheets  std=  id=datasheets_C41419318_晶体管输出光耦_MTLP521-1GB(SOP)_规格书_晶体管输出光耦_MTLP521-1GB(D
+[21:58:25]       [280] C432205_单片机(MCU-MPU-SOC)_STM32G031C8T6_规格书_WJ215307  cat=datasheets  std=  id=datasheets_C432205_单片机(MCU-MPU-SOC)_STM32G031C8T6_规格书_WJ215307
+[21:58:25]       [281] C513144_场效应管(MOSFET)_IRLZ34NPBF_规格书_WJ85474  cat=datasheets  std=  id=datasheets_C513144_场效应管(MOSFET)_IRLZ34NPBF_规格书_WJ85474
+[21:58:25]       [282] C51661_DC-DC电源芯片_XL4015E1_规格书_WJ1570548  cat=datasheets  std=  id=datasheets_C51661_DC-DC电源芯片_XL4015E1_规格书_WJ1570548
+[21:58:25]       [283] C5177_AC-DC控制器和稳压器_UC3843BN_规格书_WJ257069  cat=datasheets  std=  id=datasheets_C5177_AC-DC控制器和稳压器_UC3843BN_规格书_WJ257069
+[21:58:25]       [284] C5252902_运算放大器_LM358_规格书_WJ1176203  cat=datasheets  std=  id=datasheets_C5252902_运算放大器_LM358_规格书_WJ1176203
+[21:58:25]       [285] C54328_单片机(MCU-MPU-SOC)_STM32F429IGT6_规格书_WJ54298  cat=datasheets  std=  id=datasheets_C54328_单片机(MCU-MPU-SOC)_STM32F429IGT6_规格书_WJ54298
+[21:58:25]       [286] C6186_线性稳压器(LDO)_AMS1117-3.3_规格书_WJ27995  cat=datasheets  std=  id=datasheets_C6186_线性稳压器(LDO)_AMS1117-3.3_规格书_WJ27995
+[21:58:25]       [287] C6187_线性稳压器(LDO)_AMS1117-5.0_规格书_WJ27995  cat=datasheets  std=  id=datasheets_C6187_线性稳压器(LDO)_AMS1117-5.0_规格书_WJ27995
+[21:58:25]       [288] C648660_有刷直流电机驱动芯片_BTN7960B_规格书_WJ1759626  cat=datasheets  std=  id=datasheets_C648660_有刷直流电机驱动芯片_BTN7960B_规格书_WJ1759626
+[21:58:25]       [289] C66405_晶体管输出光耦_PC817X2CSP9F_规格书_WJ323798  cat=datasheets  std=  id=datasheets_C66405_晶体管输出光耦_PC817X2CSP9F_规格书_WJ323798
+[21:58:25]       [290] C701341_WIFI模块_ESP32-WROOM-32E-N4_规格书_WJ1389029  cat=datasheets  std=  id=datasheets_C701341_WIFI模块_ESP32-WROOM-32E-N4_规格书_WJ1389029
+[21:58:25]       [291] C726001_姿态传感器-陀螺仪_ICM-20948_规格书_WJ164427  cat=datasheets  std=  id=datasheets_C726001_姿态传感器-陀螺仪_ICM-20948_规格书_WJ164427
+[21:58:25]       [292] C7377_运算放大器_MCP6002T-I-SN_规格书_WJ146586  cat=datasheets  std=  id=datasheets_C7377_运算放大器_MCP6002T-I-SN_规格书_WJ146586
+[21:58:25]       [293] C7501763_温度传感器_MLX90614ESF-BCC-000-TU_规格书_WJ1178313  cat=datasheets  std=  id=datasheets_C7501763_温度传感器_MLX90614ESF-BCC-000-TU_规格书_WJ1178313
+[21:58:25]       [294] C77950_可控硅输出光耦_MOC3063S-TA1_规格书_WJ01745  cat=datasheets  std=  id=datasheets_C77950_可控硅输出光耦_MOC3063S-TA1_规格书_WJ01745
+[21:58:25]       [295] C77967_无线收发芯片_ESP8266EX_规格书_无线收发芯片_ESP8266EX_中文规格书  cat=datasheets  std=  id=datasheets_C77967_无线收发芯片_ESP8266EX_规格书_无线收发芯片_ESP8266EX_中文规格书
+[21:58:25]       [296] C7950_运算放大器_LM358DR2G_规格书_WJ197166  cat=datasheets  std=  id=datasheets_C7950_运算放大器_LM358DR2G_规格书_WJ197166
+[21:58:25]       [297] C83291_压力传感器_BMP280_规格书_压力传感器_BMP280_英文规格书  cat=datasheets  std=  id=datasheets_C83291_压力传感器_BMP280_规格书_压力传感器_BMP280_英文规格书
+[21:58:25]       [298] C84681_USB转换芯片_CH340C_规格书_CH340DS1_CN  cat=datasheets  std=  id=datasheets_C84681_USB转换芯片_CH340C_规格书_CH340DS1_CN
+[21:58:25]       [299] C8734_单片机(MCU-MPU-SOC)_STM32F103C8T6_规格书_WJ115614  cat=datasheets  std=  id=datasheets_C8734_单片机(MCU-MPU-SOC)_STM32F103C8T6_规格书_WJ115614
+[21:58:25]       [300] C8791_无线收发芯片_NRF24L01P-R_规格书_无线收发芯片_NRF24L01P-R_英文规格书  cat=datasheets  std=  id=datasheets_C8791_无线收发芯片_NRF24L01P-R_规格书_无线收发芯片_NRF24L01P-R_英文规格书
+[21:58:25]       [301] C93216_姿态传感器-陀螺仪_BNO055_规格书_WJ250333  cat=datasheets  std=  id=datasheets_C93216_姿态传感器-陀螺仪_BNO055_规格书_WJ250333
+[21:58:25]       [302] CC1101RGPT  cat=datasheets  std=  id=datasheets_CC1101RGPT
+[21:58:25]       [303] DRV8825  cat=datasheets  std=  id=datasheets_DRV8825
+[21:58:25]       [304] LM324  cat=datasheets  std=  id=datasheets_LM324
+[21:58:25]       [305] NXP-TJA1050T  cat=datasheets  std=  id=datasheets_NXP-TJA1050T
+[21:58:25]       [306] ST AN1705  cat=datasheets  std=  id=datasheets_ST AN1705
+[21:58:25]       [307] ST AN4323  cat=datasheets  std=  id=datasheets_ST AN4323
+[21:58:25]       [308] ST UM1722  cat=datasheets  std=  id=datasheets_ST UM1722
+[21:58:25]       [309] TI AN-1286  cat=datasheets  std=  id=datasheets_TI AN-1286
+[21:58:25]       [310] TI AN-263  cat=datasheets  std=  id=datasheets_TI AN-263
+[21:58:25]       [311] TI SLAU723  cat=datasheets  std=  id=datasheets_TI SLAU723
+[21:58:25]       [312] TI SPRABQ6  cat=datasheets  std=  id=datasheets_TI SPRABQ6
+[21:58:25]       [313] TL494  cat=datasheets  std=  id=datasheets_TL494
+[21:58:25]       [314] TPS5430  cat=datasheets  std=  id=datasheets_TPS5430
+[21:58:25]       [315] TPS54331  cat=datasheets  std=  id=datasheets_TPS54331
+[21:58:25]       [316] esp32_technical_reference_manual_cn  cat=datasheets  std=  id=datasheets_esp32_technical_reference_manual_cn
+[21:58:25]     
+[21:58:25]   [PASS] merged KB has ~316 docs
+[21:58:25] 
+============================================================
+[21:58:25] STEP: 18. KB list before cleanup
+[21:58:25] ============================================================
+[21:58:25]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py kb list
+[21:58:26]     Name                      Type         Docs     Chunks     Modified
+[21:58:26]     --------------------------------------------------------------------------------
+[21:58:26]     20260729_013732           production   316      17812      2026-07-29T02:59:01.681214
+[21:58:26]     test_empty                test         1        62         2026-07-29 21:53:08
+[21:58:26]     test_inherited            test         316      19699      2026-07-29 21:58:11
+[21:58:26]     
+[21:58:26]   [PASS] test KBs in list
+[21:58:26] 
+============================================================
+[21:58:26] STEP: 19. Delete test KBs
+[21:58:26] ============================================================
+[21:58:26]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py kb delete /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_empty
+[21:58:27]     
+[21:58:27]     2026-07-29 21:58:27,256 [INFO] KB deleted: /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_empty
+[21:58:28]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py kb delete /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_inherited
+[21:58:29]     
+[21:58:29]     2026-07-29 21:58:29,317 [INFO] KB deleted: /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/test_inherited
+[21:58:30]   [PASS] test KBs deleted
+[21:58:30] 
+============================================================
+[21:58:30] STEP: 20. KB list after cleanup
+[21:58:30] ============================================================
+[21:58:30]   CMD: python /home/nitrazepam/Cosight/deep-cosight/industrial_rag/step7_rag_util.py kb list
+[21:58:31]     Name                      Type         Docs     Chunks     Modified
+[21:58:31]     --------------------------------------------------------------------------------
+[21:58:31]     20260729_013732           production   316      17812      2026-07-29T02:59:01.681214
+[21:58:31]     
+[21:58:31]   [PASS] test KBs gone from list
+[21:58:31] 
+============================================================
+[21:58:31] RESULTS: 22 passed, 0 failed, 22 total
+[21:58:31] LOG: /home/nitrazepam/Cosight/deep-cosight/industrial_kb_data/test_versions/step7_test.log

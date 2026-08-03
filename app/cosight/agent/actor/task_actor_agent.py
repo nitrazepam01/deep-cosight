@@ -44,6 +44,7 @@ from app.cosight.tool.coder_lite_toolkit import CoderLiteToolkit
 from app.cosight.tool.wikipedia_toolkit import WikipediaToolkit
 from app.cosight.tool.google_books_toolkit import GoogleBooksToolkit
 from app.cosight.tool.video_event_toolkit import VideoEventToolkit
+from app.cosight.tool.industrial_knowledge_toolkit import IndustrialKnowledgeToolkit
 from config.config import get_tavily_config
 from app.common.logger_util import logger
 
@@ -107,6 +108,7 @@ class TaskActorAgent(BaseAgent):
         wikipedia_toolkit = WikipediaToolkit()
         google_books_toolkit = GoogleBooksToolkit()
         video_event_toolkit = VideoEventToolkit(workspace_path=self.work_space_path)
+        industrial_kb_toolkit = IndustrialKnowledgeToolkit()
         all_functions = {"mark_step": act_toolkit.mark_step,
                          # "deep_search": deep_search_toolkit.deep_search,
                         #  "search_baidu": search_baidu,
@@ -139,6 +141,16 @@ class TaskActorAgent(BaseAgent):
                               output_filename=output_filename,
                               user_query=self.question
                           ),
+                         "query_industrial_kb": industrial_kb_toolkit.query_industrial_kb,
+                         "list_industrial_files": industrial_kb_toolkit.list_industrial_files,
+                         "add_industrial_file": industrial_kb_toolkit.add_industrial_file,
+                         "delete_industrial_file": industrial_kb_toolkit.delete_industrial_file,
+                         "rebuild_industrial_file": industrial_kb_toolkit.rebuild_industrial_file,
+                         "kb_create": industrial_kb_toolkit.kb_create,
+                         "kb_list": industrial_kb_toolkit.kb_list,
+                         "kb_delete": industrial_kb_toolkit.kb_delete,
+                         "kb_activate": industrial_kb_toolkit.kb_activate,
+                         "kb_merge": industrial_kb_toolkit.kb_merge,
                          "coder_list_files": coder_lite_toolkit.coder_list_files,
                          "coder_read_file": coder_lite_toolkit.coder_read_file,
                          "coder_write_file": coder_lite_toolkit.coder_write_file,

@@ -1,0 +1,9 @@
+{
+  "build_time": "2026-07-29T02:59:01.681214",
+  "total_chunks": 17812,
+  "embedded_chunks": 17812,
+  "embedding_model": "BAAI/bge-m3",
+  "embedding_dim": 1024,
+  "bm25_top_k": 50,
+  "dense_top_k": 50
+}

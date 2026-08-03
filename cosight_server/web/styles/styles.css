@@ -729,6 +729,7 @@ body {
 .settings-content {
     flex: 1;
     padding: 20px 24px;
+    scrollbar-gutter: stable;
     overflow-y: auto;
 }
 
@@ -4021,6 +4022,8 @@ select.settings-input option:checked {
     flex: 1;
     overflow-y: auto;
     padding: 24px 28px;
+    scroll-behavior: smooth;
+    scrollbar-gutter: stable;
 }
 
 .kb-body::-webkit-scrollbar { width: 6px; }
@@ -4145,10 +4148,10 @@ select.settings-input option:checked {
 /* 知识库卡片复选框 - 右上角，类似删除按钮的行为 */
 .kb-card-checkbox {
     position: absolute;
-    top: 14px;
-    right: 14px;
-    width: 28px;
-    height: 28px;
+    top: 12px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
     border-radius: 8px;
     display: flex;
     align-items: center;
@@ -4227,6 +4230,10 @@ select.settings-input option:checked {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    margin-left: -3px;
+    margin-right: 3px;
+    position: relative;
+    top: 1px;
 }
 
 .kb-btn-primary:hover {
@@ -4282,6 +4289,7 @@ select.settings-input option:checked {
     resize: vertical;
     font-family: inherit;
     line-height: 1.5;
+    scrollbar-width: thin;
 }
 
 .kb-textarea:focus {
@@ -4336,19 +4344,7 @@ select.settings-input option:checked {
 /* 知识库卡片 */
 .kb-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-    gap: 14px;
-}
-
-.kb-card {
-    background: #fff;
-    border: 1.5px solid #e8ecf0;
-    border-radius: 14px;
-    padding: 18px 18px 18px 18px;
-    cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    display: flex;
+    grid-template-columns: repeat(2, 1fr);
     gap: 14px;
 }
 
@@ -4386,13 +4382,15 @@ select.settings-input option:checked {
     background: #fff;
     border: 1.5px solid #e8ecf0;
     border-radius: 14px;
-    padding: 18px 18px 18px 18px;
+    padding: 16px 20px 16px 20px;
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 16px;
+    min-height: 115px;
+    max-width: 360px;
 }
 
 .kb-card-name {
@@ -4524,7 +4522,6 @@ select.settings-input option:checked {
     margin-bottom: 12px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
 }
 
@@ -4534,7 +4531,14 @@ select.settings-input option:checked {
     gap: 8px;
 }
 
-.kb-section-title i { color: #10b981; }
+.kb-section-title i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    flex-shrink: 0;
+    color: #10b981;
+}
 
 .kb-section-actions {
     display: flex;
@@ -4624,15 +4628,11 @@ select.settings-input option:checked {
 .kb-query-input { flex: 1; }
 
 .kb-select {
-    padding: 8px 12px;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 10px;
-    font-size: 13px;
-    color: #374151;
-    background: #fff;
-    cursor: pointer;
-    transition: border-color 0.2s;
-    min-width: 100px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    font-size: 14px;
+    color: #333;
 }
 
 .kb-select:focus {
@@ -6022,16 +6022,6 @@ select.settings-input option:checked {
     padding: 4px;
 }
 
-
-
-
-
-
-
-
-
-
-
 .attachment-btn-download,
 .attachment-btn-delete {
     background: none;
@@ -6072,4 +6062,281 @@ select.settings-input option:checked {
 }
 .attachment-dropdown::-webkit-scrollbar-thumb:hover {
     background: #ccc;
+}
+
+/* 表单卡片与上方间距 */
+.kb-create-form {
+    margin-bottom: 16px;
+    margin-top: 20px;
+    padding: 18px 18px 14px 18px;
+    background: #fff;
+    border: 1.5px solid #e8ecf0;
+    border-radius: 14px;
+}
+
+/* 标题与内容间距 */
+.kb-create-form-title {
+    margin-bottom: 16px !important;
+    font-size: 16px;
+}
+
+@keyframes kbSlideUp {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-8px); }
+}
+
+.kb-create-form.hiding {
+    animation: kbSlideUp 0.2s ease forwards;
+}
+
+/* label 放大 + 靠近输入框 */
+.kb-create-label {
+    min-width: 45px;
+    width: 45px;
+    font-size: 14px;
+    color: #555;
+    line-height: 38px;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.kb-create-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.kb-create-row .kb-input {
+    margin-bottom: 0;
+}
+
+/* 继承：tag 容器 + 添加行，参照 cs-model 样式 */
+.kb-inherit-container {
+    background: #12122a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 8px;
+    min-height: 36px;
+    flex: 1;
+}
+.kb-inherit-add-row {
+    display: flex;
+    gap: 8px;
+}
+.kb-inherit-add-row .kb-select {
+    flex: 1;
+}
+.kb-inherit-add-row .kb-btn {
+    flex-shrink: 0;
+}
+.kb-inherit-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #252545;
+    padding: 3px 10px;
+    border-radius: 6px;
+    margin: 2px 4px;
+    font-size: 13px;
+}
+
+/* 上传区域：匹配聊天框样式 */
+.kb-upload-drop {
+    border: 2px dashed #d1d5db;
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.3s, background 0.3s;
+    background: #fafbfc;
+    flex: 1;
+}
+.kb-upload-drop.drag-over {
+    border-color: #667eea !important;
+    background: rgba(102, 126, 234, 0.08) !important;
+}
+.kb-upload-drop-text i {
+    font-size: 28px;
+    color: #aaa;
+}
+.kb-upload-drop-text p {
+    margin: 8px 0;
+    color: #999;
+    font-size: 13px;
+}
+
+/* 文件列表项 */
+.kb-file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: #252545;
+    border-radius: 6px;
+    margin: 4px 0;
+    font-size: 13px;
+}
+.kb-file-item .btn-delete-thread {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #f44;
+    cursor: pointer;
+    padding: 2px 6px;
+}
+
+.kb-inherit-box {
+    flex: 1;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #fafafa;
+}
+
+.kb-create-row-inherit {
+    align-items: center !important;
+}
+
+/* tags 容器 */
+#kb-inherit-tags {
+    min-height: 45px;
+    max-height: none;
+    overflow-y: visible;
+}
+
+#kb-inherit-tags.cs-model-tags-container {
+    margin-bottom: 0;
+}
+
+#kb-inherit-tags:empty::before {
+    content: "添加并继承旧知识库";
+    color: #aaa;
+    font-size: 14px;
+    padding-top: 3px;
+    padding-left: 6px;
+}
+
+.kb-inherit-box .cs-model-add-btn {
+    background: #42a5f5 !important;
+    color: #fff !important;
+    box-shadow: none !important;
+    border: 1px solid #1e88e5 !important;
+}
+.kb-inherit-box .cs-model-add-btn i,
+.kb-inherit-box .cs-model-add-btn .fas {
+    color: #fff !important;
+}
+.kb-inherit-box .cs-model-add-btn:hover {
+    background: #1e88e5 !important;
+}
+
+/* 文件行 */
+.kb-create-row-file {
+    align-items: flex-start !important;
+}
+
+/* upload 区域 */
+.kb-upload-drop {
+    border: 2px dashed #d1d5db;
+    border-radius: 10px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.3s, background 0.3s;
+    background: #fafbfc;
+    flex: 1;
+}
+
+.kb-upload-drop.drag-over {
+    border-color: #667eea !important;
+    background: rgba(102, 126, 234, 0.08) !important;
+}
+
+.kb-upload-drop-text i {
+    font-size: 28px;
+    color: #aaa;
+}
+
+.kb-upload-drop-text p {
+    margin: 8px 0;
+    color: #999;
+    font-size: 13px;
+}
+
+/* 文件选择器与 upload 的间距 */
+#kb-file-selector {
+    margin-bottom: 8px;
+}
+
+/* 下拉项间距微调 */
+#kb-file-selector .custom-select-option {
+    padding: 6px 12px;
+}
+#kb-file-selector .custom-select-checkbox {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    margin-left: auto;
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+    order: 2;
+}
+#kb-file-selector .custom-select-checkbox:hover {
+    background: #fee2e2;
+}
+#kb-file-selector .custom-select-checkbox i {
+    display: none;
+}
+#kb-file-selector .custom-select-checkbox::before {
+    content: "\f00d";
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    font-size: 14px;
+    color: #ef4444;
+}
+#kb-file-selector .custom-select-checkbox.checked::before {
+    color: #dc2626;
+}
+#kb-file-selector .custom-select-option-label {
+    order: 1;
+    flex: 1;
+}
+
+/* 下拉展开动画 */
+.custom-select-wrapper.open .custom-select-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.custom-select-wrapper.open .custom-select-arrow {
+    transform: rotate(180deg);
+}
+
+.kb-query-row {
+    margin-bottom: 8px;
+}
+
+.kb-file-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    padding: 8px 4px;
+}
+
+.kb-file-preview-grid .file-preview-item {
+    width: 225px;
 }

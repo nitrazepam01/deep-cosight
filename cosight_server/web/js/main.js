@@ -193,7 +193,7 @@ function renderTaskDetailOverview() {
     detailEl.innerHTML = `
         <div class="task-detail-title">${focusTitle}</div>
         <div class="task-detail-meta">状态：${escapeHtml(focusStatus)} | 进度：${completed}/${total}</div>
-        <div class="task-detail-meta">已完成 ${completed} / 进行中 ${inProgress} / 阻塞 ${blocked} / 未开始 ${notStarted}</div>
+        <div class="task-detail-meta">已完成 ${completed} / 进行中 ${inProgress} / 被阻塞 ${blocked} / 未开始 ${notStarted}</div>
         <div class="task-detail-notes">${notes}</div>
     `;
 }
