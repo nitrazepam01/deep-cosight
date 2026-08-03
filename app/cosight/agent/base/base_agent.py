@@ -431,6 +431,11 @@ class BaseAgent:
             "youtobe_tool": "YouTube工具",
             "image_search": "图片搜索",
             "audio_recognition": "音频识别",
+
+            # 知识库工具
+            "query_industrial_kb": "工业知识库查询",
+            "list_industrial_files": "列出工业知识库文件",
+            "list_activated_kbs": "列出已激活的知识库",
             
             # 文件操作类工具
             "file_saver": "保存文件",
