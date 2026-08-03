@@ -349,8 +349,8 @@ let KnowledgeService = (function () {
         return `
             <div class="kb-detail">
                 <div class="kb-detail-info">
-                    <div class="kb-detail-icon" style="${_isBuilding ? 'background:linear-gradient(135deg,#fffbeb,#fef3c7)' : ''}">
-                        <i class="fas fa-database" style="${_isBuilding ? 'color:#f59e0b' : ''}"></i></div>
+                    <div class="kb-detail-icon" style="${_isBuilding && _buildingKbId === kb.id ? 'background:linear-gradient(135deg,#fffbeb,#fef3c7)' : ''}">
+                        <i class="fas fa-database" style="${_isBuilding && _buildingKbId === kb.id ? 'color:#f59e0b' : ''}"></i></div>
                     <div class="kb-detail-info-content">
                         <h3>${escapeHtml(kb.name)}</h3>
                         <p class="kb-detail-desc">${escapeHtml(kb.description || '暂无描述')}</p>
@@ -430,6 +430,12 @@ let KnowledgeService = (function () {
     /* ========== 详情页数据加载 ========== */
     async function loadDetailData() {
         if (!_currentKbId) return;
+        const isThisKbBuilding = _isBuilding && _buildingKbId === _currentKbId;
+        if (isThisKbBuilding && _savedDocuments && _savedDocuments.length) {
+            _detailDocuments = _savedDocuments;
+            renderPipelineSection();
+            renderDocumentsSection();
+        }
         try {
             // 并行加载文档、管线、健康状态
             const [docData, pipeData] = await Promise.all([
@@ -526,7 +532,8 @@ let KnowledgeService = (function () {
         const add = (_buildingAction === 'add') ? (_buildingCount || 0) : 0;
         const del = (_buildingAction === 'delete') ? (_buildingCount || 0) : 0;
 
-        if (_isBuilding) {
+        const isThisKbBuilding = _isBuilding && _buildingKbId === _currentKbId;
+        if (isThisKbBuilding) {
             el.innerHTML = `<div class="kb-pipeline-idle"><div class="kb-pipeline-stats-row">
                 <div class="kb-stat-card"><span class="kb-stat-num">${baseTotal + add}</span><span class="kb-stat-label">总计</span></div>
                 <div class="kb-stat-card kb-stat-success"><span class="kb-stat-num">${baseTotal - del}</span><span class="kb-stat-label">已完成</span></div>
@@ -899,13 +906,13 @@ let KnowledgeService = (function () {
 
     async function executePendingDeletes() {
         if (_pendingDeleteDocs.size === 0) return;
-        lockKBUI('delete', _pendingDeleteDocs.size);
-        const cnt = _pendingDeleteDocs.size;
+        const ids = [..._pendingDeleteDocs.keys()];
+        lockKBUI('delete', ids.length);
         _pendingDeleteDocs.clear();
         renderPendingDeleteTags();
-        showToast(`${cnt} 个文件已提交删除，后台处理中...`, 'success');
-        const deletes = [...Array(cnt)].map((_, i) =>
-            fetch(`${API_BASE}/deep-research/kb/${encodeURIComponent(_currentKbId)}/documents/x`, { method: 'DELETE' })
+        showToast(`${ids.length} 个文件已提交删除，后台处理中...`, 'success');
+        const deletes = ids.map(docId =>
+            fetch(`${API_BASE}/deep-research/kb/${encodeURIComponent(_currentKbId)}/documents/${encodeURIComponent(docId)}`, { method: 'DELETE' })
         );
         Promise.all(deletes).finally(() => unlockKBUI());
     }

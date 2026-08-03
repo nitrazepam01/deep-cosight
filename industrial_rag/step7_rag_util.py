@@ -766,9 +766,9 @@ def file_delete(doc_id, kb_dir):
     log.info(f"[DELETE] {doc_id}")
 
     # Remove chunks
-    chunks = [json.loads(l) for l in open(chunk_path, "r", encoding="utf-8") if l.strip()]
-    n_removed = sum(1 for c in chunks if c["doc_id"] == doc_id)
-    chunks = [c for c in chunks if c["doc_id"] != doc_id]
+    chunks_old = [json.loads(l) for l in open(chunk_path, "r", encoding="utf-8") if l.strip()]
+    n_removed = sum(1 for c in chunks_old if c["doc_id"] == doc_id)
+    chunks = [c for c in chunks_old if c["doc_id"] != doc_id]
     log.info(f"  Removing {n_removed} chunks, {len(chunks)} remaining")
 
     # Rewrite files
@@ -778,6 +778,20 @@ def file_delete(doc_id, kb_dir):
     with open(chunk_path, "w", encoding="utf-8") as f:
         for c in chunks:
             f.write(json.dumps(c, ensure_ascii=False) + "\n")
+
+    # 清理关联的向量
+    removed_cids = {c["chunk_id"] for c in chunks_old if c["doc_id"] == doc_id}
+    if removed_cids:
+        vp = os.path.join(kb_dir, "embeddings.f16.npy")
+        ip = os.path.join(kb_dir, "vector_ids.i64.npy")
+        if os.path.exists(vp) and os.path.getsize(vp) > 128:
+            vecs = np.load(vp)
+            ids = np.load(ip)
+            mask = np.array([i not in removed_cids for i in ids])
+            if not mask.all():
+                log.info(f"  Cleaning {sum(~mask)} vectors")
+                with open(vp, 'wb') as f: np.save(f, vecs[mask])
+                with open(ip, 'wb') as f: np.save(f, ids[mask])
 
     # Rebuild BM25
     _rebuild_bm25(chunks, kb_dir)  # chunks = remaining chunks after deletion

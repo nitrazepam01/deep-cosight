@@ -19,8 +19,9 @@ but backed by industrial_rag (step6 query + step7 CRUD).
 Response format maintained for backward compat with knowledge.js.
 """
 
-import os, sys, json, io, shutil, time, numpy as np
+import os, sys, json, io, asyncio, time, numpy as np
 from fastapi import APIRouter, UploadFile, File, Body, HTTPException
+from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
 from app.common.logger_util import logger
@@ -30,6 +31,7 @@ if _PROJ not in sys.path:
     sys.path.insert(0, _PROJ)
 
 knowledgeBaseRouter = APIRouter()
+_build_executor = ThreadPoolExecutor(max_workers=4)
 
 VERSIONS_DIR = os.path.join(_PROJ, "industrial_kb_data", "versions")
 TEST_DIR = os.path.join(_PROJ, "industrial_kb_data", "test_versions")
@@ -133,7 +135,8 @@ async def kb_create(payload: dict = Body(...)):
     try:
         if base:
             base = _kb_dir(base)
-        _capture(lambda: _create(name, base_kb=base))
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(_build_executor, _capture, lambda: _create(name, base_kb=base))
         # Save to meta
         meta = _load_meta()
         meta[name] = {"name": name, "description": desc, "created": time.strftime("%Y-%m-%d %H:%M:%S")}
@@ -166,7 +169,8 @@ async def kb_merge(payload: dict = Body(...)):
     dst = _kb_dir(payload.get("dst", ""))
     if not src or not dst:
         raise HTTPException(404, "KB not found")
-    _capture(lambda: _merge(src, dst))
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(_build_executor, _capture, lambda: _merge(src, dst))
     return {"code": 0, "msg": "ok"}
 
 
@@ -177,52 +181,53 @@ async def kb_merge(payload: dict = Body(...)):
 @knowledgeBaseRouter.get("/deep-research/kb/{kb_id}/documents")
 async def kb_list_documents(kb_id: str):
     d = _kb_dir(kb_id)
-    if not d: raise HTTPException(404)
+    if not d:
+        raise HTTPException(404)
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _do_list_documents, d)
 
+
+def _do_list_documents(d):
     doc_path = os.path.join(d, "documents.jsonl")
     chunk_path = os.path.join(d, "chunks.jsonl")
     vec_path = os.path.join(d, "vector_ids.i64.npy")
 
     docs = []
+    doc_map = {}
     if os.path.exists(doc_path):
         for l in open(doc_path, "r", encoding="utf-8"):
             try:
                 doc = json.loads(l)
                 src = doc.get("source_path", "")
-                raw_name = (os.path.basename(src) if src else doc.get("title", ""))
-                name = doc.get("original_name") or raw_name.replace("_fix.md", ".pdf").replace(".md", ".pdf")
-                docs.append({"id": doc["doc_id"], "name": name, "category": doc.get("category", ""), "chunks": 0, "vectors": 0})
+                name = doc.get("original_name") or (os.path.basename(src) if src else doc.get("title", ""))
+                if name.endswith("_fix.md"):
+                    name = name.replace("_fix.md", ".pdf")
+                elif name.endswith(".md") and not name.endswith(".pdf"):
+                    name = name.replace(".md", ".pdf")
+                d2 = {"id": doc["doc_id"], "name": name, "category": doc.get("category", ""), "chunks": 0, "vectors": 0}
+                docs.append(d2)
+                doc_map[doc["doc_id"]] = d2
             except:
                 pass
 
-    # Count chunks per doc
+    chunk_to_doc = {}
     if os.path.exists(chunk_path):
         for l in open(chunk_path, "r", encoding="utf-8"):
             try:
                 ck = json.loads(l)
                 did = ck.get("doc_id", "")
-                for doc in docs:
-                    if doc["id"] == did:
-                        doc["chunks"] += 1
+                chunk_to_doc[ck["chunk_id"]] = did
+                if did in doc_map:
+                    doc_map[did]["chunks"] += 1
             except:
                 pass
 
-    # Count vectors per doc
     if os.path.exists(vec_path) and docs:
         vec_ids = np.load(vec_path)
-        chunk_to_doc = {}
-        if os.path.exists(chunk_path):
-            for l in open(chunk_path, "r", encoding="utf-8"):
-                try:
-                    ck = json.loads(l)
-                    chunk_to_doc[ck["chunk_id"]] = ck.get("doc_id", "")
-                except:
-                    pass
         for vid in vec_ids:
             did = chunk_to_doc.get(int(vid), "")
-            for doc in docs:
-                if doc["id"] == did:
-                    doc["vectors"] += 1
+            if did in doc_map:
+                doc_map[did]["vectors"] += 1
 
     return {"code": 0, "data": docs}
 
@@ -240,8 +245,10 @@ async def kb_upload_document(kb_id: str, files: List[UploadFile] = File(...)):
         tmp_path = os.path.join(upload_dir, file.filename)
         try:
             contents = await file.read()
-            with open(tmp_path, "wb") as f: f.write(contents)
-            _capture(lambda: file_add(tmp_path, d))
+            with open(tmp_path, "wb") as f:
+                f.write(contents)
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(_build_executor, _capture, lambda: file_add(tmp_path, d))
             results.append({"file": file.filename, "status": "ok"})
         except Exception as e:
             results.append({"file": file.filename, "status": str(e)})
@@ -257,8 +264,10 @@ async def kb_delete_document(kb_id: str, doc_id: str):
     d = _kb_dir(kb_id)
     if not d:
         raise HTTPException(404)
-    _capture(lambda: file_delete(doc_id, d))
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(_build_executor, _capture, lambda: file_delete(doc_id, d))
     return {"code": 0}
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Query
