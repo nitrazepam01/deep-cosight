@@ -4,7 +4,7 @@ import os, fitz, time
 from collections import defaultdict
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent / "external"
+ROOT = Path(__file__).resolve().parent
 assert ROOT.exists(), f"external/ not found at {ROOT}"
 
 def classify_and_pages(fp):

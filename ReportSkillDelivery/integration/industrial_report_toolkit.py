@@ -36,8 +36,8 @@ def _skill_root(workspace: Path) -> Path:
         candidates.append(Path(configured))
     repo_root = Path(__file__).resolve().parents[3]
     candidates.extend([
-        workspace / "report_output_skill_delivery" / "skill" / SKILL_DIR_NAME,
-        repo_root / "report_output_skill_delivery" / "skill" / SKILL_DIR_NAME,
+        workspace / "ReportSkillDelivery" / "skill" / SKILL_DIR_NAME,
+        repo_root / "ReportSkillDelivery" / "skill" / SKILL_DIR_NAME,
         repo_root / "skills" / SKILL_DIR_NAME,
         repo_root / SKILL_DIR_NAME,
     ])
