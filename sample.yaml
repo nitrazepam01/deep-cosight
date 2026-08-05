@@ -1,0 +1,44 @@
+# Co-Sight 示例工作流配置 — 汽车悬架系统建模与参数优化
+
+task_name: 中型轿车被动悬架系统阻尼参数优化设计
+
+description: >
+  新能源汽车在山区道路或连续起伏路面上行驶时，
+  车身会同时面对振动舒适性和姿态稳定性两方面压力。
+  若悬架过软，车身容易出现明显起伏和晃动；
+  若悬架过硬，则高频激励会更直接地传递到车身，乘坐舒适性下降。
+  请在以上背景下，设计一款中型轿车的悬架系统阻尼参数。
+
+plant:
+  sprung_mass_ms:    { value: 375, unit: kg }
+  unsprung_mass_mu:  { value: 40,  unit: kg }
+  spring_stiffness_ks:  { value: null, unit: N/m,   range: [15000, 60000] }
+  tire_stiffness_kt:    { value: 210000, unit: N/m }
+  damper_coefficient_cs: { value: null, unit: N*s/m, range: [800, 4000] }
+
+requirements:
+  - metric: 车身加速度 RMS
+    target: 不大于 1.5 m/s^2
+  - metric: 车轮动载荷 RMS
+    target: 不大于 1500 N
+  - metric: 悬架动挠度 RMS
+    target: 不大于 0.04 m
+  - metric: 总成本 (cost = 0.05*ks + 0.1*cs)
+    target: 不大于 1500 元
+
+excitation:
+  type: ISO 8608 B 级路面
+  speed: 60 km/h
+
+deliverables:
+  - task.json
+  - plant_model.json
+  - controller_candidates.json
+  - metrics.json
+  - compliance_matrix.json
+  - evidence_ledger.json
+  - 技术方案报告 (HTML/PDF)
+
+safety:
+  offline_only: true
+  max_iterations: 5
