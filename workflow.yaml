@@ -1,0 +1,76 @@
+# Co-Sight 工业控制设计智能体 - 示例工作流配置
+# 用法：在 Co-Sight Web UI 中上传本文件，或通过 API 传入
+# 案例：中型轿车被动悬架系统阻尼参数优化
+
+task_name: passive-suspension-damper-optimization
+description: 中型轿车四分之一车被动悬架阻尼参数优化设计
+
+plant:
+  representation: state_space
+  description: Quarter-car vehicle suspension model (2-DOF)
+  parameters:
+    sprung_mass_ms:     { value: 375, unit: kg }
+    unsprung_mass_mu:   { value: 40,  unit: kg }
+    spring_stiffness_ks:  { value: null, unit: N/m,  range: [15000, 60000], note: to be optimized }
+    tire_stiffness_kt:    { value: 210000, unit: N/m }
+    damper_coefficient_cs: { value: null, unit: N*s/m, range: [800, 4000], note: to be optimized }
+  states:  [zs-zu, zs_dot, zu-zr, zu_dot]
+  inputs:  [road_velocity]
+  outputs: [suspension_deflection, body_acceleration, tire_deformation]
+
+feedback: open_loop_passive
+
+requirements:
+  - metric:   sprung_mass_acceleration_RMS
+    operator: <=
+    target:   1.5
+    unit:     m/s^2
+    priority: critical
+    standard: ISO 2631-1:1997 Table B.1
+
+  - metric:   dynamic_tire_load_RMS
+    operator: <=
+    target:   1500
+    unit:     N
+    priority: hard
+    standard: SAE J670e (114% of static load margin)
+
+  - metric:   suspension_deflection_RMS
+    operator: <=
+    target:   0.04
+    unit:     m
+    priority: hard
+    standard: midsize sedan typical stroke 80-100mm
+
+  - metric:   total_cost
+    operator: <=
+    target:   1500
+    unit:     CNY
+    priority: hard
+    note:     cost = 0.05*ks + 0.1*cs
+
+excitation:
+  type:            road_roughness_ISO_8608
+  class:           B
+  vehicle_speed_ms: 16.67
+  note:            60 km/h
+
+safety:
+  max_rollback_iterations: 5
+  offline_only: true
+  requires_human_review:
+    - model_change
+    - constraint_relaxation
+    - unconverged
+    - external_file_execution
+  safety_statement: 本智能体仅进行离线设计与仿真验证，不向PLC、DCS或现场执行设备下发控制指令。
+
+deliverables:
+  - task.yaml
+  - plant_model.json
+  - controller_candidates.json
+  - metrics.json
+  - compliance_matrix.json
+  - evidence_ledger.json
+  - report.html
+  - report.pdf
